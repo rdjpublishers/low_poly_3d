@@ -29,13 +29,20 @@
  * streams the response (including SSE streaming bodies) straight back
  * to the browser with CORS headers attached.
  *
- * SAFETY: OPEN-PROXY GUARD
- * Because this endpoint will relay a request anywhere the caller points
- * it, X-Target-Url is checked against an allowlist of known AI API
- * hosts below so this can't be abused as a generic anonymous HTTP
- * relay. Add a host here if you want to point the panel at another
- * OpenAI-compatible provider (Azure OpenAI, a self-hosted vLLM/Ollama
- * box, etc).
+ * SAFETY: HTTPS + PRIVATE-NETWORK GUARD
+ * This endpoint will relay a request to any HTTPS host the caller
+ * points it at (no allowlist) — that's what "allow any service" means
+ * in practice, so any AI provider works without editing this file. The
+ * one thing still blocked is a target that resolves to a private/
+ * loopback/link-local address, since a public relay that could reach
+ * your own internal network is a real risk even when everything else
+ * is open. Note this is still an OPEN PROXY to the public internet:
+ * anyone who learns this endpoint's URL can use it to make HTTPS
+ * requests that appear to come from your Vercel project (and consume
+ * your function-invocation quota). That's an acceptable trade for a
+ * personal tool whose URL you don't publish; if you ever want to close
+ * that off, add back a small ALLOWED_HOSTS allowlist, or gate this
+ * endpoint behind a shared secret header checked here.
  *
  * DEPLOY — see the README in this same folder for step-by-step Vercel
  * setup (CLI or GitHub-import, either works).
@@ -43,20 +50,27 @@
 
 export const config = { runtime: 'edge' };
 
-const ALLOWED_HOSTS = [
-  'api.openai.com',
-  'api.anthropic.com',
-  'generativelanguage.googleapis.com',
-  'api.x.ai',
-  'openrouter.ai',
-  'api.groq.com',
-  'api.together.xyz',
-  'api.mistral.ai',
-  'api.deepseek.com',
-  // Add your own OpenAI-compatible host here, e.g. an Azure OpenAI
-  // resource or a self-hosted vLLM/Ollama endpoint you control:
-  // 'your-resource.openai.azure.com',
-];
+// Blocks a target host that resolves to a private/loopback/link-local
+// address, so an otherwise-open proxy can't be used to reach into your
+// own internal network. This is a hostname-pattern check, not a real
+// DNS-resolution check (Edge runtime has no DNS module) — it catches
+// the direct, obvious cases (literal IPs, localhost, .local) but not a
+// public hostname that's been set up to resolve to a private address.
+function isPrivateHost(hostname) {
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.local')) return true;
+  const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number);
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 169 && b === 254) return true; // link-local
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    return false;
+  }
+  if (h === '::1' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd')) return true;
+  return false;
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -95,9 +109,9 @@ export default async function handler(request) {
   if (parsed.protocol !== 'https:') {
     return new Response('X-Target-Url must be https.', { status: 400, headers: CORS_HEADERS });
   }
-  if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
+  if (isPrivateHost(parsed.hostname)) {
     return new Response(
-      `Host "${parsed.hostname}" is not in this proxy's allowlist. Add it to ALLOWED_HOSTS in api/proxy.js and redeploy.`,
+      `Host "${parsed.hostname}" looks like a private/internal address and is blocked.`,
       { status: 403, headers: CORS_HEADERS }
     );
   }
