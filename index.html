@@ -963,8 +963,11 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="stl-btn" title="Export STL — runs a manifold/printability check first">STL</button>
   <button class="tbtn primary" id="glb-btn">Export GLB</button>
 </div>
-<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts" style="display:none"/>
+<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx" style="display:none"/>
 <input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz" style="display:none"/>
+<!-- 3D-model uploads intentionally keep their own format list — .jsx/.tsx are
+     source code for the LBL TS factory pipeline (#file-input above), not
+     importable 3D model formats, so they don't belong on this input. -->
 
 <!-- NAV MENU (hamburger) -->
 <div id="nav-overlay"></div>
@@ -1045,7 +1048,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="dropzone">
-        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,image/*"/>
+        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx,image/*"/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Drop JSON here</div>
         <div class="dz-sub">or click to browse · drop an image onto a selected part to texture it</div>
@@ -1261,7 +1264,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="mob-dropzone" class="dropzone-box">
-        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" class="dropzone-input"/>
+        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx,image/*" class="dropzone-input"/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Tap to browse JSON</div>
       </div>
@@ -9166,7 +9169,7 @@ function insertPartIntoScene(name){
   // it, the fallback just below would silently fabricate a fresh
   // CURRENT_BLUEPRINT and buildScene() it, which would drop the .ts
   // model's Group and replace it with a single kitbashed part.
-  if(CURRENT_TS_MODEL){ toast('Parts library only works with JSON/JS blueprints — this scene was loaded from a .ts file','err'); return; }
+  if(CURRENT_TS_MODEL){ toast('Parts library only works with JSON/JS blueprints — this scene was loaded from a TS/TSX/JSX factory file','err'); return; }
   if(!CURRENT_BLUEPRINT) CURRENT_BLUEPRINT = { objects: [] };
   if(!Array.isArray(CURRENT_BLUEPRINT.objects)) CURRENT_BLUEPRINT.objects = [];
   const id = name.replace(/[^a-z0-9_]/gi,'_') + '_' + Math.random().toString(36).slice(2,7);
@@ -10827,17 +10830,30 @@ function runJsBlueprint(code){
 // validateAndBuild() was already called with as its second argument — a
 // real filename when loaded from disk/drag-drop ("shotgun.ts"), or a
 // sentinel ("demo"/"editor") otherwise. Both are safe to test for a
-// .ts/.mts/.cts suffix since the sentinels never end that way; a TS file
-// pasted into the textarea (no filename at all) still gets caught by the
-// import/export + THREE heuristic.
+// .ts/.mts/.cts/.tsx/.jsx suffix since the sentinels never end that way; a
+// TS/TSX file pasted into the textarea (no filename at all) still gets
+// caught by the import/export + THREE heuristic. .jsx/.tsx route through
+// the exact same "ts" pipeline as .ts/.mts/.cts — runTsBlueprint() (below)
+// is the one that decides, per-file, whether to additionally turn on JSX
+// parsing, based on this same extension check plus a diagnostics-driven
+// fallback for pasted/extensionless scripts.
 function detectInputFormat(text, sourceOrFilename){
   const name=(sourceOrFilename||'').toLowerCase();
-  if(/\.(ts|mts|cts)$/.test(name)) return 'ts';
+  if(/\.(ts|mts|cts|tsx|jsx)$/.test(name)) return 'ts';
   if(typeof text!=='string') return 'json'; // already-parsed object (e.g. a demo entry) is always a blueprint
   const trimmed=text.trim();
   if(/^(import|export)\s/.test(trimmed) && /THREE/.test(trimmed.slice(0,400))) return 'ts';
   if(trimmed.startsWith('{')||trimmed.startsWith('[')) return 'json';
   return 'js';
+}
+
+// Is `filename` a JSX-flavored source file (.jsx/.tsx)? Shared by
+// runTsBlueprint (to decide whether to turn on the TS compiler's JSX
+// transform) and the "Save source" button (to pick the right download
+// extension/mime type for a file that was never loaded from disk to begin
+// with — e.g. something pasted into the editor panel).
+function isJsxFilename(name){
+  return /\.(tsx|jsx)$/i.test((name||''));
 }
 
 // Lazily loads the TypeScript compiler from esm.sh and caches it — it's a
@@ -10885,7 +10901,7 @@ function pickTsFactory(mod, filename){
     return {fn:factories[0][1], name:factories[0][0]};
   }
   if(typeof mod.default==='function') return {fn:mod.default, name:'default'};
-  throw new Error(`No create*Model() export found in ${filename||'the pasted script'}. The .ts file must export a factory named createXxxModel(options): THREE.Group — see Prompt_To_Ts.txt PART 1 (OUTPUT CONTRACT).`);
+  throw new Error(`No create*Model() export found in ${filename||'the pasted script'}. The .ts/.mts/.cts/.tsx/.jsx file must export a factory named createXxxModel(options): THREE.Group — see Prompt_To_Ts.txt PART 1 (OUTPUT CONTRACT).`);
 }
 
 // Optional second export (Prompt_To_Ts.txt PART 1.3): a look-dev lights
@@ -10915,32 +10931,45 @@ function pickTsLookDevLights(mod, factoryName){
 async function runTsBlueprint(text, filename){
   const ts=await getTsCompiler();
 
-  let jsSrc;
-  try{
-    const out=ts.transpileModule(text,{
+  // JSX support: a .jsx/.tsx filename turns the compiler's JSX transform on
+  // up front. A pasted/extensionless script (editor panel, drag-drop with
+  // no name) gets one retry with JSX turned on ONLY if the first, JSX-off
+  // compile fails with a JSX-specific diagnostic (TS1005/TS1109-style "<"
+  // parse errors, or TS17004 "Cannot use JSX unless the '--jsx' flag is
+  // provided") — so plain .ts/.js/.mts/.cts files (the overwhelming common
+  // case) never pay for or risk a second compile pass.
+  let wantJsx=isJsxFilename(filename);
+
+  function tryCompile(withJsx){
+    return ts.transpileModule(text,{
       compilerOptions:{
         target: ts.ScriptTarget.ES2020,
         module: ts.ModuleKind.ESNext,
         esModuleInterop: true,
-        // "jsx" intentionally left unset (not JsxEmit.None): transpileModule's
-        // --jsx argument validator only accepts preserve/react/react-native/
-        // react-jsx/react-jsxdev, so passing the numeric JsxEmit.None (0)
-        // makes it report diagnostic TS6046 ("Argument for '--jsx' option
-        // must be: ...") — not a position-anchored syntax error, a
-        // file-less one — which the reportDiagnostics handling just below
-        // would then throw as a wildly misleading "TypeScript syntax
-        // error" on every single .ts file, regardless of the user's code.
-        // (Verified directly against typescript@5.5: confirmed via
-        // out.diagnostics, not a thrown exception from transpileModule
-        // itself — the effect on this function is identical either way.)
-        // Leaving the key out is behaviorally identical here — input is
-        // always .ts, never .tsx, so JSX syntax is already never parsed —
-        // and it satisfies PART 2 of the spec ("no JSX, ever") without
-        // tripping the validator.
+        // See withJsx: transpileModule's --jsx validator only accepts
+        // preserve/react/react-native/react-jsx/react-jsxdev, so the flag
+        // is either left OUT entirely (JsxEmit.None (0) reports diagnostic
+        // TS6046, a file-less diagnostic that reportDiagnostics below would
+        // misreport as a "TypeScript syntax error" on every plain .ts file)
+        // or set to JsxEmit.React when JSX support is actually wanted.
+        ...(withJsx ? {jsx: ts.JsxEmit.React} : {}),
         isolatedModules: true,
       },
       reportDiagnostics: true,
     });
+  }
+
+  let jsSrc;
+  try{
+    let out=tryCompile(wantJsx);
+    if(!wantJsx && out.diagnostics && out.diagnostics.length){
+      const d0=out.diagnostics[0];
+      const msg0=ts.flattenDiagnosticMessageText(d0.messageText, ' ');
+      if(d0.code===17004 || /\bJSX\b/.test(msg0)){
+        wantJsx=true;
+        out=tryCompile(true);
+      }
+    }
     if(out.diagnostics && out.diagnostics.length){
       const d=out.diagnostics[0];
       const msg=ts.flattenDiagnosticMessageText(d.messageText, ' ');
@@ -10955,7 +10984,22 @@ async function runTsBlueprint(text, filename){
     throw /^TypeScript syntax error/.test(e.message) ? e : new Error(`TypeScript syntax error: ${e.message}`);
   }
 
-  const resolvedSrc=rewriteImportsForRuntime(jsSrc);
+  // The compiled JSX transform (when wantJsx is true) emits bare
+  // `React.createElement(...)` calls, but this app builds a THREE.Object3D
+  // imperatively — it has no React renderer to turn elements into meshes.
+  // Rather than let those calls fail with a cryptic "React is not defined",
+  // inject a tiny stand-in that fails LOUD and CLEAR the moment (if ever)
+  // JSX is actually evaluated, pointing the author back at the real
+  // contract (factory must return a THREE.Object3D built with `new
+  // THREE.Mesh(...)` etc., not JSX/React elements).
+  const reactShim = wantJsx
+    ? `const React={createElement:function(type){throw new Error('This file uses JSX ('+
+        (typeof type==="string"?"<"+type+">":(type&&type.name)||"<Component>")+
+        '), but Low Poly 3D only understands plain THREE.js code — JSX elements are never rendered to 3D. '+
+        'The factory must build and return a THREE.Object3D directly (new THREE.Mesh(...), group.add(...), etc.), not JSX.');}};\n`
+    : '';
+
+  const resolvedSrc=reactShim+rewriteImportsForRuntime(jsSrc);
   const blob=new Blob([resolvedSrc],{type:'text/javascript'});
   const url=URL.createObjectURL(blob);
   let mod;
@@ -11040,6 +11084,10 @@ let CURRENT_TS_LIGHTS=null; // optional look-dev lights Group (PART 1.3), parent
 function updateFormatChip(fmt){
   const chip=document.getElementById('format-chip');
   if(!chip) return;
+  // detectInputFormat() folds .ts/.mts/.cts/.tsx/.jsx all into the single
+  // 'ts' bucket (they share one pipeline — see runTsBlueprint()), so the
+  // chip stays a general "Format: TS" for all five rather than growing a
+  // label per extension.
   const labels={json:'Format: JSON', js:'Format: JS', ts:'Format: TS'};
   chip.textContent=labels[fmt] || 'Format: —';
   chip.classList.toggle('format-ts', fmt==='ts');
@@ -14013,13 +14061,19 @@ function exportGLB(){
   if(!sceneObjects.length && !CURRENT_TS_MODEL){toast('No scene to export','err');return;}
   const exp=new GLTFExporter();
   let exportRoot=sceneGroup;
+  // CURRENT_TS_MODEL is populated the same way regardless of which of the
+  // five LBL source formats built it (.ts/.mts/.cts/.tsx/.jsx all funnel
+  // through runTsBlueprint()+addTsModelToScene() — see detectInputFormat()
+  // above), so this branch already covers .jsx/.tsx factories with no
+  // changes needed to the check itself: they're a real THREE.Object3D by
+  // the time exportGLB() ever sees them, indistinguishable from a .ts one.
   if(CURRENT_TS_MODEL && meshMap.size===0){
     // TS-loaded models never populate meshMap (that's a blueprint-only
     // data structure), so buildSkinnedHierarchyForExport/
     // buildPlainHierarchyForExport would silently build an EMPTY export
     // tree here (no error — GLTFExporter happily exports a group with no
     // meshes in it, which is exactly why the exported .glb "loads" in a
-    // viewer but shows nothing). Export the actual TS model directly.
+    // viewer but shows nothing). Export the actual TS/TSX/JSX model directly.
     exportRoot=CURRENT_TS_MODEL.clone(true);
   } else {
     try{
@@ -14030,10 +14084,17 @@ function exportGLB(){
       catch(e2){ console.warn('hierarchy export failed, exporting flat instead:',e2); exportRoot=sceneGroup; }
     }
   }
+  // Base the downloaded filename on the source file when we loaded one
+  // (works for JSON/JS/TS/MTS/CTS/TSX/JSX alike) instead of always the
+  // generic "lowpoly3d_scene.glb", so e.g. "robot.tsx" → "robot.glb".
+  const srcName = CURRENT_TS_MODEL && CURRENT_TS_META && CURRENT_TS_META.source;
+  const baseName = (srcName && /\.[a-z0-9]+$/i.test(srcName))
+    ? srcName.replace(/\.[a-z0-9]+$/i, '')
+    : 'lowpoly3d_scene';
   exp.parse(exportRoot,(glb)=>{
     const blob=new Blob([glb],{type:'application/octet-stream'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='lowpoly3d_scene.glb'; a.click(); URL.revokeObjectURL(a.href);
+    a.download=baseName+'.glb'; a.click(); URL.revokeObjectURL(a.href);
     toast('GLB exported ✓','ok');
   },err=>toast('Export failed: '+err,'err'),{binary:true});
 }
@@ -14394,20 +14455,31 @@ document.getElementById('convert-ts-btn').addEventListener('click',()=>{
   toast('Convert to TS is experimental and not yet available — coming in a future update','');
 });
 document.getElementById('ts-btn').addEventListener('click',()=>{
-  if(!CURRENT_TS_META || typeof CURRENT_TS_META.text!=='string'){ toast('Load a .ts factory file first','err'); return; }
-  const blob=new Blob([CURRENT_TS_META.text],{type:'text/typescript'});
+  if(!CURRENT_TS_META || typeof CURRENT_TS_META.text!=='string'){ toast('Load a .ts/.mts/.cts/.tsx/.jsx factory file first','err'); return; }
+  // Keep the original filename (any of .ts/.mts/.cts/.tsx/.jsx) when we
+  // have one; otherwise fall back to a sensible default that matches
+  // whichever flavor the source actually is, not always ".ts" — a pasted
+  // .tsx/.jsx script re-downloaded as "model.ts" would silently mislabel
+  // itself as plain TS (no JSX) the next time someone re-uploads it.
+  const src=CURRENT_TS_META.source;
+  const hasKnownExt = src && /\.(ts|mts|cts|tsx|jsx)$/i.test(src);
+  const fallbackExt = isJsxFilename(src) ? '.tsx' : '.ts';
+  const filename = hasKnownExt ? src : ('model'+fallbackExt);
+  const mimeByExt = {ts:'text/typescript', mts:'text/typescript', cts:'text/typescript', tsx:'text/tsx', jsx:'text/jsx'};
+  const ext=(filename.split('.').pop()||'ts').toLowerCase();
+  const blob=new Blob([CURRENT_TS_META.text],{type:mimeByExt[ext]||'text/plain'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=(CURRENT_TS_META.source && /\.(ts|mts|cts)$/i.test(CURRENT_TS_META.source)) ? CURRENT_TS_META.source : 'model.ts';
+  a.download=filename;
   a.click(); URL.revokeObjectURL(a.href);
-  toast('.ts saved ✓','ok');
+  toast('.'+ext+' saved ✓','ok');
 });
 document.getElementById('apply-btn').addEventListener('click',()=>{
   const t=document.getElementById('raw-json').value.trim();
-  if(!t){toast('Type JSON, JS, or TS first','err');return;} hideDemoNav(); validateAndBuild(t,'editor');
+  if(!t){toast('Type JSON, JS, TS, or TSX/JSX first','err');return;} hideDemoNav(); validateAndBuild(t,'editor');
 });
 document.getElementById('mob-apply-btn').addEventListener('click',()=>{
   const t=document.getElementById('mob-raw-json').value.trim();
-  if(!t){toast('Type JSON, JS, or TS first','err');return;} hideDemoNav(); validateAndBuild(t,'editor');
+  if(!t){toast('Type JSON, JS, TS, or TSX/JSX first','err');return;} hideDemoNav(); validateAndBuild(t,'editor');
   document.getElementById('mob-left').classList.remove('open');
 });
 
