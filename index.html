@@ -9305,7 +9305,9 @@ function buildGeneratedPromptText(){
   // img2threejs alignment (v1.2) — PART 19-23. Appended unconditionally per
   // the update plan (Section 5): harmless as extra guidance if the pasted
   // spec is JSON/JS (those fields simply won't apply), required if the
-  // pasted spec is Prompt_To_Ts.txt / Image_To_Ts.txt.
+  // pasted spec is one of the factory-output specs — Prompt_To_Ts.txt /
+  // Image_To_Ts.txt, or their Prompt_To_Tsx.txt / Image_To_Tsx.txt and
+  // Prompt_To_Jsx.txt / Image_To_Jsx.txt siblings (same runtime contract).
   sections.push(`===== POST-BUILD REQUIREMENTS =====
 Before you finish, populate:
 1. root.userData.sculptRuntime.subject
@@ -10804,9 +10806,12 @@ function runJsBlueprint(code){
 // ═══════════════════════════════════════════
 // LBL TS INPUT PATH — SYSTEM_UPDATE_PROMPT__Add_TS_Output_to_LBL.md
 // ═══════════════════════════════════════════
-// A .ts input isn't a blueprint the way JSON/JS are — it's real Three.js
-// source code that exports a createXxxModel(options): THREE.Group factory
-// (contract: Prompt_To_Ts.txt / Image_To_Ts.txt PART 1). buildScene() never
+// A .ts/.tsx/.jsx input isn't a blueprint the way JSON/JS are — it's real
+// Three.js source code that exports a createXxxModel(options): THREE.Group
+// factory. Contract: Prompt_To_Ts.txt / Image_To_Ts.txt PART 1 for .ts,
+// Prompt_To_Tsx.txt / Image_To_Tsx.txt for .tsx, Prompt_To_Jsx.txt /
+// Image_To_Jsx.txt for .jsx (same runtime shape, .jsx is untyped —
+// no TypeScript syntax on that path, JSDoc only). buildScene() never
 // runs on this path: the factory builds its own Group and this file just
 // hosts it — clears sceneGroup, adds the Group, fits the camera, and (if
 // the factory set userData.tick) wires it into the render loop below.
@@ -10889,6 +10894,18 @@ function rewriteImportsForRuntime(jsSrc){
   );
 }
 
+// Which OUTPUT CONTRACT spec a given filename should point to. .ts/.mts/.cts
+// use the original typed spec; .tsx and .jsx get their own siblings (same
+// runtime shape — see PART 1 of each — .jsx is just the untyped/no-TS-syntax
+// variant). Untitled pastes (no filename) default to the .ts pair since
+// that's the oldest/most-complete of the three.
+function specNameFor(filename){
+  const ext=(filename||'').split('.').pop().toLowerCase();
+  if(ext==='tsx') return {prompt:'Prompt_To_Tsx.txt', image:'Image_To_Tsx.txt'};
+  if(ext==='jsx') return {prompt:'Prompt_To_Jsx.txt', image:'Image_To_Jsx.txt'};
+  return {prompt:'Prompt_To_Ts.txt', image:'Image_To_Ts.txt'};
+}
+
 // Picks the factory to call out of the compiled module's namespace.
 // Convention (PART 1.2): one export named /^create\w+Model$/. Falls back to
 // a default export; throws with a spec pointer if neither is found.
@@ -10901,11 +10918,13 @@ function pickTsFactory(mod, filename){
     return {fn:factories[0][1], name:factories[0][0]};
   }
   if(typeof mod.default==='function') return {fn:mod.default, name:'default'};
-  throw new Error(`No create*Model() export found in ${filename||'the pasted script'}. The .ts/.mts/.cts/.tsx/.jsx file must export a factory named createXxxModel(options): THREE.Group — see Prompt_To_Ts.txt PART 1 (OUTPUT CONTRACT).`);
+  const spec=specNameFor(filename);
+  throw new Error(`No create*Model() export found in ${filename||'the pasted script'}. The .ts/.mts/.cts/.tsx/.jsx file must export a factory named createXxxModel(options): THREE.Group — see ${spec.prompt} PART 1 (OUTPUT CONTRACT).`);
 }
 
-// Optional second export (Prompt_To_Ts.txt PART 1.3): a look-dev lights
-// rig, e.g. `createIssacaShotgunModelLookDevLights(mode?)`. Prompt_To_Ts.txt
+// Optional second export (Prompt_To_Ts.txt PART 1.3, or its Prompt_To_Tsx.txt
+// / Prompt_To_Jsx.txt siblings): a look-dev lights rig, e.g.
+// `createIssacaShotgunModelLookDevLights(mode?)`. Prompt_To_Ts.txt
 // is internally inconsistent about the exact name — PART 1.3's formal
 // signature suffixes the FULL factory name ("<factoryName>LookDevLights",
 // e.g. createIssacaShotgunModelLookDevLights), but PART 14's own worked-
@@ -11023,7 +11042,7 @@ async function runTsBlueprint(text, filename){
     throw new Error(`Factory "${factoryName}" did not return a THREE.Object3D.`);
   }
   if(group.children.length===0){
-    throw new Error(`Factory "${factoryName}" returned an empty THREE.Object3D (no children) — see Prompt_To_Ts.txt PART 1.2.`);
+    throw new Error(`Factory "${factoryName}" returned an empty THREE.Object3D (no children) — see ${specNameFor(filename).prompt} PART 1.2.`);
   }
 
   // PART 1.3 (optional): a look-dev lights rig. Non-fatal if it throws or
