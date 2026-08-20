@@ -314,12 +314,13 @@ body{
 /* Welcome */
 #welcome{
   position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:14px;
-  background:radial-gradient(ellipse at 50% 35%,rgba(25,30,50,.92),rgba(10,12,16,.97));
-  transition:opacity .4s;pointer-events:none;padding:24px;text-align:center;
+  align-items:center;justify-content:flex-start;gap:14px;
+  background:radial-gradient(ellipse at 50% 20%,rgba(25,30,50,.92),rgba(10,12,16,.97));
+  transition:opacity .4s;pointer-events:auto;padding:44px 24px 54px;text-align:center;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
 }
 body.theme-light #welcome{
-  background:radial-gradient(ellipse at 50% 35%,rgba(200,218,240,.96),rgba(230,236,246,.98));
+  background:radial-gradient(ellipse at 50% 20%,rgba(200,218,240,.96),rgba(230,236,246,.98));
 }
 #welcome.hidden{opacity:0;}
 #welcome.gone{display:none;}
@@ -706,9 +707,11 @@ body.theme-light #welcome{
 .nav-link{
   display:flex;align-items:center;gap:8px;text-align:left;background:transparent;border:1px solid transparent;
   color:var(--text);padding:10px 12px;border-radius:var(--radius-sm);font-size:14px;cursor:pointer;font-family:inherit;
+  text-decoration:none;width:100%;box-sizing:border-box;
 }
 .nav-link:hover{background:var(--surface2);}
 .nav-link.active{background:var(--surface3);border-color:var(--border2);color:var(--accent2);font-weight:600;}
+.nav-menu-sep{height:1px;background:var(--border);margin:6px 4px;flex-shrink:0;}
 .nav-menu-footer{margin-top:auto;padding:10px 12px;font-size:11px;color:var(--muted);}
 
 .site-page{
@@ -745,6 +748,54 @@ body.theme-light #welcome{
   .site-contact-grid{grid-template-columns:1fr;}
   .site-hero h1{font-size:24px;}
 }
+/* ══════════════════════════════════════════════════════════════
+   IN-VIEWPORT DETAILS SECTION — lives inside #welcome, styled to
+   match the welcome/viewport theme (dark radial backdrop + the same
+   surface/accent tokens as .w-code) rather than a separate page.
+   ══════════════════════════════════════════════════════════════ */
+.wd-wrap{
+  width:100%;max-width:340px;margin-top:6px;padding-top:18px;
+  border-top:1px solid var(--border);text-align:left;pointer-events:auto;
+}
+.wd-heading{font-size:13px;font-weight:700;color:var(--text);margin:0 0 4px;text-align:center;}
+.wd-sub{font-size:11.5px;color:var(--muted);line-height:1.55;margin:0 0 16px;text-align:center;}
+
+.lp-modes{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+.lp-mode-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:var(--shadow-1);}
+.lp-mode-head h3{margin:0 0 4px;font-size:13px;color:var(--text);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.lp-mode-tag{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);border-radius:999px;padding:2px 7px;}
+.lp-mode-desc{margin:0 0 10px;font-size:11.5px;color:var(--text2);line-height:1.5;}
+.lp-dl-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.lp-dl-btn{
+  height:30px;padding:0 12px;border-radius:var(--radius-sm);border:1px solid var(--border2);
+  background:var(--surface2);color:var(--accent2);font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;display:inline-flex;align-items:center;gap:5px;transition:background .15s,transform .15s;
+}
+.lp-dl-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+.lp-dl-btn:disabled{opacity:.6;cursor:wait;}
+.lp-dl-hint{margin:0;font-size:10.5px;color:var(--muted);line-height:1.5;}
+
+.lp-privacy{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;}
+.lp-privacy h3{margin:0 0 6px;font-size:12.5px;color:var(--text);}
+.lp-privacy p{margin:0;font-size:11.5px;color:var(--text2);line-height:1.5;}
+
+.lp-faq{margin-bottom:16px;}
+.lp-faq h2{font-size:13px;font-weight:700;color:var(--text);margin:0 0 10px;text-align:center;}
+.lp-faq-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px;}
+.lp-faq-item summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--text);list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.lp-faq-item summary::-webkit-details-marker{display:none;}
+.lp-faq-item summary::after{content:'+';font-size:15px;color:var(--muted);flex-shrink:0;transition:transform .15s;}
+.lp-faq-item[open] summary::after{transform:rotate(45deg);}
+.lp-faq-item p{margin:8px 0 0;font-size:11.5px;color:var(--text2);line-height:1.55;}
+
+.site-footer{border-top:1px solid var(--border);padding-top:14px;}
+.site-footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-bottom:8px;}
+.site-footer-link{
+  background:transparent;border:none;color:var(--text2);font-size:11px;cursor:pointer;font-family:inherit;
+  padding:5px 7px;border-radius:6px;text-decoration:none;
+}
+.site-footer-link:hover{color:var(--accent2);background:var(--surface2);}
+.site-footer-copy{font-size:10px;color:var(--muted);text-align:center;}
 /* ══════════════════════════════════════════════════════════════
    LBL SYSTEM UPDATE — added CSS (Part A items H1-H10, Part B T1-T9)
    ══════════════════════════════════════════════════════════════ */
@@ -974,9 +1025,14 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
 <nav id="site-nav-menu" aria-hidden="true">
   <div id="logo">Low Poly<span>3D</span></div>
   <button class="nav-link active" id="nav-link-viewer" data-page="viewer">🧩 Viewer</button>
+  <button class="nav-link" id="nav-link-details" data-page="details">📖 Details</button>
   <button class="nav-link" id="nav-link-about" data-page="about">ℹ️ About</button>
   <button class="nav-link" id="nav-link-contact" data-page="contact">✉️ Contact</button>
   <button class="nav-link" id="nav-link-kb">⌨ Keyboard Shortcuts</button>
+  <div class="nav-menu-sep"></div>
+  <a class="nav-link" href="https://rdjpublishers.com/privacy-policy.html">🔒 Privacy Policy</a>
+  <a class="nav-link" href="https://rdjpublishers.com/terms.html">📜 Terms</a>
+  <a class="nav-link" href="https://rdjpublishers.com/sitemap.xml">🗺️ Sitemap</a>
   <div class="nav-menu-footer">RDJ Publishers</div>
 </nav>
 
@@ -1080,6 +1136,117 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
         &nbsp;&nbsp;<span class="s">"baseColor"</span>: <span class="v">"#c8763a"</span><br/>
         &nbsp;}]<br/>
         <span class="k">}</span>
+      </div>
+
+      <!-- DETAILS — how the system works, embedded directly in the main
+           interface (not a separate page). Hamburger + footer "Details"
+           links scroll here. -->
+      <div id="welcome-details" class="wd-wrap">
+        <div class="wd-heading">How Low Poly 3D Works</div>
+        <p class="wd-sub">Pick a mode, download one small text file, paste it into your own AI chat with your prompt or image, then drop the AI's output back into the app to render it — all in your browser.</p>
+
+        <div class="lp-modes">
+          <div class="lp-mode-card">
+            <div class="lp-mode-head">
+              <h3>Standard <span class="lp-mode-tag">JSON</span></h3>
+              <p class="lp-mode-desc">Best for beginners and simple models. Highest compatibility.</p>
+            </div>
+            <div class="lp-dl-row">
+              <button class="lp-dl-btn" data-file="Prompt_To_Json.txt">⬇ Prompt_To_Json.txt</button>
+              <button class="lp-dl-btn" data-file="Image_To_Json.txt">⬇ Image_To_Json.txt</button>
+            </div>
+            <p class="lp-dl-hint">Download this file → Paste it into any AI (ChatGPT, Claude, Gemini, etc.) together with your prompt or image.</p>
+          </div>
+
+          <div class="lp-mode-card">
+            <div class="lp-mode-head">
+              <h3>Advanced <span class="lp-mode-tag">JavaScript</span></h3>
+              <p class="lp-mode-desc">More control and higher detail than JSON.</p>
+            </div>
+            <div class="lp-dl-row">
+              <button class="lp-dl-btn" data-file="Prompt_To_Js.txt">⬇ Prompt_To_Js.txt</button>
+              <button class="lp-dl-btn" data-file="Image_To_Js.txt">⬇ Image_To_Js.txt</button>
+            </div>
+            <p class="lp-dl-hint">Download this file → Paste it into any AI (ChatGPT, Claude, Gemini, etc.) together with your prompt or image.</p>
+          </div>
+
+          <div class="lp-mode-card">
+            <div class="lp-mode-head">
+              <h3>Pro <span class="lp-mode-tag">TypeScript</span></h3>
+              <p class="lp-mode-desc">Highest fidelity. Generates real Three.js code. Best for advanced models and animations.</p>
+            </div>
+            <div class="lp-dl-row">
+              <button class="lp-dl-btn" data-file="Prompt_To_Ts.txt">⬇ Prompt_To_Ts.txt</button>
+              <button class="lp-dl-btn" data-file="Image_To_Ts.txt">⬇ Image_To_Ts.txt</button>
+            </div>
+            <p class="lp-dl-hint">Download this file → Paste it into any AI (ChatGPT, Claude, Gemini, etc.) together with your prompt or image.</p>
+          </div>
+
+          <div class="lp-mode-card">
+            <div class="lp-mode-head">
+              <h3>Pro+ <span class="lp-mode-tag">TSX / JSX</span></h3>
+              <p class="lp-mode-desc">Same real Three.js factory contract as Pro, wrapped as a React-style component file — .tsx is typed, .jsx is the untyped sibling.</p>
+            </div>
+            <div class="lp-dl-row">
+              <button class="lp-dl-btn" data-file="Prompt_To_Tsx.txt">⬇ Prompt_To_Tsx.txt</button>
+              <button class="lp-dl-btn" data-file="Image_To_Tsx.txt">⬇ Image_To_Tsx.txt</button>
+            </div>
+            <div class="lp-dl-row">
+              <button class="lp-dl-btn" data-file="Prompt_To_Jsx.txt">⬇ Prompt_To_Jsx.txt</button>
+              <button class="lp-dl-btn" data-file="Image_To_Jsx.txt">⬇ Image_To_Jsx.txt</button>
+            </div>
+            <p class="lp-dl-hint">Download this file → Paste it into any AI (ChatGPT, Claude, Gemini, etc.) together with your prompt or image.</p>
+          </div>
+        </div>
+
+        <div class="lp-privacy">
+          <h3>🔒 Privacy, by design</h3>
+          <p>Everything renders locally in your browser. Your blueprints, uploaded images, and exported models are never sent to any server — the only network calls this section makes are to download the plain-text prompt files above.</p>
+        </div>
+
+        <div class="lp-faq">
+          <h2>Frequently Asked Questions</h2>
+          <details class="lp-faq-item">
+            <summary>What does this tool actually do?</summary>
+            <p>Low Poly 3D is a browser-based viewer and editor for a JSON/JS/TS "blueprint" format. It doesn't generate anything by itself — you get the blueprint from your own AI chat, then load it here to render, tweak, and export a low-poly 3D model.</p>
+          </details>
+          <details class="lp-faq-item">
+            <summary>Do I need an API key or account?</summary>
+            <p>No. There's nothing to sign up for and no key to paste in. You use whichever AI chat you already have access to; this app only renders what it's given.</p>
+          </details>
+          <details class="lp-faq-item">
+            <summary>Which mode should I choose?</summary>
+            <p>Start with Standard (JSON) — it works with almost any AI and is easiest to fix by hand if something looks off. Move to Advanced (JavaScript) for more detailed geometry, or Pro (TypeScript) / Pro+ (TSX/JSX) if you want real Three.js code, animation support, and are using a strong coding model.</p>
+          </details>
+          <details class="lp-faq-item">
+            <summary>What's the difference between the "Prompt" and "Image" files?</summary>
+            <p>Use a Prompt_To_* file when you're describing your model in words. Use an Image_To_* file when you're giving the AI a reference picture to turn into a blueprint instead.</p>
+          </details>
+          <details class="lp-faq-item">
+            <summary>Is my data private?</summary>
+            <p>Yes. Blueprints, images, and exports are processed entirely on your device. Nothing you load or build in the viewer is uploaded anywhere.</p>
+          </details>
+          <details class="lp-faq-item">
+            <summary>The AI's output won't load — what now?</summary>
+            <p>Check the Validator panel on the left for the specific error, then paste that error back to your AI and ask it to fix the blueprint. The downloaded file already includes the format rules your AI needs to follow.</p>
+          </details>
+          <details class="lp-faq-item">
+            <summary>Can I edit a model after it loads?</summary>
+            <p>Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, or .ts/.tsx/.jsx.</p>
+          </details>
+        </div>
+
+        <footer class="site-footer">
+          <div class="site-footer-links">
+            <button class="site-footer-link" id="footer-link-details">Details</button>
+            <button class="site-footer-link" id="footer-link-about">About</button>
+            <button class="site-footer-link" id="footer-link-contact">Contact</button>
+            <a class="site-footer-link" href="https://rdjpublishers.com/privacy-policy.html">Privacy Policy</a>
+            <a class="site-footer-link" href="https://rdjpublishers.com/terms.html">Terms</a>
+            <a class="site-footer-link" href="https://rdjpublishers.com/sitemap.xml">Sitemap</a>
+          </div>
+          <div class="site-footer-copy">© RDJ Publishers</div>
+        </footer>
       </div>
     </div>
     <div id="hud">
@@ -15604,6 +15771,9 @@ animate();
   var mainEl = document.getElementById('main');
   var aboutPage = document.getElementById('about-page');
   var contactPage = document.getElementById('contact-page');
+  var navLinkDetails = document.getElementById('nav-link-details');
+  var welcomeEl = document.getElementById('welcome');
+  var welcomeDetailsEl = document.getElementById('welcome-details');
   var navLinks = {
     viewer: document.getElementById('nav-link-viewer'),
     about: document.getElementById('nav-link-about'),
@@ -15627,15 +15797,79 @@ animate();
 
   function showPage(page){
     Object.keys(navLinks).forEach(function(k){ navLinks[k].classList.toggle('active', k===page); });
-    mainEl.style.display = (page==='viewer') ? '' : 'none';
+    if(navLinkDetails) navLinkDetails.classList.toggle('active', page==='details');
+    mainEl.style.display = (page==='viewer' || page==='details') ? '' : 'none';
     aboutPage.hidden = (page!=='about');
     contactPage.hidden = (page!=='contact');
     window.scrollTo(0,0);
     closeMenu();
   }
-  navLinks.viewer.addEventListener('click', function(){ showPage('viewer'); });
+  navLinks.viewer.addEventListener('click', function(){
+    showPage('viewer');
+    // If Details is currently covering the viewport (welcome overlay forced
+    // open below), dismiss it to reveal a loaded scene again.
+    if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && typeof hideWelcome === 'function'){
+      hideWelcome();
+    }
+  });
   navLinks.about.addEventListener('click', function(){ showPage('about'); });
   navLinks.contact.addEventListener('click', function(){ showPage('contact'); });
+
+  // Details lives directly inside the main welcome/viewport overlay
+  // (#welcome), not a separate page. Jumping to it re-shows that overlay —
+  // over whatever's currently in the viewport, without touching the loaded
+  // scene underneath — then smooth-scrolls down to the section.
+  function goToDetails(){
+    showPage('viewer');
+    if(typeof showWelcome === 'function') showWelcome();
+    if(welcomeEl) welcomeEl.classList.remove('hidden','gone');
+    if(navLinks.viewer) navLinks.viewer.classList.remove('active');
+    if(navLinkDetails) navLinkDetails.classList.add('active');
+    if(welcomeDetailsEl){
+      setTimeout(function(){
+        welcomeDetailsEl.scrollIntoView({behavior:'smooth', block:'start'});
+      }, 60);
+    }
+  }
+  if(navLinkDetails) navLinkDetails.addEventListener('click', goToDetails);
+  var footerDetailsLink = document.getElementById('footer-link-details');
+  if(footerDetailsLink) footerDetailsLink.addEventListener('click', goToDetails);
+  var footerAboutLink = document.getElementById('footer-link-about');
+  if(footerAboutLink) footerAboutLink.addEventListener('click', function(){ showPage('about'); });
+  var footerContactLink = document.getElementById('footer-link-contact');
+  if(footerContactLink) footerContactLink.addEventListener('click', function(){ showPage('contact'); });
+
+  // Details section — download the generator blueprint files straight from
+  // this same GitHub repo (fetched fresh, saved as a real file via a Blob
+  // so the browser always shows a proper "Save As" download rather than
+  // just opening raw text in a new tab).
+  (function initDetailsDownloads(){
+    var RAW_BASE = 'https://raw.githubusercontent.com/rdjpublishers/low_poly_3d/main/';
+    document.querySelectorAll('.lp-dl-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var file = btn.getAttribute('data-file');
+        if(!file) return;
+        var origLabel = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Downloading…';
+        fetch(RAW_BASE + encodeURIComponent(file))
+          .then(function(res){ if(!res.ok) throw new Error('Fetch failed: '+res.status); return res.text(); })
+          .then(function(text){
+            var blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = file;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+          })
+          .catch(function(){
+            // Fallback if fetch is blocked (e.g. offline) — open the raw
+            // file directly so the user can still save it manually.
+            window.open(RAW_BASE + encodeURIComponent(file), '_blank', 'noopener');
+          })
+          .finally(function(){ btn.disabled = false; btn.textContent = origLabel; });
+      });
+    });
+  })();
 
   // Contact form submission (Web3Forms)
   var contactForm = document.getElementById('contact-form');
