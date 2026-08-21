@@ -960,6 +960,12 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="parts-btn" title="Kitbash part library — save/reuse object definitions">📦 Parts</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
   <div class="vdiv"></div>
+  <!-- LBL update F4 — animation controls (only visible when the loaded
+       model actually has AnimationClips, e.g. an animated glTF) -->
+  <button class="tbtn hide-xs" id="anim-play-btn" title="Start / Stop animation playback" style="display:none">▶ Play</button>
+  <button class="tbtn hide-xs" id="anim-next-btn" title="Next animation" style="display:none">⏭ Next</button>
+  <span class="tbtn" id="anim-name-chip" style="display:none;pointer-events:none;font-family:'Space Mono',monospace;font-size:10px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2)">—</span>
+  <div class="vdiv"></div>
   <!-- LBL update H1 — undo/redo -->
   <button class="tbtn" id="undo-btn" title="Undo (Ctrl+Z)" disabled>↶</button>
   <button class="tbtn" id="redo-btn" title="Redo (Ctrl+Y)" disabled>↷</button>
@@ -1112,7 +1118,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
       <div id="dropzone">
         <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx,image/*"/>
         <div class="dz-icon">📄</div>
-        <div class="dz-title">Drop JSON here</div>
+        <div class="dz-title">Drop JSON / JS / TS here</div>
         <div class="dz-sub">or click to browse · drop an image onto a selected part to texture it</div>
       </div>
     </div>
@@ -1132,7 +1138,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div id="welcome">
       <div class="w-title">Low Poly 3D</div>
       <div class="w-sub">Upload a LBL blueprint JSON to build a low-poly 3D scene instantly.</div>
-      <div class="w-hint">← Drop JSON in panel · or click <strong style="color:var(--accent)">Demo</strong></div>
+      <div class="w-hint">← Drop JSON / JS / TS / TSX / JSX in panel · or click <strong style="color:var(--accent)">Demo</strong> to load Model_1 from /models/</div>
       <div class="w-code">
         <span class="k">{</span><br/>
         &nbsp;<span class="s">"objects"</span>: [{<br/>
@@ -1399,8 +1405,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
       </div>
     </div>
     <div id="demo-label"></div>
-    <button class="demo-nav-btn left" id="demo-prev" aria-label="Previous demo" title="Previous demo">‹</button>
-    <button class="demo-nav-btn right" id="demo-next" aria-label="Next demo" title="Next demo">›</button>
+    <button class="demo-nav-btn left" id="demo-prev" aria-label="Previous model" title="Previous model">‹</button>
+    <button class="demo-nav-btn right" id="demo-next" aria-label="Next model" title="Next model">›</button>
   </div>
 
   <!-- RIGHT PANEL -->
@@ -2669,6 +2675,7 @@ function loadImageTexture(dataUrl, role, opts){
   placeholder.colorSpace = THREE.SRGBColorSpace;
   placeholder.wrapS = placeholder.wrapT = THREE.RepeatWrapping;
   placeholder.userData.__isPlaceholder = true;
+  placeholder.userData.__srcUrl = dataUrl; // LBL UPDATE F4 — used by the face-texture drag-to-position live update to find THIS texture on a material
   _imageTexCacheSet(key, placeholder);
   // Kick off the real load in the background; when it finishes, swap
   // the image data on the placeholder so the existing material reference
@@ -2689,6 +2696,7 @@ function loadImageTexture(dataUrl, role, opts){
     placeholder.minFilter = THREE.LinearMipmapLinearFilter;
     if(renderer && renderer.capabilities) placeholder.anisotropy = renderer.capabilities.getMaxAnisotropy();
     placeholder.userData.__isPlaceholder = false;
+    placeholder.userData.__srcUrl = dataUrl; // keep it set after the real image swaps in
   };
   // Use a fresh Image element so we can read its size reliably
   const img = new Image();
@@ -7807,7 +7815,7 @@ function clearScene(){
   eyeTrackEntries=[]; // v7.8 PART 54 — drop any eye-tracking entries pointing at the previous model's meshes
   updateProportionsPanel(null);
   updateTree(); updateInspector(null); updateAllValLogs('<span class="info">Waiting for JSON…</span>');
-  setStatus('no scene',false); showWelcome(); hideDemoNav();
+  setStatus('no scene',false); showWelcome(); lblModelStoreHideNav();
 }
 
 // ═══════════════════════════════════════════
@@ -9620,6 +9628,248 @@ function renderWholeModelInspector(id){
       <div class="insp-row"><div class="insp-key">Note</div><div class="insp-val" style="font-size:11px;color:var(--muted)">Imported models are edited as a single object — use the Translate/Rotate/Scale gizmo buttons in the topbar, or drag in the viewport. Per-part editing (material, attach points, etc.) only applies to blueprint-built scenes.</div></div>
     </div>`;
   ['inspector','mob-inspector'].forEach(elId=>{ const el=document.getElementById(elId); if(el) el.innerHTML=html; });
+}
+
+// LBL UPDATE H2/FIX — per-mesh inspector for sub-meshes of an uploaded or
+// TS-generated model. Shows the mesh's local position/rotation/scale,
+// vertex/triangle count, and exposes the same Texture / Face-texture
+// controls as a blueprint part (re-using lblApplyTextureDataUrl +
+// lblApplyFaceTexture through a synthetic "blueprint object" wrapper).
+function renderExternalMeshInspector(id){
+  const mesh = meshMap.get(id);
+  if(!mesh){ renderWholeModelInspector(id===LBL_EXTERNAL_ID?id:LBL_TSMODEL_ID); return; }
+  const isExt = lblExtMeshIds.includes(id);
+  const sourceLabel = isExt ? 'Uploaded 3D · sub-mesh' : 'TS-generated · sub-mesh';
+  const pos = mesh.position, rot = mesh.rotation, scl = mesh.scale;
+  const geo = mesh.geometry;
+  let triCount = '—', vertCount = '—';
+  try{
+    if(geo && geo.attributes && geo.attributes.position){
+      vertCount = geo.attributes.position.count;
+      triCount = geo.index ? (geo.index.count/3)|0 : (vertCount/3)|0;
+    }
+  }catch(_){}
+  const matName = mesh.material && (mesh.material.name || mesh.material.type) || '—';
+  // Synthetic blueprint object so the existing lblTexturePanelHtml +
+  // lblApplyTextureDataUrl + lblApplyFaceTexture functions work without
+  // a real blueprint entry. We stash this on the mesh's userData so
+  // edits flow through the same code path.
+  if(!mesh.userData.__lblSynthetic) mesh.userData.__lblSynthetic = { id, textureImage:null, textureImageRepeat:[1,1], textureImageOffset:[0,0], textureImageRotation:0, faceTextures:[] };
+  const syn = mesh.userData.__lblSynthetic;
+  syn.id = id; // always the latest id (in case the mesh was re-registered)
+  // Face-texture panel (re-uses the same renderer the blueprint part path uses)
+  const hasFtex = Array.isArray(syn.faceTextures) && syn.faceTextures.length > 0;
+  const ftexHtml = hasFtex ? syn.faceTextures.map(ft=>`
+    <div class="tex-row" style="margin-top:6px">
+      <img class="tex-preview" src="${ft.textureImage}" alt="face texture"/>
+      <span class="tex-filename">${ft.__filenameLabel||'image'} (${(ft.faces||[]).length} face${(ft.faces||[]).length===1?'':'s'})</span>
+      <button class="tex-remove-btn" data-ftex-remove="${ft.id}">🗑</button>
+    </div>`).join('') : '';
+  const html = `<div class="insp-section">
+      <div class="insp-row"><div class="insp-key">Selection</div><div class="insp-val ac">${sourceLabel}</div></div>
+      <div class="insp-row"><div class="insp-key">Name</div><div class="insp-val">${mesh.name||'(unnamed)'}</div></div>
+      <div class="insp-row"><div class="insp-key">Material</div><div class="insp-val">${matName}</div></div>
+      <div class="insp-row"><div class="insp-key">Vertices</div><div class="insp-val">${vertCount}</div></div>
+      <div class="insp-row"><div class="insp-key">Triangles</div><div class="insp-val">${triCount}</div></div>
+      <div class="insp-row"><div class="insp-key">Position</div><div class="insp-val">${pos.x.toFixed(3)}, ${pos.y.toFixed(3)}, ${pos.z.toFixed(3)}</div></div>
+      <div class="insp-row"><div class="insp-key">Rotation</div><div class="insp-val">${THREE.MathUtils.radToDeg(rot.x).toFixed(2)}°, ${THREE.MathUtils.radToDeg(rot.y).toFixed(2)}°, ${THREE.MathUtils.radToDeg(rot.z).toFixed(2)}°</div></div>
+      <div class="insp-row"><div class="insp-key">Scale</div><div class="insp-val">${scl.x.toFixed(3)} × ${scl.y.toFixed(3)} × ${scl.z.toFixed(3)}</div></div>
+      <div class="insp-row"><div class="insp-key">Note</div><div class="insp-val" style="font-size:11px;color:var(--muted)">Click a sub-mesh to select it, then use ⇄ Move / ↻ Rotate / ⤢ Scale gizmo, 🖼 Texture (full part), or ⬡ Faces + 🖼 (per-face) to texture just selected faces. Use ⛓ Group to group several sub-meshes together.</div></div>
+    </div>
+    <div class="insp-section">
+      <div class="plabel">🖼 Image Texture</div>
+      <div class="tex-row">
+        <button class="tex-choose-btn" id="ext-mesh-tex-choose">📁 Choose file…</button>
+        <span class="tex-filename">${syn.textureImage?'custom image':'part of parent material'}</span>
+        ${syn.textureImage?`<img class="tex-preview" src="${syn.textureImage}" alt="texture preview"/>`:''}
+      </div>
+      <div class="tex-hint">or drop an image onto this sub-mesh · Ctrl+V to paste</div>
+      ${syn.textureImage?`
+      <div class="tex-field-row"><label>Repeat</label>
+        <input type="number" step="0.1" id="ext-tex-rep-u" value="${syn.textureImageRepeat[0]}"/> U
+        <input type="number" step="0.1" id="ext-tex-rep-v" value="${syn.textureImageRepeat[1]}"/> V
+      </div>
+      <div class="tex-field-row"><label>Offset</label>
+        <input type="number" step="0.05" id="ext-tex-off-u" value="${syn.textureImageOffset[0]}"/> U
+        <input type="number" step="0.05" id="ext-tex-off-v" value="${syn.textureImageOffset[1]}"/> V
+      </div>
+      <div class="tex-field-row"><label>Rotation</label>
+        <input type="number" step="1" id="ext-tex-rot" value="${syn.textureImageRotation||0}"/> °
+      </div>
+      <button class="tex-remove-btn" id="ext-tex-remove">🗑 Remove texture</button>`:''}
+      <input type="file" id="ext-tex-file-input" accept="image/*" style="display:none"/>
+    </div>
+    <div class="insp-section">
+      <div class="plabel">⬡ Face Textures</div>
+      <div class="tex-hint">${lblFaceSelectMode
+        ? (lblPendingFaceSel.objId===id && lblPendingFaceSel.faces.size ? `${lblPendingFaceSel.faces.size} face${lblPendingFaceSel.faces.size===1?'':'s'} selected — choose an image to texture just them.` : 'Click a face on this sub-mesh; Shift-click to add more.')
+        : 'Turn on ⬡ Faces in the topbar, then click individual faces on this sub-mesh.'}</div>
+      ${lblFaceSelectMode && lblPendingFaceSel.objId===id && lblPendingFaceSel.faces.size ? `<div class="tex-row"><button class="tex-choose-btn" id="ext-ftex-choose">📁 Choose image for selected faces…</button><input type="file" id="ext-ftex-file-input" accept="image/*" style="display:none"/></div>` : ''}
+      ${ftexHtml}
+    </div>`;
+  ['inspector','mob-inspector'].forEach(elId=>{ const el=document.getElementById(elId); if(el) el.innerHTML=html; });
+  // Wire the buttons
+  const choose = document.getElementById('ext-mesh-tex-choose');
+  const fileIn = document.getElementById('ext-tex-file-input');
+  if(choose && fileIn){
+    choose.addEventListener('click', ()=>fileIn.click());
+    fileIn.addEventListener('change', e=>{
+      const f = e.target.files && e.target.files[0]; if(!f) return;
+      lblFileToDataUrl(f).then(dataUrl=>{
+        syn.textureImage = dataUrl;
+        syn.__textureFilenameLabel = f.name;
+        lblApplyExtMeshTexture(mesh, dataUrl);
+        renderExternalMeshInspector(id);
+      });
+    });
+  }
+  const removeTex = document.getElementById('ext-tex-remove');
+  if(removeTex) removeTex.addEventListener('click', ()=>{
+    syn.textureImage = null;
+    delete syn.__textureFilenameLabel;
+    delete syn.textureImageRepeat; delete syn.textureImageOffset; delete syn.textureImageRotation;
+    lblApplyExtMeshTexture(mesh, null);
+    renderExternalMeshInspector(id);
+  });
+  // Repeat / offset / rotation
+  const repU = document.getElementById('ext-tex-rep-u');
+  const repV = document.getElementById('ext-tex-rep-v');
+  const offU = document.getElementById('ext-tex-off-u');
+  const offV = document.getElementById('ext-tex-off-v');
+  const rotIn = document.getElementById('ext-tex-rot');
+  if(repU) repU.addEventListener('change', ()=>{ syn.textureImageRepeat = [Number(repU.value)||1, Number(repV?.value)||1]; lblApplyExtMeshTexture(mesh, syn.textureImage); });
+  if(repV) repV.addEventListener('change', ()=>{ syn.textureImageRepeat = [Number(repU?.value)||1, Number(repV.value)||1]; lblApplyExtMeshTexture(mesh, syn.textureImage); });
+  if(offU) offU.addEventListener('change', ()=>{ syn.textureImageOffset = [Number(offU.value)||0, Number(offV?.value)||0]; lblApplyExtMeshTexture(mesh, syn.textureImage); });
+  if(offV) offV.addEventListener('change', ()=>{ syn.textureImageOffset = [Number(offU?.value)||0, Number(offV.value)||0]; lblApplyExtMeshTexture(mesh, syn.textureImage); });
+  if(rotIn) rotIn.addEventListener('change', ()=>{ syn.textureImageRotation = Number(rotIn.value)||0; lblApplyExtMeshTexture(mesh, syn.textureImage); });
+  // Face-texture picker
+  const ftexChoose = document.getElementById('ext-ftex-choose');
+  const ftexFile = document.getElementById('ext-ftex-file-input');
+  if(ftexChoose && ftexFile){
+    ftexChoose.addEventListener('click', ()=>ftexFile.click());
+    ftexFile.addEventListener('change', e=>{
+      const f = e.target.files && e.target.files[0]; if(!f) return;
+      // Route through the normal face-texture path, but target the
+      // synthetic object on the mesh's userData.
+      lblFileToDataUrl(f).then(dataUrl=>{
+        const faces = lblPendingFaceSel.faces;
+        if(!faces.size) return;
+        let n = (syn.faceTextures||[]).length + 1, ftId = 'ftex_' + n;
+        const existing = new Set((syn.faceTextures||[]).map(x=>x.id));
+        while(existing.has(ftId)){ n++; ftId = 'ftex_'+n; }
+        if(!Array.isArray(syn.faceTextures)) syn.faceTextures = [];
+        syn.faceTextures.push({ id: ftId, faces: Array.from(faces), textureImage: dataUrl, textureImageRepeat:[1,1], textureImageOffset:[0,0], textureImageRotation:0, __filenameLabel: f.name });
+        lblPendingFaceSel = { objId: null, faces: new Set() };
+        lblClearFaceHighlight();
+        lblApplyExtMeshFaceTextures(mesh);
+        renderExternalMeshInspector(id);
+      });
+    });
+  }
+  // Remove face texture
+  document.querySelectorAll('[data-ftex-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const ftId = btn.getAttribute('data-ftex-remove');
+      if(Array.isArray(syn.faceTextures)) syn.faceTextures = syn.faceTextures.filter(x=>x.id !== ftId);
+      lblApplyExtMeshFaceTextures(mesh);
+      renderExternalMeshInspector(id);
+    });
+  });
+}
+
+// LBL UPDATE H2/FIX — apply a texture (dataUrl or null to clear) to a
+// sub-mesh of an uploaded / TS model. The base material's other
+// properties (color, metalness, roughness, etc.) are preserved; only
+// the .map slot is replaced. materialIndex handling is done in the
+// face-texture path below.
+function lblApplyExtMeshTexture(mesh, dataUrl){
+  if(!mesh) return;
+  if(Array.isArray(mesh.material)){
+    mesh.material.forEach(m=>lblApplyExtMeshTexture(m, dataUrl));
+    return;
+  }
+  const mat = mesh.material;
+  if(!mat) return;
+  if(!dataUrl){ mat.map = null; mat.needsUpdate = true; return; }
+  const syn = mesh.userData && mesh.userData.__lblSynthetic;
+  const tex = loadImageTextureSync(dataUrl, 'map', {
+    repeat: (syn && syn.textureImageRepeat) || [1,1],
+    offset: (syn && syn.textureImageOffset) || [0,0],
+    rotationDeg: (syn && syn.textureImageRotation) || 0
+  });
+  mat.map = tex;
+  if(mat.color && mat.color.set) mat.color.set(0xffffff);
+  mat.needsUpdate = true;
+}
+
+// LBL UPDATE H2/FIX — face-texture material-array wiring for an external
+// sub-mesh. Same logic as the blueprint lblApplyFaceTexturesToMesh, but
+// scoped to ONE mesh (no per-object id walk).
+function lblApplyExtMeshFaceTextures(mesh){
+  if(!mesh) return;
+  const syn = mesh.userData && mesh.userData.__lblSynthetic;
+  const faceTexEntries = (syn && Array.isArray(syn.faceTextures)) ? syn.faceTextures : [];
+  // Reset to a single-material mesh (drop the array form) so a previous
+  // face-texture config is cleared before reapplying.
+  if(Array.isArray(mesh.material) && mesh.material.length > 1){
+    const base = mesh.material[0];
+    // Dispose the cloned face materials we previously created (everything
+    // past index 0) so the GPU doesn't leak textures/materials across
+    // repeated edits.
+    for(let i=1;i<mesh.material.length;i++){
+      const m = mesh.material[i];
+      if(m && m.map) m.map.dispose();
+    }
+    mesh.material = base;
+  }
+  if(!faceTexEntries.length){
+    if(mesh.geometry && mesh.geometry.groups) mesh.geometry.clearGroups();
+    return;
+  }
+  const geo = mesh.geometry;
+  if(!geo || !geo.attributes || !geo.attributes.uv){
+    console.warn('[external-face-textures] mesh "'+(mesh.name||'?')+'" has no UVs — skipping face texture(s)');
+    return;
+  }
+  const idx = geo.index;
+  const triCount = idx ? (idx.count/3)|0 : (geo.attributes.position.count/3)|0;
+  if(triCount === 0){
+    if(geo.groups) geo.clearGroups();
+    return;
+  }
+  const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const faceMatIndex = new Array(triCount).fill(0);
+  const mats = [baseMat];
+  faceTexEntries.forEach((ft, i)=>{
+    const matIndex = i+1;
+    const tex = loadImageTextureSync(ft.textureImage, 'map', {
+      repeat: Array.isArray(ft.textureImageRepeat)?ft.textureImageRepeat:[1,1],
+      offset: Array.isArray(ft.textureImageOffset)?ft.textureImageOffset:[0,0],
+      rotationDeg: typeof ft.textureImageRotation==='number'?ft.textureImageRotation:0
+    });
+    const m = baseMat.clone();
+    m.map = tex;
+    if(m.color && m.color.set){
+      m.color.set(baseMat.map ? 0xffffff : (baseMat.color ? baseMat.color.getHex() : 0xffffff));
+    }
+    m.needsUpdate = true;
+    mats.push(m);
+    (ft.faces||[]).forEach(f=>{ if(f>=0 && f<triCount) faceMatIndex[f]=matIndex; });
+  });
+  geo.clearGroups();
+  let runStart=0, runMat=faceMatIndex[0]||0;
+  for(let f=1; f<=triCount; f++){
+    const mi = f<triCount ? faceMatIndex[f] : null;
+    if(mi!==runMat){
+      geo.addGroup(runStart*3, (f-runStart)*3, runMat);
+      runStart=f; runMat=mi;
+    }
+  }
+  // Critical: when geometry is not indexed, addGroup(start, count, matIndex)
+  // takes vertex count, not triangle count. The blueprint path uses an
+  // indexed geometry so the *3 there is correct; for non-indexed we need
+  // to keep that *3 too because addGroup always takes vertex indices.
+  mesh.material = mats;
 }
 
 function updateInspector(obj){
@@ -12001,6 +12251,13 @@ function addTsModelToScene(group, meta, lightsGroup){
   // PART 1.3 — parented to `scene` (world space), not sceneGroup, so it
   // isn't affected by the model's own centering/grounding transform above.
   if(lightsGroup){ scene.add(lightsGroup); CURRENT_TS_LIGHTS=lightsGroup; }
+  // LBL update H2/FIX — register every sub-mesh so the user can click and
+  // select individual parts (gizmo, texture, face-texture all re-use the
+  // meshMap infrastructure downstream). Skeleton / helper markers are
+  // skipped inside the registration function.
+  lblRegisterTsMeshes(group);
+  // Pick up GLTF-style AnimationClips stored on the loaded group too.
+  if(typeof lblCollectAnimations === 'function') lblCollectAnimations(group, group.userData && group.userData.__gltf);
   frameCameraOnScene();
 
   CURRENT_TS_MODEL=group;
@@ -12246,2175 +12503,143 @@ canvas.addEventListener('click',e=>{
 });
 
 // ═══════════════════════════════════════════
-// DEMO SCENE
+// MODEL STORE — sequential Model_N loader (LBL UPDATE F6)
 // ═══════════════════════════════════════════
-const DEMOS=[
-  {label:"Private Villa \u00b7 Pool", json:
-{
-  "name": "Modern_Villa_With_Front_Pool",
-  "type": "group",
-  "constraints": [
-    "groundAligned"
-  ],
-  "children": [
-    {
-      "name": "Environment_Landscape",
-      "type": "group",
-      "children": [
-        {
-          "name": "Grass_Lawn",
-          "type": "box",
-          "position": [0, 0.01, 0],
-          "scale": [10, 0.02, 10],
-          "material": { "baseColor": "#4CAF50", "roughness": 0.9 }
-        },
-        {
-          "name": "Concrete_Driveway",
-          "type": "box",
-          "position": [2.2, 0.02, 2],
-          "scale": [1.8, 0.01, 6],
-          "material": { "baseColor": "#BDC3C7", "roughness": 0.7 }
-        },
-        {
-          "name": "Entrance_Path_Tile_1",
-          "type": "box",
-          "position": [-0.5, 0.02, 1.2],
-          "scale": [0.8, 0.01, 0.5],
-          "material": { "baseColor": "#34495E", "roughness": 0.6 }
-        },
-        {
-          "name": "Entrance_Path_Tile_2",
-          "type": "box",
-          "position": [-0.5, 0.02, 0.5],
-          "scale": [0.8, 0.01, 0.5],
-          "material": { "baseColor": "#34495E", "roughness": 0.6 }
-        }
-      ]
-    },
-    {
-      "name": "Swimming_Pool_Feature",
-      "type": "group",
-      "position": [-2.2, 0, 2.5],
-      "children": [
-        {
-          "name": "Pool_Water_Surface",
-          "type": "box",
-          "position": [0, 0.02, 0],
-          "scale": [2.6, 0.01, 3.6],
-          "material": { "baseColor": "#29B6F6", "roughness": 0.1, "metalness": 0.1, "opacity": 0.8, "emissive": 0.1 }
-        },
-        {
-          "name": "Pool_Border_Front",
-          "type": "box",
-          "position": [0, 0.03, 1.9],
-          "scale": [3.0, 0.04, 0.2],
-          "material": { "baseColor": "#E0E0E0", "roughness": 0.5 }
-        },
-        {
-          "name": "Pool_Border_Back",
-          "type": "box",
-          "position": [0, 0.03, -1.9],
-          "scale": [3.0, 0.04, 0.2],
-          "material": { "baseColor": "#E0E0E0", "roughness": 0.5 }
-        },
-        {
-          "name": "Pool_Border_Left",
-          "type": "box",
-          "position": [-1.4, 0.03, 0],
-          "scale": [0.2, 0.04, 4.0],
-          "material": { "baseColor": "#E0E0E0", "roughness": 0.5 }
-        },
-        {
-          "name": "Pool_Border_Right",
-          "type": "box",
-          "position": [1.4, 0.03, 0],
-          "scale": [0.2, 0.04, 4.0],
-          "material": { "baseColor": "#E0E0E0", "roughness": 0.5 }
-        },
-        {
-          "name": "Lounge_Chair_1",
-          "type": "group",
-          "position": [2.0, 0.02, 0.6],
-          "rotation": [0, -90, 0],
-          "children": [
-            {
-              "name": "Chair_Base",
-              "type": "box",
-              "position": [0, 0.05, 0],
-              "scale": [0.6, 0.06, 1.2],
-              "material": { "baseColor": "#A06A42", "roughness": 0.6 }
-            },
-            {
-              "name": "Chair_Backrest",
-              "type": "wedge",
-              "position": [0, 0.18, -0.4],
-              "scale": [0.6, 0.3, 0.4],
-              "rotation": [-20, 0, 0],
-              "material": { "baseColor": "#A06A42", "roughness": 0.6 }
-            },
-            {
-              "name": "Chair_Cushion",
-              "type": "box",
-              "position": [0, 0.09, 0.1],
-              "scale": [0.54, 0.04, 0.9],
-              "material": { "baseColor": "#FFFFFF", "roughness": 0.9 }
-            }
-          ]
-        },
-        {
-          "name": "Lounge_Chair_2",
-          "type": "group",
-          "position": [2.0, 0.02, -0.6],
-          "rotation": [0, -90, 0],
-          "children": [
-            {
-              "name": "Chair_Base",
-              "type": "box",
-              "position": [0, 0.05, 0],
-              "scale": [0.6, 0.06, 1.2],
-              "material": { "baseColor": "#A06A42", "roughness": 0.6 }
-            },
-            {
-              "name": "Chair_Backrest",
-              "type": "wedge",
-              "position": [0, 0.18, -0.4],
-              "scale": [0.6, 0.3, 0.4],
-              "rotation": [-20, 0, 0],
-              "material": { "baseColor": "#A06A42", "roughness": 0.6 }
-            },
-            {
-              "name": "Chair_Cushion",
-              "type": "box",
-              "position": [0, 0.09, 0.1],
-              "scale": [0.54, 0.04, 0.9],
-              "material": { "baseColor": "#FFFFFF", "roughness": 0.9 }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Main_House_Structure",
-      "type": "group",
-      "position": [0, 0, -1.5],
-      "children": [
-        {
-          "name": "First_Floor_Core",
-          "type": "box",
-          "position": [0, 0.81, 0],
-          "scale": [6.4, 1.6, 4.4],
-          "material": { "baseColor": "#F5F5F7", "roughness": 0.3 }
-        },
-        {
-          "name": "Wooden_Accent_Wall",
-          "type": "box",
-          "position": [-1.8, 0.81, 2.21],
-          "scale": [2.0, 1.6, 0.04],
-          "material": { "baseColor": "#8E5A36", "roughness": 0.5 }
-        },
-        {
-          "name": "Main_Entrance_Door",
-          "type": "box",
-          "position": [-0.5, 0.66, 2.22],
-          "scale": [0.8, 1.3, 0.04],
-          "material": { "baseColor": "#2C3035", "roughness": 0.4 }
-        },
-        {
-          "name": "Door_Handle",
-          "type": "cylinder",
-          "position": [-0.2, 0.66, 2.25],
-          "scale": [0.02, 0.14, 0.02],
-          "material": { "baseColor": "#D4AF37", "metalness": 0.8, "roughness": 0.2 }
-        },
-        {
-          "name": "Living_Room_Window_Large",
-          "type": "box",
-          "position": [1.6, 0.81, 2.22],
-          "scale": [2.4, 1.0, 0.02],
-          "material": { "baseColor": "#88D8EC", "roughness": 0.1, "opacity": 0.6 }
-        },
-        {
-          "name": "Living_Room_Window_Frame",
-          "type": "frame",
-          "position": [1.6, 0.81, 2.23],
-          "scale": [2.44, 1.04, 0.04],
-          "material": { "baseColor": "#2C3035", "roughness": 0.5 }
-        },
-        {
-          "name": "Garage_Door",
-          "type": "box",
-          "position": [2.2, 0.61, 2.21],
-          "scale": [1.6, 1.2, 0.02],
-          "material": { "baseColor": "#7F8C8D", "roughness": 0.6 }
-        },
-        {
-          "name": "Mid_Floor_Slab_Separation",
-          "type": "box",
-          "position": [0, 1.66, 0],
-          "scale": [6.6, 0.1, 4.6],
-          "material": { "baseColor": "#2C3035", "roughness": 0.4 }
-        },
-        {
-          "name": "Second_Floor_Core",
-          "type": "box",
-          "position": [-0.6, 2.41, -0.2],
-          "scale": [4.8, 1.4, 3.6],
-          "material": { "baseColor": "#F5F5F7", "roughness": 0.3 }
-        },
-        {
-          "name": "Balcony_Floor_Extension",
-          "type": "box",
-          "position": [-0.6, 1.73, 1.8],
-          "scale": [4.4, 0.04, 0.8],
-          "material": { "baseColor": "#BDC3C7", "roughness": 0.5 }
-        },
-        {
-          "name": "Balcony_Glass_Railing",
-          "type": "box",
-          "position": [-0.6, 1.98, 2.18],
-          "scale": [4.4, 0.4, 0.02],
-          "material": { "baseColor": "#88D8EC", "roughness": 0.1, "opacity": 0.4 }
-        },
-        {
-          "name": "Balcony_Railing_Top_Trim",
-          "type": "box",
-          "position": [-0.6, 2.19, 2.18],
-          "scale": [4.44, 0.02, 0.04],
-          "material": { "baseColor": "#2C3035", "roughness": 0.4 }
-        },
-        {
-          "name": "Master_Bedroom_Sliding_Door",
-          "type": "box",
-          "position": [-0.6, 2.36, 1.61],
-          "scale": [2.0, 1.1, 0.02],
-          "material": { "baseColor": "#88D8EC", "roughness": 0.1, "opacity": 0.6 }
-        },
-        {
-          "name": "Master_Bedroom_Door_Frame",
-          "type": "frame",
-          "position": [-0.6, 2.36, 1.62],
-          "scale": [2.04, 1.14, 0.04],
-          "material": { "baseColor": "#2C3035", "roughness": 0.5 }
-        },
-        {
-          "name": "Second_Floor_Side_Window",
-          "type": "box",
-          "position": [-3.01, 2.41, -0.2],
-          "scale": [0.02, 0.8, 1.6],
-          "material": { "baseColor": "#88D8EC", "roughness": 0.1, "opacity": 0.6 }
-        },
-        {
-          "name": "Roof_Main_Slab",
-          "type": "box",
-          "position": [-0.6, 3.16, -0.2],
-          "scale": [5.2, 0.12, 4.0],
-          "material": { "baseColor": "#F5F5F7", "roughness": 0.3 }
-        },
-        {
-          "name": "Roof_Dark_Facial_Trim",
-          "type": "box",
-          "position": [-0.6, 3.23, -0.2],
-          "scale": [5.24, 0.04, 4.04],
-          "material": { "baseColor": "#2C3035", "roughness": 0.4 }
-        }
-      ]
-    },
-    {
-      "name": "Lush_Trees_Collection",
-      "type": "group",
-      "children": [
-        {
-          "name": "Front_Left_Premium_Tree",
-          "type": "group",
-          "position": [-4.0, 0.01, -0.5],
-          "children": [
-            {
-              "name": "Tree_Trunk",
-              "type": "cylinder",
-              "position": [0, 0.7, 0],
-              "scale": [0.16, 1.4, 0.16],
-              "material": { "baseColor": "#5D4037", "roughness": 0.9 }
-            },
-            {
-              "name": "Foliage_Layer_1",
-              "type": "truncated_pyramid",
-              "position": [0, 1.7, 0],
-              "scale": [1.4, 0.8, 1.4],
-              "material": { "baseColor": "#2E7D32", "roughness": 0.85 }
-            },
-            {
-              "name": "Foliage_Layer_2",
-              "type": "truncated_pyramid",
-              "position": [0, 2.2, 0],
-              "scale": [1.0, 0.7, 1.0],
-              "material": { "baseColor": "#388E3C", "roughness": 0.8 }
-            },
-            {
-              "name": "Foliage_Layer_3",
-              "type": "pyramid",
-              "position": [0, 2.6, 0],
-              "scale": [0.7, 0.6, 0.7],
-              "material": { "baseColor": "#4CAF50", "roughness": 0.75 }
-            }
-          ]
-        },
-        {
-          "name": "Mid_Right_Slender_Tree",
-          "type": "group",
-          "position": [4.2, 0.01, -1.0],
-          "children": [
-            {
-              "name": "Tree_Trunk",
-              "type": "cylinder",
-              "position": [0, 0.8, 0],
-              "scale": [0.12, 1.6, 0.12],
-              "material": { "baseColor": "#5D4037", "roughness": 0.9 }
-            },
-            {
-              "name": "Foliage_Sphere_Main",
-              "type": "sphere",
-              "position": [0, 1.9, 0],
-              "scale": [1.1, 1.2, 1.1],
-              "material": { "baseColor": "#388E3C", "roughness": 0.8 }
-            },
-            {
-              "name": "Foliage_Sphere_Top",
-              "type": "sphere",
-              "position": [0, 2.5, 0],
-              "scale": [0.7, 0.7, 0.7],
-              "material": { "baseColor": "#4CAF50", "roughness": 0.8 }
-            }
-          ]
-        },
-        {
-          "name": "Corner_Back_Dense_Tree",
-          "type": "group",
-          "position": [-4.2, 0.01, -4.0],
-          "children": [
-            {
-              "name": "Tree_Trunk",
-              "type": "cylinder",
-              "position": [0, 0.9, 0],
-              "scale": [0.2, 1.8, 0.2],
-              "material": { "baseColor": "#4E342E", "roughness": 0.95 }
-            },
-            {
-              "name": "Foliage_Chunky_Base",
-              "type": "box",
-              "position": [0, 2.1, 0],
-              "scale": [1.5, 1.0, 1.5],
-              "material": { "baseColor": "#1B5E20", "roughness": 0.9 }
-            },
-            {
-              "name": "Foliage_Chunky_Mid",
-              "type": "box",
-              "position": [0, 2.8, 0],
-              "scale": [1.1, 0.8, 1.1],
-              "material": { "baseColor": "#2E7D32", "roughness": 0.85 }
-            }
-          ]
-        }
-      ]
+// Replaces the previous hard-coded DEMOS array. Models live in
+//   public/models/Model_<N>.<ext>
+// with extensions tried in this exact order, first hit wins:
+//   .js → .jsx → .json → .ts → .tsx
+// Only one file per model number is allowed (the loader stops at the
+// first extension that returns 200). When the user opens the Demo
+// section, Model_1 is loaded automatically. The Demo button's chip
+// shows "Model N / total · filename".
+const LBL_MODEL_STORE_MAX = 200;
+const LBL_MODEL_STORE_EXTS = ['js','jsx','json','ts','tsx'];
+// Try the public-hosting path first (most static sites serve public/ at /).
+// If the user is running the page over file:// or with a custom layout, we
+// fall back to a relative path automatically. A failed fetch on the first
+// path is fine — lblModelStoreFindExisting tries both.
+const LBL_MODEL_STORE_BASES = ['public/models/', 'models/', './public/models/', './models/'];
+let lblModelStoreIndex = 1; // currently loaded model number
+let lblModelStoreCount = 0; // total count discovered
+let lblModelStoreLoadedFilename = ''; // for the chip
+
+function lblModelStoreUrl(n, ext){
+  // Return the primary path (the first base) — actual probing happens
+  // in lblModelStoreFindExisting, which iterates bases × exts.
+  return LBL_MODEL_STORE_BASES[0] + 'Model_' + n + '.' + ext;
+}
+
+async function lblModelStoreFindExisting(n){
+  // Try each base × ext combination. First 200 response wins. This
+  // covers the three common hosting layouts:
+  //   • Vite/CRA/Next-style "public/models/" served at "/models/"
+  //   • Plain "models/" at the same level as index.html
+  //   • "./models/" or "./public/models/" relative (file://, custom server)
+  for(const base of LBL_MODEL_STORE_BASES){
+    for(const ext of LBL_MODEL_STORE_EXTS){
+      const url = base + 'Model_' + n + '.' + ext;
+      try{
+        const r = await fetch(url, {method:'HEAD', cache:'no-store'});
+        if(r.ok) return {n, ext, url};
+      }catch(_){ /* network or CORS — try next */ }
     }
-  ]
+  }
+  return null;
 }
-  },
-  {label:"Private Villa", json:
-{
-  "name": "Luxury_Architectural_Pool_Villa",
-  "type": "group",
-  "constraints": [
-    "groundAligned"
-  ],
-  "children": [
-    {
-      "name": "Site_Landscape_Base",
-      "type": "group",
-      "position": [0, 0, 0],
-      "children": [
-        {
-          "name": "Main_Grass_Plot",
-          "type": "box",
-          "position": [0, 0.01, 0],
-          "scale": [16.0, 0.02, 16.0],
-          "material": { "baseColor": "#3E7D32", "roughness": 0.9 }
-        },
-        {
-          "name": "Stone_Tiled_Terrace",
-          "type": "box",
-          "position": [0, 0.02, 0.5],
-          "scale": [11.0, 0.02, 9.0],
-          "material": { "baseColor": "#DFE2E2", "roughness": 0.6 }
-        },
-        {
-          "name": "Driveway_Paving",
-          "type": "box",
-          "position": [6.2, 0.015, 2.0],
-          "scale": [2.6, 0.01, 12.0],
-          "material": { "baseColor": "#4A4D50", "roughness": 0.8 }
-        },
-        {
-          "name": "Perimeter_Wall_Left",
-          "type": "box",
-          "position": [-7.9, 0.9, 0],
-          "scale": [0.2, 1.8, 16.0],
-          "material": { "baseColor": "#7F8285", "roughness": 0.7 }
-        },
-        {
-          "name": "Perimeter_Wall_Back",
-          "type": "box",
-          "position": [0, 0.9, -7.9],
-          "scale": [16.0, 1.8, 0.2],
-          "material": { "baseColor": "#7F8285", "roughness": 0.7 }
-        }
-      ]
-    },
-    {
-      "name": "Sunken_Front_Pool_Complex",
-      "type": "group",
-      "position": [-2.0, 0.02, 3.2],
-      "children": [
-        {
-          "name": "Pool_Water_Body",
-          "type": "box",
-          "position": [0, 0.005, 0],
-          "scale": [4.5, 0.01, 3.2],
-          "material": { "baseColor": "#40C4FF", "roughness": 0.05, "metalness": 0.1, "opacity": 0.7, "emissive": 0.15 }
-        },
-        {
-          "name": "Pool_Frame_Left",
-          "type": "box",
-          "position": [-2.4, 0.01, 0],
-          "scale": [0.3, 0.03, 3.8],
-          "material": { "baseColor": "#ECEFF1", "roughness": 0.4 }
-        },
-        {
-          "name": "Pool_Frame_Right",
-          "type": "box",
-          "position": [2.4, 0.01, 0],
-          "scale": [0.3, 0.03, 3.8],
-          "material": { "baseColor": "#ECEFF1", "roughness": 0.4 }
-        },
-        {
-          "name": "Pool_Frame_Front",
-          "type": "box",
-          "position": [0, 0.01, 1.75],
-          "scale": [5.1, 0.03, 0.3],
-          "material": { "baseColor": "#ECEFF1", "roughness": 0.4 }
-        },
-        {
-          "name": "Pool_Frame_Back",
-          "type": "box",
-          "position": [0, 0.01, -1.75],
-          "scale": [5.1, 0.03, 0.3],
-          "material": { "baseColor": "#ECEFF1", "roughness": 0.4 }
-        },
-        {
-          "name": "Submerged_Step_1",
-          "type": "box",
-          "position": [1.8, -0.01, -1.3],
-          "scale": [0.6, 0.02, 0.3],
-          "material": { "baseColor": "#B3E5FC", "roughness": 0.2 }
-        },
-        {
-          "name": "Submerged_Step_2",
-          "type": "box",
-          "position": [1.8, -0.03, -1.0],
-          "scale": [0.6, 0.02, 0.3],
-          "material": { "baseColor": "#81D4FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Poolside_Lounger_L",
-          "type": "group",
-          "position": [-3.2, 0.01, -0.6],
-          "rotation": [0, 90, 0],
-          "children": [
-            {
-              "name": "Wood_Slat_Base",
-              "type": "box",
-              "position": [0, 0.04, 0],
-              "scale": [0.55, 0.05, 1.4],
-              "material": { "baseColor": "#795548", "roughness": 0.6 }
-            },
-            {
-              "name": "Angled_Headrest",
-              "type": "wedge",
-              "position": [0, 0.14, -0.5],
-              "scale": [0.55, 0.22, 0.4],
-              "rotation": [-22, 0, 0],
-              "material": { "baseColor": "#795548", "roughness": 0.6 }
-            },
-            {
-              "name": "Fabric_Cushion",
-              "type": "box",
-              "position": [0, 0.08, 0.08],
-              "scale": [0.5, 0.04, 1.1],
-              "material": { "baseColor": "#F5F5F5", "roughness": 0.95 }
-            }
-          ]
-        },
-        {
-          "name": "Poolside_Lounger_R",
-          "type": "group",
-          "position": [-3.2, 0.01, 0.8],
-          "rotation": [0, 90, 0],
-          "children": [
-            {
-              "name": "Wood_Slat_Base",
-              "type": "box",
-              "position": [0, 0.04, 0],
-              "scale": [0.55, 0.05, 1.4],
-              "material": { "baseColor": "#795548", "roughness": 0.6 }
-            },
-            {
-              "name": "Angled_Headrest",
-              "type": "wedge",
-              "position": [0, 0.14, -0.5],
-              "scale": [0.55, 0.22, 0.4],
-              "rotation": [-22, 0, 0],
-              "material": { "baseColor": "#795548", "roughness": 0.6 }
-            },
-            {
-              "name": "Fabric_Cushion",
-              "type": "box",
-              "position": [0, 0.08, 0.08],
-              "scale": [0.5, 0.04, 1.1],
-              "material": { "baseColor": "#F5F5F5", "roughness": 0.95 }
-            }
-          ]
-        },
-        {
-          "name": "Patio_Umbrella",
-          "type": "group",
-          "position": [-3.2, 0.01, 0.1],
-          "children": [
-            {
-              "name": "Umbrella_Stand",
-              "type": "cylinder",
-              "position": [0, 0.04, 0],
-              "scale": [0.25, 0.08, 0.25],
-              "material": { "baseColor": "#37474F", "roughness": 0.5 }
-            },
-            {
-              "name": "Umbrella_Mast",
-              "type": "cylinder",
-              "position": [0, 1.1, 0],
-              "scale": [0.04, 2.2, 0.04],
-              "material": { "baseColor": "#CFD8DC", "metalness": 0.6 }
-            },
-            {
-              "name": "Umbrella_Canopy",
-              "type": "cone",
-              "position": [0, 2.1, 0],
-              "scale": [1.6, 0.35, 1.6],
-              "material": { "baseColor": "#FFB300", "roughness": 0.8 }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "Two_Story_Modern_Villa",
-      "type": "group",
-      "position": [0, 0.02, -1.8],
-      "children": [
-        {
-          "name": "GF_Main_Structure",
-          "type": "box",
-          "position": [0, 1.2, 0],
-          "scale": [10.2, 2.4, 5.2],
-          "material": { "baseColor": "#FFFFFF", "roughness": 0.25 }
-        },
-        {
-          "name": "GF_Timber_Facade_Left",
-          "type": "box",
-          "position": [-3.6, 1.2, 2.61],
-          "scale": [2.8, 2.4, 0.04],
-          "material": { "baseColor": "#A16B47", "roughness": 0.5 }
-        },
-        {
-          "name": "GF_Front_Glass_Wall",
-          "type": "box",
-          "position": [0.8, 1.1, 2.61],
-          "scale": [4.5, 1.8, 0.02],
-          "material": { "baseColor": "#90CAF9", "opacity": 0.4, "roughness": 0.1 }
-        },
-        {
-          "name": "GF_Glass_Wall_Frame",
-          "type": "frame",
-          "position": [0.8, 1.1, 2.62],
-          "scale": [4.56, 1.86, 0.06],
-          "material": { "baseColor": "#212121", "roughness": 0.5 }
-        },
-        {
-          "name": "Villa_Entrance_Door",
-          "type": "box",
-          "position": [-1.8, 1.05, 2.61],
-          "scale": [0.9, 2.1, 0.05],
-          "material": { "baseColor": "#2E3033", "roughness": 0.4 }
-        },
-        {
-          "name": "Entrance_Door_Handle",
-          "type": "box",
-          "position": [-1.45, 1.05, 2.65],
-          "scale": [0.03, 0.4, 0.02],
-          "material": { "baseColor": "#BCAAA4", "metalness": 0.8, "roughness": 0.2 }
-        },
-        {
-          "name": "Integrated_Garage_Door",
-          "type": "box",
-          "position": [3.9, 1.0, 2.61],
-          "scale": [2.2, 2.0, 0.03],
-          "material": { "baseColor": "#424242", "roughness": 0.5 }
-        },
-        {
-          "name": "Garage_Horizontal_Stripe",
-          "type": "box",
-          "position": [3.9, 1.5, 2.63],
-          "scale": [2.1, 0.04, 0.02],
-          "material": { "baseColor": "#E0E0E0", "metalness": 0.5 }
-        },
-        {
-          "name": "Mid_Floor_Separation_Slab",
-          "type": "box",
-          "position": [-0.2, 2.43, 0.2],
-          "scale": [10.8, 0.14, 5.8],
-          "material": { "baseColor": "#263238", "roughness": 0.4 }
-        },
-        {
-          "name": "FF_Main_Structure",
-          "type": "box",
-          "position": [-0.6, 3.4, 0.1],
-          "scale": [8.2, 1.8, 4.4],
-          "material": { "baseColor": "#F5F5F7", "roughness": 0.3 }
-        },
-        {
-          "name": "FF_Cantilever_Feature_Block",
-          "type": "box",
-          "position": [1.4, 3.4, 1.4],
-          "scale": [4.0, 1.8, 2.0],
-          "material": { "baseColor": "#212121", "roughness": 0.4 }
-        },
-        {
-          "name": "FF_Panoramic_Bedroom_Window",
-          "type": "box",
-          "position": [1.4, 3.3, 2.41],
-          "scale": [3.4, 1.2, 0.02],
-          "material": { "baseColor": "#A9DEF9", "opacity": 0.5, "roughness": 0.08 }
-        },
-        {
-          "name": "FF_Panoramic_Window_Frame",
-          "type": "frame",
-          "position": [1.4, 3.3, 2.42],
-          "scale": [3.46, 1.26, 0.04],
-          "material": { "baseColor": "#FFFFFF", "roughness": 0.3 }
-        },
-        {
-          "name": "FF_Balcony_Decking",
-          "type": "box",
-          "position": [-2.7, 2.52, 1.5],
-          "scale": [3.8, 0.04, 1.6],
-          "material": { "baseColor": "#8D6E63", "roughness": 0.7 }
-        },
-        {
-          "name": "FF_Balcony_Glass_Railing",
-          "type": "box",
-          "position": [-2.7, 2.97, 2.28],
-          "scale": [3.8, 0.8, 0.02],
-          "material": { "baseColor": "#A9DEF9", "opacity": 0.3, "roughness": 0.1 }
-        },
-        {
-          "name": "FF_Balcony_Railing_Top",
-          "type": "box",
-          "position": [-2.7, 3.38, 2.28],
-          "scale": [3.84, 0.03, 0.04],
-          "material": { "baseColor": "#212121", "roughness": 0.4 }
-        },
-        {
-          "name": "FF_Balcony_Access_Sliding_Door",
-          "type": "box",
-          "position": [-2.5, 3.3, 0.71],
-          "scale": [2.2, 1.4, 0.02],
-          "material": { "baseColor": "#A9DEF9", "opacity": 0.4 }
-        },
-        {
-          "name": "Flat_Roof_Slab",
-          "type": "box",
-          "position": [-0.4, 4.36, 0.1],
-          "scale": [8.8, 0.12, 4.8],
-          "material": { "baseColor": "#FFFFFF", "roughness": 0.3 }
-        },
-        {
-          "name": "Roof_Parapet_Wall",
-          "type": "frame",
-          "position": [-0.4, 4.48, 0.1],
-          "scale": [8.8, 0.12, 4.8],
-          "material": { "baseColor": "#E0E0E0", "roughness": 0.4 }
-        },
-        {
-          "name": "Architectural_Overhang_Fin",
-          "type": "box",
-          "position": [1.4, 4.36, 1.6],
-          "scale": [4.4, 0.12, 1.8],
-          "material": { "baseColor": "#212121", "roughness": 0.4 }
-        }
-      ]
-    },
-    {
-      "name": "Detailed_Botanical_Elements",
-      "type": "group",
-      "children": [
-        {
-          "name": "Feature_Pine_Tree_Left",
-          "type": "group",
-          "position": [-5.8, 0.02, 1.5],
-          "children": [
-            {
-              "name": "Tree_Trunk_Base",
-              "type": "cylinder",
-              "position": [0, 0.8, 0],
-              "scale": [0.18, 1.6, 0.18],
-              "material": { "baseColor": "#4E342E", "roughness": 0.9 }
-            },
-            {
-              "name": "Foliage_Tier_Lower",
-              "type": "truncated_pyramid",
-              "position": [0, 1.9, 0],
-              "scale": [1.6, 0.9, 1.6],
-              "material": { "baseColor": "#1B5E20", "roughness": 0.8 }
-            },
-            {
-              "name": "Foliage_Tier_Mid",
-              "type": "truncated_pyramid",
-              "position": [0, 2.5, 0],
-              "scale": [1.2, 0.8, 1.2],
-              "material": { "baseColor": "#2E7D32", "roughness": 0.75 }
-            },
-            {
-              "name": "Foliage_Tier_Top",
-              "type": "pyramid",
-              "position": [0, 3.1, 0],
-              "scale": [0.8, 0.7, 0.8],
-              "material": { "baseColor": "#4CAF50", "roughness": 0.7 }
-            }
-          ]
-        },
-        {
-          "name": "Tall_Sculptural_Tree_Right",
-          "type": "group",
-          "position": [4.8, 0.02, -3.2],
-          "children": [
-            {
-              "name": "Main_Trunk",
-              "type": "cylinder",
-              "position": [0, 1.1, 0],
-              "scale": [0.22, 2.2, 0.22],
-              "material": { "baseColor": "#3E2723", "roughness": 0.95 }
-            },
-            {
-              "name": "Canopy_Cluster_Center",
-              "type": "sphere",
-              "position": [0, 2.6, 0],
-              "scale": [1.5, 1.4, 1.5],
-              "material": { "baseColor": "#2E7D32", "roughness": 0.85 }
-            },
-            {
-              "name": "Canopy_Cluster_Top",
-              "type": "sphere",
-              "position": [0, 3.3, 0],
-              "scale": [1.0, 0.9, 1.0],
-              "material": { "baseColor": "#388E3C", "roughness": 0.8 }
-            },
-            {
-              "name": "Canopy_Cluster_Side_L",
-              "type": "sphere",
-              "position": [-0.5, 2.4, 0.2],
-              "scale": [0.7, 0.6, 0.7],
-              "material": { "baseColor": "#1B5E20", "roughness": 0.8 }
-            }
-          ]
-        },
-        {
-          "name": "Flanking_Pool_Shubbery",
-          "type": "group",
-          "position": [1.0, 0.02, 5.5],
-          "children": [
-            {
-              "name": "Geometric_Hedge_1",
-              "type": "box",
-              "position": [0, 0.25, 0],
-              "scale": [0.5, 0.5, 0.5],
-              "material": { "baseColor": "#2E7D32", "roughness": 0.8 }
-            },
-            {
-              "name": "Geometric_Hedge_2",
-              "type": "box",
-              "position": [0.6, 0.35, -0.1],
-              "scale": [0.4, 0.7, 0.4],
-              "material": { "baseColor": "#1B5E20", "roughness": 0.8 }
-            },
-            {
-              "name": "Minimalist_Planter_Box",
-              "type": "box",
-              "position": [0.3, 0.05, -0.05],
-              "scale": [1.3, 0.1, 0.7],
-              "material": { "baseColor": "#37474F", "roughness": 0.5 }
-            }
-          ]
-        },
-        {
-          "name": "Boundary_Line_Cypress",
-          "type": "group",
-          "position": [-6.2, 0.02, -4.5],
-          "children": [
-            {
-              "name": "Trunk",
-              "type": "cylinder",
-              "position": [0, 0.4, 0],
-              "scale": [0.1, 0.8, 0.1],
-              "material": { "baseColor": "#4E342E", "roughness": 0.9 }
-            },
-            {
-              "name": "Slender_Foliage",
-              "type": "cone",
-              "position": [0, 1.8, 0],
-              "scale": [0.7, 2.4, 0.7],
-              "material": { "baseColor": "#1B5E20", "roughness": 0.8 }
-            }
-          ]
-        }
-      ]
+
+async function lblModelStoreCountModels(){
+  // Sequential probe from 1..LBL_MODEL_STORE_MAX; stop at the first
+  // miss. This is a one-time scan the first time Demo is opened.
+  let count = 0;
+  for(let n=1; n<=LBL_MODEL_STORE_MAX; n++){
+    const found = await lblModelStoreFindExisting(n);
+    if(!found) break;
+    count = n;
+  }
+  return count;
+}
+
+async function lblModelStoreLoadByNumber(n){
+  // Find the first file for model #N, fetch its body, and dispatch to
+  // the matching parser (JSON / JS / TS / TSX / JSX).
+  const found = await lblModelStoreFindExisting(n);
+  if(!found){
+    toast(`Model_${n} not found in ${LBL_MODEL_STORE_BASE} (tried ${LBL_MODEL_STORE_EXTS.join(', ')})`, 'err');
+    return false;
+  }
+  let text;
+  try{
+    const r = await fetch(found.url, {cache:'no-store'});
+    text = await r.text();
+  }catch(err){
+    toast(`Failed to fetch ${found.url}: ${err.message}`, 'err');
+    return false;
+  }
+  lblModelStoreIndex = n;
+  lblModelStoreLoadedFilename = 'Model_' + n + '.' + found.ext;
+  // Dispatch to the same parser the file-input / paste flow uses so all
+  // downstream behaviour (validation, build, undo snapshot, animations,
+  // mesh registration) stays identical.
+  if(found.ext === 'ts' || found.ext === 'tsx' || found.ext === 'jsx'){
+    validateAndBuildTs(text, lblModelStoreLoadedFilename);
+  } else {
+    validateAndBuild(text, lblModelStoreLoadedFilename);
+  }
+  lblUpdateModelStoreNav();
+  return true;
+}
+
+function lblUpdateModelStoreNav(){
+  const prev = document.getElementById('demo-prev');
+  const next = document.getElementById('demo-next');
+  const lbl  = document.getElementById('demo-label');
+  if(!prev || !next || !lbl) return;
+  if(lblModelStoreCount > 0){
+    prev.classList.add('show');
+    next.classList.add('show');
+    lbl.classList.add('show');
+    lbl.textContent = `Model ${lblModelStoreIndex} / ${lblModelStoreCount} · ${lblModelStoreLoadedFilename}`;
+  } else {
+    prev.classList.remove('show');
+    next.classList.remove('show');
+    lbl.classList.remove('show');
+  }
+}
+
+function lblModelStoreHideNav(){
+  const prev = document.getElementById('demo-prev');
+  const next = document.getElementById('demo-next');
+  const lbl  = document.getElementById('demo-label');
+  if(prev) prev.classList.remove('show');
+  if(next) next.classList.remove('show');
+  if(lbl)  lbl.classList.remove('show');
+}
+
+async function lblOpenModelStore(){
+  // Called by the Demo button. First click: scan + load Model_1.
+  if(!lblModelStoreCount){
+    toast('Scanning ' + LBL_MODEL_STORE_BASE + ' for Model_1…', '');
+    lblModelStoreCount = await lblModelStoreCountModels();
+    if(!lblModelStoreCount){
+      toast('No Model_1 found in ' + LBL_MODEL_STORE_BASE + ' (tried ' + LBL_MODEL_STORE_EXTS.join(', ') + ')', 'err');
+      lblModelStoreHideNav();
+      return;
     }
-  ]
-}
-  },
-  {label:"Spiderman", json:
-{
-  "name": "Roblox_Spiderman_Avatar",
-  "version": "4.2",
-  "type": "group",
-  "constraints": [
-    "groundAligned"
-  ],
-  "children": [
-    {
-      "id": "LowerTorso",
-      "name": "LowerTorso",
-      "type": "box",
-      "scale": [2.0, 0.6, 1.0],
-      "position": [0.0, 1.3, 0.0],
-      "material": {
-        "baseColor": "#0D2E60",
-        "roughness": 0.6,
-        "metalness": 0.0
-      },
-      "children": [
-        {
-          "id": "LowerTorsoBelt",
-          "name": "LowerTorsoBelt",
-          "type": "box",
-          "scale": [2.02, 0.2, 1.02],
-          "position": [0.0, 1.5, 0.0],
-          "material": {
-            "baseColor": "#D01316",
-            "roughness": 0.6,
-            "metalness": 0.0
-          }
-        },
-        {
-          "id": "UpperTorso",
-          "name": "UpperTorso",
-          "type": "box",
-          "scale": [2.0, 1.4, 1.0],
-          "position": [0.0, 2.3, 0.0],
-          "material": {
-            "baseColor": "#0D2E60",
-            "roughness": 0.6,
-            "metalness": 0.0
-          },
-          "children": [
-            {
-              "id": "ChestRed",
-              "name": "ChestRed",
-              "type": "box",
-              "scale": [1.2, 1.4, 1.04],
-              "position": [0.0, 2.3, 0.01],
-              "material": {
-                "baseColor": "#D01316",
-                "roughness": 0.6,
-                "metalness": 0.0
-              }
-            },
-            {
-              "id": "SpiderEmblemFront",
-              "name": "SpiderEmblemFront",
-              "type": "extrude",
-              "scale": [1.0, 1.0, 1.0],
-              "position": [0.0, 2.3, 0.53],
-              "depth": 0.02,
-              "profile": [
-                [0.0, 0.3],
-                [0.03, 0.1],
-                [0.18, 0.22],
-                [0.05, 0.05],
-                [0.25, 0.06],
-                [0.05, -0.02],
-                [0.2, -0.15],
-                [0.0, -0.05],
-                [-0.2, -0.15],
-                [-0.05, -0.02],
-                [-0.25, 0.06],
-                [-0.05, 0.05],
-                [-0.18, 0.22],
-                [-0.03, 0.1]
-              ],
-              "material": {
-                "baseColor": "#111111",
-                "roughness": 0.9,
-                "metalness": 0.2
-              }
-            },
-            {
-              "id": "Head",
-              "name": "Head",
-              "type": "box",
-              "scale": [1.2, 1.2, 1.2],
-              "position": [0.0, 3.6, 0.0],
-              "roundness": 0.12,
-              "material": {
-                "baseColor": "#D01316",
-                "roughness": 0.6,
-                "metalness": 0.0
-              },
-              "children": [
-                {
-                  "id": "LeftLensOuter",
-                  "name": "LeftLensOuter",
-                  "type": "plane",
-                  "scale": [0.35, 0.35, 1.0],
-                  "position": [0.22, 3.65, 0.61],
-                  "rotation": [0.0, 12.0, -5.0],
-                  "constraints": [
-                    "bilateralSymmetry"
-                  ],
-                  "material": {
-                    "baseColor": "#111111",
-                    "roughness": 0.8,
-                    "metalness": 0.0
-                  }
-                },
-                {
-                  "id": "LeftLensInner",
-                  "name": "LeftLensInner",
-                  "type": "plane",
-                  "scale": [0.26, 0.26, 1.0],
-                  "position": [0.22, 3.65, 0.62],
-                  "rotation": [0.0, 12.0, -5.0],
-                  "constraints": [
-                    "bilateralSymmetry"
-                  ],
-                  "material": {
-                    "baseColor": "#FFFFFF",
-                    "roughness": 0.2,
-                    "metalness": 0.0,
-                    "emissive": "#FFFFFF",
-                    "emissiveIntensity": 2.2
-                  }
-                }
-              ]
-            },
-            {
-              "id": "LeftUpperArm",
-              "name": "LeftUpperArm",
-              "type": "box",
-              "scale": [1.0, 1.0, 1.0],
-              "position": [1.5, 2.5, 0.0],
-              "roundness": 0.05,
-              "constraints": [
-                "bilateralSymmetry"
-                  ],
-              "material": {
-                "baseColor": "#0D2E60",
-                "roughness": 0.6,
-                "metalness": 0.0
-              }
-            },
-            {
-              "id": "LeftShoulderRed",
-              "name": "LeftShoulderRed",
-              "type": "box",
-              "scale": [1.02, 0.3, 1.02],
-              "position": [1.5, 2.85, 0.0],
-              "constraints": [
-                "bilateralSymmetry"
-              ],
-              "material": {
-                "baseColor": "#D01316",
-                "roughness": 0.6,
-                "metalness": 0.0
-              }
-            },
-            {
-              "id": "LeftLowerArm",
-              "name": "LeftLowerArm",
-              "type": "box",
-              "scale": [1.0, 1.0, 1.0],
-              "position": [1.5, 1.5, 0.0],
-              "roundness": 0.05,
-              "constraints": [
-                "bilateralSymmetry"
-              ],
-              "material": {
-                "baseColor": "#D01316",
-                "roughness": 0.6,
-                "metalness": 0.0
-              }
-            },
-            {
-              "id": "LeftHand",
-              "name": "LeftHand",
-              "type": "box",
-              "scale": [1.0, 0.4, 1.0],
-              "position": [1.5, 0.8, 0.0],
-              "roundness": 0.08,
-              "constraints": [
-                "bilateralSymmetry"
-              ],
-              "material": {
-                "baseColor": "#D01316",
-                "roughness": 0.6,
-                "metalness": 0.0
-              }
-            },
-            {
-              "id": "LeftWebShooter",
-              "name": "LeftWebShooter",
-              "type": "cylinder",
-              "scale": [0.15, 0.2, 0.15],
-              "position": [1.5, 1.1, 0.51],
-              "rotation": [90.0, 0.0, 0.0],
-              "constraints": [
-                "bilateralSymmetry"
-              ],
-              "material": {
-                "baseColor": "#B0B5BC",
-                "roughness": 0.2,
-                "metalness": 0.8
-              }
-            }
-          ]
-        },
-        {
-          "id": "LeftUpperLeg",
-          "name": "LeftUpperLeg",
-          "type": "box",
-          "scale": [1.0, 0.6, 1.0],
-          "position": [0.5, 0.7, 0.0],
-          "roundness": 0.05,
-          "constraints": [
-            "bilateralSymmetry"
-          ],
-          "material": {
-            "baseColor": "#0D2E60",
-            "roughness": 0.6,
-            "metalness": 0.0
-          }
-        },
-        {
-          "id": "LeftLowerLeg",
-          "name": "LeftLowerLeg",
-          "type": "box",
-          "scale": [1.0, 0.6, 1.0],
-          "position": [0.5, -0.1, 0.0],
-          "roundness": 0.05,
-          "constraints": [
-            "bilateralSymmetry"
-          ],
-          "material": {
-            "baseColor": "#D01316",
-            "roughness": 0.6,
-            "metalness": 0.0
-          }
-        },
-        {
-          "id": "LeftFoot",
-          "name": "LeftFoot",
-          "type": "box",
-          "scale": [1.0, 0.4, 1.1],
-          "position": [0.5, -0.6, 0.05],
-          "roundness": 0.05,
-          "constraints": [
-            "bilateralSymmetry"
-          ],
-          "material": {
-            "baseColor": "#D01316",
-            "roughness": 0.6,
-            "metalness": 0.0
-          }
-        }
-      ]
-    }
-  ]
-}
-  },
-  {label:"Gundam Exia", json:
-{
-  "name": "Gundam_Exia_Refined",
-  "type": "group",
-  "constraints": [
-    "bilateralSymmetry",
-    "groundAligned"
-  ],
-  "children": [
-    {
-      "name": "Pelvis_Assembly",
-      "type": "group",
-      "position": [0, 0.92, 0],
-      "children": [
-        {
-          "name": "Pelvis_Core_Frame",
-          "type": "box",
-          "position": [0, 0, 0],
-          "scale": [0.32, 0.14, 0.24],
-          "material": { "baseColor": "#263238", "roughness": 0.4, "metalness": 0.6 }
-        },
-        {
-          "name": "Pelvis_Outer_Armor",
-          "type": "box",
-          "position": [0, 0.02, 0],
-          "scale": [0.34, 0.12, 0.26],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Center_Crotch_Guard",
-          "type": "wedge",
-          "position": [0, -0.02, 0.13],
-          "scale": [0.1, 0.16, 0.08],
-          "rotation": [-8, 0, 0],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.25 }
-        },
-        {
-          "name": "Front_Skirt_Left",
-          "type": "truncated_pyramid",
-          "position": [-0.1, -0.06, 0.13],
-          "scale": [0.11, 0.2, 0.04],
-          "rotation": [10, -4, -2],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Front_Skirt_Right",
-          "type": "truncated_pyramid",
-          "position": [0.1, -0.06, 0.13],
-          "scale": [0.11, 0.2, 0.04],
-          "rotation": [10, 4, 2],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Side_Skirt_Blade_Mount_L",
-          "type": "wedge",
-          "position": [-0.17, -0.04, 0.02],
-          "scale": [0.04, 0.26, 0.1],
-          "rotation": [0, 0, -6],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Side_Skirt_Blade_Mount_R",
-          "type": "wedge",
-          "position": [0.17, -0.04, 0.02],
-          "scale": [0.04, 0.26, 0.1],
-          "rotation": [0, 0, 6],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Hip_Joint_Axle_L",
-          "type": "cylinder",
-          "position": [-0.14, -0.05, 0],
-          "scale": [0.05, 0.07, 0.05],
-          "rotation": [0, 0, 90],
-          "material": { "baseColor": "#263238", "metalness": 0.7 }
-        },
-        {
-          "name": "Hip_Joint_Axle_R",
-          "type": "cylinder",
-          "position": [0.14, -0.05, 0],
-          "scale": [0.05, 0.07, 0.05],
-          "rotation": [0, 0, 90],
-          "material": { "baseColor": "#263238", "metalness": 0.7 }
-        }
-      ]
-    },
-    {
-      "name": "Torso_Assembly",
-      "type": "group",
-      "position": [0, 1.18, 0],
-      "children": [
-        {
-          "name": "Abdomen_Inner_Frame",
-          "type": "box",
-          "position": [0, -0.1, 0],
-          "scale": [0.2, 0.12, 0.16],
-          "material": { "baseColor": "#263238", "roughness": 0.4, "metalness": 0.5 }
-        },
-        {
-          "name": "Abdomen_Outer_Segment",
-          "type": "box",
-          "position": [0, -0.02, 0.01],
-          "scale": [0.22, 0.08, 0.18],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.2 }
-        },
-        {
-          "name": "Chest_Main_Block",
-          "type": "box",
-          "position": [0, 0.16, -0.02],
-          "scale": [0.46, 0.28, 0.3],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Pectoral_Armor_Left",
-          "type": "wedge",
-          "position": [-0.15, 0.18, 0.11],
-          "scale": [0.15, 0.2, 0.11],
-          "rotation": [5, -12, -3],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.2, "metalness": 0.2 }
-        },
-        {
-          "name": "Pectoral_Armor_Right",
-          "type": "wedge",
-          "position": [0.15, 0.18, 0.11],
-          "scale": [0.15, 0.2, 0.11],
-          "rotation": [5, 12, 3],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.2, "metalness": 0.2 }
-        },
-        {
-          "name": "Cockpit_Center_Chamber",
-          "type": "truncated_pyramid",
-          "position": [0, 0.04, 0.12],
-          "scale": [0.14, 0.12, 0.08],
-          "rotation": [6, 0, 0],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.2 }
-        },
-        {
-          "name": "GN_Drive_Central_Cone",
-          "type": "cone",
-          "position": [0, 0.16, 0.13],
-          "scale": [0.12, 0.1, 0.12],
-          "rotation": [90, 0, 0],
-          "material": { "baseColor": "#263238", "roughness": 0.3 }
-        },
-        {
-          "name": "GN_Drive_Glowing_Lens",
-          "type": "cylinder",
-          "position": [0, 0.16, 0.14],
-          "scale": [0.09, 0.02, 0.09],
-          "rotation": [90, 0, 0],
-          "material": { "baseColor": "#00E676", "emissive": 0.8, "roughness": 0.1 }
-        },
-        {
-          "name": "Clavicle_Air_Vent_L",
-          "type": "box",
-          "position": [-0.11, 0.28, 0.05],
-          "scale": [0.07, 0.04, 0.11],
-          "rotation": [0, -8, -4],
-          "material": { "baseColor": "#F57F17", "roughness": 0.3 }
-        },
-        {
-          "name": "Clavicle_Air_Vent_R",
-          "type": "box",
-          "position": [0.11, 0.28, 0.05],
-          "scale": [0.07, 0.04, 0.11],
-          "rotation": [0, 8, 4],
-          "material": { "baseColor": "#F57F17", "roughness": 0.3 }
-        },
-        {
-          "name": "Shoulder_Joint_Stub_L",
-          "type": "box",
-          "position": [-0.26, 0.2, -0.01],
-          "scale": [0.08, 0.1, 0.12],
-          "material": { "baseColor": "#263238", "roughness": 0.4 }
-        },
-        {
-          "name": "Shoulder_Joint_Stub_R",
-          "type": "box",
-          "position": [0.26, 0.2, -0.01],
-          "scale": [0.08, 0.1, 0.12],
-          "material": { "baseColor": "#263238", "roughness": 0.4 }
-        },
-        {
-          "name": "Neck_Support_Pillar",
-          "type": "cylinder",
-          "position": [0, 0.3, -0.01],
-          "scale": [0.07, 0.05, 0.07],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        }
-      ]
-    },
-    {
-      "name": "Head_Assembly",
-      "type": "group",
-      "position": [0, 1.54, -0.02],
-      "children": [
-        {
-          "name": "Head_Base_Skull",
-          "type": "box",
-          "position": [0, 0, 0],
-          "scale": [0.16, 0.16, 0.16],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Face_Plate_Mask",
-          "type": "truncated_pyramid",
-          "position": [0, -0.02, 0.07],
-          "scale": [0.08, 0.07, 0.03],
-          "rotation": [5, 0, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Chin_Guard_Piece",
-          "type": "wedge",
-          "position": [0, -0.06, 0.08],
-          "scale": [0.03, 0.05, 0.03],
-          "rotation": [-12, 0, 0],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.2 }
-        },
-        {
-          "name": "Main_Optic_Visor",
-          "type": "box",
-          "position": [0, 0.02, 0.08],
-          "scale": [0.09, 0.018, 0.015],
-          "material": { "baseColor": "#00E676", "emissive": 0.9 }
-        },
-        {
-          "name": "V_Fin_Left_Wing",
-          "type": "wedge",
-          "position": [-0.01, 0.08, 0.07],
-          "scale": [0.015, 0.28, 0.025],
-          "rotation": [6, -15, -62],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.15 }
-        },
-        {
-          "name": "V_Fin_Right_Wing",
-          "type": "wedge",
-          "position": [0.01, 0.08, 0.07],
-          "scale": [0.015, 0.28, 0.025],
-          "rotation": [6, 15, 62],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.15 }
-        },
-        {
-          "name": "Central_Forehead_Crest",
-          "type": "pyramid",
-          "position": [0, 0.06, 0.09],
-          "scale": [0.035, 0.06, 0.025],
-          "rotation": [10, 0, 0],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.2 }
-        },
-        {
-          "name": "Cheek_Armor_Flange_L",
-          "type": "wedge",
-          "position": [-0.08, -0.02, 0.02],
-          "scale": [0.02, 0.1, 0.07],
-          "rotation": [-8, -4, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Cheek_Armor_Flange_R",
-          "type": "wedge",
-          "position": [0.08, -0.02, 0.02],
-          "scale": [0.02, 0.1, 0.07],
-          "rotation": [-8, 4, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        }
-      ]
-    },
-    {
-      "name": "Left_Arm_Assembly",
-      "type": "group",
-      "position": [-0.31, 1.36, -0.01],
-      "children": [
-        {
-          "name": "Shoulder_Internal_Ball_L",
-          "type": "box",
-          "position": [0, 0, 0],
-          "scale": [0.08, 0.08, 0.08],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Shoulder_Pauldrons_Main_L",
-          "type": "box",
-          "position": [-0.05, 0.03, 0],
-          "scale": [0.16, 0.14, 0.2],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Shoulder_Blue_Cap_Trim_L",
-          "type": "wedge",
-          "position": [-0.05, 0.1, 0],
-          "scale": [0.17, 0.04, 0.21],
-          "rotation": [0, 0, 180],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.25 }
-        },
-        {
-          "name": "Bicep_Upper_Arm_L",
-          "type": "box",
-          "position": [-0.02, -0.14, 0],
-          "scale": [0.08, 0.18, 0.08],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Elbow_Joint_Hinged_L",
-          "type": "box",
-          "position": [-0.02, -0.25, 0],
-          "scale": [0.07, 0.07, 0.07],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Forearm_Lower_Arm_L",
-          "type": "truncated_pyramid",
-          "position": [-0.02, -0.38, 0],
-          "scale": [0.09, 0.2, 0.09],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Manipulator_Hand_Fist_L",
-          "type": "box",
-          "position": [-0.02, -0.5, 0],
-          "scale": [0.055, 0.055, 0.055],
-          "material": { "baseColor": "#263238", "roughness": 0.5 }
-        }
-      ]
-    },
-    {
-      "name": "Right_Arm_Assembly",
-      "type": "group",
-      "position": [0.31, 1.36, -0.01],
-      "children": [
-        {
-          "name": "Shoulder_Internal_Ball_R",
-          "type": "box",
-          "position": [0, 0, 0],
-          "scale": [0.08, 0.08, 0.08],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Shoulder_Pauldrons_Main_R",
-          "type": "box",
-          "position": [0.05, 0.03, 0],
-          "scale": [0.16, 0.14, 0.2],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Shoulder_Blue_Cap_Trim_R",
-          "type": "wedge",
-          "position": [0.05, 0.1, 0],
-          "scale": [0.17, 0.04, 0.21],
-          "rotation": [0, 0, 180],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.25 }
-        },
-        {
-          "name": "Bicep_Upper_Arm_R",
-          "type": "box",
-          "position": [0.02, -0.14, 0],
-          "scale": [0.08, 0.18, 0.08],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Elbow_Joint_Hinged_R",
-          "type": "box",
-          "position": [0.02, -0.25, 0],
-          "scale": [0.07, 0.07, 0.07],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Forearm_Lower_Arm_R",
-          "type": "truncated_pyramid",
-          "position": [0.02, -0.38, 0],
-          "scale": [0.09, 0.2, 0.09],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "GN_Sword_Forearm_Bracer",
-          "type": "box",
-          "position": [0.05, -0.35, 0.04],
-          "scale": [0.045, 0.14, 0.07],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.2 }
-        },
-        {
-          "name": "GN_Sword_Solid_Blade",
-          "type": "wedge",
-          "position": [0.06, -0.58, 0.14],
-          "scale": [0.018, 0.5, 0.07],
-          "rotation": [174, 0, 0],
-          "material": { "baseColor": "#ECEFF1", "roughness": 0.1, "metalness": 0.95 }
-        },
-        {
-          "name": "Manipulator_Hand_Fist_R",
-          "type": "box",
-          "position": [0.02, -0.5, 0],
-          "scale": [0.055, 0.055, 0.055],
-          "material": { "baseColor": "#263238", "roughness": 0.5 }
-        }
-      ]
-    },
-    {
-      "name": "Left_Leg_Assembly",
-      "type": "group",
-      "position": [-0.14, 0.86, 0],
-      "children": [
-        {
-          "name": "Thigh_Connection_Socket_L",
-          "type": "box",
-          "position": [0, 0, 0],
-          "scale": [0.11, 0.09, 0.11],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Thigh_Upper_Leg_Armor_L",
-          "type": "truncated_pyramid",
-          "position": [0, -0.18, 0.01],
-          "scale": [0.14, 0.32, 0.14],
-          "rotation": [180, 0, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Knee_Joint_Enclosure_L",
-          "type": "box",
-          "position": [0, -0.37, 0.01],
-          "scale": [0.11, 0.09, 0.11],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Knee_Cap_Shield_L",
-          "type": "truncated_pyramid",
-          "position": [0, -0.35, 0.08],
-          "scale": [0.11, 0.13, 0.06],
-          "rotation": [-5, 0, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Shin_Lower_Leg_Gaiter_L",
-          "type": "truncated_pyramid",
-          "position": [0, -0.6, 0.02],
-          "scale": [0.18, 0.42, 0.18],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Calf_Side_Fairing_Outer_L",
-          "type": "wedge",
-          "position": [-0.07, -0.58, 0.01],
-          "scale": [0.045, 0.3, 0.12],
-          "rotation": [0, -90, -3],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Calf_Side_Fairing_Inner_L",
-          "type": "wedge",
-          "position": [0.07, -0.58, 0.01],
-          "scale": [0.045, 0.3, 0.12],
-          "rotation": [0, 90, 3],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Ache_Calf_Thruster_Fin_L",
-          "type": "wedge",
-          "position": [0, -0.58, -0.1],
-          "scale": [0.07, 0.24, 0.08],
-          "rotation": [10, 0, 0],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.25 }
-        },
-        {
-          "name": "Ankle_Spindle_Joint_L",
-          "type": "box",
-          "position": [0, -0.82, 0.01],
-          "scale": [0.09, 0.07, 0.09],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Ankle_Cuff_Armor_Guard_L",
-          "type": "box",
-          "position": [0, -0.84, 0.02],
-          "scale": [0.14, 0.05, 0.13],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.2 }
-        },
-        {
-          "name": "Foot_Anatomic_Sole_L",
-          "type": "box",
-          "position": [0, -0.89, 0.05],
-          "scale": [0.15, 0.05, 0.24],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.3 }
-        },
-        {
-          "name": "Foot_Plunging_Toe_Wedge_L",
-          "type": "wedge",
-          "position": [0, -0.89, 0.19],
-          "scale": [0.13, 0.045, 0.07],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.25 }
-        }
-      ]
-    },
-    {
-      "name": "Right_Leg_Assembly",
-      "type": "group",
-      "position": [0.14, 0.86, 0],
-      "children": [
-        {
-          "name": "Thigh_Connection_Socket_R",
-          "type": "box",
-          "position": [0, 0, 0],
-          "scale": [0.11, 0.09, 0.11],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Thigh_Upper_Leg_Armor_R",
-          "type": "truncated_pyramid",
-          "position": [0, -0.18, 0.01],
-          "scale": [0.14, 0.32, 0.14],
-          "rotation": [180, 0, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Knee_Joint_Enclosure_R",
-          "type": "box",
-          "position": [0, -0.37, 0.01],
-          "scale": [0.11, 0.09, 0.11],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Knee_Cap_Shield_R",
-          "type": "truncated_pyramid",
-          "position": [0, -0.35, 0.08],
-          "scale": [0.11, 0.13, 0.06],
-          "rotation": [-5, 0, 0],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Shin_Lower_Leg_Gaiter_R",
-          "type": "truncated_pyramid",
-          "position": [0, -0.6, 0.02],
-          "scale": [0.18, 0.42, 0.18],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Calf_Side_Fairing_Outer_R",
-          "type": "wedge",
-          "position": [0.07, -0.58, 0.01],
-          "scale": [0.045, 0.3, 0.12],
-          "rotation": [0, 90, 3],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Calf_Side_Fairing_Inner_R",
-          "type": "wedge",
-          "position": [-0.07, -0.58, 0.01],
-          "scale": [0.045, 0.3, 0.12],
-          "rotation": [0, -90, -3],
-          "material": { "baseColor": "#F8F9FA", "roughness": 0.2 }
-        },
-        {
-          "name": "Ache_Calf_Thruster_Fin_R",
-          "type": "wedge",
-          "position": [0, -0.58, -0.1],
-          "scale": [0.07, 0.24, 0.08],
-          "rotation": [10, 0, 0],
-          "material": { "baseColor": "#0D47A1", "roughness": 0.25 }
-        },
-        {
-          "name": "Ankle_Spindle_Joint_R",
-          "type": "box",
-          "position": [0, -0.82, 0.01],
-          "scale": [0.09, 0.07, 0.09],
-          "material": { "baseColor": "#263238", "metalness": 0.6 }
-        },
-        {
-          "name": "Ankle_Cuff_Armor_Guard_R",
-          "type": "box",
-          "position": [0, -0.84, 0.02],
-          "scale": [0.14, 0.05, 0.13],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.2 }
-        },
-        {
-          "name": "Foot_Anatomic_Sole_R",
-          "type": "box",
-          "position": [0, -0.89, 0.05],
-          "scale": [0.15, 0.05, 0.24],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.3 }
-        },
-        {
-          "name": "Foot_Plunging_Toe_Wedge_R",
-          "type": "wedge",
-          "position": [0, -0.89, 0.19],
-          "scale": [0.13, 0.045, 0.07],
-          "material": { "baseColor": "#B71C1C", "roughness": 0.25 }
-        }
-      ]
-    }
-  ]
-}
-  },
-  {label:"Mossy Iron Golem", json:
-{
-  "meta": {
-    "name": "Mossy Iron Golem",
-    "description": "A chunky, low-poly Minecraft-style iron golem overgrown with moss. White/cream iron plating on the core (head, torso, upper arms, hands, lower legs, feet), green mossy growth on the crown, forearms, hips, and thighs. Glowing pink eyes and a dark mouth grille give it a menacing, slightly forward-leaning stance."
-  },
-  "objects": [
-    {
-      "id": "ground",
-      "type": "ground_plane",
-      "scale": [6, 1, 6],
-      "material": "grass",
-      "baseColor": "#3a5a2a",
-      "position": [0, 0, 0]
-    },
-
-    {
-      "id": "foot_l",
-      "type": "cube",
-      "scale": [0.50, 0.20, 0.65],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [-0.22, 0.10, 0.10],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "foot_toe_l",
-      "type": "cube",
-      "scale": [0.46, 0.08, 0.15],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "roughness": 0.6,
-      "metalness": 0.35,
-      "position": [-0.22, 0.03, 0.40],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "ankle_l",
-      "type": "cube",
-      "scale": [0.44, 0.12, 0.48],
-      "material": "iron",
-      "baseColor": "#b8b4a4",
-      "roughness": 0.7,
-      "metalness": 0.4,
-      "position": [-0.22, 0.25, 0.02],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "lower_leg_l",
-      "type": "cube",
-      "scale": [0.40, 0.55, 0.48],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [-0.22, 0.57, 0],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "knee_l",
-      "type": "cube",
-      "scale": [0.44, 0.18, 0.52],
-      "material": "iron",
-      "baseColor": "#b8b4a4",
-      "roughness": 0.7,
-      "metalness": 0.4,
-      "position": [-0.22, 0.93, 0.02],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "thigh_l",
-      "type": "cube",
-      "scale": [0.42, 0.60, 0.50],
-      "material": "moss",
-      "baseColor": "#3d6a28",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [-0.22, 1.27, 0],
-      "operations": [
-        { "type": "noise", "params": { "amount": 0.02 } }
-      ],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "hip_moss",
-      "type": "cube",
-      "scale": [0.95, 0.35, 0.60],
-      "material": "moss",
-      "baseColor": "#4a7a35",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [0, 1.73, 0]
-    },
-
-    {
-      "id": "torso",
-      "type": "cube",
-      "scale": [1.0, 0.95, 0.65],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [0, 2.40, 0],
-      "operations": [
-        { "type": "noise", "params": { "amount": 0.015 } }
-      ]
-    },
-
-    {
-      "id": "chest_plate_seam",
-      "type": "cube",
-      "scale": [0.04, 0.85, 0.66],
-      "material": "iron",
-      "baseColor": "#b8b4a4",
-      "roughness": 0.7,
-      "metalness": 0.4,
-      "position": [0, 2.40, 0]
-    },
-
-    {
-      "id": "moss_patch_torso_l",
-      "type": "cube",
-      "scale": [0.20, 0.18, 0.05],
-      "material": "moss",
-      "baseColor": "#5a8a3a",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [-0.35, 2.60, 0.34],
-      "operations": [
-        { "type": "noise", "params": { "amount": 0.02 } }
-      ]
-    },
-    {
-      "id": "moss_patch_torso_r",
-      "type": "cube",
-      "scale": [0.18, 0.14, 0.05],
-      "material": "moss",
-      "baseColor": "#5a8a3a",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [0.38, 2.50, 0.34],
-      "operations": [
-        { "type": "noise", "params": { "amount": 0.02 } }
-      ]
-    },
-
-    {
-      "id": "shoulder_l",
-      "type": "cube",
-      "scale": [0.55, 0.55, 0.65],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [-0.78, 2.73, 0],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "shoulder_top_l",
-      "type": "cube",
-      "scale": [0.45, 0.18, 0.65],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "roughness": 0.6,
-      "metalness": 0.35,
-      "position": [-0.74, 3.05, 0],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "moss_patch_shoulder_l",
-      "type": "cube",
-      "scale": [0.22, 0.16, 0.06],
-      "material": "moss",
-      "baseColor": "#5a8a3a",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [-0.55, 2.87, 0.33]
-    },
-    {
-      "id": "moss_patch_shoulder_r",
-      "type": "cube",
-      "scale": [0.22, 0.16, 0.06],
-      "material": "moss",
-      "baseColor": "#5a8a3a",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [0.55, 2.87, 0.33]
-    },
-
-    {
-      "id": "upper_arm_l",
-      "type": "cube",
-      "scale": [0.40, 0.55, 0.50],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [-0.78, 2.15, 0.05],
-      "rotation": [0, 0, -8],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "elbow_l",
-      "type": "cube",
-      "scale": [0.42, 0.18, 0.50],
-      "material": "iron",
-      "baseColor": "#b8b4a4",
-      "roughness": 0.7,
-      "metalness": 0.4,
-      "position": [-0.82, 1.80, 0.10],
-      "rotation": [0, 0, -5],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "forearm_moss_l",
-      "type": "cube",
-      "scale": [0.50, 0.55, 0.55],
-      "material": "moss",
-      "baseColor": "#3d6a28",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [-0.85, 1.43, 0.18],
-      "rotation": [0, 0, -5],
-      "operations": [
-        { "type": "noise", "params": { "amount": 0.025 } }
-      ],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "wrist_l",
-      "type": "cube",
-      "scale": [0.46, 0.12, 0.52],
-      "material": "iron",
-      "baseColor": "#b8b4a4",
-      "roughness": 0.7,
-      "metalness": 0.4,
-      "position": [-0.88, 1.13, 0.22],
-      "rotation": [0, 0, -3],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "fist_l",
-      "type": "cube",
-      "scale": [0.55, 0.45, 0.55],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [-0.92, 0.90, 0.28],
-      "rotation": [0, 0, -3],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "knuckle_l1",
-      "type": "cube",
-      "scale": [0.12, 0.10, 0.10],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "roughness": 0.6,
-      "metalness": 0.35,
-      "position": [-1.04, 1.00, 0.45],
-      "constraints": ["symmetrical"]
-    },
-    {
-      "id": "knuckle_l2",
-      "type": "cube",
-      "scale": [0.12, 0.10, 0.10],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "roughness": 0.6,
-      "metalness": 0.35,
-      "position": [-0.92, 1.07, 0.50],
-      "constraints": ["symmetrical"]
-    },
-    {
-      "id": "knuckle_l3",
-      "type": "cube",
-      "scale": [0.12, 0.10, 0.10],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "roughness": 0.6,
-      "metalness": 0.35,
-      "position": [-0.80, 1.00, 0.45],
-      "constraints": ["symmetrical"]
-    },
-
-    {
-      "id": "vine_left",
-      "type": "tube",
-      "scale": [0.04, 0.6, 0.04],
-      "material": "vine",
-      "baseColor": "#5a8a3a",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [-0.78, 1.50, 0.30],
-      "bendAngle": 25,
-      "bendAxis": "y"
-    },
-
-    {
-      "id": "vine_right",
-      "type": "tube",
-      "scale": [0.04, 0.55, 0.04],
-      "material": "vine",
-      "baseColor": "#5a8a3a",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [0.78, 1.55, 0.28],
-      "bendAngle": -22,
-      "bendAxis": "y"
-    },
-
-    {
-      "id": "head",
-      "type": "cube",
-      "scale": [0.9, 0.85, 0.9],
-      "material": "iron",
-      "baseColor": "#ece8d8",
-      "roughness": 0.55,
-      "metalness": 0.35,
-      "position": [0, 3.00, 0]
-    },
-
-    {
-      "id": "head_crown_moss",
-      "type": "cube",
-      "scale": [0.95, 0.18, 0.95],
-      "material": "moss",
-      "baseColor": "#4d7a35",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [0, 3.51, 0],
-      "operations": [
-        { "type": "noise", "params": { "amount": 0.04 } }
-      ]
-    },
-
-    {
-      "id": "head_chin_moss",
-      "type": "cube",
-      "scale": [0.55, 0.12, 0.55],
-      "material": "moss",
-      "baseColor": "#3d6a28",
-      "roughness": 0.95,
-      "metalness": 0.0,
-      "position": [0, 2.50, 0.25]
-    },
-
-    {
-      "id": "eye_socket_l",
-      "type": "cube",
-      "scale": [0.26, 0.22, 0.04],
-      "material": "stone",
-      "baseColor": "#1f1f26",
-      "roughness": 0.85,
-      "metalness": 0.15,
-      "position": [-0.22, 3.05, 0.435]
-    },
-    {
-      "id": "eye_socket_r",
-      "type": "cube",
-      "scale": [0.26, 0.22, 0.04],
-      "material": "stone",
-      "baseColor": "#1f1f26",
-      "roughness": 0.85,
-      "metalness": 0.15,
-      "position": [0.22, 3.05, 0.435]
-    },
-
-    {
-      "id": "eye_l",
-      "type": "cube",
-      "scale": [0.18, 0.14, 0.06],
-      "material": "magiccrystal",
-      "baseColor": "#ffaadd",
-      "emissive": "#ff44aa",
-      "emissiveIntensity": 2.4,
-      "position": [-0.22, 3.05, 0.46]
-    },
-    {
-      "id": "eye_r",
-      "type": "cube",
-      "scale": [0.18, 0.14, 0.06],
-      "material": "magiccrystal",
-      "baseColor": "#ffaadd",
-      "emissive": "#ff44aa",
-      "emissiveIntensity": 2.4,
-      "position": [0.22, 3.05, 0.46]
-    },
-
-    {
-      "id": "mouth_grille",
-      "type": "cube",
-      "scale": [0.55, 0.18, 0.05],
-      "material": "obsidian",
-      "baseColor": "#1a1a22",
-      "roughness": 0.7,
-      "metalness": 0.4,
-      "position": [0, 2.75, 0.46]
-    },
-
-    {
-      "id": "mouth_grille_bar1",
-      "type": "cube",
-      "scale": [0.50, 0.025, 0.07],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "position": [0, 2.81, 0.46]
-    },
-    {
-      "id": "mouth_grille_bar2",
-      "type": "cube",
-      "scale": [0.50, 0.025, 0.07],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "position": [0, 2.75, 0.46]
-    },
-    {
-      "id": "mouth_grille_bar3",
-      "type": "cube",
-      "scale": [0.50, 0.025, 0.07],
-      "material": "iron",
-      "baseColor": "#d8d2c0",
-      "position": [0, 2.69, 0.46]
-    }
-  ]
-}
-  },
-];
-
-let demoIndex = 0;
-
-function showDemoNav(){
-  document.getElementById('demo-prev').classList.add('show');
-  document.getElementById('demo-next').classList.add('show');
-  const lbl=document.getElementById('demo-label');
-  lbl.textContent = `${demoIndex+1} / ${DEMOS.length} · ${DEMOS[demoIndex].label}`;
-  lbl.classList.add('show');
-}
-function hideDemoNav(){
-  document.getElementById('demo-prev').classList.remove('show');
-  document.getElementById('demo-next').classList.remove('show');
-  document.getElementById('demo-label').classList.remove('show');
-}
-function loadDemo(i){
-  demoIndex = ((i % DEMOS.length) + DEMOS.length) % DEMOS.length;
-  validateAndBuild(DEMOS[demoIndex].json, 'demo');
-  showDemoNav();
-  toast(DEMOS[demoIndex].label+' loaded','ok');
+  }
+  await lblModelStoreLoadByNumber(1);
 }
 
+async function lblModelStorePrev(){
+  if(!lblModelStoreCount) return;
+  const n = lblModelStoreIndex > 1 ? lblModelStoreIndex - 1 : lblModelStoreCount;
+  await lblModelStoreLoadByNumber(n);
+}
+async function lblModelStoreNext(){
+  if(!lblModelStoreCount) return;
+  const n = lblModelStoreIndex < lblModelStoreCount ? lblModelStoreIndex + 1 : 1;
+  await lblModelStoreLoadByNumber(n);
+}
 // ═══════════════════════════════════════════
 // EXPORT
 // ═══════════════════════════════════════════
@@ -14981,7 +13206,7 @@ window.exportGLB=exportGLB; window.exportOBJ=exportOBJ;
 // ═══════════════════════════════════════════
 // EVENT WIRING
 // ═══════════════════════════════════════════
-function readFile(file){ hideDemoNav(); const r=new FileReader(); r.onload=e=>validateAndBuild(e.target.result,file.name); r.readAsText(file); }
+function readFile(file){ lblModelStoreHideNav(); const r=new FileReader(); r.onload=e=>validateAndBuild(e.target.result,file.name); r.readAsText(file); }
 
 document.getElementById('upload-btn').addEventListener('click',()=>document.getElementById('file-input').click());
 document.getElementById('file-input').addEventListener('change',e=>{ if(e.target.files[0]) readFile(e.target.files[0]); });
@@ -15004,9 +13229,9 @@ dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over'); if(e.dataTransfer.files[0]) lblRouteDroppedFile(e.dataTransfer.files[0]);});
 
 document.getElementById('mob-dz-input').addEventListener('change',e=>{ if(e.target.files[0]) lblRouteDroppedFile(e.target.files[0]); });
-document.getElementById('demo-btn').addEventListener('click',()=>loadDemo(0));
-document.getElementById('demo-prev').addEventListener('click',()=>loadDemo(demoIndex-1));
-document.getElementById('demo-next').addEventListener('click',()=>loadDemo(demoIndex+1));
+document.getElementById('demo-btn').addEventListener('click',()=>lblOpenModelStore());
+document.getElementById('demo-prev').addEventListener('click',()=>lblModelStorePrev());
+document.getElementById('demo-next').addEventListener('click',()=>lblModelStoreNext());
 document.getElementById('clear-btn').addEventListener('click',clearScene);
 document.getElementById('skeleton-toggle-btn').addEventListener('click',()=>{
   showSkeleton=!showSkeleton;
@@ -15196,11 +13421,11 @@ document.getElementById('ts-btn').addEventListener('click',()=>{
 });
 document.getElementById('apply-btn').addEventListener('click',()=>{
   const t=document.getElementById('raw-json').value.trim();
-  if(!t){toast('Type JSON, JS, TS, or TSX/JSX first','err');return;} hideDemoNav(); validateAndBuild(t,'editor');
+  if(!t){toast('Type JSON, JS, TS, or TSX/JSX first','err');return;} lblModelStoreHideNav(); validateAndBuild(t,'editor');
 });
 document.getElementById('mob-apply-btn').addEventListener('click',()=>{
   const t=document.getElementById('mob-raw-json').value.trim();
-  if(!t){toast('Type JSON, JS, TS, or TSX/JSX first','err');return;} hideDemoNav(); validateAndBuild(t,'editor');
+  if(!t){toast('Type JSON, JS, TS, or TSX/JSX first','err');return;} lblModelStoreHideNav(); validateAndBuild(t,'editor');
   document.getElementById('mob-left').classList.remove('open');
 });
 
@@ -15223,7 +13448,7 @@ function load3DFile(file){
   CURRENT_TS_MODEL=null; CURRENT_TS_META=null;
   updateFormatChip(null); updateGenModeChip(null); setTsExclusiveUiState(false); // RJS UPDATE 2 — N2
   sceneGroup.position.set(0,0,0);
-  hideDemoNav(); updateTree(); updateInspector(null);
+  lblModelStoreHideNav(); updateTree(); updateInspector(null);
 
   function onLoaded(object){
     URL.revokeObjectURL(url);
@@ -15242,6 +13467,12 @@ function load3DFile(file){
     // Enable shadows on all meshes
     object.traverse(n=>{ if(n.isMesh){ n.castShadow=true; n.receiveShadow=true; } });
     scene.add(object);
+    // LBL update H2/FIX — register every sub-mesh of the uploaded model
+    // so the user can click + transform / texture / group them just like
+    // blueprint parts. Animation clips (e.g. embedded in glTF) are
+    // collected separately below for the Start/Stop/Next control.
+    lblRegisterExternalMeshes(object);
+    if(typeof lblCollectAnimations === 'function') lblCollectAnimations(object, object.userData && object.userData.__gltf);
     hideWelcome();
     updateTree(); // show the new "📦 Uploaded model" row (see updateTree's whole-model branch)
     // Fit camera
@@ -15257,9 +13488,14 @@ function load3DFile(file){
   function onError(err){ URL.revokeObjectURL(url); console.error(err); toast('Failed to load: ' + file.name,'err'); }
 
   if(ext==='glb'||ext==='gltf'){
-    new GLTFLoader().load(url, gltf=>onLoaded(gltf.scene), undefined, onError);
+    new GLTFLoader().load(url, gltf=>{
+      // Stash the full gltf on the scene so lblCollectAnimations can grab
+      // the AnimationClips (Start / Stop / Next animation buttons).
+      if(gltf.scene) gltf.scene.userData.__gltf = gltf;
+      onLoaded(gltf.scene);
+    }, undefined, onError);
   } else if(ext==='fbx'){
-    new FBXLoader().load(url, onLoaded, undefined, onError);
+    new FBXLoader().load(url, obj=>{ if(obj.userData) obj.userData.__gltf = { animations: obj.animations || [] }; onLoaded(obj); }, undefined, onError);
   } else if(ext==='obj'){
     new OBJLoader().load(url, onLoaded, undefined, onError);
   } else if(ext==='stl'){
@@ -15269,7 +13505,7 @@ function load3DFile(file){
       const g = new THREE.Group(); g.add(mesh); onLoaded(g);
     }, undefined, onError);
   } else if(ext==='dae'){
-    new ColladaLoader().load(url, col=>onLoaded(col.scene), undefined, onError);
+    new ColladaLoader().load(url, col=>{ if(col.scene){ col.scene.userData.__gltf = { animations: (col.animations || []) }; } onLoaded(col.scene); }, undefined, onError);
   } else if(ext==='usdz'){
     toast('USDZ preview not supported in browser — try GLB/glTF instead','err');
     URL.revokeObjectURL(url);
@@ -15484,7 +13720,12 @@ const _perfChip = document.getElementById('perf-chip');
 const _tsClock = new THREE.Clock();
 function animate(){
   requestAnimationFrame(animate); controls.update(); updateLOD(); updateEyeTracking();
-  tickAllTsModels(_tsClock.getDelta(), _tsClock.elapsedTime);
+  const __animDt = _tsClock.getDelta();
+  tickAllTsModels(__animDt, _tsClock.elapsedTime);
+  // LBL UPDATE F4 — tick the AnimationMixer for any active animations
+  // (TS factory hints / uploaded glTF / uploaded FBX). Skipped when no
+  // mixer is active so there's zero overhead in the no-animation path.
+  if(lblAnim && lblAnim.mixer) lblAnim.mixer.update(__animDt);
   composer.render();
   if(_perfChip && (++_frameCount % 20 === 0)){
     const info=renderer.info;
@@ -15515,6 +13756,15 @@ let LBL_HISTORY = [];
 let LBL_HISTORY_INDEX = -1;
 let LBL_HISTORY_SUPPRESS = false;
 const LBL_HISTORY_MAX = 60;
+
+// LBL UPDATE H2/FIX — synthetic ids for the sub-meshes of an uploaded 3D
+// model or a TS-generated model. Declared at the top of this LBL block so
+// every wrapper / function below can reference them without TDZ surprises
+// (the previous layout put them further down, after several function
+// declarations whose bodies used them — which technically only mattered
+// at call time, but moving them up keeps the code easier to reason about).
+let lblTsMeshIds = [];
+let lblExtMeshIds = [];
 
 function lblUpdateUndoRedoUI(){
   const ub=document.getElementById('undo-btn'), rb=document.getElementById('redo-btn');
@@ -15675,6 +13925,19 @@ function lblCommitGizmoTransform(){
     // loaded3dGroup/CURRENT_TS_MODEL's own transform (there's no blueprint
     // object to mirror it into), so just refresh the readout.
     renderWholeModelInspector(selectedId);
+    return;
+  }
+  // LBL UPDATE H2/FIX — per-mesh selection inside an uploaded 3D model or a
+  // TS-generated model. TransformControls already wrote onto the mesh's
+  // own transform; there's no blueprint object to mirror into (these
+  // meshes were registered synthetically in meshMap, not via buildScene).
+  // We just update the inspector readout. The transform persists because
+  // the mesh is owned by loaded3dGroup / CURRENT_TS_MODEL, not by
+  // buildScene's per-rebuild mesh recreation.
+  if(selectedId && (lblTsMeshIds.includes(selectedId) || lblExtMeshIds.includes(selectedId))){
+    const mesh = lblCurrentMesh();
+    if(!mesh) return;
+    renderExternalMeshInspector(selectedId);
     return;
   }
   const obj = lblCurrentObj();
@@ -16049,7 +14312,7 @@ function lblRenderRecipesPanel(){
   body.querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const bp = STARTER_BLUEPRINTS[btn.dataset.name];
-      hideDemoNav(); hideWelcome();
+      lblModelStoreHideNav(); hideWelcome();
       validateAndBuild(JSON.stringify(bp), 'recipe: '+btn.dataset.name);
       document.getElementById('recipes-panel').classList.remove('open');
       toast(`Loaded starter recipe "${btn.dataset.name}"`, 'ok');
@@ -16094,7 +14357,7 @@ function lblQuickSpawn(){
   }
   const bp = JSON.parse(JSON.stringify(STARTER_BLUEPRINTS[recipeKey]));
   if(color) bp.objects.forEach(o=>{ if(o.id===bp.objects[0].id) o.baseColor = color; });
-  hideDemoNav(); hideWelcome();
+  lblModelStoreHideNav(); hideWelcome();
   validateAndBuild(JSON.stringify(bp), 'quick-spawn: '+recipeKey);
   toast(`🪄 Quick spawn: ${recipeKey}${color?' ('+color+')':''}`, 'ok');
 }
@@ -16214,6 +14477,14 @@ function lblRenderTexturePanels(){
 // T6 — topbar shortcut button mirrors the inspector's file picker.
 document.getElementById('texture-btn').addEventListener('click', ()=>{
   if(!selectedId) return;
+  // LBL UPDATE H2/FIX — if a TS-generated or uploaded-3D sub-mesh is
+  // selected, its texture controls live in the per-mesh inspector
+  // (renderExternalMeshInspector) under a different file-input id.
+  if(lblTsMeshIds.includes(selectedId) || lblExtMeshIds.includes(selectedId)){
+    const input = document.querySelector('#inspector #ext-tex-file-input') || document.querySelector('#mob-inspector #ext-tex-file-input');
+    if(input) input.click();
+    return;
+  }
   const input = document.querySelector('#lbl-texture-panel #tex-file-input') || document.querySelector('#mob-lbl-texture-panel #tex-file-input');
   if(input) input.click();
 });
@@ -16234,11 +14505,105 @@ window.addEventListener('paste', (e)=>{
   }
 });
 
-// T4 — click-to-select in viewport via raycaster. Only a genuine click
-// (no drag — that's OrbitControls orbiting) counts, and clicks that
-// started/landed on the transform gizmo itself are ignored (TransformControls
-// already handles those and re-selecting mid-drag would fight it).
-const lblRaycaster = new THREE.Raycaster();
+// ───────────────────────────────────────────────────────────────────────
+// LBL UPDATE H2/FIX — Per-mesh selection for TS models and uploaded 3D
+// models. Previously only the WHOLE TS model or WHOLE uploaded model
+// could be selected (sentinel ids LBL_TSMODEL_ID / LBL_EXTERNAL_ID), so
+// the user could never isolate a single sub-mesh for transform / texture
+// / face-texture / grouping. Now every named sub-mesh is registered in
+// meshMap with a synthetic id (__lblTsMesh_<n> / __lblExtMesh_<n>) when
+// the model is loaded; the click handler (just below) recognises those
+// ids from raycasts and the gizmo / texture / face-texture pipeline
+// re-uses them through the existing meshMap infrastructure. The whole-
+// model sentinel selection still works as a fallback when no specific
+// sub-mesh is hit, and is preserved so the existing UI doesn't break.
+// ───────────────────────────────────────────────────────────────────────
+// (lblTsMeshIds / lblExtMeshIds are declared at the top of this LBL block
+// so the wrapping order below doesn't hit a TDZ when selectObj is called.)
+
+function lblRegisterTsMeshes(group){
+  if(!group) return;
+  // Clear out any previous TS-mesh ids (so a model reload doesn't leave
+  // stale ids pointing at the old THREE.Mesh instances).
+  lblTsMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
+  lblTsMeshIds = [];
+  lblExtMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
+  lblExtMeshIds = [];
+  let n=1;
+  group.traverse(o=>{
+    if(!o.isMesh) return;
+    if(o.userData && o.userData.__helper) return; // skip helper / skeleton markers
+    let id = '__lblTsMesh_' + n;
+    while(meshMap.has(id) || lblTsMeshIds.includes(id) || (CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.objects && CURRENT_BLUEPRINT.objects.some(x=>x.id===id))){ n++; id = '__lblTsMesh_' + n; }
+    o.userData.__lblId = id;
+    o.userData.__lblSource = 'ts';
+    // Stash the original material clone's emissive baseline so the highlight
+    // helper can put it back, mirroring the lblHighlightWholeModel pattern.
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(mat=>{
+      if(mat && 'emissive' in mat && !mat.userData.__origEmissive){
+        mat.userData.__origEmissive = mat.emissive ? mat.emissive.getHex() : 0;
+        mat.userData.__origEmissiveIntensity = ('emissiveIntensity' in mat) ? mat.emissiveIntensity : 1;
+      }
+    });
+    meshMap.set(id, o);
+    lblTsMeshIds.push(id);
+    n++;
+  });
+}
+
+function lblRegisterExternalMeshes(group){
+  if(!group) return;
+  lblExtMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
+  lblTsMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
+  lblTsMeshIds = [];
+  lblExtMeshIds = [];
+  let n=1;
+  group.traverse(o=>{
+    if(!o.isMesh) return;
+    if(o.userData && o.userData.__helper) return;
+    let id = '__lblExtMesh_' + n;
+    while(meshMap.has(id) || lblExtMeshIds.includes(id) || (CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.objects && CURRENT_BLUEPRINT.objects.some(x=>x.id===id))){ n++; id = '__lblExtMesh_' + n; }
+    o.userData.__lblId = id;
+    o.userData.__lblSource = 'ext';
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(mat=>{
+      if(mat && 'emissive' in mat && !mat.userData.__origEmissive){
+        mat.userData.__origEmissive = mat.emissive ? mat.emissive.getHex() : 0;
+        mat.userData.__origEmissiveIntensity = ('emissiveIntensity' in mat) ? mat.emissiveIntensity : 1;
+      }
+    });
+    meshMap.set(id, o);
+    lblExtMeshIds.push(id);
+    n++;
+  });
+}
+
+// Highlight a single TS/external mesh (when the user picks one instead of
+// the whole-model sentinel), mirroring the meshMap-based highlight loop
+// in selectObj() but scoped to ONE mesh.
+function lblHighlightExternalMesh(id){
+  [CURRENT_TS_MODEL, loaded3dGroup].forEach(group=>{
+    if(!group) return;
+    const on = (id !== null);
+    group.traverse(o=>{
+      if(!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(mat=>{
+        if(!mat || !('emissive' in mat)) return;
+        if(o.userData.__lblId === id && on){
+          mat.emissive = new THREE.Color(0x6c63ff);
+          mat.emissiveIntensity = 0.22;
+        } else {
+          mat.emissive = new THREE.Color(mat.userData.__origEmissive || 0);
+          mat.emissiveIntensity = mat.userData.__origEmissiveIntensity ?? mat.emissiveIntensity ?? 1;
+        }
+      });
+    });
+  });
+}
+
+
 let lblPointerDownPos = null;
 canvas.addEventListener('pointerdown', (e)=>{ lblPointerDownPos = {x:e.clientX, y:e.clientY}; });
 canvas.addEventListener('pointerup', (e)=>{
@@ -16255,40 +14620,78 @@ canvas.addEventListener('pointerup', (e)=>{
   lblRaycaster.setFromCamera(pointer, camera);
   // loaded3dGroup lives under `scene` directly (not sceneGroup — see
   // load3DFile), so it has to be raycast separately or an uploaded model
-  // could never be clicked at all.
-  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  // could never be clicked at all. CURRENT_TS_MODEL also lives in scene
+  // (under sceneGroup in addTsModelToScene, but at runtime it can be
+  // attached to scene directly too via the TS model path) — we union
+  // all available targets.
+  const raycastTargets = [];
+  sceneGroup.children.forEach(c => raycastTargets.push(c));
+  if(loaded3dGroup) raycastTargets.push(loaded3dGroup);
+  if(CURRENT_TS_MODEL) raycastTargets.push(CURRENT_TS_MODEL);
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
   const hit = hits.find(h=>{
     let n=h.object;
-    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent) n=n.parent;
+    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent!==CURRENT_TS_MODEL && n.parent) n=n.parent;
     return n && !n.userData?.__helper;
   });
   if(hit){
+    // Determine the new target id from the hit, BEFORE we call selectObj —
+    // we need to know if the click landed on the SAME thing that's already
+    // selected so we can toggle the gizmo off (per the new requirement:
+    // clicking the same part again hides the gizmo).
+    let newId = null;
     let target = hit.object;
-    while(target && target.parent!==sceneGroup && target.parent!==loaded3dGroup && target.parent) target = target.parent;
+    while(target && target.parent!==sceneGroup && target.parent!==loaded3dGroup && target.parent!==CURRENT_TS_MODEL && target.parent) target = target.parent;
     if(target && target.userData && target.userData.__helper) return;
+    // 1) Direct meshMap hit (blueprint parts)
     for(const [id, m] of meshMap.entries()){
       if(m===target || target===hit.object || (target && target.getObjectById && target.getObjectById(hit.object.id))){
-        selectObj(id); return;
+        newId = id; break;
       }
     }
-    // Fallback: walk hit.object up until we find a mesh present in meshMap.
-    let n = hit.object;
-    while(n){
-      for(const [id,m] of meshMap.entries()){ if(m===n){ selectObj(id); return; } }
-      n = n.parent;
+    if(!newId){
+      // Fallback: walk hit.object up until we find a mesh present in meshMap.
+      let n = hit.object;
+      while(n && !newId){
+        for(const [id,m] of meshMap.entries()){ if(m===n){ newId = id; break; } }
+        n = n.parent;
+      }
     }
-    // Not a blueprint part at all — if the click landed inside the
-    // uploaded model or a TS-generated model, select that whole model as
-    // a single rigid object (see LBL_EXTERNAL_ID/LBL_TSMODEL_ID above).
-    if(loaded3dGroup){
+    // 2) Per-mesh selection inside an uploaded 3D model — meshes were
+    //    registered in meshMap with a synthetic "__lblExtMesh_<n>" id when
+    //    the model was loaded (see registerExternalMeshes), so a hit on
+    //    any sub-mesh lands here.
+    // 3) Per-mesh selection inside a TS-generated model — same scheme,
+    //    see registerTsMeshes.
+    // 4) Whole-model fallback — if nothing more specific matched, fall
+    //    back to the whole-uploaded-model or whole-TS-model sentinel.
+    if(!newId && loaded3dGroup){
       let m=hit.object;
-      while(m){ if(m===loaded3dGroup){ selectObj(LBL_EXTERNAL_ID); return; } m=m.parent; }
+      while(m){ if(m===loaded3dGroup){ newId = LBL_EXTERNAL_ID; break; } m=m.parent; }
     }
-    if(CURRENT_TS_MODEL){
+    if(!newId && CURRENT_TS_MODEL){
       let m=hit.object;
-      while(m){ if(m===CURRENT_TS_MODEL){ selectObj(LBL_TSMODEL_ID); return; } m=m.parent; }
+      while(m){ if(m===CURRENT_TS_MODEL){ newId = LBL_TSMODEL_ID; break; } m=m.parent; }
     }
+    if(newId){
+      // Toggle behavior: clicking the SAME thing that's already selected
+      // (and not multi-select / group-pick / face-select mode) deselects
+      // it, which auto-hides the gizmo via the existing selectObj(null)
+      // → lblOnSelectionChanged() → lblAttachGizmo() pipeline.
+      if(newId === selectedId && !lblMultiSelectIds.size && !lblGroupPickMode && !lblFaceSelectMode){
+        selectObj(null);
+      } else {
+        selectObj(newId);
+      }
+    } else {
+      // Hit a helper / decoration with no associated scene object — treat
+      // as "click on empty space" and deselect.
+      if(selectedId !== null) selectObj(null);
+    }
+  } else {
+    // Click landed on completely empty space (sky / background) — hide
+    // gizmo by deselecting.
+    if(selectedId !== null) selectObj(null);
   }
 });
 
@@ -16463,18 +14866,78 @@ function lblRebuildGroupObject3Ds(blueprint){
 // of faces can carry different materials/textures, without touching the
 // base per-part textureImage system at all (face textures always layer
 // ON TOP of / independently from the whole-part texture).
+//
+// FIX-D1 (disappearing-parts bug): the previous version had several
+// real failure modes that made the part vanish after a face texture
+// was applied:
+//   1. If a part's geometry had no UV attribute, the function
+//      returned WITHOUT calling geo.clearGroups() or restoring the
+//      material — but the caller had already snapshotted the previous
+//      state, so subsequent rebuilds had broken material/group state.
+//   2. If triCount === 0, the for-loop body never executed, so the
+//      geometry was left with NO groups and the renderer drew nothing.
+//   3. If faceTexEntries referenced face indices that didn't all
+//      exist, the faceMatIndex could be left in a state where some
+//      triangles had a material index ≥ mats.length, which renders as
+//      black (and on some drivers, the part vanishes entirely).
+//   4. baseMat.clone() was called even when the base material was
+//      already a single material with a per-part texture — the clone
+//      didn't carry over the part's own map/color, so the face picked
+//      up the face texture at the wrong tint.
+//   5. The function would replace mesh.material = [base, ...cloned]
+//      even when no face textures were actually applied, because it
+//      was called unconditionally from lblApplyAllFaceTextures when
+//      the part's faceTextures array was non-empty (even if every
+//      entry was empty).
+// The rewrite below is defensive on every one of these — it
+// (a) always re-establishes a valid single-group or material array,
+// (b) clamps all face indices to the triCount, (c) clones the
+// CURRENT base material so any per-part texture is preserved,
+// (d) skips the whole material-array switch if no face textures are
+// actually valid, and (e) never leaves a geometry with zero groups.
 function lblApplyFaceTexturesToMesh(mesh, faceTexEntries){
+  if(!mesh || !mesh.geometry) return;
   const geo = mesh.geometry;
-  if(!geo || !geo.attributes || !geo.attributes.uv){
-    console.warn('[faceTextures] part "'+mesh.name+'" has no UVs — skipping its face texture(s)');
+  // No UVs → face texturing is impossible. Don't touch the geometry or
+  // the material at all (preserves whatever buildScene left behind).
+  if(!geo.attributes || !geo.attributes.uv){
+    if(faceTexEntries && faceTexEntries.length){
+      console.warn('[faceTextures] part "'+(mesh.name||mesh.id||'?')+'" has no UVs — skipping its face texture(s)');
+    }
     return;
   }
   const idx = geo.index;
   const triCount = idx ? (idx.count/3)|0 : (geo.attributes.position.count/3)|0;
+  // Filter face texture entries to only those that have a valid dataUrl
+  // AND a non-empty faces list. Anything else is silently dropped so the
+  // material array doesn't get a junk entry.
+  const validFts = (faceTexEntries||[]).filter(ft => ft && ft.textureImage && Array.isArray(ft.faces) && ft.faces.length);
+  if(triCount === 0 || !validFts.length){
+    // Nothing to apply. If the mesh was previously a multi-material mesh
+    // (from a prior face-texture application that's been removed), reset
+    // it to a single material so the part keeps rendering.
+    if(Array.isArray(mesh.material) && mesh.material.length > 1){
+      const base = mesh.material[0];
+      for(let i=1;i<mesh.material.length;i++){
+        const m = mesh.material[i];
+        if(m && m.map) m.map.dispose();
+      }
+      mesh.material = base;
+    }
+    if(geo.groups) geo.clearGroups();
+    return;
+  }
+  // Make sure we have a real base material to work from. If the mesh's
+  // material is currently an array (from a prior face-texture pass), use
+  // the first entry as the base; otherwise use the single material.
+  const baseMat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material);
+  if(!baseMat){
+    if(geo.groups) geo.clearGroups();
+    return;
+  }
   const faceMatIndex = new Array(triCount).fill(0);
-  const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
   const mats = [baseMat];
-  faceTexEntries.forEach((ft,i)=>{
+  validFts.forEach((ft, i)=>{
     const matIndex = i+1;
     // FIX-T2 — use the sync helper to get the placeholder immediately,
     // assign to the face material, and let the real image arrive in
@@ -16484,42 +14947,77 @@ function lblApplyFaceTexturesToMesh(mesh, faceTexEntries){
       offset: Array.isArray(ft.textureImageOffset)?ft.textureImageOffset:[0,0],
       rotationDeg: typeof ft.textureImageRotation==='number'?ft.textureImageRotation:0
     });
-    // FIX-T6 — instead of a full baseMat.clone() which REPLACES the part's
-    // color/texture/lighting with the face texture's white-only state,
-    // preserve the part's existing material settings (color, normalMap,
-    // roughnessMap, etc.) and only OVERRIDE the .map slot with the face
-    // texture. The face texture is now an "albedo override" for the
-    // selected faces, not a completely fresh material — so the part's
-    // roughness/metalness/emissive/normalMap settings still apply.
+    // Clone the CURRENT base material (not just the first slot of a
+    // stale multi-material array) so the face material inherits the
+    // part's real color / metalness / roughness / normalMap / etc.
     const m = baseMat.clone();
     m.map = tex;
-    // Don't reset color to white if the base material has a meaningful
-    // color tinting the texture — but DO reset to white if the base
-    // material also has a .map (so the face texture shows on top of an
-    // already-textured part rather than tinting the existing texture).
+    // Reset the color to white when the base material also has its own
+    // .map (so the face texture shows on top of an already-textured
+    // part rather than tinting the existing texture), otherwise inherit
+    // the base color so the face texture matches the rest of the part.
     if(m.color && m.color.set){
       m.color.set(baseMat.map ? 0xffffff : (baseMat.color ? baseMat.color.getHex() : 0xffffff));
     }
     m.needsUpdate = true;
     mats.push(m);
-    (ft.faces||[]).forEach(f=>{ if(f>=0 && f<triCount) faceMatIndex[f]=matIndex; });
+    // Clamp every face index to the valid range so an out-of-range
+    // entry can never produce a face whose material index is out of
+    // bounds (= the part-renders-as-black / disappears bug).
+    (ft.faces||[]).forEach(f=>{
+      const fi = (f|0);
+      if(fi>=0 && fi<triCount) faceMatIndex[fi]=matIndex;
+    });
   });
+  // Rebuild groups from the (now-validated) faceMatIndex. We always
+  // emit a group for the last run too — the previous code's loop left
+  // the tail un-grouped when the last triangle's material happened to
+  // match runMat at exit, so a few triangles at the end of a complex
+  // mesh could end up un-grouped (= invisible).
   geo.clearGroups();
-  let runStart=0, runMat=faceMatIndex[0]||0;
+  let runStart=0;
+  let runMat = faceMatIndex[0];
   for(let f=1; f<=triCount; f++){
-    const mi = f<triCount ? faceMatIndex[f] : null;
-    if(mi!==runMat){
+    const mi = f<triCount ? faceMatIndex[f] : -1;
+    if(mi !== runMat){
       geo.addGroup(runStart*3, (f-runStart)*3, runMat);
-      runStart=f; runMat=mi;
+      runStart = f;
+      runMat = mi;
     }
   }
-  mesh.material = mats;
+  // Defensive: if for any reason no group was added (e.g. triCount===0
+  // was masked by an early return, or the for-loop logic missed a
+  // transition at the tail), add a fallback whole-mesh group with
+  // material 0 so the part still renders.
+  if(geo.groups && geo.groups.length === 0){
+    const count = idx ? idx.count : geo.attributes.position.count;
+    geo.addGroup(0, count, 0);
+  }
+  // Replace the material array — but if the new array is exactly
+  // [baseMat] (no actual face textures survived the filter), keep the
+  // mesh as a single-material mesh so we don't introduce an extra
+  // group layer that can confuse downstream code.
+  if(mats.length === 1){
+    if(Array.isArray(mesh.material) && mesh.material.length > 1){
+      for(let i=1;i<mesh.material.length;i++){
+        const m = mesh.material[i];
+        if(m && m.map) m.map.dispose();
+      }
+    }
+    mesh.material = mats[0];
+  } else {
+    mesh.material = mats;
+  }
 }
 function lblApplyAllFaceTextures(){
   sceneObjects.forEach(obj=>{
-    if(!Array.isArray(obj.faceTextures) || !obj.faceTextures.length) return;
     const mesh = meshMap.get(obj.id);
     if(!mesh || !mesh.isMesh || mesh.isInstancedMesh) return;
+    // Always call the applier — the no-face-textures branch inside
+    // lblApplyFaceTexturesToMesh properly resets a previously multi-
+    // material mesh back to a single material, so removing a face
+    // texture no longer leaves the part with a broken material array
+    // (which is what was making parts "disappear" after edits).
     lblApplyFaceTexturesToMesh(mesh, obj.faceTextures);
   });
 }
@@ -16674,11 +15172,39 @@ selectObj = function(id){
       m.material.emissiveIntensity = on?0.22:0;
     });
     lblHighlightWholeModel(null);
+    lblHighlightExternalMesh(null);
+    lblOnSelectionChanged();
+    lblRefreshMultiSelectHighlight();
+    return;
+  }
+  // LBL UPDATE H2/FIX — per-mesh selection inside an uploaded 3D model or a
+  // TS-generated model. These meshes were registered in meshMap with
+  // synthetic ids by lblRegisterTsMeshes/lblRegisterExternalMeshes, so the
+  // existing meshMap highlight loop in selectObj would just walk them
+  // (and only the picked mesh highlights), but the original
+  // renderWholeModelInspector() would always be called from inside the
+  // sentinel branch. Intercept here to render the per-mesh inspector
+  // instead, and visually deselect any whole-model highlight.
+  if(id && (lblTsMeshIds.includes(id) || lblExtMeshIds.includes(id))){
+    selectedId = id;
+    updateTree();
+    renderExternalMeshInspector(id);
+    controls.autoRotate = false;
+    // Clear blueprint-part highlights, then highlight this sub-mesh only.
+    meshMap.forEach((m,mid)=>{
+      if(lblTsMeshIds.includes(mid) || lblExtMeshIds.includes(mid)) return; // handled below
+      if(!m.material) return;
+      m.material.emissive = new THREE.Color(0x000000);
+      m.material.emissiveIntensity = 0;
+    });
+    lblHighlightWholeModel(null);
+    lblHighlightExternalMesh(id);
     lblOnSelectionChanged();
     lblRefreshMultiSelectHighlight();
     return;
   }
   __lblOrigSelectObjG(id);
+  lblHighlightExternalMesh(null);
   lblRefreshMultiSelectHighlight();
 };
 
@@ -17340,9 +15866,30 @@ function lblExtractFacesGeometry(srcGeo, faceIndices){
   return geo;
 }
 function lblApplyFaceTexture(file){
-  if(!CURRENT_BLUEPRINT) return;
   const {objId, faces} = lblPendingFaceSel;
   if(!objId || !faces.size){ toast('Select some faces first (turn on ⬡ Faces, click/Shift-click on the part)','err'); return; }
+  // LBL UPDATE H2/FIX — also support per-face texturing on sub-meshes of
+  // uploaded 3D models and TS-generated models (synthetic objects stashed
+  // on the mesh's userData by renderExternalMeshInspector).
+  if(lblTsMeshIds.includes(objId) || lblExtMeshIds.includes(objId)){
+    lblFileToDataUrl(file).then(dataUrl=>{
+      const mesh = meshMap.get(objId);
+      if(!mesh) return;
+      if(!mesh.userData.__lblSynthetic) mesh.userData.__lblSynthetic = { id:objId, faceTextures:[] };
+      const syn = mesh.userData.__lblSynthetic;
+      if(!Array.isArray(syn.faceTextures)) syn.faceTextures = [];
+      let n = syn.faceTextures.length + 1, ftId = 'ftex_' + n;
+      const existing = new Set(syn.faceTextures.map(f=>f.id));
+      while(existing.has(ftId)){ n++; ftId = 'ftex_' + n; }
+      syn.faceTextures.push({ id: ftId, faces: Array.from(faces), textureImage: dataUrl, textureImageRepeat:[1,1], textureImageOffset:[0,0], textureImageRotation:0, __filenameLabel: file.name });
+      lblPendingFaceSel = { objId: null, faces: new Set() };
+      lblClearFaceHighlight();
+      lblApplyExtMeshFaceTextures(mesh);
+      selectObj(objId);
+    });
+    return;
+  }
+  if(!CURRENT_BLUEPRINT) return;
   lblFileToDataUrl(file).then(dataUrl=>{
     const obj = sceneObjects.find(o=>o.id===objId) || (CURRENT_BLUEPRINT.objects||[]).find(o=>o.id===objId);
     if(!obj) return;
@@ -17377,7 +15924,8 @@ function lblRenderFaceTexPanel(){
         <div class="tex-row" style="margin-top:6px">
           <img class="tex-preview" src="${ft.textureImage}" alt="face texture"/>
           <span class="tex-filename">${ft.__filenameLabel||'image'} (${(ft.faces||[]).length} face${(ft.faces||[]).length===1?'':'s'})</span>
-          <button class="tex-choose-btn ftex-scale-btn" data-ftid="${ft.id}" title="Edit scale">⚙ Scale</button>
+          <button class="tex-choose-btn ftex-scale-btn" data-ftid="${ft.id}" title="Edit repeat/offset/rotation">⚙ Scale</button>
+          <button class="tex-choose-btn ftex-pos-btn" data-ftid="${ft.id}" title="Drag to position · scroll to zoom · Alt+drag to rotate">📍 Position</button>
           <button class="tex-remove-btn ftex-remove-btn" data-ftid="${ft.id}">🗑</button>
         </div>
         <div class="ftex-scale-panel" data-ftid="${ft.id}" style="display:none">
@@ -17403,6 +15951,18 @@ function lblRenderFaceTexPanel(){
     panel.querySelectorAll('.ftex-scale-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const p = panel.querySelector(`.ftex-scale-panel[data-ftid="${btn.dataset.ftid}"]`);
       if(p) p.style.display = p.style.display==='none' ? '' : 'none';
+    }));
+    // LBL UPDATE F4 — drag-to-position face texture: same workflow as the
+    // whole-part positioning (drag to move, scroll to scale, Alt+drag to
+    // rotate), but writes into a specific face-texture entry's repeat /
+    // offset / rotation. Live-updates the THREE.Texture for instant
+    // feedback, then commits the final numbers on ✓ Fix.
+    panel.querySelectorAll('.ftex-pos-btn').forEach(btn=>btn.addEventListener('click', ()=>{
+      const ftId = btn.dataset.ftid;
+      const o = sceneObjects.find(x=>x.id===obj.id) || (CURRENT_BLUEPRINT.objects||[]).find(x=>x.id===obj.id);
+      if(!o || !Array.isArray(o.faceTextures)) return;
+      const ft = o.faceTextures.find(x=>x.id===ftId); if(!ft) return;
+      lblStartFaceTexPositioning(obj.id, ftId);
     }));
     panel.querySelectorAll('.ftex-remove-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const o = sceneObjects.find(x=>x.id===obj.id) || (CURRENT_BLUEPRINT.objects||[]).find(x=>x.id===obj.id);
@@ -17476,6 +16036,64 @@ function lblFixTexPositioning(){
   lblRemoveTexPosBanner();
   rebuildFromBlueprint().then(()=>{ selectObj(id); });
 }
+
+// LBL UPDATE F4 — face-texture drag-to-position. Same UX as
+// lblStartTexPositioning but the live edits go to a specific face-texture
+// entry (textureImageRepeat / Offset / Rotation), and the ✓ Fix commits
+// without a full blueprint rebuild (just a selectObj for UI refresh).
+let lblFaceTexPos = null; // { objId, ftId }
+function lblStartFaceTexPositioning(objId, ftId){
+  lblFaceTexPos = { objId, ftId };
+  controls.enabled = false;
+  transformControls.enabled = false; transformControls.visible = false;
+  toast('Drag to position face texture · scroll to zoom · Alt+drag to rotate — click ✓ Fix when it looks right','');
+  lblRenderTexPosBanner();
+}
+function lblFixFaceTexPositioning(){
+  if(!lblFaceTexPos) return;
+  lblFaceTexPos = null;
+  controls.enabled = true;
+  lblRemoveTexPosBanner();
+  if(selectedId) selectObj(selectedId);
+}
+function lblApplyFaceTexPosDrag(dx, dy, altHeld, scrollDelta){
+  if(!lblFaceTexPos) return;
+  const { objId, ftId } = lblFaceTexPos;
+  const o = sceneObjects.find(x=>x.id===objId) || (CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.objects && CURRENT_BLUEPRINT.objects.find(x=>x.id===objId));
+  if(!o || !Array.isArray(o.faceTextures)) return;
+  const ft = o.faceTextures.find(x=>x.id===ftId); if(!ft) return;
+  if(!Array.isArray(ft.textureImageRepeat)) ft.textureImageRepeat = [1,1];
+  if(!Array.isArray(ft.textureImageOffset)) ft.textureImageOffset = [0,0];
+  if(typeof ft.textureImageRotation !== 'number') ft.textureImageRotation = 0;
+  if(typeof scrollDelta === 'number' && scrollDelta !== 0){
+    // Scroll → uniform scale on the repeat vector.
+    const s = Math.exp(-scrollDelta * 0.001);
+    ft.textureImageRepeat = [ft.textureImageRepeat[0] * s, ft.textureImageRepeat[1] * s];
+  } else if(altHeld){
+    // Alt+drag → rotation in degrees.
+    ft.textureImageRotation = (ft.textureImageRotation + dx * 0.5) % 360;
+  } else {
+    // Plain drag → offset in UV space.
+    ft.textureImageOffset = [ft.textureImageOffset[0] + dx * 0.0035, ft.textureImageOffset[1] - dy * 0.0035];
+  }
+  // Live-update the texture that's already on the cloned material so
+  // the user sees the change in real time without a per-frame rebuild.
+  const mesh = meshMap.get(objId); if(!mesh) return;
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  // The face-texture material sits at index ftIndex+1 in the array (see
+  // lblApplyFaceTexturesToMesh). Find it by matching the textureImage
+  // dataUrl on the .map slot.
+  for(const m of mats){
+    if(!m || !m.map || !m.map.userData) continue;
+    if(m.map.userData.__srcUrl === ft.textureImage){
+      m.map.repeat.set(ft.textureImageRepeat[0], ft.textureImageRepeat[1]);
+      m.map.offset.set(ft.textureImageOffset[0], ft.textureImageOffset[1]);
+      m.map.center.set(0.5, 0.5);
+      m.map.rotation = THREE.MathUtils.degToRad(ft.textureImageRotation);
+      break;
+    }
+  }
+}
 function lblRenderTexPosBanner(){
   lblRemoveTexPosBanner();
   const el = document.createElement('div');
@@ -17487,7 +16105,11 @@ function lblRenderTexPosBanner(){
   el.innerHTML = `<span>🎯 Positioning image — drag to move · scroll to scale · Alt+drag to rotate</span>
     <button id="texpos-fix-btn" style="height:26px;padding:0 10px;border-radius:6px;border:1px solid var(--border,#333);background:#6c63ff;color:#fff;cursor:pointer;font-size:11px;">✓ Fix</button>`;
   document.body.appendChild(el);
-  document.getElementById('texpos-fix-btn').addEventListener('click', lblFixTexPositioning);
+  document.getElementById('texpos-fix-btn').addEventListener('click', ()=>{
+    // Dispatch to whichever positioning mode is active.
+    if(lblFaceTexPos) lblFixFaceTexPositioning();
+    else lblFixTexPositioning();
+  });
 }
 function lblRemoveTexPosBanner(){ const el=document.getElementById('lbl-texpos-banner'); if(el) el.remove(); }
 
@@ -17512,35 +16134,60 @@ function lblLiveUpdateTexPos(){
   });
 }
 canvas.addEventListener('pointerdown', (e)=>{
-  if(!lblTexPosMode) return;
-  lblTexPosMode.dragging = true;
-  lblTexPosMode.lastX = e.clientX; lblTexPosMode.lastY = e.clientY;
+  if(lblTexPosMode){
+    lblTexPosMode.dragging = true;
+    lblTexPosMode.lastX = e.clientX; lblTexPosMode.lastY = e.clientY;
+    return;
+  }
+  // LBL UPDATE F4 — face-texture drag-to-position uses the same canvas
+  // drag/wheel UX as the whole-part positioning. Separate state so the
+  // two modes can coexist (only one banner shows at a time).
+  if(lblFaceTexPos){
+    lblFaceTexPos.dragging = true;
+    lblFaceTexPos.lastX = e.clientX; lblFaceTexPos.lastY = e.clientY;
+  }
 }, true);
 window.addEventListener('pointermove', (e)=>{
-  if(!lblTexPosMode || !lblTexPosMode.dragging) return;
-  const dx = e.clientX - lblTexPosMode.lastX, dy = e.clientY - lblTexPosMode.lastY;
-  lblTexPosMode.lastX = e.clientX; lblTexPosMode.lastY = e.clientY;
-  const def = lblGetTexTargetDef(lblTexPosMode.kind, lblTexPosMode.id);
-  if(!def) return;
-  const rect = canvas.getBoundingClientRect();
-  if(e.altKey){
-    def.textureImageRotation = (def.textureImageRotation||0) + dx*0.5;
-  } else {
-    const du = dx/rect.width, dv = -dy/rect.height;
-    def.textureImageOffset = [ (def.textureImageOffset[0]||0) + du, (def.textureImageOffset[1]||0) + dv ];
+  if(lblTexPosMode && lblTexPosMode.dragging){
+    const dx = e.clientX - lblTexPosMode.lastX, dy = e.clientY - lblTexPosMode.lastY;
+    lblTexPosMode.lastX = e.clientX; lblTexPosMode.lastY = e.clientY;
+    const def = lblGetTexTargetDef(lblTexPosMode.kind, lblTexPosMode.id);
+    if(!def) return;
+    const rect = canvas.getBoundingClientRect();
+    if(e.altKey){
+      def.textureImageRotation = (def.textureImageRotation||0) + dx*0.5;
+    } else {
+      const du = dx/rect.width, dv = -dy/rect.height;
+      def.textureImageOffset = [ (def.textureImageOffset[0]||0) + du, (def.textureImageOffset[1]||0) + dv ];
+    }
+    lblLiveUpdateTexPos();
+    return;
   }
-  lblLiveUpdateTexPos();
+  if(lblFaceTexPos && lblFaceTexPos.dragging){
+    const dx = e.clientX - lblFaceTexPos.lastX, dy = e.clientY - lblFaceTexPos.lastY;
+    lblFaceTexPos.lastX = e.clientX; lblFaceTexPos.lastY = e.clientY;
+    lblApplyFaceTexPosDrag(dx, dy, e.altKey, 0);
+  }
 }, true);
-window.addEventListener('pointerup', ()=>{ if(lblTexPosMode) lblTexPosMode.dragging=false; }, true);
+window.addEventListener('pointerup', ()=>{
+  if(lblTexPosMode) lblTexPosMode.dragging=false;
+  if(lblFaceTexPos) lblFaceTexPos.dragging=false;
+}, true);
 canvas.addEventListener('wheel', (e)=>{
-  if(!lblTexPosMode) return;
-  e.preventDefault();
-  const def = lblGetTexTargetDef(lblTexPosMode.kind, lblTexPosMode.id);
-  if(!def) return;
-  const factor = e.deltaY>0 ? 1.06 : 0.94;
-  const rep = Array.isArray(def.textureImageRepeat)?def.textureImageRepeat:[1,1];
-  def.textureImageRepeat = [rep[0]*factor, rep[1]*factor];
-  lblLiveUpdateTexPos();
+  if(lblTexPosMode){
+    e.preventDefault();
+    const def = lblGetTexTargetDef(lblTexPosMode.kind, lblTexPosMode.id);
+    if(!def) return;
+    const factor = e.deltaY>0 ? 1.06 : 0.94;
+    const rep = Array.isArray(def.textureImageRepeat)?def.textureImageRepeat:[1,1];
+    def.textureImageRepeat = [rep[0]*factor, rep[1]*factor];
+    lblLiveUpdateTexPos();
+    return;
+  }
+  if(lblFaceTexPos){
+    e.preventDefault();
+    lblApplyFaceTexPosDrag(0, 0, false, e.deltaY);
+  }
 }, {passive:false});
 
 // Injects a "🎯 Position Image on Model" button into the EXISTING (not
@@ -18131,6 +16778,139 @@ lblUpdateGroupButtons();
 // Initial UI sync (nothing selected at startup).
 lblOnSelectionChanged();
 lblUpdateUndoRedoUI();
+
+// ───────────────────────────────────────────────────────────────────────
+// LBL UPDATE F4 — ANIMATION CONTROLS
+// AnimationMixer is part of THREE core (imported as `THREE.AnimationMixer`).
+// When a model is loaded (TS or uploaded 3D), we walk the userData/__gltf
+// stash for AnimationClip[]s and build actions. The Start/Stop/Next
+// buttons only appear when at least one clip is found. The mixer is
+// ticked from the animate() loop just like the TS tick().
+// ───────────────────────────────────────────────────────────────────────
+let lblAnim = {
+  mixer: null,            // THREE.AnimationMixer (or null)
+  clips: [],              // THREE.AnimationClip[] (deep-copied per root)
+  actions: [],            // THREE.AnimationAction[]
+  currentIdx: -1,         // which action is playing (-1 = none)
+  isPlaying: false,
+  root: null              // the THREE.Object3D the mixer is bound to
+};
+
+function lblCollectAnimations(root, gltf){
+  // Tear down any previous mixer first so we don't leak actions across
+  // model loads.
+  lblTeardownAnimations();
+  lblAnim.root = root;
+  // Pull clips from: gltf.animations (GLTFLoader), root.animations
+  // (FBXLoader/ColladaLoader), and the sculptRuntime.animations hint
+  // that TS factories can publish (factory-side: root.userData.sculptRuntime
+  // .animations = [ {name, duration, tracks:[{name, times, values}]} ]).
+  let clips = [];
+  if(gltf && Array.isArray(gltf.animations)) clips = clips.concat(gltf.animations);
+  if(root && Array.isArray(root.animations)) clips = clips.concat(root.animations);
+  // TS-factory clips (synthesized AnimationClips)
+  const rt = root && root.userData && root.userData.sculptRuntime;
+  if(rt && Array.isArray(rt.animations)){
+    rt.animations.forEach((a, i)=>{
+      if(!a || !Array.isArray(a.tracks)) return;
+      try{
+        const tracks = a.tracks.map(t=>{
+          // tracks can be {name, times, values} or THREE.KeyframeTrack
+          if(t && t.isKeyframeTrack) return t;
+          if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
+            return new THREE.NumberKeyframeTrack(t.name, t.times, t.values);
+          }
+          return null;
+        }).filter(Boolean);
+        if(tracks.length){
+          const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
+          clips.push(clip);
+        }
+      }catch(err){ console.warn('[anim] failed to build clip from TS factory hint:', err); }
+    });
+  }
+  lblAnim.clips = clips;
+  if(clips.length && root){
+    lblAnim.mixer = new THREE.AnimationMixer(root);
+    lblAnim.actions = clips.map(c=>lblAnim.mixer.clipAction(c));
+    lblAnim.actions.forEach(a=>{ a.setLoop(THREE.LoopRepeat, Infinity); a.clampWhenFinished = false; });
+    lblAnim.currentIdx = 0;
+    lblUpdateAnimUI();
+  } else {
+    lblUpdateAnimUI();
+  }
+}
+
+function lblTeardownAnimations(){
+  if(lblAnim.mixer){
+    try{ lblAnim.mixer.stopAllAction(); }catch(_){}
+    try{ lblAnim.mixer.uncacheRoot(lblAnim.root); }catch(_){}
+  }
+  lblAnim = { mixer:null, clips:[], actions:[], currentIdx:-1, isPlaying:false, root:null };
+  lblUpdateAnimUI();
+}
+
+function lblUpdateAnimUI(){
+  const playBtn = document.getElementById('anim-play-btn');
+  const nextBtn = document.getElementById('anim-next-btn');
+  const chip = document.getElementById('anim-name-chip');
+  if(!playBtn || !nextBtn) return;
+  const has = lblAnim.clips.length > 0;
+  playBtn.style.display = has ? '' : 'none';
+  nextBtn.style.display = (has && lblAnim.clips.length > 1) ? '' : 'none';
+  if(chip) chip.style.display = has ? '' : 'none';
+  if(!has){ if(chip) chip.textContent='—'; return; }
+  // Play/Pause label
+  playBtn.textContent = lblAnim.isPlaying ? '⏸ Pause' : '▶ Play';
+  playBtn.classList.toggle('active', !!lblAnim.isPlaying);
+  const name = (lblAnim.clips[lblAnim.currentIdx] && lblAnim.clips[lblAnim.currentIdx].name) || `anim ${lblAnim.currentIdx+1}`;
+  if(chip) chip.textContent = `${lblAnim.currentIdx+1}/${lblAnim.clips.length} · ${name}`;
+}
+
+function lblAnimToggle(){
+  if(!lblAnim.mixer || !lblAnim.actions.length) return;
+  if(lblAnim.isPlaying){
+    lblAnim.actions.forEach(a=>a.pause());
+    lblAnim.isPlaying = false;
+  } else {
+    // Start the current one (and stop the others so only one runs at a time).
+    lblAnim.actions.forEach((a,i)=>{ if(i===lblAnim.currentIdx) a.reset().play(); else a.stop(); });
+    lblAnim.isPlaying = true;
+  }
+  lblUpdateAnimUI();
+}
+
+function lblAnimNext(){
+  if(!lblAnim.mixer || !lblAnim.actions.length) return;
+  lblAnim.currentIdx = (lblAnim.currentIdx + 1) % lblAnim.actions.length;
+  lblAnim.actions.forEach((a,i)=>{ if(i===lblAnim.currentIdx) a.reset().play(); else a.stop(); });
+  lblAnim.isPlaying = true;
+  lblUpdateAnimUI();
+}
+
+// Wire up the buttons (the elements exist in the topbar; this just hooks
+// them up — they stay display:none until a model with clips is loaded).
+document.getElementById('anim-play-btn').addEventListener('click', lblAnimToggle);
+document.getElementById('anim-next-btn').addEventListener('click', lblAnimNext);
+// Spacebar shortcut for play/pause when no input is focused
+window.addEventListener('keydown', (e)=>{
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT') return;
+  if(e.code === 'Space' && lblAnim.mixer && lblAnim.actions.length){
+    e.preventDefault();
+    lblAnimToggle();
+  }
+});
+
+// Tear down animations when a fresh model is loaded (so we don't keep
+// animating the previous model). The blueprint path uses CURRENT_BLUEPRINT
+// as the trigger, TS uses CURRENT_TS_MODEL, upload uses loaded3dGroup.
+const __lblOrigClearScene = (typeof clearScene === 'function') ? clearScene : null;
+const __lblOrigBuildSceneForAnim = buildScene;
+buildScene = function(blueprint){
+  lblTeardownAnimations();
+  return __lblOrigBuildSceneForAnim(blueprint);
+};
 
 animate();
 
