@@ -643,6 +643,128 @@ body.theme-light #welcome{
 #toast.ok{border-color:var(--accent2);color:var(--accent2);}
 #toast.err{border-color:var(--warn);color:var(--warn);}
 
+/* LBL UPDATE F6.2 — loading overlay with spinner + progress bar.
+   Used by the model store loader (and reusable for any other
+   async operation that needs a visible "we're working" indicator).
+   Mobile-responsive: full-width on small screens, centered card on
+   desktop. Blocks pointer events on the canvas so the user can't
+   accidentally orbit / click while a model is being fetched. */
+#lbl-loading-overlay{
+  position:fixed;inset:0;z-index:9998;
+  background:rgba(8,9,14,.55);
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s var(--ease);
+  font-family:'Space Grotesk',sans-serif;
+  padding:20px;
+}
+#lbl-loading-overlay.show{opacity:1;pointer-events:auto;}
+#lbl-loading-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-2);
+  padding:20px 22px;
+  width:min(380px, calc(100vw - 40px));
+  display:flex;flex-direction:column;gap:14px;
+  color:var(--text);
+}
+#lbl-loading-card .lbl-load-title{
+  display:flex;align-items:center;gap:10px;
+  font-size:14px;font-weight:600;letter-spacing:.2px;
+}
+#lbl-loading-card .lbl-load-msg{
+  font-size:12px;color:var(--text2);
+  line-height:1.5;min-height:32px;
+  word-break:break-word;
+}
+#lbl-loading-card .lbl-load-sub{
+  font-size:11px;color:var(--muted);
+  font-family:'Space Mono',monospace;
+  word-break:break-all;
+}
+.lbl-spinner{
+  width:18px;height:18px;flex-shrink:0;
+  border:2px solid var(--border);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:lbl-spin .8s linear infinite;
+}
+.lbl-spinner.lg{width:24px;height:24px;border-width:3px;}
+@keyframes lbl-spin{to{transform:rotate(360deg);}}
+#lbl-loading-card .lbl-load-bar{
+  width:100%;height:6px;
+  background:var(--border);
+  border-radius:3px;
+  overflow:hidden;
+  position:relative;
+}
+#lbl-loading-card .lbl-load-bar-fill{
+  position:absolute;inset:0;
+  background:linear-gradient(90deg, var(--accent), var(--accent2));
+  width:0%;
+  transition:width .25s var(--ease);
+  border-radius:3px;
+}
+#lbl-loading-card .lbl-load-bar-fill.indeterminate{
+  width:30% !important;
+  animation:lbl-load-indet 1.4s var(--ease) infinite;
+}
+@keyframes lbl-load-indet{
+  0%{transform:translateX(-100%);}
+  100%{transform:translateX(330%);}
+}
+#lbl-loading-card .lbl-load-actions{
+  display:flex;gap:8px;justify-content:flex-end;
+  margin-top:2px;
+}
+#lbl-loading-card .lbl-load-actions button{
+  font-family:inherit;font-size:11px;
+  padding:6px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--surface2);
+  color:var(--text2);
+  cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+}
+#lbl-loading-card .lbl-load-actions button:hover{
+  background:var(--surface3);
+  color:var(--text);
+  border-color:var(--border2);
+}
+#lbl-loading-card .lbl-load-ok{
+  border-color:var(--accent) !important;
+  color:var(--accent) !important;
+}
+/* Mobile (≤680px): card goes full-width with safe-area padding so it
+   doesn't crowd the iPhone notch / home indicator. */
+@media (max-width:680px){
+  #lbl-loading-card{
+    padding:16px 18px;
+    border-radius:var(--radius);
+  }
+  #lbl-loading-card .lbl-load-title{font-size:13px;}
+  #lbl-loading-card .lbl-load-msg{font-size:11px;}
+  #lbl-loading-card{padding-bottom:calc(16px + var(--safe-b, 0px));}
+}
+
+/* LBL UPDATE F6.2 — Demo button busy state. When the loader is
+   scanning/loading, the Demo button shows a tiny inline spinner and
+   dims slightly so it's clear something is happening. */
+#demo-btn.busy{opacity:.75;pointer-events:none;position:relative;}
+#demo-btn .demo-spinner{
+  display:none;
+  width:11px;height:11px;
+  border:1.5px solid currentColor;
+  border-top-color:transparent;
+  border-radius:50%;
+  animation:lbl-spin .8s linear infinite;
+  vertical-align:-1px;margin-right:4px;
+}
+#demo-btn.busy .demo-spinner{display:inline-block;}
+
 /* Tablet range — keep both panels but tighten them so the viewport
    doesn't get squeezed to a sliver on iPad-class / split-screen widths */
 @media(max-width:1024px) and (min-width:701px){
@@ -944,7 +1066,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="logo">Low Poly<span>3D</span></div>
   <div class="vdiv"></div>
   <button class="tbtn" id="upload-btn">📂 Upload</button>
-  <button class="tbtn purple" id="demo-btn">Demo</button>
+  <button class="tbtn purple" id="demo-btn"><span class="demo-spinner" aria-hidden="true"></span>Demo</button>
   <button class="tbtn warn hide-xs" id="clear-btn">Clear</button>
   <div class="vdiv"></div>
   <button class="tbtn hide-xs" id="skeleton-toggle-btn" title="Show/hide skeleton joint markers">🦴 Skeleton</button>
@@ -1495,6 +1617,22 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
 </div>
 
 <div id="toast"></div>
+
+<!-- LBL UPDATE F6.2 — fullscreen loading overlay. Shown by the model
+     store loader (and any other async operation) while a long-running
+     task is in flight. Blocks canvas pointer events so the user can't
+     accidentally orbit / click while a model is fetching. -->
+<div id="lbl-loading-overlay" role="status" aria-live="polite" aria-busy="false">
+  <div id="lbl-loading-card">
+    <div class="lbl-load-title"><span class="lbl-spinner lg" aria-hidden="true"></span><span id="lbl-load-title-text">Loading…</span></div>
+    <div class="lbl-load-msg" id="lbl-load-msg">Preparing…</div>
+    <div class="lbl-load-sub" id="lbl-load-sub" style="display:none"></div>
+    <div class="lbl-load-bar" id="lbl-load-bar-wrap"><div class="lbl-load-bar-fill indeterminate" id="lbl-load-bar-fill"></div></div>
+    <div class="lbl-load-actions" id="lbl-load-actions" style="display:none">
+      <button type="button" id="lbl-load-cancel-btn">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- LBL update H4 — HDR environment presets popover (position set by JS next to its button) -->
 <div id="env-presets-panel">
@@ -12607,29 +12745,65 @@ async function lblModelStoreFindExisting(n){
 async function lblModelStoreCountModels(){
   // Sequential probe from 1..LBL_MODEL_STORE_MAX; stop at the first
   // miss. This is a one-time scan the first time Demo is opened.
+  // Updates the validator log + loading overlay every probe so the
+  // user sees the scan progressing on both desktop and mobile.
   let count = 0;
+  let cancelled = false;
+  // Wire the overlay's Cancel button to abort the scan mid-flight.
+  lblLoadCancelCb = ()=>{ cancelled = true; };
   for(let n=1; n<=LBL_MODEL_STORE_MAX; n++){
+    if(cancelled) break;
     const found = await lblModelStoreFindExisting(n);
+    if(cancelled) break;
     if(!found) break;
     count = n;
+    if(n === 1 || n % 5 === 0 || n === LBL_MODEL_STORE_MAX){
+      const msg = `Found ${n} model${n===1?'':'s'} so far — checking Model_${n+1}…`;
+      updateAllValLogs(`<span class="info">${msg}</span>`);
+      // Overlay progress: scale relative to the maximum we might scan
+      // (5 models / second is plenty fast, so cap at 50 to keep the
+      // bar from stalling visually when the user only has 3 models).
+      const cap = Math.max(20, count + 5);
+      lblLoadingUpdate({ message: msg, progress: Math.min(0.95, count / cap) });
+    }
   }
+  lblLoadCancelCb = null;
   return count;
 }
 
 async function lblModelStoreLoadByNumber(n){
   // Find the first file for model #N, fetch its body, and dispatch to
-  // the matching parser (JSON / JS / TS / TSX / JSX).
+  // the matching parser (JSON / JS / TS / TSX / JSX). Mirrors the
+  // validator progress the TS-upload / paste flow shows — every step
+  // (probe, download, detect, parse, build) writes a line into the
+  // validator log AND updates the loading overlay (when shown) so
+  // the user sees the same kind of "scanning → downloading →
+  // compiling → ✓ built" progression that they get when they paste
+  // or drop a TS file.
+  updateAllValLogs(`<span class="info">Scanning for Model_${n}…</span>`);
+  setStatus('scanning…', true);
+  lblLoadingUpdate({ message: `Looking for Model_${n}…`, progress: 0.15 });
   const found = await lblModelStoreFindExisting(n);
   if(!found){
     const sample = (found && found.tried || []).slice(0, 3).join(', ');
-    toast(`Model_${n} not found — make sure your model file is in the repo (e.g. public/models/Model_${n}.json) and was pushed. Tried: ${sample}…`, 'err');
+    const triedCount = (found && found.tried || []).length;
+    updateAllValLogs(`<span class="err">✗ Model_${n} not found — checked ${triedCount} URL${triedCount===1?'':'s'}, e.g. ${sample}…</span><br><span class="info">→ Place Model_${n}.json (or .js / .jsx / .ts / .tsx) under <code>public/models/</code> in your repo and push.</span>`);
+    setStatus('not found', false);
+    lblLoadingErr(`Model_${n} not found — see validator log for tried URLs`);
+    toast(`Model_${n} not found — see validator log for tried URLs`, 'err');
     return false;
   }
+  updateAllValLogs(`<span class="ok">✓ Found ${lblModelStoreLoadedFilename || ('Model_'+n+'.'+found.ext)} at ${found.url}</span><br><span class="info">→ downloading…</span>`);
+  setStatus('downloading…', true);
+  lblLoadingUpdate({ title: 'Downloading model', message: `Model_${n}.${found.ext}`, sub: found.url, progress: 0.35 });
   let text;
   try{
     const r = await fetch(found.url, {cache:'no-store'});
     text = await r.text();
   }catch(err){
+    updateAllValLogs(`<span class="err">✗ Failed to fetch ${found.url}: ${err.message}</span>`);
+    setStatus('fetch error', false);
+    lblLoadingErr(`Fetch failed: ${err.message}`);
     toast(`Failed to fetch ${found.url}: ${err.message}`, 'err');
     return false;
   }
@@ -12638,14 +12812,25 @@ async function lblModelStoreLoadByNumber(n){
   if(typeof console !== 'undefined'){
     console.log(`[model-store] Loaded ${lblModelStoreLoadedFilename} from ${found.url}`);
   }
+  // Show the format-detection line BEFORE handing off to the parser, so
+  // the user sees "Detected JSON" / "Detected TS" exactly like the
+  // file-input / paste path shows.
+  const extLabel = ({js:'JS blueprint script', jsx:'JSX (JS factory)', ts:'TypeScript factory', tsx:'TSX (TS factory)', json:'JSON blueprint'})[found.ext] || found.ext;
+  const phase = (found.ext==='ts'||found.ext==='tsx'||found.ext==='jsx') ? 'compiling' : 'validating';
+  updateAllValLogs(`<span class="ok">✓ Downloaded ${lblModelStoreLoadedFilename} (${text.length.toLocaleString()} bytes)</span><br><span class="info">→ Detected ${extLabel} (${found.url.split('/').pop()})</span><br><span class="info">→ ${phase}…</span>`);
+  setStatus(phase + '…', true);
+  lblLoadingUpdate({ title: phase.charAt(0).toUpperCase()+phase.slice(1), message: `${extLabel} — ${text.length.toLocaleString()} bytes`, sub: `Building ${lblModelStoreLoadedFilename}…`, progress: 0.7 });
   // Dispatch to the same parser the file-input / paste flow uses so all
   // downstream behaviour (validation, build, undo snapshot, animations,
-  // mesh registration) stays identical.
+  // mesh registration) stays identical. validateAndBuild / validateAndBuildTs
+  // overwrite the validator log with their own detailed lines, which is
+  // what we want — we just primed the pump with the format-detect line.
   if(found.ext === 'ts' || found.ext === 'tsx' || found.ext === 'jsx'){
     validateAndBuildTs(text, lblModelStoreLoadedFilename);
   } else {
     validateAndBuild(text, lblModelStoreLoadedFilename);
   }
+  lblLoadingUpdate({ progress: 1.0, message: `Built ${lblModelStoreLoadedFilename}` });
   lblUpdateModelStoreNav();
   return true;
 }
@@ -12678,16 +12863,50 @@ function lblModelStoreHideNav(){
 
 async function lblOpenModelStore(){
   // Called by the Demo button. First click: scan + load Model_1.
+  // Shows a fullscreen loading overlay (with spinner, progress bar, and
+  // Cancel button) so the user gets visible feedback on both desktop
+  // and mobile while the scan / download / build is in flight.
   if(!lblModelStoreCount){
-    toast('Scanning for Model_1…', '');
+    lblLoading({
+      title: 'Scanning model store',
+      message: `Checking ${LBL_MODEL_STORE_BASES.length} base paths × ${LBL_MODEL_STORE_EXTS.length} extensions for Model_1…`,
+      sub: 'Tip: drop Model_1.json into public/models/ and push if nothing loads.',
+      progress: 0,
+      cancel: ()=>{ lblLoadCancelCb && lblLoadCancelCb(); },
+      cancelLabel: 'Cancel',
+      markDemoBusy: true
+    });
+    updateAllValLogs(`<span class="info">Scanning for Model_1… (tries ${LBL_MODEL_STORE_BASES.length} base paths × ${LBL_MODEL_STORE_EXTS.length} extensions)</span>`);
+    setStatus('scanning…', true);
     lblModelStoreCount = await lblModelStoreCountModels();
     if(!lblModelStoreCount){
-      toast(`No Model_1 found. Place Model_1.json (or .js/.jsx/.ts/.tsx) under public/models/ in your repo and push.`, 'err');
+      updateAllValLogs(`<span class="err">✗ No Model_1 found in any base path.</span><br><span class="info">→ Place Model_1.json (or .js / .jsx / .ts / .tsx) under <code>public/models/</code> in your repo and push. Check the browser console for the full list of URLs tried.</span>`);
+      setStatus('not found', false);
+      lblLoadingErr('No Model_1 found — see validator log');
+      setTimeout(()=>lblLoadingHide(), 2400);
       lblModelStoreHideNav();
       return;
     }
+    lblLoadingUpdate({ message: `Found ${lblModelStoreCount} model${lblModelStoreCount===1?'':'s'} — loading Model_1…`, progress: 0.5 });
+  } else {
+    lblLoading({
+      title: 'Loading model',
+      message: 'Fetching Model_1…',
+      progress: 0.1,
+      markDemoBusy: true
+    });
   }
-  await lblModelStoreLoadByNumber(1);
+  const ok = await lblModelStoreLoadByNumber(1);
+  if(ok){
+    lblLoadingOk(`Loaded Model_1 (${lblModelStoreLoadedFilename})`);
+  }
+  // If lblModelStoreLoadByNumber already set a fail-state via the
+  // overlay, don't double-hide. Otherwise (e.g. a sync failure) hide
+  // the overlay ourselves.
+  const overlay = document.getElementById('lbl-loading-overlay');
+  if(overlay && overlay.classList.contains('show') && !document.getElementById('lbl-load-title-text').textContent.startsWith('✓')){
+    lblLoadingHide();
+  }
 }
 
 async function lblModelStorePrev(){
@@ -13228,6 +13447,128 @@ function toast(msg,type=''){
 }
 function hideWelcome(){ const w=document.getElementById('welcome'); w.classList.add('hidden'); setTimeout(()=>w.classList.add('gone'),400); }
 function showWelcome(){ const w=document.getElementById('welcome'); w.classList.remove('gone'); requestAnimationFrame(()=>w.classList.remove('hidden')); }
+
+// ───────────────────────────────────────────────────────────────────────
+// LBL UPDATE F6.2 — Loading overlay controller
+// Reusable for any async task. Default mode is "indeterminate" (just a
+// spinner + animated bar). Pass opts.progress (0-1) for determinate.
+// Pass opts.cancel to expose a Cancel button.
+// ───────────────────────────────────────────────────────────────────────
+let lblLoadCancelCb = null;
+function lblLoading(opts){
+  opts = opts || {};
+  const overlay = document.getElementById('lbl-loading-overlay');
+  const title = document.getElementById('lbl-load-title-text');
+  const msg = document.getElementById('lbl-load-msg');
+  const sub = document.getElementById('lbl-load-sub');
+  const fill = document.getElementById('lbl-load-bar-fill');
+  const actions = document.getElementById('lbl-load-actions');
+  if(!overlay || !title || !msg || !fill) return;
+  title.textContent = opts.title || 'Loading…';
+  msg.textContent = opts.message || 'Please wait…';
+  if(opts.sub){
+    sub.textContent = opts.sub;
+    sub.style.display = '';
+  } else {
+    sub.style.display = 'none';
+  }
+  if(typeof opts.progress === 'number'){
+    fill.classList.remove('indeterminate');
+    fill.style.width = Math.max(0, Math.min(100, opts.progress*100)) + '%';
+  } else {
+    fill.classList.add('indeterminate');
+    fill.style.width = '';
+  }
+  if(opts.cancel){
+    lblLoadCancelCb = opts.cancel;
+    actions.style.display = '';
+    const btn = document.getElementById('lbl-load-cancel-btn');
+    if(btn){
+      btn.textContent = opts.cancelLabel || 'Cancel';
+      btn.className = '';
+      btn.onclick = ()=>{
+        if(typeof lblLoadCancelCb === 'function'){
+          try{ lblLoadCancelCb(); }catch(_){}
+        }
+        lblLoadingHide();
+      };
+    }
+  } else {
+    lblLoadCancelCb = null;
+    actions.style.display = 'none';
+  }
+  // Show on next frame so the CSS transition can animate the opacity.
+  requestAnimationFrame(()=>{
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-busy', 'true');
+  });
+  // Also flip the Demo button to its busy state so the user gets
+  // feedback at the click-source too, not just the overlay.
+  const demoBtn = document.getElementById('demo-btn');
+  if(demoBtn && opts.markDemoBusy) demoBtn.classList.add('busy');
+}
+function lblLoadingUpdate(opts){
+  // Re-uses the same DOM elements the lblLoading() call set up. Pass
+  // only the fields you want to change.
+  opts = opts || {};
+  const title = document.getElementById('lbl-load-title-text');
+  const msg = document.getElementById('lbl-load-msg');
+  const sub = document.getElementById('lbl-load-sub');
+  const fill = document.getElementById('lbl-load-bar-fill');
+  if(title && typeof opts.title === 'string') title.textContent = opts.title;
+  if(msg && typeof opts.message === 'string') msg.textContent = opts.message;
+  if(sub){
+    if(typeof opts.sub === 'string'){ sub.textContent = opts.sub; sub.style.display = ''; }
+    else if(opts.sub === null){ sub.style.display = 'none'; }
+  }
+  if(fill && typeof opts.progress === 'number'){
+    fill.classList.remove('indeterminate');
+    fill.style.width = Math.max(0, Math.min(100, opts.progress*100)) + '%';
+  }
+}
+function lblLoadingOk(message){
+  // Brief "success" flash on the overlay before hiding. Useful when a
+  // multi-step operation finishes so the user sees the completion
+  // moment instead of the overlay just vanishing.
+  const overlay = document.getElementById('lbl-loading-overlay');
+  const title = document.getElementById('lbl-load-title-text');
+  const msg = document.getElementById('lbl-load-msg');
+  const fill = document.getElementById('lbl-load-bar-fill');
+  const actions = document.getElementById('lbl-load-actions');
+  if(!overlay) return;
+  if(title) title.textContent = '✓ Done';
+  if(msg) msg.textContent = message || 'Loaded';
+  if(fill){ fill.classList.remove('indeterminate'); fill.style.width = '100%'; fill.classList.add('lbl-load-ok'); }
+  if(actions) actions.style.display = 'none';
+  setTimeout(()=>lblLoadingHide(), 380);
+}
+function lblLoadingErr(message){
+  const overlay = document.getElementById('lbl-loading-overlay');
+  const title = document.getElementById('lbl-load-title-text');
+  const msg = document.getElementById('lbl-load-msg');
+  const fill = document.getElementById('lbl-load-bar-fill');
+  const actions = document.getElementById('lbl-load-actions');
+  if(!overlay) return;
+  if(title) title.textContent = '✗ Error';
+  if(msg) msg.textContent = message || 'Something went wrong';
+  if(fill){ fill.classList.remove('indeterminate'); fill.style.width = '100%'; fill.classList.add('lbl-load-ok'); }
+  // Re-purpose the actions row as a single dismiss button.
+  if(actions){
+    actions.style.display = '';
+    const btn = document.getElementById('lbl-load-cancel-btn');
+    if(btn){ btn.textContent = 'Dismiss'; btn.className = 'lbl-load-ok'; btn.onclick = ()=>lblLoadingHide(); }
+  }
+}
+function lblLoadingHide(){
+  const overlay = document.getElementById('lbl-loading-overlay');
+  const demoBtn = document.getElementById('demo-btn');
+  if(overlay){ overlay.classList.remove('show'); overlay.setAttribute('aria-busy','false'); }
+  if(demoBtn) demoBtn.classList.remove('busy');
+  // Reset the success-styled bar so the next load starts clean.
+  const fill = document.getElementById('lbl-load-bar-fill');
+  if(fill){ fill.classList.remove('lbl-load-ok'); fill.classList.add('indeterminate'); fill.style.width = ''; }
+  lblLoadCancelCb = null;
+}
 
 function closeMobExportMenu(){
   const existing=document.getElementById('exp-menu');
