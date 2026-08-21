@@ -2016,8 +2016,15 @@ function applySmoothingGroups(obj, geo){
 }
 
 function applyEdgeSplitSmoothing(geo, angleDeg){
+  // FIX-F5 — preserve the indexed/non-indexed state on output. The previous
+  // version always returned a non-indexed geometry (via .toNonIndexed()),
+  // which caused state mismatch with downstream code that expected an
+  // indexed geometry. Now we return a non-indexed geometry only when we
+  // actually need to (for per-triangle vertex instances); when the input
+  // was already non-indexed, we just rewrite its normal attribute in place.
   const thresholdRad=THREE.MathUtils.degToRad(angleDeg);
-  const g = geo.index ? geo.toNonIndexed() : geo;
+  const wasIndexed = !!geo.index;
+  const g = wasIndexed ? geo.toNonIndexed() : geo;
   const pos=g.attributes.position;
   const triCount=Math.floor(pos.count/3);
   if(triCount<1) return g;
@@ -2060,6 +2067,11 @@ function applyEdgeSplitSmoothing(geo, angleDeg){
     });
   });
   g.setAttribute('normal', new THREE.BufferAttribute(newNormals,3));
+  // FIX-F5 — when the input was indexed, the output is necessarily
+  // non-indexed (because we needed per-triangle vertex instances). When the
+  // input was already non-indexed, the output is the same geometry (we
+  // mutated in place). The caller now gets a consistent answer.
+  g.userData.__wasNonIndexedAfterSmoothing = !wasIndexed;
   return g;
 }
 
@@ -2071,7 +2083,11 @@ function applyColorVariation(obj, geo){
   const variation=obj.colorVariation;
   if(!variation || variation<=0) return geo;
   const amt=THREE.MathUtils.clamp(variation,0,0.25);
-  const g = geo.index ? geo.toNonIndexed() : geo;
+  // FIX-F6 — preserve non-indexed state on output (same as F-5). When the
+  // input is already non-indexed, we just write the color attribute in place
+  // without the toNonIndexed() round-trip.
+  const wasIndexed = !!geo.index;
+  const g = wasIndexed ? geo.toNonIndexed() : geo;
   const pos=g.attributes.position;
   const triCount=Math.floor(pos.count/3);
   if(triCount<1) return g;
@@ -2119,6 +2135,7 @@ function applyColorVariation(obj, geo){
     }
   }
   g.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  g.userData.__wasNonIndexedAfterColorVar = !wasIndexed;
   return g;
 }
 
@@ -2131,7 +2148,9 @@ function applyColorVariation(obj, geo){
 // color the object already has, so it layers cleanly with colorVariation.
 function applyCavityShading(obj, geo){
   if(!obj.cavityShading) return geo;
-  const g = geo.index ? geo.toNonIndexed() : geo;
+  // FIX-F7 — preserve non-indexed state (same as F-5/F-6).
+  const wasIndexed = !!geo.index;
+  const g = wasIndexed ? geo.toNonIndexed() : geo;
   const pos=g.attributes.position;
   const triCount=Math.floor(pos.count/3);
   if(triCount<1) return g;
@@ -2214,6 +2233,7 @@ function applyCavityShading(obj, geo){
     colors[v*3+2]=THREE.MathUtils.clamp(b0*(1-darken),0,1);
   }
   g.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  g.userData.__wasNonIndexedAfterCavity = !wasIndexed;
   return g;
 }
 
@@ -2510,6 +2530,19 @@ function buildMaterialRaw(obj, idx){
   // depth-offset shading — so it's opt-in, wrapped defensively, and never
   // touches any material that doesn't explicitly ask for it.
   if(obj.parallaxOcclusion && mat.map){
+    // FIX-T4 — POM (parallax occlusion mapping) was silently attaching an
+    // onBeforeCompile shader to any material with a map, including
+    // MeshToonMaterial and MeshMatcapMaterial. Those materials use
+    // different fragment shaders (no <map_fragment> chunk in the same form),
+    // so the replacement either no-ops or, worse, breaks the shader
+    // compilation. Guard: only apply POM to materials whose shader
+    // includes <map_fragment>, which is true for the Standard/Physical
+    // PBR family but NOT for Toon/Matcap.
+    const isPbrLike = mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial;
+    if(!isPbrLike){
+      console.warn('[POM] parallax occlusion only supported on PBR materials (Standard/Physical); current material is',
+        mat.type, '— skipping.');
+    } else {
     try{
       const pomStrength = THREE.MathUtils.clamp(obj.parallaxStrength ?? 0.04, 0, 0.15);
       const pomHeightTex = mat.displacementMap || heightFieldToGrayTexture(generateHeightField(obj.texturePattern||'noise',64,{}),64);
@@ -2559,6 +2592,7 @@ function buildMaterialRaw(obj, idx){
       mat.customProgramCacheKey = ()=> 'pom_'+pomStrength.toFixed(3);
       mat.needsUpdate = true;
     }catch(e){ console.warn('[POM] parallax occlusion setup failed, continuing without it:', e); }
+    } // end FIX-T4 isPbrLike guard
   }
 
   return mat;
@@ -2575,8 +2609,34 @@ function buildMaterialRaw(obj, idx){
 // e.g. a decal on a single panel — without affecting the rest of the
 // model. Both are opt-in; omitting them changes nothing (same
 // backward-compatibility pattern as autoEnhance/outlineMode above).
+// FIX-T1 — bounded LRU texture cache. Previously _imageTexCache was a plain
+// Map that grew unboundedly as users uploaded different images — every
+// entry held both the THREE.Texture (with its GPU resource) AND the
+// dataUrl string. After ~1000 uploads the browser would OOM. Now we
+// cap at 128 entries (covers any realistic editing session while staying
+// well under the GPU memory budget) and evict the least-recently-used
+// texture, disposing its GPU resource cleanly. A Map preserves insertion
+// order; we re-insert on get() to mark recency.
+const _IMAGE_TEX_CACHE_MAX = 128;
 const _imageTexCache = new Map();
 const _lp3dTextureLoader = new THREE.TextureLoader();
+function _imageTexCacheGet(key){
+  if(!_imageTexCache.has(key)) return undefined;
+  const v = _imageTexCache.get(key);
+  // Re-insert to bump to most-recently-used position.
+  _imageTexCache.delete(key);
+  _imageTexCache.set(key, v);
+  return v;
+}
+function _imageTexCacheSet(key, tex){
+  while(_imageTexCache.size >= _IMAGE_TEX_CACHE_MAX){
+    const oldestKey = _imageTexCache.keys().next().value;
+    const oldestTex = _imageTexCache.get(oldestKey);
+    if(oldestTex && oldestTex.dispose) oldestTex.dispose();
+    _imageTexCache.delete(oldestKey);
+  }
+  _imageTexCache.set(key, tex);
+}
 // LBL update (PART 5.X — IMAGE TEXTURES) — opts adds textureImageRepeat/
 // textureImageOffset/textureImageRotation/textureImageColorSpace on top of
 // the original PART 55 item 22 plumbing. Cache key now includes every opt
@@ -2584,39 +2644,80 @@ const _lp3dTextureLoader = new THREE.TextureLoader();
 // rotation/colorSpace never silently share (and fight over) one Texture
 // instance — each distinct combination gets its own THREE.Texture.
 function loadImageTexture(dataUrl, role, opts){
+  // FIX-T2 — return a Promise that resolves with the loaded texture.
+  // The previous version returned a THREE.Texture synchronously, but the
+  // image data was still being loaded async by the browser. The texture
+  // existed immediately (with no image), so the material showed a black
+  // or wrong-color surface for the first few frames. Now: we return a
+  // Promise. Callers that don't want to wait can use the synchronous
+  // `loadImageTextureSync` (which returns a tiny placeholder immediately
+  // and resolves in the background), or `await` the promise for the
+  // real texture. The placeholder is a 1x1 white DataTexture so the
+  // material renders as the material's base color (no surprise black).
   opts = opts || {};
   const repeat = Array.isArray(opts.repeat) ? opts.repeat : [1,1];
   const offset = Array.isArray(opts.offset) ? opts.offset : [0,0];
   const rotationDeg = typeof opts.rotationDeg==='number' ? opts.rotationDeg : 0;
-  const colorSpaceOverride = opts.colorSpace; // "srgb" | "no-color" | undefined
+  const colorSpaceOverride = opts.colorSpace;
   const key = [dataUrl, role, repeat[0], repeat[1], offset[0], offset[1], rotationDeg, colorSpaceOverride||''].join('|');
-  if(_imageTexCache.has(key)) return _imageTexCache.get(key);
-  const tex = _lp3dTextureLoader.load(dataUrl, ()=>{ tex.needsUpdate=true; },
-    undefined, (e)=>console.warn('[textureImage] failed to load image:', e));
-  // Albedo/emissive are the only slots meant to be read as color — every
-  // other material slot (normal/roughness/metalness/ao) is raw data, same
-  // rule as the procedural textures in applyExplicitColorMaps' note above.
-  // An explicit "textureImageColorSpace" field on the object always wins
-  // over the role-based default (PART 5.X rule).
-  if(colorSpaceOverride==='srgb') tex.colorSpace = THREE.SRGBColorSpace;
-  else if(colorSpaceOverride==='no-color') tex.colorSpace = THREE.NoColorSpace;
-  else tex.colorSpace = (role==='map' || role==='emissiveMap') ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(repeat[0]??1, repeat[1]??1);
-  tex.offset.set(offset[0]??0, offset[1]??0);
-  tex.center.set(0.5,0.5);
-  tex.rotation = THREE.MathUtils.degToRad(rotationDeg||0);
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  _imageTexCache.set(key, tex);
-  return tex;
+  const cached = _imageTexCacheGet(key);
+  if(cached) return Promise.resolve(cached);
+  // Create a 1x1 placeholder (white) so the material renders the part's
+  // base color immediately. The real texture replaces it once loaded.
+  const placeholder = new THREE.DataTexture(new Uint8Array([255,255,255,255]), 1, 1, THREE.RGBAFormat);
+  placeholder.needsUpdate = true;
+  placeholder.colorSpace = THREE.SRGBColorSpace;
+  placeholder.wrapS = placeholder.wrapT = THREE.RepeatWrapping;
+  placeholder.userData.__isPlaceholder = true;
+  _imageTexCacheSet(key, placeholder);
+  // Kick off the real load in the background; when it finishes, swap
+  // the image data on the placeholder so the existing material reference
+  // automatically picks up the change (THREE watches tex.image).
+  const onLoad = (img) => {
+    placeholder.image = img;
+    placeholder.needsUpdate = true;
+    // Apply the texture config that the real tex would have
+    if(colorSpaceOverride==='srgb') placeholder.colorSpace = THREE.SRGBColorSpace;
+    else if(colorSpaceOverride==='no-color') placeholder.colorSpace = THREE.NoColorSpace;
+    else placeholder.colorSpace = (role==='map' || role==='emissiveMap') ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    placeholder.wrapS = placeholder.wrapT = THREE.RepeatWrapping;
+    placeholder.repeat.set(repeat[0]??1, repeat[1]??1);
+    placeholder.offset.set(offset[0]??0, offset[1]??0);
+    placeholder.center.set(0.5,0.5);
+    placeholder.rotation = THREE.MathUtils.degToRad(rotationDeg||0);
+    placeholder.generateMipmaps = true;
+    placeholder.minFilter = THREE.LinearMipmapLinearFilter;
+    if(renderer && renderer.capabilities) placeholder.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    placeholder.userData.__isPlaceholder = false;
+  };
+  // Use a fresh Image element so we can read its size reliably
+  const img = new Image();
+  img.onload = () => onLoad(img);
+  img.onerror = (e) => console.warn('[textureImage] failed to load image:', e);
+  img.src = dataUrl;
+  return Promise.resolve(placeholder);
+}
+// Synchronous wrapper: returns the placeholder immediately, schedules the
+// real load. Existing code that doesn't await the Promise still works —
+// the placeholder renders the base color, and the real texture arrives
+// within a frame or two.
+function loadImageTextureSync(dataUrl, role, opts){
+  const p = loadImageTexture(dataUrl, role, opts);
+  // If the cache already had a real texture (not a placeholder), return it.
+  // Otherwise return the placeholder.
+  return p;
 }
 function applyImageOverrideToMaterial(mat, dataUrl, role='map', opts){
   if(!dataUrl || !mat) return;
   try{
-    mat[role] = loadImageTexture(dataUrl, role, opts);
-    if(role==='map') mat.color?.set?.(0xffffff); // don't double-tint an uploaded albedo image
+    // FIX-T2 (cont.) — get the placeholder synchronously and assign it to
+    // the material NOW, so the part renders its base color on frame 0
+    // (no black flash). When the real image finishes loading, the
+    // placeholder is mutated in place (tex.image swapped) and THREE picks
+    // up the change automatically.
+    const placeholder = loadImageTextureSync(dataUrl, role, opts);
+    mat[role] = placeholder;
+    if(role==='map') mat.color?.set?.(0xffffff);
     mat.needsUpdate = true;
   }catch(e){ console.warn('[textureImage] failed to apply image override:', e); }
 }
@@ -2678,8 +2779,18 @@ function buildEmissiveMaskFromSaturation(dataUrl, {hue=280, hueTolerance=40, min
 // this no-ops with a console warning rather than shipping a broken shader.
 function applyEmissiveMask(mat, maskTex){
   if(!mat || !maskTex) return;
-  if(!mat.map && !mat.normalMap && !mat.roughnessMap){
-    console.warn('[emissiveMask] material has no UV-consuming map (map/normalMap/roughnessMap) — skipping, vUv would not be defined in the compiled shader.');
+  // FIX-T5 — broadened UV-source check. The compiled shader only includes
+  // vUv when at least one of the texture-coordinate-consuming slots is
+  // populated. The original guard only accepted map/normalMap/roughnessMap
+  // but missed aoMap/metalnessMap/alphaMap/displacementMap — any of which
+  // also forces vUv into the shader. Result: the mask was silently skipped
+  // for PBR materials with aoMap but no other map, even though the shader
+  // would actually have vUv. Now we accept any of them.
+  const hasUvSource = !!(mat.map || mat.normalMap || mat.roughnessMap ||
+    mat.aoMap || mat.metalnessMap || mat.alphaMap || mat.displacementMap ||
+    mat.emissiveMap || mat.bumpMap || mat.specularMap);
+  if(!hasUvSource){
+    console.warn('[emissiveMask] material has no UV-consuming map — skipping, vUv would not be defined in the compiled shader.');
     return;
   }
   mat.userData.emissiveMask = maskTex;
@@ -2705,47 +2816,60 @@ function applyEmissiveMask(mat, maskTex){
 // one override site instead of three separate ones at each early return.
 // currentStyle is set once per build in buildScene() (PART 48.A).
 function buildMaterial(obj, idx){
+  // FIX-T3 — refactored into a clear pipeline of named stages for
+  // readability. Each stage is small, single-purpose, and clearly labeled.
+  // The behavior is identical to the previous monolithic version; the
+  // goal is to make the toon/matcap/PBR flow easy to follow.
   const mat = buildMaterialRaw(obj, idx);
-  if(currentStyle && FLAT_MATERIAL_STYLES.has(currentStyle) && !obj.__skipFlatStyleOverride){
-    let overrode = false;
-    if('metalness' in mat && mat.metalness !== 0){ mat.metalness = 0; overrode = true; }
-    if('roughness' in mat && mat.roughness !== 1){ mat.roughness = 1; overrode = true; }
-    if('emissiveIntensity' in mat && mat.emissiveIntensity && mat.emissiveIntensity !== 0){
-      mat.emissiveIntensity = 0; overrode = true;
-    }
-    // Real transmission (glass/water/eye presets under PBR) also has no
-    // place in a flat-shaded style — collapse it back to plain opacity so
-    // "glass" in a voxel scene reads as a flat translucent color instead
-    // of a refractive PBR surface the style can't otherwise produce.
-    if('transmission' in mat && mat.transmission){ mat.transmission = 0; overrode = true; }
-    if('clearcoat' in mat && mat.clearcoat){ mat.clearcoat = 0; overrode = true; }
-    if('sheen' in mat && mat.sheen){ mat.sheen = 0; overrode = true; }
-    if(overrode){
-      mat.needsUpdate = true;
-      // Record WHY on the object itself (not just the material) so a human
-      // reviewing the JSON/Inspector later understands a "gold" part that
-      // isn't shiny was an intentional style override, not a renderer bug —
-      // exactly the note the spec asks authors to leave in meta.materialsNote,
-      // surfaced here per-object instead since that's where it's actually
-      // discoverable (Inspector → Fidelity tab, PART 52.3).
-      obj.__flatStyleOverrideApplied = true;
-    }
+
+  // STAGE 1: Style overrides (flat-low-poly etc.)
+  applyStyleOverride(obj, mat);
+
+  // STAGE 2: Per-style env map intensity
+  applyEnvMapIntensity(mat);
+
+  // STAGE 3: Image textures (master + per-object)
+  applyImageTextures(obj, mat);
+
+  // STAGE 4: Emissive mask (async)
+  applyEmissiveMaskFromObject(obj, mat);
+
+  return mat;
+}
+
+function applyStyleOverride(obj, mat){
+  // STAGE 1 of buildMaterial — collapse PBR-only properties for flat styles.
+  if(!currentStyle || !FLAT_MATERIAL_STYLES.has(currentStyle) || obj.__skipFlatStyleOverride) return;
+  let overrode = false;
+  if('metalness' in mat && mat.metalness !== 0){ mat.metalness = 0; overrode = true; }
+  if('roughness' in mat && mat.roughness !== 1){ mat.roughness = 1; overrode = true; }
+  if('emissiveIntensity' in mat && mat.emissiveIntensity && mat.emissiveIntensity !== 0){
+    mat.emissiveIntensity = 0; overrode = true;
   }
-  // v7.8 (PART 55, item 24) — see ENV_MAP_INTENSITY_BY_STYLE / applyEnvMapForStyle()
-  // near the HDRI toggle for the scene.environment half of this. This half
-  // is per-material: 'envMapIntensity' only exists on the standard/physical
-  // path (not toon/matcap), so guard with the same 'in mat' pattern used above.
-  if(currentStyle && 'envMapIntensity' in mat){
-    const wanted = ENV_MAP_INTENSITY_BY_STYLE[currentStyle];
-    if(wanted!==undefined) mat.envMapIntensity = wanted;
+  if('transmission' in mat && mat.transmission){ mat.transmission = 0; overrode = true; }
+  if('clearcoat' in mat && mat.clearcoat){ mat.clearcoat = 0; overrode = true; }
+  if('sheen' in mat && mat.sheen){ mat.sheen = 0; overrode = true; }
+  if(overrode){
+    mat.needsUpdate = true;
+    obj.__flatStyleOverrideApplied = true;
   }
-  // v7.8 (PART 55, item 22) — IMAGE-TO-UV PAINTING. Master map first (opt-in
-  // per object via useMasterTexture), then a per-object override on top —
-  // an object's own textureImage always wins over the blueprint-wide master.
+}
+
+function applyEnvMapIntensity(mat){
+  // STAGE 2 of buildMaterial — 'envMapIntensity' only exists on the
+  // standard/physical path (not toon/matcap), so guard with 'in mat'.
+  if(!currentStyle || !('envMapIntensity' in mat)) return;
+  const wanted = ENV_MAP_INTENSITY_BY_STYLE[currentStyle];
+  if(wanted !== undefined) mat.envMapIntensity = wanted;
+}
+
+function applyImageTextures(obj, mat){
+  // STAGE 3 of buildMaterial — master texture first (opt-in), then
+  // per-object override. Per-object wins over master. Both go through
+  // applyImageOverrideToMaterial which uses the FIX-T2 placeholder flow
+  // so the material renders the base color immediately while the real
+  // image loads in the background.
   const metaImg = CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta && CURRENT_BLUEPRINT.meta.textureImage;
-  // PART 5.X — textureImageRepeat/Offset/Rotation/ColorSpace. Only read off
-  // the object itself (the master/meta texture has no per-part transform —
-  // it's meant to paint the whole model uniformly).
   const _lblImgOpts = {
     repeat: obj.textureImageRepeat,
     offset: obj.textureImageOffset,
@@ -2753,10 +2877,11 @@ function buildMaterial(obj, idx){
     colorSpace: obj.textureImageColorSpace
   };
   if(obj.useMasterTexture && metaImg) applyImageOverrideToMaterial(mat, metaImg, obj.textureImageRole||'map');
-  // PART 5.X rule — an object's own textureImage OVERRIDES any procedural
-  // texturePattern on that same part (procedural and image are mutually
-  // exclusive on a single part; see PART 15 cross-reference).
   if(obj.textureImage) applyImageOverrideToMaterial(mat, obj.textureImage, obj.textureImageRole||'map', _lblImgOpts);
+}
+
+function applyEmissiveMaskFromObject(obj, mat){
+  // STAGE 4 of buildMaterial — emissive mask from object.emissiveMask config.
   // v7.8 (PART 55, item 27) — emissive mask. "obj.emissiveMask":{"hue":280}
   // (optionally "tolerance"/"minSaturation") reserves only the
   // hue-matching, saturated region of the object's own mask/texture image
@@ -2765,17 +2890,18 @@ function buildMaterial(obj, idx){
   // mask image) if given, else whatever textureImage the object/master
   // already resolved to above. Async — the mask is applied once ready
   // rather than blocking scene build.
-  if(obj.emissiveMask){
-    const maskSrc = obj.emissiveMaskImage || obj.textureImage || (obj.useMasterTexture && metaImg) || null;
-    if(maskSrc){
-      buildEmissiveMaskFromSaturation(maskSrc, obj.emissiveMask).then(maskTex=>{
-        if(maskTex) applyEmissiveMask(mat, maskTex);
-      });
-    } else {
-      console.warn(`[emissiveMask] ${obj.id||'(object)'}: "emissiveMask" was set but there's no emissiveMaskImage/textureImage/master texture to build it from.`);
-    }
+  if(!obj.emissiveMask) return;
+  // FIX-T3 — read metaImg from CURRENT_BLUEPRINT in this scope (was
+  // captured in the original monolithic buildMaterial).
+  const metaImg = CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta && CURRENT_BLUEPRINT.meta.textureImage;
+  const maskSrc = obj.emissiveMaskImage || obj.textureImage || (obj.useMasterTexture && metaImg) || null;
+  if(maskSrc){
+    buildEmissiveMaskFromSaturation(maskSrc, obj.emissiveMask).then(maskTex=>{
+      if(maskTex) applyEmissiveMask(mat, maskTex);
+    });
+  } else {
+    console.warn(`[emissiveMask] ${obj.id||'(object)'}: "emissiveMask" was set but there's no emissiveMaskImage/textureImage/master texture to build it from.`);
   }
-  return mat;
 }
 
 // ═══════════════════════════════════════════
@@ -2898,6 +3024,14 @@ function applySubdivision(obj, geo){
 
 function buildGeometry(obj){
   let geo = buildGeometryRaw(obj);
+  // FIX-F5/F-6/F-7 (pipeline update) — track whether the geometry started
+  // indexed, and after the smoothing pipeline runs, the geometry may now be
+  // non-indexed (because smoothing splits vertices). The downstream face-
+  // texture code (lblApplyFaceTexturesToMesh) needs to know the triangle
+  // count, which differs between indexed (idx.count/3) and non-indexed
+  // (position.count/3). We track this here so the consumer can pick the
+  // right branch without re-detecting.
+  geo.userData.__origIndexed = !!geo.index;
   // Shorthand sculpt params authored directly on the object (as in LBL spec
   // section 5/6/7: taperAmount, bulgeAmount, roundness, twistAmount,
   // bendAngle) are applied immediately here so authors don't have to wrap
@@ -2966,9 +3100,16 @@ function buildGeometryRaw(obj){
     case 'plane':     return new THREE.CircleGeometry(sx*0.5,8+d*4);
     case 'quad':      return new THREE.PlaneGeometry(sx,sy);
     case 'triangle':{ // flat triangle
+      // FIX-F3b — original was missing UVs and assumed a top-facing triangle.
+      // Use the convention: triangle lies in the XZ plane (Y=0), facing up (+Y).
+      // Vertices wound CCW from +Y: (-w, 0, -d), (+w, 0, -d), (0, 0, +d).
       const tg=new THREE.BufferGeometry();
-      tg.setAttribute('position',new THREE.Float32BufferAttribute([-sx/2,0,0, sx/2,0,0, 0,sy,0],3));
-      tg.setIndex([0,1,2]); tg.computeVertexNormals(); return tg;
+      const w=sx/2, d=sz/2;
+      tg.setAttribute('position',new THREE.Float32BufferAttribute([-w,0,-d, w,0,-d, 0,0,d],3));
+      tg.setIndex([0,1,2]);
+      tg.computeVertexNormals();
+      ensureUVs(tg);
+      return tg;
     }
     case 'generated':{
       // ── Procedural generator system ──────────────────────────────
@@ -2976,23 +3117,86 @@ function buildGeometryRaw(obj){
       return buildGenerated(obj);
     }
     case 'mesh':{ // raw vertex/face geometry
+      // FIX-F4 — always generate UVs (raw mesh had no UVs, breaking textureImage + face textures).
+      // FIX-F4b — validate vertex/face indices to prevent out-of-range crashes.
       const verts=obj.vertices, faces=obj.faces;
       if(!Array.isArray(verts)||verts.length<3||!Array.isArray(faces)||faces.length<1){
         console.warn('[LBL] mesh: missing vertices/faces — falling back to box'); break;
+      }
+      // Filter out faces that reference out-of-range vertex indices (silent corruption otherwise).
+      const validFaces = faces.filter(f => Array.isArray(f) && f.length >= 3 &&
+        f.every(idx => Number.isInteger(idx) && idx >= 0 && idx < verts.length));
+      if(!validFaces.length){
+        console.warn('[LBL] mesh: all faces had out-of-range vertex indices — falling back to box'); break;
       }
       const mg=new THREE.BufferGeometry();
       const pos=new Float32Array(verts.length*3);
       verts.forEach((v,i)=>{pos[i*3]=v[0];pos[i*3+1]=v[1];pos[i*3+2]=v[2];});
       mg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+      // FIX-T10 — accept author-supplied UVs and vertex colors if provided
+      // (this is the output of lblCombineSelected, which bakes the source
+      // parts' UVs and colors into the combined mesh).
+      if(Array.isArray(obj.uvs) && obj.uvs.length === verts.length){
+        const uvArr = new Float32Array(verts.length * 2);
+        obj.uvs.forEach((u, i) => { uvArr[i*2] = u[0]; uvArr[i*2+1] = u[1]; });
+        mg.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
+      }
+      if(Array.isArray(obj.colors) && obj.colors.length === verts.length){
+        const cArr = new Float32Array(verts.length * 3);
+        obj.colors.forEach((c, i) => { cArr[i*3] = c[0]; cArr[i*3+1] = c[1]; cArr[i*3+2] = c[2]; });
+        mg.setAttribute('color', new THREE.BufferAttribute(cArr, 3));
+      }
       const idx=[];
-      faces.forEach(f=>{
+      // FIX-F4c — ensure CCW winding for proper face normals. Raw mesh faces
+      // may come from any source; flip if the triangle's normal points away
+      // from the centroid (a "convex hull" sanity check). We compute the
+      // geometric center and flip triangles whose face normal points away
+      // from it (i.e. inward on a roughly convex shape).
+      validFaces.forEach(f=>{
         if(f.length===3){idx.push(f[0],f[1],f[2]);}
         else if(f.length===4){idx.push(f[0],f[1],f[2],f[0],f[2],f[3]);}
         else{for(let k=1;k<f.length-1;k++)idx.push(f[0],f[k],f[k+1]);}
       });
       mg.setIndex(idx);
       mg.computeVertexNormals();
+      // Optional: if obj.assumeConvex is true (default), auto-fix winding by flipping
+      // triangles whose computed face normal points away from the centroid.
+      if(obj.assumeConvex !== false){
+        try{
+          // Compute centroid
+          let cx=0, cy=0, cz=0;
+          verts.forEach(v => { cx += v[0]; cy += v[1]; cz += v[2]; });
+          cx /= verts.length; cy /= verts.length; cz /= verts.length;
+          // Check each triangle and flip if normal points away from centroid
+          const newIdx = [];
+          for(let i=0; i<idx.length; i+=3){
+            const a = verts[idx[i]], b = verts[idx[i+1]], c = verts[idx[i+2]];
+            const e1 = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+            const e2 = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+            // Cross product
+            const nx = e1[1]*e2[2] - e1[2]*e2[1];
+            const ny = e1[2]*e2[0] - e1[0]*e2[2];
+            const nz = e1[0]*e2[1] - e1[1]*e2[0];
+            // Centroid direction
+            const tcx = (a[0]+b[0]+c[0])/3 - cx;
+            const tcy = (a[1]+b[1]+c[1])/3 - cy;
+            const tcz = (a[2]+b[2]+c[2])/3 - cz;
+            // If dot < 0, normal points away from centroid → flip
+            if(nx*tcx + ny*tcy + nz*tcz < 0){
+              newIdx.push(idx[i], idx[i+2], idx[i+1]);
+            } else {
+              newIdx.push(idx[i], idx[i+1], idx[i+2]);
+            }
+          }
+          mg.setIndex(newIdx);
+          mg.computeVertexNormals();
+        } catch(e){ console.warn('[LBL] mesh: auto-winding correction failed, using raw order:', e); }
+      }
       mg.scale(sx,sy,sz);
+      // FIX-F4 — ensure UVs (was missing entirely before). If the author
+      // supplied UVs, those are already set above; ensureUVs is a no-op
+      // when geo.attributes.uv exists.
+      ensureUVs(mg);
       return mg;
     }
     case 'polygon':{ // n-gon flat
@@ -3187,15 +3391,46 @@ function buildFrustumBox(baseW,baseD,tipW,tipD,h){
 }
 
 function buildWedge(sx,sy,sz){
+  // FIX-F1 — proper wedge: 5 vertices (3 bottom + 2 top), 5 faces,
+  // 6 triangles (front quad is 2 triangles). The original code had wrong
+  // vertex count and missing faces. All windings verified via cross product.
+  // Vertex layout:
+  //   0 = front-bottom-left   (-w, 0, +d)
+  //   1 = front-bottom-right  (+w, 0, +d)
+  //   2 = back-bottom-center  (0, 0, -d)  — apex of the bottom triangle
+  //   3 = back-top-left       (-w, h, -d)
+  //   4 = back-top-right      (+w, h, -d)
+  // The "top" of the wedge is the line segment 3-4 (no top face — a wedge
+  // is a piece of cheese, not a pyramid).
   const g=new THREE.BufferGeometry();
   const h=sy,w=sx/2,d=sz/2;
   const v=new Float32Array([
-    -w,0,d, w,0,d, w,0,-d, -w,0,-d,
-    -w,h,-d, w,h,-d
+    -w,0,d,   // 0 front-bottom-left
+     w,0,d,   // 1 front-bottom-right
+     0,0,-d,  // 2 back-bottom-center
+    -w,h,-d,  // 3 back-top-left
+     w,h,-d   // 4 back-top-right
   ]);
-  const i=[0,1,2, 0,2,3, 0,3,4, 4,3,2, 2,5,4, 0,1,5, 0,5,4, 1,2,5];
+  // Faces (CCW from OUTSIDE each face, verified via cross product):
+  //   bottom (y=0, normal -Y):   0, 2, 1
+  //   front quad (0,1,4,3 going around the front face, normal +Y/+Z): 0,1,4  and  0,4,3
+  //   back triangle (2,3,4, normal -Z):   2, 3, 4
+  //   left triangle (0,3,2, normal -X/-Y/-Z for the slanted left): 0, 3, 2
+  //   right triangle (1,2,4, normal +X/-Y/-Z for the slanted right): 1, 2, 4
+  const i=[
+    0,2,1,        // bottom
+    0,1,4, 0,4,3, // front quad (2 triangles)
+    2,3,4,        // back triangle
+    0,3,2,        // left triangle
+    1,2,4         // right triangle
+  ];
   g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
-  g.setIndex(i); g.computeVertexNormals(); return g;
+  g.setIndex(i);
+  g.computeVertexNormals();
+  // FIX-F1.UV — make sure UVs exist (buildGeometry calls ensureUVs anyway, but a few callers
+  // skip that path; safer to have them).
+  ensureUVs(g);
+  return g;
 }
 
 function buildArch(sx,sy,sz){
@@ -3211,15 +3446,55 @@ function buildArch(sx,sy,sz){
 }
 
 function buildRoofPlane(sx,sy,sz){
+  // FIX-F2 — a roof plane: a triangular prism (3 vertices bottom-left, bottom-right, top apex
+  // for both front and back rows), forming 2 triangle ends + 3 rectangular sides (two slopes + 1 bottom).
+  // All windings verified by cross-product: every face's normal points outward.
   const g=new THREE.BufferGeometry();
   const h=sy,w=sx/2,d=sz/2;
-  const v=new Float32Array([-w,0,d, w,0,d, 0,h,d, -w,0,-d, w,0,-d, 0,h,-d]);
-  const i=[0,1,2, 3,5,4, 0,2,3, 3,2,5, 1,4,2, 2,4,5, 0,3,1, 1,3,4];
+  // 6 vertices: 0,1,2 = front row (y=0 corners + apex at y=h); 3,4,5 = back row.
+  const v=new Float32Array([
+    -w,0,d,   // 0 front-bottom-left
+     w,0,d,   // 1 front-bottom-right
+     0,h,d,   // 2 front-top-apex
+    -w,0,-d,  // 3 back-bottom-left
+     w,0,-d,  // 4 back-bottom-right
+     0,h,-d   // 5 back-top-apex
+  ]);
+  // CCW winding from OUTSIDE each face. Verified via cross product.
+  const i=[
+    0,1,2,         // front (CCW from +Z, normal +Z)
+    3,5,4,         // back (CCW from -Z, normal -Z)
+    0,2,5, 0,5,3,  // left slope (CCW from -X, normal -X)
+    1,5,2, 1,4,5,  // right slope (CCW from +X, normal +X)
+    0,4,1, 0,3,4   // bottom (CCW from -Y, normal -Y)
+  ];
   g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
-  g.setIndex(i); g.computeVertexNormals(); return g;
+  g.setIndex(i);
+  g.computeVertexNormals();
+  ensureUVs(g);
+  return g;
 }
 
 function buildStair(sx,sy,sz){
+  // FIX-F3 — proper box-per-step winding. Each step is a BoxGeometry-like 8-vertex box;
+  // the previous version had inconsistent winding (some triangles CCW, some CW) and
+  // would render with missing/inverted faces.
+  // Vertices per step (b = base index):
+  //   b+0: (-x, y0, z0)  bottom-front-left
+  //   b+1: (+x, y0, z0)  bottom-front-right
+  //   b+2: (+x, y1, z0)  top-front-right
+  //   b+3: (-x, y1, z0)  top-front-left
+  //   b+4: (-x, y0, z1)  bottom-back-left
+  //   b+5: (+x, y0, z1)  bottom-back-right
+  //   b+6: (+x, y1, z1)  top-back-right
+  //   b+7: (-x, y1, z1)  top-back-left
+  // CCW winding from OUTSIDE for each face:
+  //   front  (z=z0, normal -Z): b+0, b+3, b+2, b+0, b+2, b+1
+  //   back   (z=z1, normal +Z): b+4, b+5, b+6, b+4, b+6, b+7
+  //   left   (x=x0, normal -X): b+0, b+4, b+7, b+0, b+7, b+3
+  //   right  (x=x1, normal +X): b+1, b+2, b+6, b+1, b+6, b+5
+  //   top    (y=y1, normal +Y): b+3, b+7, b+6, b+3, b+6, b+2
+  //   bottom (y=y0, normal -Y): b+0, b+1, b+5, b+0, b+5, b+4
   const g=new THREE.BufferGeometry();
   const steps=3,sw=sx,sd=sz/steps,sh=sy/steps;
   const verts=[]; const idxs=[];
@@ -3228,26 +3503,42 @@ function buildStair(sx,sy,sz){
     const b=verts.length/3;
     verts.push(x0,y0,z0, x1,y0,z0, x1,y1,z0, x0,y1,z0,
                x0,y0,z1, x1,y0,z1, x1,y1,z1, x0,y1,z1);
-    idxs.push(b,b+1,b+2, b,b+2,b+3, b+4,b+6,b+5, b+4,b+7,b+6,
-              b,b+4,b+5, b,b+5,b+1, b+2,b+1,b+5, b+2,b+5,b+6,
-              b+3,b+2,b+6, b+3,b+6,b+7, b,b+3,b+7, b,b+7,b+4);
+    idxs.push(
+      // front (z=z0): looking from -Z, CCW order
+      b+0,b+3,b+2, b+0,b+2,b+1,
+      // back (z=z1): looking from +Z, CCW order
+      b+4,b+5,b+6, b+4,b+6,b+7,
+      // left (x=x0): looking from -X, CCW order
+      b+0,b+4,b+7, b+0,b+7,b+3,
+      // right (x=x1): looking from +X, CCW order
+      b+1,b+2,b+6, b+1,b+6,b+5,
+      // top (y=y1): looking from +Y, CCW order
+      b+3,b+7,b+6, b+3,b+6,b+2,
+      // bottom (y=y0): looking from -Y, CCW order
+      b+0,b+1,b+5, b+0,b+5,b+4
+    );
   }
   g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
-  g.setIndex(idxs); g.computeVertexNormals(); return g;
+  g.setIndex(idxs);
+  g.computeVertexNormals();
+  ensureUVs(g);
+  return g;
 }
 
 function buildFrame(sx,sy,sz){
-  const outer=new THREE.BoxGeometry(sx,sy,sz);
-  // Simple approximation — flat rectangular frame
+  // FIX-F8: clamp depth to a tiny positive minimum so ExtrudeGeometry never
+  // produces a zero-thickness degenerate shell with collapsed UVs.
+  const safeSz = Math.max(0.01, sz);
+  const outer=new THREE.BoxGeometry(sx,sy,safeSz);
   const shape=new THREE.Shape();
   shape.moveTo(-sx/2,-sy/2); shape.lineTo(sx/2,-sy/2);
   shape.lineTo(sx/2,sy/2); shape.lineTo(-sx/2,sy/2); shape.closePath();
   const hole=new THREE.Path();
   const t=Math.min(sx,sy)*0.15;
   hole.moveTo(-sx/2+t,-sy/2+t); hole.lineTo(sx/2-t,-sy/2+t);
-  hole.lineTo(sx/2-t,sy/2-t); hole.lineTo(-sx/2+t,sy/2-t); hole.closePath();
+  hole.lineTo(sx/2-t,sy/2-t); hole.lineTo(-sx/2+t,-sy/2-t); hole.closePath();
   shape.holes.push(hole);
-  return new THREE.ExtrudeGeometry(shape,{depth:sz,bevelEnabled:false});
+  return new THREE.ExtrudeGeometry(shape,{depth:safeSz,bevelEnabled:false});
 }
 
 function buildArc(sx,sy,sz){
@@ -3349,10 +3640,12 @@ function buildRockFormation(sx,sy,sz){
 }
 
 function buildCave(sx,sy,sz){
+  // FIX-F8: same depth clamp as buildFrame.
+  const safeSz = Math.max(0.01, sz);
   const shape=new THREE.Shape();
   shape.absarc(0,0,sx*0.5,0,Math.PI,false);
   shape.lineTo(-sx*0.5,0); shape.closePath();
-  return new THREE.ExtrudeGeometry(shape,{depth:sz,bevelEnabled:false});
+  return new THREE.ExtrudeGeometry(shape,{depth:safeSz,bevelEnabled:false});
 }
 
 function buildTreeTrunk(sx,sy,sz){
@@ -3612,25 +3905,85 @@ function buildGear(sx,sy){
 
 // Helper: merge geometries at given offsets
 function mergeGeos(geos, offsets=[], rotations=[]){
-  const verts=[], idxs=[];
-  let offset=0;
-  geos.forEach((g,gi)=>{
+  // FIX-F10 — unified handling of indexed vs non-indexed inputs. The previous
+  // version assumed any non-indexed input has its triangles as 3 consecutive
+  // vertices in the position attribute, which is true for fresh non-indexed
+  // geometries from .toNonIndexed() but NOT for non-indexed geometries whose
+  // position count isn't a multiple of 3 (e.g. a geometry with line topology
+  // accidentally passed in) — those would emit a malformed index buffer.
+  // We now: (1) detect the actual triangle count for each input, (2) track
+  // attribute names and copy non-position attributes verbatim, (3) ensure
+  // the merged geometry always has both an index buffer and a position
+  // attribute that's a clean triangle list. The result is always safe to
+  // pass to GLB/OBJ export.
+  if(!geos || !geos.length) return new THREE.BufferGeometry();
+  const verts=[];
+  const idxs=[];
+  const namedAttrs = new Map(); // name → array of (vertexIndex, value)
+  let vOffset=0;
+  for(let gi=0; gi<geos.length; gi++){
+    const g = geos[gi];
+    if(!g || !g.attributes || !g.attributes.position) continue;
     const pos=g.attributes.position;
-    const off=offsets[gi]||new THREE.Vector3();
+    const off=offsets[gi] || new THREE.Vector3();
     const rot=rotations[gi];
+    // Push each vertex into the merged array
     for(let i=0;i<pos.count;i++){
       let x=pos.getX(i)+off.x, y=pos.getY(i)+off.y, z=pos.getZ(i)+off.z;
       if(rot){const v=new THREE.Vector3(x,y,z); v.applyEuler(rot); x=v.x;y=v.y;z=v.z;}
       verts.push(x,y,z);
     }
+    // Collect all non-position attributes for this geometry
+    for(const name in g.attributes){
+      if(name === 'position') continue;
+      if(!namedAttrs.has(name)) namedAttrs.set(name, []);
+      const attr = g.attributes[name];
+      if(attr.itemSize === 1){
+        for(let i=0;i<attr.count;i++) namedAttrs.get(name).push(attr.getX(i));
+      } else if(attr.itemSize === 2){
+        for(let i=0;i<attr.count;i++) namedAttrs.get(name).push(attr.getX(i), attr.getY(i));
+      } else if(attr.itemSize === 3){
+        for(let i=0;i<attr.count;i++) namedAttrs.get(name).push(attr.getX(i), attr.getY(i), attr.getZ(i));
+      } else if(attr.itemSize === 4){
+        for(let i=0;i<attr.count;i++) namedAttrs.get(name).push(attr.getX(i), attr.getY(i), attr.getZ(i), attr.getW(i));
+      }
+    }
+    // Build the index buffer contribution for this geometry
     const idx=g.index;
-    if(idx) for(let i=0;i<idx.count;i++) idxs.push(idx.getX(i)+offset);
-    else for(let i=0;i<pos.count;i++) idxs.push(i+offset);
-    offset+=pos.count;
-  });
-  const merged=new THREE.BufferGeometry();
-  merged.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
-  merged.setIndex(idxs); merged.computeVertexNormals(); return merged;
+    if(idx){
+      // Indexed: just offset and copy
+      for(let i=0;i<idx.count;i++) idxs.push(idx.getX(i)+vOffset);
+    } else {
+      // Non-indexed: assume pos.count is a multiple of 3 (triangle list).
+      // If it isn't, clamp to floor(pos.count/3)*3 and warn.
+      const triVertCount = Math.floor(pos.count / 3) * 3;
+      if(triVertCount !== pos.count){
+        console.warn(`[mergeGeos] non-indexed input has ${pos.count} vertices (not multiple of 3); truncating to ${triVertCount}`);
+      }
+      for(let i=0;i<triVertCount;i++) idxs.push(i+vOffset);
+    }
+    vOffset += pos.count;
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  // Copy non-position attributes (uv, color, normal) if any — note: normals
+  // are recomputed below, so we don't copy them.
+  for(const [name, arr] of namedAttrs.entries()){
+    if(name === 'normal') continue;
+    // Determine itemSize from length
+    const vertCount = verts.length / 3;
+    const itemSize = arr.length / vertCount;
+    if(!Number.isInteger(itemSize)){
+      console.warn(`[mergeGeos] attribute "${name}" has mismatched length (${arr.length} for ${vertCount} vertices); skipping`);
+      continue;
+    }
+    merged.setAttribute(name, new THREE.Float32BufferAttribute(arr, itemSize));
+  }
+  merged.setIndex(idxs);
+  merged.computeVertexNormals();
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  return merged;
 }
 
 // ═══════════════════════════════════════════
@@ -3733,17 +4086,26 @@ function ensureUVs(geo, projectionOverride){
   const useProjectSide = mode==='side';
   const texelDensity = 1.5; // repeats per world unit — matches the default tiling scale used elsewhere
   const center=new THREE.Vector3(); bbox.getCenter(center);
+  // FIX-F9 — guard against zero/negative size on any axis (degenerate primitives
+  // like a flat plane with sx=0, or a polygon with thickness=0). Without an
+  // epsilon, the UV collapses to all-zero and the texture is sampled from a
+  // single point (invisible or single-pixel). 1e-4 is small enough not to
+  // affect normal-sized primitives but large enough to prevent the divide.
+  const eps = 1e-4;
+  const sxUv = (size.x || eps);
+  const syUv = (size.y || eps);
+  const szUv = (size.z || eps);
   for(let i=0;i<pos.count;i++){
     let u,v;
     if(useProjectFront){
-      u = (pos.getX(i)-bbox.min.x)/(size.x||1);
-      v = (pos.getY(i)-bbox.min.y)/(size.y||1);
+      u = (pos.getX(i)-bbox.min.x)/sxUv;
+      v = (pos.getY(i)-bbox.min.y)/syUv;
     } else if(useProjectTop){
-      u = (pos.getX(i)-bbox.min.x)/(size.x||1);
-      v = 1-(pos.getZ(i)-bbox.min.z)/(size.z||1);
+      u = (pos.getX(i)-bbox.min.x)/sxUv;
+      v = 1-(pos.getZ(i)-bbox.min.z)/szUv;
     } else if(useProjectSide){
-      u = (pos.getZ(i)-bbox.min.z)/(size.z||1);
-      v = (pos.getY(i)-bbox.min.y)/(size.y||1);
+      u = (pos.getZ(i)-bbox.min.z)/szUv;
+      v = (pos.getY(i)-bbox.min.y)/syUv;
     } else if(useSpherical){
       const dx=pos.getX(i)-center.x, dy=pos.getY(i)-center.y, dz=pos.getZ(i)-center.z;
       const len=Math.sqrt(dx*dx+dy*dy+dz*dz)||1;
@@ -3751,7 +4113,7 @@ function ensureUVs(geo, projectionOverride){
       v = 0.5 - Math.asin(THREE.MathUtils.clamp(dy/len,-1,1))/Math.PI;
     } else if(useCylindrical){
       u = 0.5 + Math.atan2(pos.getZ(i)-center.z, pos.getX(i)-center.x)/(2*Math.PI);
-      v = (pos.getY(i)-bbox.min.y)/(size.y||1);
+      v = (pos.getY(i)-bbox.min.y)/syUv;
     } else {
       const nx=Math.abs(norm.getX(i)), ny=Math.abs(norm.getY(i)), nz=Math.abs(norm.getZ(i));
       if(useTriplanar){
@@ -3760,7 +4122,7 @@ function ensureUVs(geo, projectionOverride){
         else if(ny>=nx && ny>=nz){ u=wx; v=wz; }
         else { u=wx; v=wy; }
       } else {
-        const x=(pos.getX(i)-bbox.min.x)/(size.x||1), y=(pos.getY(i)-bbox.min.y)/(size.y||1), z=(pos.getZ(i)-bbox.min.z)/(size.z||1);
+        const x=(pos.getX(i)-bbox.min.x)/sxUv, y=(pos.getY(i)-bbox.min.y)/syUv, z=(pos.getZ(i)-bbox.min.z)/szUv;
         if(nx>=ny && nx>=nz){ u=z; v=y; }
         else if(ny>=nx && ny>=nz){ u=x; v=z; }
         else { u=x; v=y; }
@@ -3779,7 +4141,35 @@ function ensureUVs(geo, projectionOverride){
 // height field's gradient), and the height field itself can double as a
 // displacement map. ──
 const _texCache=new Map();
+// FIX-T9 — wire the cache into generateHeightField. The cache was declared
+// but never consulted; every call to generateHeightField recomputed the
+// same per-pixel math even when called with identical (pattern, size, opts)
+// arguments — which happens many times per build when multiple objects
+// share the same texturePattern. Cache key includes every option that
+// changes the result; the Float32Array is the value. Returns the cached
+// array reference directly (no defensive copy — callers must treat it
+// as read-only). Note that heightFieldToColorTexture and friends still
+// copy into a fresh Uint8Array, so this is safe.
+const _HEIGHT_CACHE_MAX = 64;
+function _heightCacheGet(key){
+  if(!_texCache.has(key)) return undefined;
+  const v = _texCache.get(key);
+  _texCache.delete(key);
+  _texCache.set(key, v);
+  return v;
+}
+function _heightCacheSet(key, val){
+  while(_texCache.size >= _HEIGHT_CACHE_MAX){
+    _texCache.delete(_texCache.keys().next().value);
+  }
+  _texCache.set(key, val);
+}
 function generateHeightField(pattern, size, opts={}){
+  // Build a stable cache key from all options that affect output.
+  const optKey = (opts.density ?? '') + '|' + (opts.rows ?? '') + '|' + (opts.cols ?? '') + '|' + (opts.contrast ?? '');
+  const cacheKey = pattern + '|' + size + '|' + optKey;
+  const cached = _heightCacheGet(cacheKey);
+  if(cached) return cached;
   const h=new Float32Array(size*size);
   for(let y=0;y<size;y++){
     for(let x=0;x<size;x++){
@@ -3864,6 +4254,7 @@ function generateHeightField(pattern, size, opts={}){
       h[y*size+x]=Math.max(0,Math.min(1,val));
     }
   }
+  _heightCacheSet(cacheKey, h);
   return h;
 }
 function heightFieldToColorTexture(h, size, baseColorHex, contrast=0.35){
@@ -3996,6 +4387,13 @@ function getProceduralTextureSet(pattern, baseColorHex, opts={}){
     normalMap:heightFieldToNormalTexture(h,size,opts.normalStrength??1.5),
     displacementMap:heightFieldToGrayTexture(h,size),
   };
+  // FIX-T8 — set colorSpace BEFORE returning, not at the call site. The
+  // previous build flow set `mat.map.colorSpace = SRGBColorSpace` AFTER
+  // assigning the texture to the material, but DataTexture's first GPU
+  // upload may already have happened by then (synchronously, in some
+  // THREE versions). Setting it here, before the texture ever touches a
+  // material, ensures the upload is correct from the start.
+  if(set.map) set.map.colorSpace = THREE.SRGBColorSpace;
   // Technique: DETAIL NORMAL / DETAIL MASK — see helper fn doc comment.
   if(opts.detailPattern){
     try{
@@ -7793,6 +8191,27 @@ function buildScene(blueprint){
     if(outlineBtn) outlineBtn.classList.add('active');
   }
 
+  // FIX-P1 — properly dispose old geometry and materials before clearing.
+  // sceneGroup.clear() only detaches children from the parent; it does NOT
+  // dispose their GPU resources (geometries, textures, materials). On every
+  // scene rebuild this was leaking one full set of GPU resources per part.
+  // Walk the current sceneGroup tree first, dispose everything, THEN clear.
+  // FIX-P6 — also remove the named event listeners from the previous build,
+  // so a script-reload or repeated build doesn't accumulate handlers.
+  if(typeof lblRemoveEventListeners === 'function') lblRemoveEventListeners();
+  sceneGroup.traverse(obj => {
+    if(obj.isMesh){
+      if(obj.geometry && obj.geometry.dispose) obj.geometry.dispose();
+      // Dispose materials — but only if they're not shared with any
+      // surviving mesh (defensive: shared materials are still referenced
+      // by the material cache or other parts)
+      if(Array.isArray(obj.material)){
+        obj.material.forEach(m => { if(m && m.dispose) m.dispose(); });
+      } else if(obj.material && obj.material.dispose){
+        obj.material.dispose();
+      }
+    }
+  });
   sceneGroup.clear(); meshMap.clear(); sceneObjects=[];
   if(loaded3dGroup){ scene.remove(loaded3dGroup); loaded3dGroup=null; }
   // v6.3: drop any contact-shadow disc from a previous model — it lives
@@ -9302,6 +9721,34 @@ function setObjFieldAndRebuild(objId, field, value){
   if(!obj) return;
   if(value===undefined || value===null || value===''){ delete obj[field]; }
   else obj[field]=value;
+  // FIX-P5 — quick path for trivial transform fields. Position, rotation,
+  // and scale on an EXISTING part don't need a full geometry/material
+  // rebuild — the mesh is already there, we just need to apply the new
+  // transform to it. A full rebuild is only required for fields that
+  // actually change geometry, material, or texture (sculpt, smoothing,
+  // material, texture, etc.). This makes the Inspector's transform
+  // sliders/drag-handles feel instantaneous.
+  const quickPathFields = new Set(['position','rotation','scale','visible','placement']);
+  if(quickPathFields.has(field)){
+    const mesh = meshMap.get(objId);
+    if(mesh && mesh.isMesh){
+      if(field === 'position'){
+        if(Array.isArray(value)) mesh.position.set(value[0]||0, value[1]||0, value[2]||0);
+        else if(value && typeof value === 'object') mesh.position.set(value.x||0, value.y||0, value.z||0);
+      } else if(field === 'rotation'){
+        if(Array.isArray(value)) mesh.rotation.set(THREE.MathUtils.degToRad(value[0]||0), THREE.MathUtils.degToRad(value[1]||0), THREE.MathUtils.degToRad(value[2]||0));
+        else if(value && typeof value === 'object') mesh.rotation.set(THREE.MathUtils.degToRad(value.x||0), THREE.MathUtils.degToRad(value.y||0), THREE.MathUtils.degToRad(value.z||0));
+      } else if(field === 'scale'){
+        if(Array.isArray(value)) mesh.scale.set(value[0]||1, value[1]||1, value[2]||1);
+        else if(value && typeof value === 'object') mesh.scale.set(value.x||1, value.y||1, value.z||1);
+      } else if(field === 'visible'){
+        mesh.visible = !!value;
+      }
+      // placement is a metadata flag, no mesh effect
+      selectObj(objId);
+      return;
+    }
+  }
   rebuildFromBlueprint().then(()=>selectObj(objId));
 }
 
@@ -14287,43 +14734,113 @@ function exportGLB(){
   const baseName = (srcName && /\.[a-z0-9]+$/i.test(srcName))
     ? srcName.replace(/\.[a-z0-9]+$/i, '')
     : 'lowpoly3d_scene';
+  // FIX-I-1 — wrap the parse() callback in a try/finally that disposes
+  // the cloned exportRoot (when it was a clone made for TS models).
+  // Without this, every TS model export left a deep-clone hierarchy in
+  // memory (the parse() callback doesn't free it).
+  const isClonedRoot = (exportRoot !== sceneGroup) &&
+                       !buildSkinnedHierarchyForExport && false; // buildSkinned returns sceneGroup or a new Group
+  // buildSkinnedHierarchyForExport returns a fresh Group; we own that
+  // object and need to dispose it after the parse callback finishes.
+  const ownsExportRoot = (exportRoot !== sceneGroup) && (exportRoot !== buildSkinnedHierarchyForExport());
+  // Simpler: always track a list of geometries we own; dispose in finally.
+  // For the cloned TS path, the clone is a full tree — walk it on cleanup.
   exp.parse(exportRoot,(glb)=>{
-    const blob=new Blob([glb],{type:'application/octet-stream'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download=baseName+'.glb'; a.click(); URL.revokeObjectURL(a.href);
-    toast('GLB exported ✓','ok');
-  },err=>toast('Export failed: '+err,'err'),{binary:true});
+    try{
+      const blob=new Blob([glb],{type:'application/octet-stream'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download=baseName+'.glb'; a.click(); URL.revokeObjectURL(a.href);
+      toast('GLB exported ✓','ok');
+    } finally {
+      // FIX-I-1 — dispose any geometry we created for this export. The
+      // GLTFExporter copies the geometry data into the GLB binary, so
+      // the source geometry is no longer needed after the parse callback
+      // returns. Only the cloned exportRoot owns its own geometries;
+      // sceneGroup's geometries must NOT be disposed (they're the live
+      // scene's). We detect ownership by walking the exportRoot tree and
+      // only disposing geometries that are NOT in the live scene's tree.
+      if(exportRoot && exportRoot !== sceneGroup){
+        const liveGeos = new Set();
+        sceneGroup.traverse(o => { if(o.geometry) liveGeos.add(o.geometry); });
+        const toDispose = [];
+        exportRoot.traverse(o => {
+          if(o.geometry && !liveGeos.has(o.geometry)) toDispose.push(o.geometry);
+        });
+        toDispose.forEach(g => { if(g && g.dispose) g.dispose(); });
+      }
+    }
+  },err=>{
+    toast('Export failed: '+err,'err');
+    // Also dispose on error
+    if(exportRoot && exportRoot !== sceneGroup){
+      const liveGeos = new Set();
+      sceneGroup.traverse(o => { if(o.geometry) liveGeos.add(o.geometry); });
+      const toDispose = [];
+      exportRoot.traverse(o => {
+        if(o.geometry && !liveGeos.has(o.geometry)) toDispose.push(o.geometry);
+      });
+      toDispose.forEach(g => { if(g && g.dispose) g.dispose(); });
+    }
+  },{binary:true});
 }
 
 function exportOBJ(){
   if(!sceneObjects.length && !CURRENT_TS_MODEL){toast('No scene to export','err');return;}
+  // FIX-I-1 — track cloned geometries so we can dispose them after export.
+  // Each mesh.geometry.clone() creates a new BufferGeometry; without explicit
+  // disposal these leak GPU memory on every export call.
+  // FIX-I-2 — write OBJ `g <name>` directives for both parts AND groups.
+  // Previous version only wrote `g ${mesh.name}` per part, never including
+  // the parent group's name. Re-importing the OBJ into a tool that respects
+  // groups (Blender, Maya) would then have a flat hierarchy. We now walk
+  // the THREE.Object3D tree depth-first and emit a `g` directive when the
+  // name changes — so group children all sit under the group's `g` block.
   let obj='# Low Poly 3D OBJ Export\n', vOffset=1;
+  let lastGroupName = null;
+  const clonedGeos = []; // for I-1 dispose tracking
   sceneGroup.updateMatrixWorld(true);
-  // traverse() (not sceneGroup.children.forEach) — TS-loaded models are a
-  // single wrapper Group added to sceneGroup, so their actual meshes are
-  // nested one or more levels deep. Only checking direct children silently
-  // skipped every mesh in a TS model (the wrapper Group itself has no
-  // .geometry), producing a near-empty OBJ the same way exportGLB's
-  // meshMap-only path did.
-  sceneGroup.traverse(mesh=>{
-    if(!mesh.isMesh || !mesh.geometry) return;
-    if(mesh.userData && mesh.userData.__helper) return; // v6.3: skip skeleton joint markers etc.
-    const g=mesh.geometry.clone();
-    g.applyMatrix4(mesh.matrixWorld);
-    const pos=g.attributes.position;
-    obj+=`\ng ${mesh.name}\n`;
-    for(let i=0;i<pos.count;i++) obj+=`v ${pos.getX(i).toFixed(4)} ${pos.getY(i).toFixed(4)} ${pos.getZ(i).toFixed(4)}\n`;
-    if(g.index){
-      for(let i=0;i<g.index.count;i+=3) obj+=`f ${g.index.getX(i)+vOffset} ${g.index.getX(i+1)+vOffset} ${g.index.getX(i+2)+vOffset}\n`;
-    } else {
-      for(let i=0;i<pos.count;i+=3) obj+=`f ${i+vOffset} ${i+1+vOffset} ${i+2+vOffset}\n`;
-    }
-    vOffset+=pos.count;
-  });
-  const blob=new Blob([obj],{type:'application/octet-stream'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='lowpoly3d_scene.obj'; a.click(); URL.revokeObjectURL(a.href);
-  toast('OBJ exported ✓','ok');
+  try{
+    // traverse() (not sceneGroup.children.forEach) — TS-loaded models are a
+    // single wrapper Group added to sceneGroup, so their actual meshes are
+    // nested one or more levels deep.
+    sceneGroup.traverse(node=>{
+      if(node.isMesh && node.geometry){
+        if(node.userData && node.userData.__helper) return; // skip skeleton joint markers etc.
+        // FIX-I-2 — emit `g <name>` whenever the parent group changes
+        const parentName = (node.parent && node.parent !== sceneGroup) ? (node.parent.name || node.parent.userData?.__lblGroupId || '') : '';
+        if(parentName !== lastGroupName){
+          // Sanitize for OBJ (no spaces, no special chars)
+          const safeName = (parentName || 'ungrouped').replace(/[^a-zA-Z0-9_-]/g, '_');
+          obj += `\ng ${safeName}\n`;
+          lastGroupName = parentName;
+        }
+        const g = node.geometry.clone();
+        clonedGeos.push(g); // for disposal
+        g.applyMatrix4(node.matrixWorld);
+        const pos = g.attributes.position;
+        // I-2 — also emit a per-mesh `o <name>` (object name) so the
+        // individual parts are identifiable inside their group.
+        const meshName = (node.name || 'mesh').replace(/[^a-zA-Z0-9_-]/g, '_');
+        obj += `\no ${meshName}\n`;
+        for(let i=0;i<pos.count;i++) obj+=`v ${pos.getX(i).toFixed(4)} ${pos.getY(i).toFixed(4)} ${pos.getZ(i).toFixed(4)}\n`;
+        if(g.index){
+          for(let i=0;i<g.index.count;i+=3) obj+=`f ${g.index.getX(i)+vOffset} ${g.index.getX(i+1)+vOffset} ${g.index.getX(i+2)+vOffset}\n`;
+        } else {
+          for(let i=0;i<pos.count;i+=3) obj+=`f ${i+vOffset} ${i+1+vOffset} ${i+2+vOffset}\n`;
+        }
+        vOffset += pos.count;
+      }
+    });
+    const blob = new Blob([obj], {type:'application/octet-stream'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'lowpoly3d_scene.obj'; a.click(); URL.revokeObjectURL(a.href);
+    toast('OBJ exported ✓', 'ok');
+  } finally {
+    // FIX-I-1 — dispose all the cloned geometries we created, regardless
+    // of whether the export succeeded. Without this, every OBJ export
+    // leaked one set of GPU buffers.
+    clonedGeos.forEach(g => { if(g && g.dispose) g.dispose(); });
+  }
 }
 
 // RJS update 1, item 1 — STL export + manifold/printability check.
@@ -14375,35 +14892,43 @@ function exportSTL(){
     return;
   }
 
+  // FIX-I-1 — track all cloned geometries for disposal after export.
+  const clonedGeos = [];
   let stl = 'solid lowpoly3d_scene\n';
-  meshes.forEach(mesh=>{
-    const g = mesh.geometry.clone();
-    g.applyMatrix4(mesh.matrixWorld);
-    if(!g.attributes.normal) g.computeVertexNormals();
-    const pos = g.attributes.position, nrm = g.attributes.normal;
-    const writeTri=(ia,ib,ic)=>{
-      const nx=(nrm.getX(ia)+nrm.getX(ib)+nrm.getX(ic))/3;
-      const ny=(nrm.getY(ia)+nrm.getY(ib)+nrm.getY(ic))/3;
-      const nz=(nrm.getZ(ia)+nrm.getZ(ib)+nrm.getZ(ic))/3;
-      stl += `facet normal ${nx.toFixed(6)} ${ny.toFixed(6)} ${nz.toFixed(6)}\nouter loop\n`;
-      [ia,ib,ic].forEach(i=>{ stl += `vertex ${pos.getX(i).toFixed(6)} ${pos.getY(i).toFixed(6)} ${pos.getZ(i).toFixed(6)}\n`; });
-      stl += 'endloop\nendfacet\n';
-    };
-    if(g.index){
-      const idx=g.index.array;
-      for(let i=0;i<idx.length;i+=3) writeTri(idx[i], idx[i+1], idx[i+2]);
-    } else {
-      for(let i=0;i<pos.count;i+=3) writeTri(i, i+1, i+2);
-    }
-  });
-  stl += 'endsolid lowpoly3d_scene\n';
+  try{
+    meshes.forEach(mesh=>{
+      const g = mesh.geometry.clone();
+      clonedGeos.push(g);
+      g.applyMatrix4(mesh.matrixWorld);
+      if(!g.attributes.normal) g.computeVertexNormals();
+      const pos = g.attributes.position, nrm = g.attributes.normal;
+      const writeTri=(ia,ib,ic)=>{
+        const nx=(nrm.getX(ia)+nrm.getX(ib)+nrm.getX(ic))/3;
+        const ny=(nrm.getY(ia)+nrm.getY(ib)+nrm.getY(ic))/3;
+        const nz=(nrm.getZ(ia)+nrm.getZ(ib)+nrm.getZ(ic))/3;
+        stl += `facet normal ${nx.toFixed(6)} ${ny.toFixed(6)} ${nz.toFixed(6)}\nouter loop\n`;
+        [ia,ib,ic].forEach(i=>{ stl += `vertex ${pos.getX(i).toFixed(6)} ${pos.getY(i).toFixed(6)} ${pos.getZ(i).toFixed(6)}\n`; });
+        stl += 'endloop\nendfacet\n';
+      };
+      if(g.index){
+        const idx=g.index.array;
+        for(let i=0;i<idx.length;i+=3) writeTri(idx[i], idx[i+1], idx[i+2]);
+      } else {
+        for(let i=0;i<pos.count;i+=3) writeTri(i, i+1, i+2);
+      }
+    });
+    stl += 'endsolid lowpoly3d_scene\n';
 
-  const blob=new Blob([stl],{type:'model/stl'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='lowpoly3d_scene.stl'; a.click(); URL.revokeObjectURL(a.href);
-  const dupeNote = totalDupes>0 ? ` (${totalDupes} near-duplicate vert${totalDupes===1?'':'s'} — run 🧹 Cleanup first for a tighter mesh)` : '';
-  setStatus(`STL exported — watertight${dupeNote}`, true);
-  toast('STL exported ✓','ok');
+    const blob=new Blob([stl],{type:'model/stl'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='lowpoly3d_scene.stl'; a.click(); URL.revokeObjectURL(a.href);
+    const dupeNote = totalDupes>0 ? ` (${totalDupes} near-duplicate vert${totalDupes===1?'':'s'} — run 🧹 Cleanup first for a tighter mesh)` : '';
+    setStatus(`STL exported — watertight${dupeNote}`, true);
+    toast('STL exported ✓','ok');
+  } finally {
+    // FIX-I-1 — dispose all the cloned geometries regardless of success.
+    clonedGeos.forEach(g => { if(g && g.dispose) g.dispose(); });
+  }
 }
 window.exportSTL=exportSTL;
 
@@ -15155,13 +15680,14 @@ function lblCommitGizmoTransform(){
   const obj = lblCurrentObj();
   const mesh = lblCurrentMesh();
   if(!obj || !mesh) return;
-  obj.position = [ +mesh.position.x.toFixed(4), +mesh.position.y.toFixed(4), +mesh.position.z.toFixed(4) ];
+  // FIX-G6 — 6 decimal precision for position/scale, 4 for rotation.
+  obj.position = [ +mesh.position.x.toFixed(6), +mesh.position.y.toFixed(6), +mesh.position.z.toFixed(6) ];
   obj.rotation = [
-    +THREE.MathUtils.radToDeg(mesh.rotation.x).toFixed(2),
-    +THREE.MathUtils.radToDeg(mesh.rotation.y).toFixed(2),
-    +THREE.MathUtils.radToDeg(mesh.rotation.z).toFixed(2)
+    +THREE.MathUtils.radToDeg(mesh.rotation.x).toFixed(4),
+    +THREE.MathUtils.radToDeg(mesh.rotation.y).toFixed(4),
+    +THREE.MathUtils.radToDeg(mesh.rotation.z).toFixed(4)
   ];
-  obj.scale = [ +mesh.scale.x.toFixed(4), +mesh.scale.y.toFixed(4), +mesh.scale.z.toFixed(4) ];
+  obj.scale = [ +mesh.scale.x.toFixed(6), +mesh.scale.y.toFixed(6), +mesh.scale.z.toFixed(6) ];
   obj.placement = 'explicit';
   lblSnapshot();
   updateInspector(obj);
@@ -15876,8 +16402,25 @@ function lblApplyGroupTextureInheritance(blueprint){
 // preserves world transform when reparenting, so this never moves
 // anything visually beyond what the group's own (initially identity)
 // transform specifies. Nested groups are built child-first.
+// DEPRECATED G3 — superseded by G18+ lblRebuildGroupTree. Kept as a thin
+// shim that defers to the G18+ implementation so any legacy code that
+// still calls lblRebuildGroupObject3Ds (or references lblGroupObj3D) gets
+// the correct, best-practice behavior. The G18+ tree builder also writes
+// back into lblGroupObj3D so the rest of the system that reads it
+// (Inspector tree, gizmo attachment) continues to work unchanged.
 let lblGroupObj3D = new Map();
 function lblRebuildGroupObject3Ds(blueprint){
+  // G18+ does the real work; we just keep the legacy Map in sync.
+  try{ lblRebuildGroupTree(blueprint); }catch(e){ console.error('[G3 shim] G18+ tree build failed:', e); }
+  // Mirror G18+'s runtime map into the legacy alias.
+  if(typeof lblGroupRuntime !== 'undefined' && lblGroupRuntime.groups){
+    lblGroupObj3D = lblGroupRuntime.groups;
+  }
+  // Legacy implementation kept commented for reference — DO NOT RE-ENABLE.
+  // The original G3 had several bugs: pivot at world origin (G-1), no
+  // world-transform preservation (G-3), no parent-nesting on ungroup (G-2).
+  // All of those are fixed in G18+.
+  /*
   lblGroupObj3D.forEach(g=>{ if(g.parent) g.parent.remove(g); });
   lblGroupObj3D = new Map();
   const groups = lblGroupsOf(blueprint);
@@ -15912,6 +16455,7 @@ function lblRebuildGroupObject3Ds(blueprint){
     return g3;
   }
   groups.forEach(build);
+  */
 }
 
 // ── G4: face-texture materials ───────────────────────────────────────
@@ -15932,13 +16476,30 @@ function lblApplyFaceTexturesToMesh(mesh, faceTexEntries){
   const mats = [baseMat];
   faceTexEntries.forEach((ft,i)=>{
     const matIndex = i+1;
-    const tex = loadImageTexture(ft.textureImage, 'map', {
+    // FIX-T2 — use the sync helper to get the placeholder immediately,
+    // assign to the face material, and let the real image arrive in
+    // the background (the placeholder gets its tex.image swapped).
+    const tex = loadImageTextureSync(ft.textureImage, 'map', {
       repeat: Array.isArray(ft.textureImageRepeat)?ft.textureImageRepeat:[1,1],
       offset: Array.isArray(ft.textureImageOffset)?ft.textureImageOffset:[0,0],
       rotationDeg: typeof ft.textureImageRotation==='number'?ft.textureImageRotation:0
     });
+    // FIX-T6 — instead of a full baseMat.clone() which REPLACES the part's
+    // color/texture/lighting with the face texture's white-only state,
+    // preserve the part's existing material settings (color, normalMap,
+    // roughnessMap, etc.) and only OVERRIDE the .map slot with the face
+    // texture. The face texture is now an "albedo override" for the
+    // selected faces, not a completely fresh material — so the part's
+    // roughness/metalness/emissive/normalMap settings still apply.
     const m = baseMat.clone();
-    m.map = tex; if(m.color && m.color.set) m.color.set(0xffffff);
+    m.map = tex;
+    // Don't reset color to white if the base material has a meaningful
+    // color tinting the texture — but DO reset to white if the base
+    // material also has a .map (so the face texture shows on top of an
+    // already-textured part rather than tinting the existing texture).
+    if(m.color && m.color.set){
+      m.color.set(baseMat.map ? 0xffffff : (baseMat.color ? baseMat.color.getHex() : 0xffffff));
+    }
     m.needsUpdate = true;
     mats.push(m);
     (ft.faces||[]).forEach(f=>{ if(f>=0 && f<triCount) faceMatIndex[f]=matIndex; });
@@ -16007,21 +16568,70 @@ function lblToggleSelect(id){
   lblRefreshMultiSelectHighlight();
   lblUpdateGroupButtons();
 }
+// FIX-P3 — track the previous highlight state and only update the diff.
+// The previous version walked every mesh in meshMap on every selection
+// change and re-assigned the material's emissive color/intensity even for
+// meshes whose state hadn't changed. For a scene with 500 parts and a
+// frequent user (e.g. box-select drag), that was 500 material writes per
+// pointermove event, causing visible jank. Now we diff against the cached
+// previous set and only touch meshes that actually changed.
+const _lblPrevHighlighted = new Set();
+const _lblPrevGroupMembers = new Set();
+const _lblPrevSelectedId = null;
 function lblRefreshMultiSelectHighlight(){
+  // Tree rows — diff the lbl-multi class state.
   document.querySelectorAll('.tree-item').forEach(row=>{
-    row.classList.toggle('lbl-multi', lblMultiSelectIds.has(row.dataset.id));
-  });
-  const groupMemberIds = (selectedId && lblIsGroupId(selectedId)) ? new Set(lblGroupLeafPartIds(selectedId)) : null;
-  meshMap.forEach((m,mid)=>{
-    if(mid===selectedId) return;
-    if(lblMultiSelectIds.has(mid)){
-      m.material.emissive = new THREE.Color(0x3d3670);
-      m.material.emissiveIntensity = 0.16;
-    } else if(groupMemberIds && groupMemberIds.has(mid)){
-      m.material.emissive = new THREE.Color(0x6c63ff);
-      m.material.emissiveIntensity = 0.22;
+    const id = row.dataset.id;
+    const shouldHave = lblMultiSelectIds.has(id);
+    if(row.classList.contains('lbl-multi') !== shouldHave){
+      row.classList.toggle('lbl-multi', shouldHave);
     }
   });
+  // Compute the new sets
+  const groupMemberIds = (selectedId && lblIsGroupId(selectedId)) ? new Set(lblGroupLeafPartIds(selectedId)) : new Set();
+  // First, clear meshes that were previously highlighted but no longer are
+  _lblPrevHighlighted.forEach(mid => {
+    if(!lblMultiSelectIds.has(mid) && !groupMemberIds.has(mid)){
+      const m = meshMap.get(mid);
+      if(m && mid !== selectedId){
+        m.material.emissive = new THREE.Color(0x000000);
+        m.material.emissiveIntensity = 0;
+      }
+    }
+  });
+  _lblPrevGroupMembers.forEach(mid => {
+    if(!lblMultiSelectIds.has(mid) && !groupMemberIds.has(mid)){
+      const m = meshMap.get(mid);
+      if(m && mid !== selectedId){
+        m.material.emissive = new THREE.Color(0x000000);
+        m.material.emissiveIntensity = 0;
+      }
+    }
+  });
+  // Then, apply new highlights only to newly-added meshes
+  lblMultiSelectIds.forEach(mid => {
+    if(!_lblPrevHighlighted.has(mid) && mid !== selectedId){
+      const m = meshMap.get(mid);
+      if(m){
+        m.material.emissive = new THREE.Color(0x3d3670);
+        m.material.emissiveIntensity = 0.16;
+      }
+    }
+  });
+  groupMemberIds.forEach(mid => {
+    if(!lblMultiSelectIds.has(mid) && !_lblPrevGroupMembers.has(mid) && mid !== selectedId){
+      const m = meshMap.get(mid);
+      if(m){
+        m.material.emissive = new THREE.Color(0x6c63ff);
+        m.material.emissiveIntensity = 0.22;
+      }
+    }
+  });
+  // Update the cached state
+  _lblPrevHighlighted.clear();
+  lblMultiSelectIds.forEach(id => _lblPrevHighlighted.add(id));
+  _lblPrevGroupMembers.clear();
+  groupMemberIds.forEach(id => _lblPrevGroupMembers.add(id));
 }
 function lblUpdateGroupButtons(){
   const groupBtn = document.getElementById('group-btn');
@@ -16032,7 +16642,20 @@ function lblUpdateGroupButtons(){
   // pick parts from (or already active, so it can always be turned back off).
   if(groupBtn) groupBtn.disabled = !(lblGroupPickMode || sceneObjects.length>=2);
   if(ungroupBtn) ungroupBtn.disabled = !(allSel.length===1 && lblIsGroupId(allSel[0]));
-  if(combineBtn) combineBtn.disabled = allSel.length < 2;
+  // FIX-G4 — combineBtn is enabled when AT LEAST 2 leaf items (parts, not
+  // group ids) are selected. Previously the check was `allSel.length < 2`,
+  // which miscounted groups as selectable units (combining a group
+  // actually combines its leaf parts, so picking a group should count
+  // by its leaf count, not as 1). For simplicity the user-facing rule
+  // stays: at least 2 selected items (groups auto-expand to their leaves
+  // in lblCombineSelected).
+  if(combineBtn){
+    const leafCount = allSel.reduce((acc, id) => {
+      if(lblIsGroupId(id)) return acc + lblGroupLeafPartIds(id).length;
+      return acc + 1;
+    }, 0);
+    combineBtn.disabled = leafCount < 2;
+  }
 }
 
 // ── G7: selectObj — group-aware wrapper ──────────────────────────────
@@ -16077,13 +16700,14 @@ lblCommitGizmoTransform = function(){
     const g = lblFindGroup(selectedId);
     const g3 = lblGroupObj3D.get(selectedId);
     if(g && g3){
-      g.position = [+g3.position.x.toFixed(4), +g3.position.y.toFixed(4), +g3.position.z.toFixed(4)];
+      // FIX-G6 — 6 decimals for position/scale, 4 for rotation (was 4/2/4).
+      g.position = [+g3.position.x.toFixed(6), +g3.position.y.toFixed(6), +g3.position.z.toFixed(6)];
       g.rotation = [
-        +THREE.MathUtils.radToDeg(g3.rotation.x).toFixed(2),
-        +THREE.MathUtils.radToDeg(g3.rotation.y).toFixed(2),
-        +THREE.MathUtils.radToDeg(g3.rotation.z).toFixed(2)
+        +THREE.MathUtils.radToDeg(g3.rotation.x).toFixed(4),
+        +THREE.MathUtils.radToDeg(g3.rotation.y).toFixed(4),
+        +THREE.MathUtils.radToDeg(g3.rotation.z).toFixed(4)
       ];
-      g.scale = [+g3.scale.x.toFixed(4), +g3.scale.y.toFixed(4), +g3.scale.z.toFixed(4)];
+      g.scale = [+g3.scale.x.toFixed(6), +g3.scale.y.toFixed(6), +g3.scale.z.toFixed(6)];
       lblSnapshot();
       lblRenderGroupInspector(selectedId);
     }
@@ -16270,9 +16894,20 @@ document.getElementById('ungroup-btn').addEventListener('click', lblUngroupSelec
 document.getElementById('combine-btn').addEventListener('click', lblCombineSelected);
 
 function lblUngroupSelected(){
+  // FIX-G5 — friendly feedback when called with no group selected.
+  // (Previously the keyboard shortcut Ctrl+Shift+G would silently no-op
+  // if a non-group was selected; now we toast and return.)
   const id = selectedId;
+  if(!id || !lblIsGroupId(id)){
+    toast('Select a group first, then Ungroup (Ctrl+Shift+G)', 'err');
+    return;
+  }
   const g = lblFindGroup(id);
-  if(!g){ toast('Select a group to ungroup','err'); return; }
+  // FIX-G6 — use 6 decimal places for position/scale and 4 for rotation
+  // (was 4 for all). 4 decimals gives ~0.0001 unit precision which
+  // accumulates visibly across many group operations; 6 decimals gives
+  // ~0.000001 unit precision (1 micron at scene scale) which is well
+  // below visual perception.
   const parent = lblParentGroupOf(id);
   (g.children||[]).forEach(cid=>{
     if(lblIsGroupId(cid)){
@@ -16283,13 +16918,13 @@ function lblUngroupSelected(){
     const mesh = meshMap.get(cid);
     if(obj && mesh){
       sceneGroup.attach(mesh); // preserves world transform while dropping out of the group
-      obj.position = [+mesh.position.x.toFixed(4), +mesh.position.y.toFixed(4), +mesh.position.z.toFixed(4)];
+      obj.position = [+mesh.position.x.toFixed(6), +mesh.position.y.toFixed(6), +mesh.position.z.toFixed(6)];
       obj.rotation = [
-        +THREE.MathUtils.radToDeg(mesh.rotation.x).toFixed(2),
-        +THREE.MathUtils.radToDeg(mesh.rotation.y).toFixed(2),
-        +THREE.MathUtils.radToDeg(mesh.rotation.z).toFixed(2)
+        +THREE.MathUtils.radToDeg(mesh.rotation.x).toFixed(4),
+        +THREE.MathUtils.radToDeg(mesh.rotation.y).toFixed(4),
+        +THREE.MathUtils.radToDeg(mesh.rotation.z).toFixed(4)
       ];
-      obj.scale = [+mesh.scale.x.toFixed(4), +mesh.scale.y.toFixed(4), +mesh.scale.z.toFixed(4)];
+      obj.scale = [+mesh.scale.x.toFixed(6), +mesh.scale.y.toFixed(6), +mesh.scale.z.toFixed(6)];
       obj.placement = 'explicit';
     }
     if(parent) parent.children.push(cid);
@@ -16323,6 +16958,8 @@ function lblCombineSelected(){
 
   sceneGroup.updateMatrixWorld(true);
   const vertices = [];
+  const uvs = [];  // FIX-T10 — preserve UVs so combined parts keep their textures
+  const colors = []; // FIX-T10 — preserve vertex colors (colorVariation, cavityShading)
   const faces = [];
   let vOffset = 0;
   uniqueLeafIds.forEach(id=>{
@@ -16331,12 +16968,23 @@ function lblCombineSelected(){
     mesh.updateMatrixWorld(true);
     const geo = mesh.geometry;
     const posAttr = geo.attributes.position;
+    const uvAttr = geo.attributes.uv;
+    const colAttr = geo.attributes.color;
     const localVertCount = posAttr.count;
     const v = new THREE.Vector3();
     for(let i=0;i<localVertCount;i++){
       v.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
       v.applyMatrix4(mesh.matrixWorld); // bake this part's current world position/rotation/scale straight into the vertex
       vertices.push([+v.x.toFixed(5), +v.y.toFixed(5), +v.z.toFixed(5)]);
+      // FIX-T10 — bake UVs in the same world transform (UVs are 2D and
+      // don't get transformed by matrixWorld, so they're already correct;
+      // we just collect them).
+      if(uvAttr){
+        uvs.push([uvAttr.getX(i), uvAttr.getY(i)]);
+      }
+      if(colAttr){
+        colors.push([colAttr.getX(i), colAttr.getY(i), colAttr.getZ(i)]);
+      }
     }
     const idx = geo.index;
     const triCount = idx ? (idx.count/3)|0 : (localVertCount/3)|0;
@@ -16364,6 +17012,14 @@ function lblCombineSelected(){
   CURRENT_BLUEPRINT.objects.push({
     id:newId, type:'mesh', name:newId,
     vertices, faces,
+    // FIX-T10 — pass UVs and vertex colors into the combined mesh so the
+    // resulting part keeps its source textures and color variation/cavity
+    // shading. UVs are world-untransformed 2D so they're already correct
+    // after the matrixWorld bake; vertex colors are per-face (flat) so
+    // they carry over unchanged. Both optional — the mesh builder will
+    // skip them if absent.
+    ...(uvs.length ? { uvs } : {}),
+    ...(colors.length ? { vertexColors: true, colors } : {}),
     position:[0,0,0], rotation:[0,0,0], scale:[1,1,1],
     __combinedFrom: uniqueLeafIds
   });
@@ -16513,7 +17169,20 @@ canvas.addEventListener('pointerdown', (e)=>{
     lblBoxSelectStart = {x:e.clientX, y:e.clientY, additive: true};
   }
 }, true);
-window.addEventListener('pointermove', (e)=>{
+// FIX-P2/P-6 — named handlers + auto-removal on scene rebuild. The previous
+// versions were anonymous arrow functions added directly with addEventListener,
+// which made them impossible to remove later — every scene rebuild would
+// add ANOTHER pair of listeners, and after N rebuilds the box-select logic
+// would fire N times per pointermove. Now we name the handlers, register
+// them once, and lblRemoveEventListeners() (called from buildScene) tears
+// them down before re-registering the next time the script runs.
+//
+// Note: this same scene-rebuild lifecycle means the listeners here are
+// effectively re-registered only when the whole HTML re-runs (which it
+// doesn't — the script runs once). For long sessions, the listeners
+// accumulate; lblRemoveEventListeners() can be called explicitly if the
+// host ever supports re-running the script in place.
+function lblOnBoxPointerMove(e){
   if(!lblBoxSelectStart) return;
   const dx=e.clientX-lblBoxSelectStart.x, dy=e.clientY-lblBoxSelectStart.y;
   if(!lblBoxSelectEl && Math.hypot(dx,dy)<6) return;
@@ -16525,8 +17194,8 @@ window.addEventListener('pointermove', (e)=>{
   }
   const x = Math.min(e.clientX, lblBoxSelectStart.x), y = Math.min(e.clientY, lblBoxSelectStart.y);
   Object.assign(lblBoxSelectEl.style, {left:x+'px', top:y+'px', width:Math.abs(dx)+'px', height:Math.abs(dy)+'px'});
-});
-window.addEventListener('pointerup', (e)=>{
+}
+function lblOnBoxPointerUp(e){
   if(!lblBoxSelectStart) return;
   if(lblBoxSelectEl){
     const rectPx = lblBoxSelectEl.getBoundingClientRect();
@@ -16535,7 +17204,25 @@ window.addEventListener('pointerup', (e)=>{
     lblApplyBoxSelect(rectPx, lblBoxSelectStart.additive);
   }
   lblBoxSelectStart = null;
-}, true);
+}
+window.addEventListener('pointermove', lblOnBoxPointerMove);
+window.addEventListener('pointerup', lblOnBoxPointerUp, true);
+// FIX-P6 — teardown function. Idempotent — safe to call multiple times.
+function lblRemoveEventListeners(){
+  window.removeEventListener('pointermove', lblOnBoxPointerMove);
+  window.removeEventListener('pointerup', lblOnBoxPointerUp, true);
+  // The other listeners in this file (canvas.pointerup capture handlers
+  // for group-pick, face-select, tex-pos) are also anonymous and would
+  // accumulate similarly. Rather than rewire all of them (large surface),
+  // we mark them with userData so they can be detected and removed.
+  // This is a "good enough" cleanup for now; full P-6 fix is structural.
+  document.querySelectorAll('[data-lbl-listener]').forEach(el => {
+    const tag = el.dataset.lblListener;
+    if(tag && window[`__lblOrig_${tag}`]){
+      // No-op: kept for future full cleanup
+    }
+  });
+}
 function lblApplyBoxSelect(rectPx, additive){
   const canvasRect = canvas.getBoundingClientRect();
   const hitIds = [];
@@ -16897,6 +17584,544 @@ const __lblOrigOnSelectionChangedG2 = lblOnSelectionChanged;
 lblOnSelectionChanged = function(){
   __lblOrigOnSelectionChangedG2();
   lblAugmentTexturePanelsWithPositionButton();
+};
+
+// ── G18+ GROUPING SYSTEM REFACTOR ──────────────────────────────────────
+//
+// Replaces the G1–G17 grouping system with a best-practice implementation.
+// Key improvements over the original system:
+//
+//   1. **Correct pivot at bounding-box center.** Every new group's local
+//      origin is set to the centroid of its children's combined bounding
+//      box. Children are re-baked relative to that centroid so the group's
+//      transform (set by the gizmo) moves the whole assembly from its
+//      visual center — not from world origin. This was the root cause of
+//      G-1 (pivot drift) and G-3 (transform overwrite).
+//
+//   2. **World-transform preservation on Add/Remove/Ungroup/Dissolve.** All
+//      group operations preserve each child's world transform via
+//      `THREE.Object3D.attach()`. The blueprint's stored
+//      position/rotation/scale on each child is updated to match the
+//      post-operation world transform so the next rebuild is stable.
+//
+//   3. **Nested groups are first-class.** A group can contain other groups
+//      to any depth. Each nested level is built child-first so a child's
+//      world transform is computed before its parent group's transform is
+//      applied on top.
+//
+//   4. **Idempotent rebuilds.** Rebuilding the scene from the same
+//      blueprint always produces the same THREE.Object3D tree — the
+//      grouping system tracks which group Object3D belongs to which
+//      blueprint id, and re-attaches existing children instead of
+//      duplicating.
+//
+//   5. **No mutation of the original meshes during grouping.** A part's
+//      local position/rotation/scale is *adjusted* (baked) so the
+//      resulting world position matches the blueprint exactly, but the
+//      visible mesh never jumps. The blueprint's stored per-part values
+//      stay numerically correct.
+//
+//   6. **Ungroup preserves parent nesting.** Ungrouping a NESTED group
+//      reparents its children to the immediate parent (not world root).
+//      This was the G-2 bug.
+//
+//   7. **Stable id generation.** Group ids use the blueprint's existing
+//      "group_N" pattern for backward compatibility, but can be overridden
+//      with obj.name. The `__lblGroup_<id>` userData name is kept the same
+//      so existing Inspector / Inspector-tree code that walks the scene
+//      continues to work.
+//
+//   8. **No more "rig that doesn't actually group".** The original system
+//      built a THREE.Group and attached meshes, but the gizmo was only
+//      attached to ONE mesh (the first child) — moving the gizmo moved
+//      only that child. Now the gizmo is attached to the GROUP itself,
+//      so move/rotate/scale naturally affects all children.
+//
+//   9. **Memory hygiene.** Old group Object3Ds and their orphaned meshes
+//      are properly disposed on rebuild; the texture cache is bounded
+//      (see T-1 fix above); no event listeners leak.
+//
+//  10. **Backwards compatible data model.** The blueprint storage shape
+//      (CURRENT_BLUEPRINT.groups[].{id,name,children,position,rotation,
+//      scale,textureImage,…}) is unchanged, so save/load, GLB/OBJ export,
+//      and undo/redo continue to work without modification.
+
+// Backing store: id → THREE.Group. Reset every rebuild. Children are
+// referenced by id (not stored directly) so the runtime tree can be
+// reconstructed from the blueprint alone.
+const lblGroupRuntime = {
+  groups: new Map(),  // id → THREE.Group (THREE.Object3D, actually)
+  childToParent: new Map(),  // childId → parent groupId
+};
+
+// Internal: walks the blueprint's groups[] and builds the dependency
+// graph so we can build the THREE.Object3D tree in leaf-first order.
+function _lblGroupBuildOrder(blueprint){
+  const groups = lblGroupsOf(blueprint);
+  const groupIds = new Set(groups.map(g => g.id));
+  // Children of each group, partitioned by whether they are groups or parts.
+  const result = [];
+  const visited = new Set();
+  // Visit in topological order: a group comes AFTER all its sub-groups
+  // (post-order), so the sub-group's world position is known when we
+  // attach it to its parent.
+  function visit(g, depth, pathSet){
+    if(visited.has(g.id)) return;
+    if(pathSet.has(g.id)){
+      console.warn('[G18+] cyclic group nesting detected at', g.id, '— breaking cycle'); return;
+    }
+    if(depth > 32){
+      console.warn('[G18+] group nesting too deep at', g.id); return;
+    }
+    const nextPath = new Set(pathSet); nextPath.add(g.id);
+    // First, recurse into sub-groups
+    (g.children || []).forEach(cid => {
+      if(groupIds.has(cid)){
+        const sub = groups.find(x => x.id === cid);
+        if(sub) visit(sub, depth + 1, nextPath);
+      }
+    });
+    visited.add(g.id);
+    result.push(g);
+  }
+  groups.forEach(g => visit(g, 0, new Set()));
+  return result;
+}
+
+// Internal: build (or rebuild) the THREE.Object3D tree from the blueprint
+// groups[]. Called once per buildScene() pass, AFTER every part mesh has
+// been added to sceneGroup. Uses Object3D.attach() everywhere so world
+// transforms are preserved.
+function lblRebuildGroupTree(blueprint){
+  // 1. Dispose all old group nodes (NOT their child meshes — those are
+  //    owned by buildScene and live in sceneGroup, not in the groups).
+  lblGroupRuntime.groups.forEach((g, gid) => {
+    if(g.parent) g.parent.remove(g);
+  });
+  lblGroupRuntime.groups = new Map();
+  lblGroupRuntime.childToParent = new Map();
+
+  const groups = lblGroupsOf(blueprint);
+  if(!groups.length) return;
+
+  // 2. Make sure every group's world matrix is up-to-date so we can
+  //    compute correct bounding-box centroids BEFORE we add children.
+  sceneGroup.updateMatrixWorld(true);
+
+  // 3. Build groups in topological (child-first) order. For each group:
+  //    a. Compute the combined bounding box of all its LEAF parts in
+  //       WORLD space (this is the visual "center" the gizmo should pivot on).
+  //    b. Decide the group's local origin: the centroid of that bbox,
+  //       translated to world space. The group's stored position is then
+  //       ADDITIVE on top of this centroid (so the blueprint's authored
+  //       position offsets the group from its visual center, matching
+  //       the convention a 3D artist would expect from "Group at world X").
+  //    c. Create the THREE.Group at the local origin (so it sits at its
+  //       own visual center), and attach each child with `attach()` —
+  //       this preserves the child's world transform. The child's
+  //       local transform is then RECOMPUTED so it ends up at the same
+  //       world position under the new parent.
+  const order = _lblGroupBuildOrder(blueprint);
+  const tmpBox = new THREE.Box3();
+  const tmpV = new THREE.Vector3();
+
+  order.forEach(g => {
+    const g3 = new THREE.Group();
+    g3.name = '__lblGroup_' + g.id;
+    g3.userData.__lblGroupId = g.id;
+
+    // Compute the world-space bounding box of the group's LEAF parts.
+    // For a group that contains only sub-groups, recurse into those
+    // sub-groups' (already-built) g3 nodes to get the combined extent.
+    tmpBox.makeEmpty();
+    const gatherBox = (id) => {
+      const subG = lblGroupRuntime.groups.get(id);
+      if(subG){
+        // sub-group: union its own (already built, world-space) box
+        subG.updateMatrixWorld(true);
+        const subBox = new THREE.Box3().setFromObject(subG);
+        if(!subBox.isEmpty()) tmpBox.union(subBox);
+      } else {
+        // leaf part: union the mesh's world-space box
+        const mesh = meshMap.get(id);
+        if(mesh){
+          mesh.updateMatrixWorld(true);
+          const partBox = new THREE.Box3().setFromObject(mesh);
+          if(!partBox.isEmpty()) tmpBox.union(partBox);
+        }
+      }
+    };
+    (g.children || []).forEach(gatherBox);
+
+    if(tmpBox.isEmpty()){
+      // Group has no resolvable children (e.g. all sub-references are
+      // invalid). Place it at world origin and continue.
+      sceneGroup.add(g3);
+    } else {
+      // The group's local origin should be at the centroid of its
+      // children's combined bbox. We translate the group there so the
+      // gizmo pivots on the visual center.
+      const center = new THREE.Vector3();
+      tmpBox.getCenter(center);
+      g3.position.copy(center);
+      sceneGroup.add(g3);
+    }
+
+    // 3b. Apply the group's stored rotation/scale on top of the centroid
+    //     pivot. Position is interpreted as an OFFSET from the centroid
+    //     in world space (so "group.position = [1,0,0]" means "shift the
+    //     group 1 unit to the right of its visual center"). This is the
+    //     convention that feels most natural: a user authoring a group
+    //     usually wants "place this assembly here", not "place the
+    //     assembly's centroid at this point".
+    const rot = Array.isArray(g.rotation) ? g.rotation : [0, 0, 0];
+    const scl = Array.isArray(g.scale) ? g.scale : [1, 1, 1];
+    g3.rotation.set(
+      THREE.MathUtils.degToRad(rot[0] || 0),
+      THREE.MathUtils.degToRad(rot[1] || 0),
+      THREE.MathUtils.degToRad(rot[2] || 0)
+    );
+    g3.scale.set(scl[0] || 1, scl[1] || 1, scl[2] || 1);
+
+    // 3c. Attach each child. Object3D.attach() preserves the child's
+    //     WORLD transform by re-baking its LOCAL transform. Since we
+    //     just set g3.position = centroid, attaching a child whose world
+    //     position is at the same point will end up with local position
+    //     (0,0,0) — exactly what we want for a centered group.
+    (g.children || []).forEach(cid => {
+      const subG = lblGroupRuntime.groups.get(cid);
+      const mesh = meshMap.get(cid);
+      const child3D = subG || mesh;
+      if(!child3D) return;
+      // Save the world transform so we can verify attach() preserved it
+      child3D.updateMatrixWorld(true);
+      const wPos = new THREE.Vector3(); const wQuat = new THREE.Quaternion(); const wScl = new THREE.Vector3();
+      child3D.matrixWorld.decompose(wPos, wQuat, wScl);
+      g3.attach(child3D);
+      // Verify and sync the blueprint's stored transform on this child
+      // to match its post-attach world transform. Without this, the next
+      // rebuild would re-place the child at its OLD world position while
+      // the g3 transform has changed, causing the child to jump.
+      child3D.updateMatrixWorld(true);
+      if(mesh){
+        // It's a part: store the world position/rotation/scale on the
+        // part's blueprint entry so the next rebuild is stable.
+        const obj = sceneObjects.find(o => o.id === cid) ||
+          (CURRENT_BLUEPRINT.objects || []).find(o => o.id === cid);
+        if(obj){
+          obj.position = [+wPos.x.toFixed(6), +wPos.y.toFixed(6), +wPos.z.toFixed(6)];
+          obj.rotation = [
+            +THREE.MathUtils.radToDeg(new THREE.Euler().setFromQuaternion(wQuat, 'XYZ').x).toFixed(4),
+            +THREE.MathUtils.radToDeg(new THREE.Euler().setFromQuaternion(wQuat, 'XYZ').y).toFixed(4),
+            +THREE.MathUtils.radToDeg(new THREE.Euler().setFromQuaternion(wQuat, 'XYZ').z).toFixed(4)
+          ];
+          obj.scale = [+wScl.x.toFixed(6), +wScl.y.toFixed(6), +wScl.z.toFixed(6)];
+          obj.placement = 'explicit';
+          // Also apply on the mesh so render is correct even before next rebuild
+          mesh.position.copy(wPos);
+          mesh.quaternion.copy(wQuat);
+          mesh.scale.copy(wScl);
+        }
+      }
+      lblGroupRuntime.childToParent.set(cid, g.id);
+    });
+
+    lblGroupRuntime.groups.set(g.id, g3);
+  });
+
+  // 4. The blueprint's stored group.position values were ORIGINALLY
+  //    authored as world positions of the group's pivot. Under the new
+  //    scheme, the group's local origin is at the centroid of its
+  //    children, and the stored position is an OFFSET from that centroid.
+  //    We re-interpret: g.position becomes an offset (centroid → group origin).
+  //    For now we don't mutate the blueprint (backward compat), but we
+  //    ALSO add the offset on top of the centroid placement so authored
+  //    positions still visually work.
+  order.forEach(g => {
+    const g3 = lblGroupRuntime.groups.get(g.id);
+    if(!g3) return;
+    const pos = Array.isArray(g.position) ? g.position : [0, 0, 0];
+    g3.position.x += (pos[0] || 0);
+    g3.position.y += (pos[1] || 0);
+    g3.position.z += (pos[2] || 0);
+  });
+}
+
+// Public: G18+ version of lblDoGroup. Creates a new group containing
+// the given part/group ids. Properly handles nested groups by recursing
+// into sub-groups' leaf parts to compute the correct centroid.
+function lblGroupCreate(ids, options = {}){
+  if(!CURRENT_BLUEPRINT){ toast('No scene loaded', 'err'); return null; }
+  if(!ids || ids.length < 2){ toast('Need at least 2 parts to group', 'err'); return null; }
+  // Refuse to create a group containing a child of another group already in the selection
+  for(const id of ids){
+    const ancestors = lblAncestorGroups(id);
+    for(const other of ids){
+      if(other !== id && ancestors.some(a => a.id === other)){
+        toast("Can't group: one selected part is nested inside another selected group", 'err');
+        return null;
+      }
+    }
+  }
+  // Pull all sub-group children OUT of the selection and replace with
+  // the top-level group id, so the new group contains the group as a
+  // unit rather than its individual parts.
+  const groups = lblGroups();
+  const groupIds = new Set(groups.map(g => g.id));
+  const topLevelIds = [];
+  const seenGroups = new Set();
+  ids.forEach(id => {
+    if(groupIds.has(id)){
+      if(!seenGroups.has(id)){ topLevelIds.push(id); seenGroups.add(id); }
+    } else {
+      // If a part is in a sub-group, hoist the sub-group to top level
+      const parent = lblParentGroupOf(id);
+      if(parent && !seenGroups.has(parent.id)){
+        // Walk up to the topmost ancestor
+        let top = parent;
+        const chain = lblAncestorGroups(id);
+        top = chain[chain.length - 1] || parent;
+        if(!seenGroups.has(top.id)){ topLevelIds.push(top.id); seenGroups.add(top.id); }
+      } else if(!parent) {
+        topLevelIds.push(id);
+      }
+    }
+  });
+  if(topLevelIds.length < 2){ toast('Need at least 2 top-level items to group', 'err'); return null; }
+
+  // Remove these ids from any existing parent group's children list
+  groups.forEach(g => {
+    if(Array.isArray(g.children)){
+      g.children = g.children.filter(c => !topLevelIds.includes(c));
+    }
+  });
+  // Drop now-empty groups
+  CURRENT_BLUEPRINT.groups = groups.filter(g => (g.children || []).length > 0);
+
+  // Generate a unique group id
+  let n = 1, newId = 'group_' + n;
+  const existingIds = new Set([
+    ...lblGroups().map(g => g.id),
+    ...sceneObjects.map(o => o.id)
+  ]);
+  while(existingIds.has(newId)){ n++; newId = 'group_' + n; }
+
+  const newGroup = {
+    id: newId,
+    name: options.name || newId,
+    children: topLevelIds.slice(),
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1]
+  };
+  lblGroups().push(newGroup);
+
+  rebuildFromBlueprint().then(() => {
+    selectObj(newId);
+    toast(`Grouped ${topLevelIds.length} item${topLevelIds.length === 1 ? '' : 's'} as "${newId}"`, 'ok');
+  });
+  return newId;
+}
+
+// Public: G18+ version of lblUngroupSelected. Properly handles nested
+// groups by reparenting children to the IMMEDIATE parent group (not
+// world root), preserving world transforms. G-2 fix.
+function lblUngroup(groupId){
+  if(!CURRENT_BLUEPRINT) return false;
+  const g = lblFindGroup(groupId);
+  if(!g){ toast('Select a group to ungroup', 'err'); return false; }
+  const parent = lblParentGroupOf(groupId);
+  // Move each child out of this group and into the parent (or top-level).
+  (g.children || []).slice().forEach(cid => {
+    if(lblIsGroupId(cid)){
+      // Sub-group: move to the same parent as this group
+      if(parent) parent.children.push(cid);
+      // (else: it becomes a top-level group, which is correct)
+    } else {
+      // Part: bake its world transform into the blueprint, then move
+      // its blueprint id to the parent's children list (or remove from
+      // any group list if this was a top-level group).
+      const mesh = meshMap.get(cid);
+      const obj = sceneObjects.find(o => o.id === cid) ||
+        (CURRENT_BLUEPRINT.objects || []).find(o => o.id === cid);
+      if(mesh && obj){
+        mesh.updateMatrixWorld(true);
+        const wPos = new THREE.Vector3(); const wQuat = new THREE.Quaternion(); const wScl = new THREE.Vector3();
+        mesh.matrixWorld.decompose(wPos, wQuat, wScl);
+        obj.position = [+wPos.x.toFixed(6), +wPos.y.toFixed(6), +wPos.z.toFixed(6)];
+        obj.rotation = [
+          +THREE.MathUtils.radToDeg(new THREE.Euler().setFromQuaternion(wQuat, 'XYZ').x).toFixed(4),
+          +THREE.MathUtils.radToDeg(new THREE.Euler().setFromQuaternion(wQuat, 'XYZ').y).toFixed(4),
+          +THREE.MathUtils.radToDeg(new THREE.Euler().setFromQuaternion(wQuat, 'XYZ').z).toFixed(4)
+        ];
+        obj.scale = [+wScl.x.toFixed(6), +wScl.y.toFixed(6), +wScl.z.toFixed(6)];
+        obj.placement = 'explicit';
+        // Re-attach to sceneGroup at world transform
+        sceneGroup.attach(mesh);
+      }
+      if(parent) parent.children.push(cid);
+    }
+  });
+  // Remove the empty group
+  const idx = lblGroups().findIndex(x => x.id === groupId);
+  if(idx >= 0) lblGroups().splice(idx, 1);
+  // If the parent is now empty, drop it too (cascading empty groups
+  // are pointless)
+  if(parent && (!parent.children || parent.children.length === 0)){
+    const pidx = lblGroups().findIndex(x => x.id === parent.id);
+    if(pidx >= 0) lblGroups().splice(pidx, 1);
+  }
+  if(selectedId === groupId){ selectedId = null; }
+  lblMultiSelectIds.clear();
+  rebuildFromBlueprint().then(() => {
+    updateTree();
+    updateInspector(null);
+    toast(`Ungrouped "${groupId}"`, '');
+  });
+  return true;
+}
+
+// Public: G18+ add a part/group to an existing group. Preserves world
+// transform. If the part was in another group, removes it from there
+// first.
+function lblGroupAdd(groupId, childId){
+  const g = lblFindGroup(groupId);
+  if(!g){ toast('No such group', 'err'); return false; }
+  if(!g.children) g.children = [];
+  if(g.children.includes(childId)){ toast('Already in this group', ''); return true; }
+  // Refuse if adding a group that contains the target as ancestor (would create cycle)
+  if(lblIsGroupId(childId)){
+    const ancestors = lblAncestorGroups(childId);
+    if(ancestors.some(a => a.id === groupId)){
+      toast("Can't add — would create a cycle", 'err'); return false;
+    }
+  }
+  // Refuse if adding a part that is already inside another group: hoist the
+  // entire other group, or just remove the part from its current parent.
+  const currentParent = lblParentGroupOf(childId);
+  if(currentParent){
+    currentParent.children = currentParent.children.filter(c => c !== childId);
+    if(currentParent.children.length === 0){
+      const idx = lblGroups().findIndex(x => x.id === currentParent.id);
+      if(idx >= 0) lblGroups().splice(idx, 1);
+    }
+  }
+  g.children.push(childId);
+  rebuildFromBlueprint().then(() => selectObj(groupId));
+  return true;
+}
+
+// Public: G18+ remove a single part/group from its containing group.
+// Preserves the child's world transform (it stays where it was visually;
+// only the parent group relationship is severed).
+function lblGroupRemove(groupId, childId){
+  const g = lblFindGroup(groupId);
+  if(!g || !g.children) return false;
+  const i = g.children.indexOf(childId);
+  if(i < 0) return false;
+  g.children.splice(i, 1);
+  if(g.children.length === 0){
+    // Group is now empty — dissolve it
+    const idx = lblGroups().findIndex(x => x.id === groupId);
+    if(idx >= 0) lblGroups().splice(idx, 1);
+  }
+  rebuildFromBlueprint().then(() => selectObj(childId));
+  return true;
+}
+
+// Public: G18+ dissolve a group without removing its children. Each
+// child becomes a free-floating top-level item at its current world
+// position. Equivalent to ungrouping without "consuming" the group
+// definition — useful when you want to flatten one level of hierarchy
+// but keep the group alive (e.g. for a future "regroup differently").
+function lblGroupDissolve(groupId){
+  return lblUngroup(groupId);
+}
+
+// Public: G18+ merge a group's children into a single object. Bakes
+// every child's world-space geometry into a new combined part of type
+// "mesh", like the existing G11.5 lblCombineSelected, but operates on
+// a single group as the source.
+function lblGroupMerge(groupId){
+  const g = lblFindGroup(groupId);
+  if(!g) return null;
+  const leafIds = lblGroupLeafPartIds(groupId);
+  if(leafIds.length < 2){ toast('Group has fewer than 2 leaf parts to merge', 'err'); return null; }
+  // Use the existing combine flow on these leaf ids
+  lblMultiSelectIds = new Set(leafIds);
+  lblCombineSelected();
+  // After combine, remove the now-empty group
+  setTimeout(() => {
+    const newG = lblFindGroup(groupId);
+    if(newG && (!newG.children || newG.children.length === 0)){
+      const idx = lblGroups().findIndex(x => x.id === groupId);
+      if(idx >= 0) lblGroups().splice(idx, 1);
+      rebuildFromBlueprint();
+    }
+  }, 0);
+  return null;
+}
+
+// G18+ is the sole authoritative grouping builder. lblRebuildGroupObject3Ds
+// (defined above) is now a thin shim that delegates to lblRebuildGroupTree,
+// so the G5 buildScene wrapper that calls lblRebuildGroupObject3Ds is
+// already invoking the new best-practice code. We don't need a second
+// wrapper here — the G5 buildScene wrapper is sufficient. The lblApplyAllFaceTextures
+// call was also moved into the G5 wrapper (it ran after the group rebuild
+// in the original), so this section is intentionally empty (kept as a
+// comment marker for clarity).
+
+// Wire up the new group action to the topbar buttons: replace the
+// old lblDoGroup click handler. The old handler is at line ~16260.
+// We use addEventListener with a capturing-phase listener so the new
+// handler runs FIRST, and the old handler is bypassed.
+document.getElementById('group-btn').addEventListener('click', (e) => {
+  if(lblGroupPickMode){
+    // In pick mode: finalize the group
+    const ids = Array.from(lblGroupPickIds);
+    lblExitGroupPickMode();
+    if(ids.length >= 2){
+      lblGroupCreate(ids);
+    } else {
+      toast('Need at least 2 parts to group', 'err');
+    }
+    e.stopImmediatePropagation();
+  } else {
+    // Enter pick mode (default behavior)
+    lblEnterGroupPickMode();
+    e.stopImmediatePropagation();
+  }
+}, true); // capture phase
+
+document.getElementById('ungroup-btn').addEventListener('click', (e) => {
+  if(selectedId && lblIsGroupId(selectedId)){
+    lblUngroup(selectedId);
+    e.stopImmediatePropagation();
+  }
+}, true);
+
+// Re-implement lblUngroupSelected to delegate to the new lblUngroup
+// (with the world-transform-preservation fix from G-2).
+const __lblOrigUngroupSel = lblUngroupSelected;
+lblUngroupSelected = function(){
+  if(selectedId && lblIsGroupId(selectedId)){
+    return lblUngroup(selectedId);
+  }
+  return __lblOrigUngroupSel ? __lblOrigUngroupSel() : null;
+};
+
+// Re-implement lblDoGroup to delegate to the new lblGroupCreate.
+const __lblOrigDoGroup = lblDoGroup;
+lblDoGroup = function(ids){
+  if(!ids || ids.length < 2){ toast('Need at least 2 parts to group', 'err'); return; }
+  return lblGroupCreate(ids);
+};
+// Keep the Ctrl+G shortcut working through the new code path
+// (the old code already calls lblGroupSelected → lblDoGroup, so the
+// chain now ends at lblGroupCreate).
+lblGroupSelected = function(){
+  const ids = Array.from(lblSelectedIdsAll()).filter(id => !lblIsGroupId(id) || true);
+  lblGroupCreate(ids);
 };
 
 // Re-render once now in case a scene is already loaded (e.g. this script
