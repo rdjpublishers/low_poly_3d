@@ -980,6 +980,12 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <!-- LBL update T6 — image texture shortcut -->
   <button class="tbtn hide-xs" id="texture-btn" title="Apply an image texture to the selected part" disabled>🖼 Texture</button>
   <div class="vdiv"></div>
+  <!-- LBL update G — multi-select grouping & face texturing -->
+  <button class="tbtn hide-xs" id="group-btn" title="Click to start picking parts to group (plain click each part, click here again to finish) — still separate objects underneath, just move together" disabled>⛓ Group</button>
+  <button class="tbtn hide-xs" id="ungroup-btn" title="Ungroup the selected group (Ctrl+Shift+G)" disabled>⛓‍💥 Ungroup</button>
+  <button class="tbtn hide-xs" id="combine-btn" title="Combine (merge) the selected parts into ONE real object — one mesh, one texture" disabled>🔗 Combine</button>
+  <button class="tbtn hide-xs" id="face-select-btn" title="Toggle face-select mode — click faces on a part to select them, Shift-click to add more">⬡ Faces</button>
+  <div class="vdiv"></div>
   <!-- LBL update H4 — HDR environment presets -->
   <button class="tbtn hide-xs" id="env-presets-btn" title="HDR environment presets, quality, intensity">🌐▾ Env</button>
   <div class="vdiv"></div>
@@ -1411,6 +1417,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
       <div id="proportions-panel" class="proportions-panel"></div>
       <div id="inspector"><div class="insp-empty">Select an object to inspect.</div></div>
       <div id="lbl-texture-panel"></div>
+      <div id="lbl-group-panel"></div>
+      <div id="lbl-facetex-panel"></div>
     </div>
     <div id="insp-tab-fidelity" style="display:none">
       <div id="fidelity-tab"><div class="insp-empty">Build a scene to see its fidelity breakdown (PART 51.2).</div></div>
@@ -1460,6 +1468,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
       <div id="mob-proportions-panel" class="proportions-panel"></div>
       <div id="mob-inspector"><div class="insp-empty">Select an object.</div></div>
       <div id="mob-lbl-texture-panel"></div>
+      <div id="mob-lbl-group-panel"></div>
+      <div id="mob-lbl-facetex-panel"></div>
     </div>
     <div id="mob-insp-tab-fidelity" style="display:none">
       <div id="mob-fidelity-tab"><div class="insp-empty">Build a scene to see its fidelity breakdown (PART 51.2).</div></div>
@@ -15755,6 +15765,1143 @@ canvas.addEventListener('pointerup', (e)=>{
     }
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// PART C — MULTI-SELECT, GROUPING & FACE-LEVEL TEXTURING (G1–G16)
+// Added per user request: select several parts at once, group/ungroup
+// them, move/rotate/scale/texture a group as one unit (nested groups —
+// "ingroup" — supported), and separately click individual FACES on a
+// part to texture just that subset with its own image + independent
+// U/V repeat (scale) / offset / rotation.
+//
+// Purely additive, following the exact same pattern PART B/H already use
+// in this file: capture the current binding of a function/const declared
+// above, reassign it to a wrapper that calls the original plus new logic.
+// Every existing call site keeps working unchanged because everything in
+// this module looks up these names by identifier at CALL time, not at
+// definition time (buildScene is already wrapped once above for H1 —
+// this wraps it a second time).
+//
+// Data model additions (plain JSON, so existing export/undo/redo/JSON
+// download paths pick them up automatically, same as PART B's textureImage
+// fields did):
+//   CURRENT_BLUEPRINT.groups = [{
+//     id, name, children:[ids],           // a child id can be a part id OR another group's id (nesting)
+//     position:[x,y,z], rotation:[x,y,z] (deg), scale:[x,y,z],   // group's OWN transform, layered on top of children's authored transforms
+//     textureImage, textureImageRepeat, textureImageOffset, textureImageRotation   // optional group-wide texture, inherited by member parts that don't have their own
+//   }]
+//   object.faceTextures = [{ id, faces:[triangleIndex,...], textureImage,
+//     textureImageRepeat, textureImageOffset, textureImageRotation, __filenameLabel }]
+// ═══════════════════════════════════════════════════════════════════════
+
+(function injectLblGCss(){
+  const css = `
+    .tree-item.lbl-multi{outline:2px solid rgba(108,99,255,.35);background:rgba(108,99,255,.08);}
+    .tree-item.lbl-grouppick{outline:2px solid #ffb020;background:rgba(255,176,32,.12);}
+    .lbl-selrect{position:fixed;border:1px solid #6c63ff;background:rgba(108,99,255,.15);pointer-events:none;z-index:9999;}
+    #face-select-btn.active{background:var(--accent,#6c63ff);color:#fff;}
+    #group-btn.active,#ungroup-btn.active{background:var(--accent,#6c63ff);color:#fff;}
+    .lbl-ftex-badge{margin-right:3px;}
+    .ftex-scale-panel{padding:6px 4px 2px;}
+  `;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
+
+// ── G1: group data-model helpers ─────────────────────────────────────
+function lblGroupsOf(blueprint){
+  if(!blueprint) return [];
+  if(!Array.isArray(blueprint.groups)) blueprint.groups = [];
+  return blueprint.groups;
+}
+function lblGroups(){ return lblGroupsOf(CURRENT_BLUEPRINT); }
+function lblFindGroup(id){ return lblGroups().find(g=>g.id===id) || null; }
+function lblIsGroupId(id){ return !!id && !!lblFindGroup(id); }
+function lblParentGroupOf(id){
+  return lblGroups().find(g=>Array.isArray(g.children) && g.children.includes(id)) || null;
+}
+function lblAncestorGroups(id){
+  const out=[]; let cur=lblParentGroupOf(id), guard=0;
+  while(cur && guard++<50){ out.push(cur); cur=lblParentGroupOf(cur.id); }
+  return out;
+}
+function lblGroupLeafPartIds(groupId){
+  const g=lblFindGroup(groupId); if(!g) return [];
+  const out=[];
+  (g.children||[]).forEach(cid=>{
+    if(lblIsGroupId(cid)) out.push(...lblGroupLeafPartIds(cid));
+    else out.push(cid);
+  });
+  return out;
+}
+
+// ── G2: group-wide texture inheritance ───────────────────────────────
+// Runs BEFORE the real build so buildMaterial sees the inherited fields
+// like any other authored obj.textureImage. A part's OWN uploaded texture
+// always wins and is never overwritten; __inheritedTexFromGroup marks
+// fields that came from a group so they can be cleanly withdrawn again
+// if the group's texture is removed or the part leaves the group.
+function lblApplyGroupTextureInheritance(blueprint){
+  const groups = lblGroupsOf(blueprint);
+  if(!Array.isArray(blueprint.objects)) return;
+  const parentOf = id => groups.find(g=>Array.isArray(g.children)&&g.children.includes(id)) || null;
+  function nearestTexturedAncestor(id){
+    let cur = parentOf(id), guard=0;
+    while(cur && guard++<50){ if(cur.textureImage) return cur; cur = parentOf(cur.id); }
+    return null;
+  }
+  blueprint.objects.forEach(obj=>{
+    const hasOwnTexture = !!obj.textureImage && !obj.__inheritedTexFromGroup;
+    if(hasOwnTexture) return;
+    const anc = nearestTexturedAncestor(obj.id);
+    if(anc){
+      obj.textureImage = anc.textureImage;
+      obj.textureImageRepeat = anc.textureImageRepeat;
+      obj.textureImageOffset = anc.textureImageOffset;
+      obj.textureImageRotation = anc.textureImageRotation;
+      obj.__inheritedTexFromGroup = anc.id;
+      delete obj.texturePattern;
+    } else if(obj.__inheritedTexFromGroup){
+      delete obj.textureImage; delete obj.textureImageRepeat; delete obj.textureImageOffset;
+      delete obj.textureImageRotation; delete obj.__inheritedTexFromGroup;
+    }
+  });
+}
+
+// ── G3: runtime group Object3Ds ──────────────────────────────────────
+// Re-parents the flat meshes buildScene just created (all direct children
+// of sceneGroup) into a THREE.Group per blueprint group, then applies
+// that group's own stored position/rotation/scale on top. Object3D#attach
+// preserves world transform when reparenting, so this never moves
+// anything visually beyond what the group's own (initially identity)
+// transform specifies. Nested groups are built child-first.
+let lblGroupObj3D = new Map();
+function lblRebuildGroupObject3Ds(blueprint){
+  lblGroupObj3D.forEach(g=>{ if(g.parent) g.parent.remove(g); });
+  lblGroupObj3D = new Map();
+  const groups = lblGroupsOf(blueprint);
+  if(!groups.length) return;
+  sceneGroup.updateMatrixWorld(true);
+  const built = new Set(), visiting = new Set();
+  function build(g){
+    if(built.has(g.id)) return lblGroupObj3D.get(g.id);
+    if(visiting.has(g.id)){ console.warn('[groups] cyclic group nesting detected at', g.id, '— skipping'); return null; }
+    visiting.add(g.id);
+    const g3 = new THREE.Group();
+    g3.name = '__lblGroup_'+g.id;
+    g3.userData.__lblGroupId = g.id;
+    sceneGroup.add(g3);
+    (g.children||[]).forEach(cid=>{
+      let child3D = meshMap.get(cid);
+      if(!child3D){
+        const childGroupDef = groups.find(x=>x.id===cid);
+        if(childGroupDef) child3D = build(childGroupDef);
+      }
+      if(child3D) g3.attach(child3D);
+    });
+    const pos = Array.isArray(g.position)?g.position:[0,0,0];
+    const rot = Array.isArray(g.rotation)?g.rotation:[0,0,0];
+    const scl = Array.isArray(g.scale)?g.scale:[1,1,1];
+    g3.position.set(pos[0]||0,pos[1]||0,pos[2]||0);
+    g3.rotation.set(THREE.MathUtils.degToRad(rot[0]||0),THREE.MathUtils.degToRad(rot[1]||0),THREE.MathUtils.degToRad(rot[2]||0));
+    g3.scale.set(scl[0]||1,scl[1]||1,scl[2]||1);
+    visiting.delete(g.id);
+    built.add(g.id);
+    lblGroupObj3D.set(g.id, g3);
+    return g3;
+  }
+  groups.forEach(build);
+}
+
+// ── G4: face-texture materials ───────────────────────────────────────
+// Splits a mesh's geometry into BufferGeometry groups so different sets
+// of faces can carry different materials/textures, without touching the
+// base per-part textureImage system at all (face textures always layer
+// ON TOP of / independently from the whole-part texture).
+function lblApplyFaceTexturesToMesh(mesh, faceTexEntries){
+  const geo = mesh.geometry;
+  if(!geo || !geo.attributes || !geo.attributes.uv){
+    console.warn('[faceTextures] part "'+mesh.name+'" has no UVs — skipping its face texture(s)');
+    return;
+  }
+  const idx = geo.index;
+  const triCount = idx ? (idx.count/3)|0 : (geo.attributes.position.count/3)|0;
+  const faceMatIndex = new Array(triCount).fill(0);
+  const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const mats = [baseMat];
+  faceTexEntries.forEach((ft,i)=>{
+    const matIndex = i+1;
+    const tex = loadImageTexture(ft.textureImage, 'map', {
+      repeat: Array.isArray(ft.textureImageRepeat)?ft.textureImageRepeat:[1,1],
+      offset: Array.isArray(ft.textureImageOffset)?ft.textureImageOffset:[0,0],
+      rotationDeg: typeof ft.textureImageRotation==='number'?ft.textureImageRotation:0
+    });
+    const m = baseMat.clone();
+    m.map = tex; if(m.color && m.color.set) m.color.set(0xffffff);
+    m.needsUpdate = true;
+    mats.push(m);
+    (ft.faces||[]).forEach(f=>{ if(f>=0 && f<triCount) faceMatIndex[f]=matIndex; });
+  });
+  geo.clearGroups();
+  let runStart=0, runMat=faceMatIndex[0]||0;
+  for(let f=1; f<=triCount; f++){
+    const mi = f<triCount ? faceMatIndex[f] : null;
+    if(mi!==runMat){
+      geo.addGroup(runStart*3, (f-runStart)*3, runMat);
+      runStart=f; runMat=mi;
+    }
+  }
+  mesh.material = mats;
+}
+function lblApplyAllFaceTextures(){
+  sceneObjects.forEach(obj=>{
+    if(!Array.isArray(obj.faceTextures) || !obj.faceTextures.length) return;
+    const mesh = meshMap.get(obj.id);
+    if(!mesh || !mesh.isMesh || mesh.isInstancedMesh) return;
+    lblApplyFaceTexturesToMesh(mesh, obj.faceTextures);
+  });
+}
+
+// ── G5: wrap buildScene again (post-H1 wrapper) ──────────────────────
+const __lblOrigBuildSceneG = buildScene;
+buildScene = function(blueprint){
+  lblApplyGroupTextureInheritance(blueprint);
+  const result = __lblOrigBuildSceneG(blueprint);
+  return Promise.resolve(result).then(()=>{
+    lblRebuildGroupObject3Ds(blueprint);
+    lblApplyAllFaceTextures();
+    return result;
+  });
+};
+
+// ── G6: multi-select state ───────────────────────────────────────────
+// lblMultiSelectIds holds every EXTRA selected id beyond the primary
+// `selectedId` (which keeps working exactly as before for every existing
+// single-select code path — inspector, gizmo, texture panel).
+let lblMultiSelectIds = new Set();
+function lblSelectedIdsAll(){
+  const s = new Set(lblMultiSelectIds);
+  if(selectedId) s.add(selectedId);
+  return s;
+}
+function lblToggleSelect(id){
+  const all = lblSelectedIdsAll();
+  if(all.has(id)){
+    if(id===selectedId){
+      const remaining = Array.from(lblMultiSelectIds);
+      if(remaining.length){
+        const newPrimary = remaining[0], rest = remaining.slice(1);
+        selectObj(newPrimary); // clears lblMultiSelectIds internally — re-add the rest right after
+        rest.forEach(x=>lblMultiSelectIds.add(x));
+      } else {
+        selectObj(null);
+      }
+    } else {
+      lblMultiSelectIds.delete(id);
+    }
+  } else {
+    if(!selectedId) selectObj(id);
+    else lblMultiSelectIds.add(id);
+  }
+  lblRefreshMultiSelectHighlight();
+  lblUpdateGroupButtons();
+}
+function lblRefreshMultiSelectHighlight(){
+  document.querySelectorAll('.tree-item').forEach(row=>{
+    row.classList.toggle('lbl-multi', lblMultiSelectIds.has(row.dataset.id));
+  });
+  const groupMemberIds = (selectedId && lblIsGroupId(selectedId)) ? new Set(lblGroupLeafPartIds(selectedId)) : null;
+  meshMap.forEach((m,mid)=>{
+    if(mid===selectedId) return;
+    if(lblMultiSelectIds.has(mid)){
+      m.material.emissive = new THREE.Color(0x3d3670);
+      m.material.emissiveIntensity = 0.16;
+    } else if(groupMemberIds && groupMemberIds.has(mid)){
+      m.material.emissive = new THREE.Color(0x6c63ff);
+      m.material.emissiveIntensity = 0.22;
+    }
+  });
+}
+function lblUpdateGroupButtons(){
+  const groupBtn = document.getElementById('group-btn');
+  const ungroupBtn = document.getElementById('ungroup-btn');
+  const combineBtn = document.getElementById('combine-btn');
+  const allSel = Array.from(lblSelectedIdsAll());
+  // Group is now a pick-mode toggle — enabled whenever there's a scene to
+  // pick parts from (or already active, so it can always be turned back off).
+  if(groupBtn) groupBtn.disabled = !(lblGroupPickMode || sceneObjects.length>=2);
+  if(ungroupBtn) ungroupBtn.disabled = !(allSel.length===1 && lblIsGroupId(allSel[0]));
+  if(combineBtn) combineBtn.disabled = allSel.length < 2;
+}
+
+// ── G7: selectObj — group-aware wrapper ──────────────────────────────
+const __lblOrigSelectObjG = selectObj;
+selectObj = function(id){
+  lblMultiSelectIds.clear();
+  if(id && lblIsGroupId(id)){
+    selectedId = id;
+    updateTree();
+    lblRenderGroupInspector(id);
+    controls.autoRotate = false;
+    const memberIds = new Set(lblGroupLeafPartIds(id));
+    meshMap.forEach((m,mid)=>{
+      const on = memberIds.has(mid);
+      m.material.emissive = new THREE.Color(on?0x6c63ff:0x000000);
+      m.material.emissiveIntensity = on?0.22:0;
+    });
+    lblHighlightWholeModel(null);
+    lblOnSelectionChanged();
+    lblRefreshMultiSelectHighlight();
+    return;
+  }
+  __lblOrigSelectObjG(id);
+  lblRefreshMultiSelectHighlight();
+};
+
+// ── G8: lblCurrentMesh / lblAttachGizmo / lblCommitGizmoTransform ────
+// group-aware, and face-select-mode-aware for the gizmo.
+const __lblOrigCurrentMeshG = lblCurrentMesh;
+lblCurrentMesh = function(){
+  if(selectedId && lblIsGroupId(selectedId)) return lblGroupObj3D.get(selectedId) || null;
+  return __lblOrigCurrentMeshG();
+};
+const __lblOrigAttachGizmoG = lblAttachGizmo;
+lblAttachGizmo = function(){
+  if(lblFaceSelectMode){ transformControls.detach(); transformControls.enabled=false; transformControls.visible=false; return; }
+  __lblOrigAttachGizmoG();
+};
+const __lblOrigCommitGizmoTransformG = lblCommitGizmoTransform;
+lblCommitGizmoTransform = function(){
+  if(selectedId && lblIsGroupId(selectedId)){
+    const g = lblFindGroup(selectedId);
+    const g3 = lblGroupObj3D.get(selectedId);
+    if(g && g3){
+      g.position = [+g3.position.x.toFixed(4), +g3.position.y.toFixed(4), +g3.position.z.toFixed(4)];
+      g.rotation = [
+        +THREE.MathUtils.radToDeg(g3.rotation.x).toFixed(2),
+        +THREE.MathUtils.radToDeg(g3.rotation.y).toFixed(2),
+        +THREE.MathUtils.radToDeg(g3.rotation.z).toFixed(2)
+      ];
+      g.scale = [+g3.scale.x.toFixed(4), +g3.scale.y.toFixed(4), +g3.scale.z.toFixed(4)];
+      lblSnapshot();
+      lblRenderGroupInspector(selectedId);
+    }
+    return;
+  }
+  __lblOrigCommitGizmoTransformG();
+};
+
+// ── G9: lblOnSelectionChanged — group-aware wrapper ──────────────────
+const __lblOrigOnSelectionChangedG = lblOnSelectionChanged;
+lblOnSelectionChanged = function(){
+  const isGroupSel = !!(selectedId && lblIsGroupId(selectedId));
+  if(isGroupSel){
+    ['gizmo-translate-btn','gizmo-rotate-btn','gizmo-scale-btn'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.disabled=false;
+    });
+    const texBtn=document.getElementById('texture-btn'); if(texBtn) texBtn.disabled=true;
+    lblAttachGizmo();
+    lblRenderTexturePanels(); // clears the part-texture panel (no sceneObjects match for a group id)
+  } else {
+    __lblOrigOnSelectionChangedG();
+  }
+  lblRenderGroupPanel();
+  lblRenderFaceTexPanel();
+  lblUpdateGroupButtons();
+};
+
+function lblRenderGroupInspector(id){
+  const g = lblFindGroup(id);
+  const g3 = lblGroupObj3D.get(id);
+  const n = lblGroupLeafPartIds(id).length;
+  const s = g3 ? g3.scale : {x:1,y:1,z:1};
+  const html = `<div class="insp-section">
+      <div class="insp-row"><div class="insp-key">Selection</div><div class="insp-val ac">⛓ Group — ${(g&&g.name)||id}</div></div>
+      <div class="insp-row"><div class="insp-key">Parts</div><div class="insp-val">${n}</div></div>
+      <div class="insp-row"><div class="insp-key">Scale</div><div class="insp-val">${s.x.toFixed(3)} × ${s.y.toFixed(3)} × ${s.z.toFixed(3)}</div></div>
+      <div class="insp-row"><div class="insp-key">Note</div><div class="insp-val" style="font-size:11px;color:var(--muted)">Move/Rotate/Scale in the topbar transforms every part in this group together. Set a group-wide image texture below.</div></div>
+    </div>`;
+  ['inspector','mob-inspector'].forEach(elId=>{ const el=document.getElementById(elId); if(el) el.innerHTML=html; });
+}
+
+// ── G10: updateTree — group rows + multi-select wiring ───────────────
+const __lblOrigUpdateTreeG = updateTree;
+updateTree = function(){
+  __lblOrigUpdateTreeG();
+  lblRenderGroupTreeRows();
+  lblAddFaceTexBadges();
+  lblRefreshMultiSelectHighlight();
+  lblWireTreeMultiSelectCapture();
+};
+function lblRenderGroupTreeRows(){
+  const groups = lblGroups();
+  ['scene-tree-wrap','mob-scene-tree'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.querySelectorAll('.tree-item.lbl-group-row').forEach(r=>r.remove());
+    if(!groups.length) return;
+    const rowsHtml = groups.map(g=>{
+      const n = lblGroupLeafPartIds(g.id).length;
+      const texBadge = g.textureImage ? `<span class="tree-tex-badge" title="Has a group image texture">🖼</span>` : '';
+      return `<div class="tree-item lbl-group-row${g.id===selectedId?' selected':''}" data-id="${g.id}">
+        <div class="tree-dot" style="background:#6c63ff"></div>
+        <div class="tree-name">⛓ ${texBadge}${g.name||g.id}</div>
+        <div class="tree-type">group · ${n}</div>
+      </div>`;
+    }).join('');
+    el.insertAdjacentHTML('afterbegin', rowsHtml);
+    el.querySelectorAll('.tree-item.lbl-group-row').forEach(row=>{
+      row.addEventListener('click', (e)=>{
+        if(e.ctrlKey||e.metaKey||e.shiftKey) return; // capture-phase listener below handles modifier clicks
+        selectObj(row.dataset.id);
+      });
+    });
+  });
+}
+function lblAddFaceTexBadges(){
+  sceneObjects.forEach(o=>{
+    if(!Array.isArray(o.faceTextures) || !o.faceTextures.length) return;
+    document.querySelectorAll(`.tree-item[data-id="${o.id}"] .tree-name`).forEach(nameEl=>{
+      if(!nameEl.querySelector('.lbl-ftex-badge')){
+        const b=document.createElement('span'); b.className='lbl-ftex-badge'; b.title='Has face-level texture(s)'; b.textContent='⬡';
+        nameEl.prepend(b);
+      }
+    });
+  });
+}
+let lblTreeClickWired = new Set();
+function lblWireTreeMultiSelectCapture(){
+  ['scene-tree-wrap','mob-scene-tree'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el || lblTreeClickWired.has(id)) return;
+    lblTreeClickWired.add(id);
+    el.addEventListener('click', (e)=>{
+      const row = e.target.closest('.tree-item');
+      if(!row) return;
+      if(lblGroupPickMode){
+        e.stopImmediatePropagation();
+        const id = row.dataset.id;
+        if(lblGroupPickIds.has(id)) lblGroupPickIds.delete(id); else lblGroupPickIds.add(id);
+        lblRefreshGroupPickHighlight();
+        return;
+      }
+      if(e.ctrlKey || e.metaKey || e.shiftKey){
+        e.stopImmediatePropagation();
+        lblToggleSelect(row.dataset.id);
+      }
+    }, true);
+  });
+}
+
+// ── G11: Group / Ungroup actions ─────────────────────────────────────
+function lblDoGroup(ids){
+  if(!CURRENT_BLUEPRINT){ toast('No scene loaded','err'); return; }
+  if(ids.length < 2){ toast('Click at least 2 parts before grouping','err'); return; }
+  for(const id of ids){
+    const ancIds = lblAncestorGroups(id).map(g=>g.id);
+    if(ids.some(other=>other!==id && ancIds.includes(other))){
+      toast("Can't group — one selection is already nested inside another selected group",'err'); return;
+    }
+  }
+  const groups = lblGroups();
+  groups.forEach(g=>{ if(Array.isArray(g.children)) g.children = g.children.filter(c=>!ids.includes(c)); });
+  let n=1, newId='group_'+n;
+  const existingIds = new Set([...groups.map(g=>g.id), ...sceneObjects.map(o=>o.id)]);
+  while(existingIds.has(newId)){ n++; newId='group_'+n; }
+  groups.push({ id:newId, name:newId, children:ids, position:[0,0,0], rotation:[0,0,0], scale:[1,1,1] });
+  rebuildFromBlueprint().then(()=>{ selectObj(newId); toast(`Grouped ${ids.length} parts as "${newId}"`,'ok'); });
+}
+// Kept for the Ctrl+G shortcut — groups whatever's currently multi-selected
+// via Ctrl/Shift-click or a box-select, if anyone still uses that flow.
+function lblGroupSelected(){
+  lblDoGroup(Array.from(lblSelectedIdsAll()));
+}
+
+// ── G11.6: Group PICK MODE — click ⛓ Group, then plain-click each part
+// you want (no modifier key needed, toggles on/off per click), then click
+// ⛓ Group again to finalize. This is the primary way to build a group now;
+// Ctrl/Shift-click multi-select still works too and feeds into pick mode
+// if anything was already selected when you start picking.
+let lblGroupPickMode = false;
+let lblGroupPickIds = new Set();
+function lblEnterGroupPickMode(){
+  if(lblFaceSelectMode) document.getElementById('face-select-btn').click(); // modes are mutually exclusive
+  lblGroupPickMode = true;
+  lblGroupPickIds = new Set(lblSelectedIdsAll());
+  const btn = document.getElementById('group-btn');
+  if(btn){ btn.classList.add('active'); btn.textContent = `⛓ Group (${lblGroupPickIds.size})`; }
+  lblRefreshGroupPickHighlight();
+  toast('Click each part to add it, click again to remove — click ⛓ Group when ready','');
+}
+function lblExitGroupPickMode(){
+  lblGroupPickMode = false;
+  lblGroupPickIds = new Set();
+  const btn = document.getElementById('group-btn');
+  if(btn){ btn.classList.remove('active'); btn.textContent = '⛓ Group'; }
+  lblRefreshGroupPickHighlight();
+}
+function lblRefreshGroupPickHighlight(){
+  document.querySelectorAll('.tree-item').forEach(row=>{
+    row.classList.toggle('lbl-grouppick', lblGroupPickIds.has(row.dataset.id));
+  });
+  meshMap.forEach((m,mid)=>{
+    if(lblGroupPickIds.has(mid)){
+      m.material.emissive = new THREE.Color(0xffb020);
+      m.material.emissiveIntensity = 0.25;
+    } else if(mid!==selectedId && !lblMultiSelectIds.has(mid)){
+      m.material.emissive = new THREE.Color(0x000000);
+      m.material.emissiveIntensity = 0;
+    }
+  });
+  const btn = document.getElementById('group-btn');
+  if(btn && lblGroupPickMode) btn.textContent = `⛓ Group (${lblGroupPickIds.size})`;
+}
+document.getElementById('group-btn').addEventListener('click', ()=>{
+  if(lblGroupPickMode){
+    const ids = Array.from(lblGroupPickIds);
+    lblExitGroupPickMode();
+    lblDoGroup(ids);
+  } else {
+    lblEnterGroupPickMode();
+  }
+});
+document.getElementById('ungroup-btn').addEventListener('click', lblUngroupSelected);
+document.getElementById('combine-btn').addEventListener('click', lblCombineSelected);
+
+function lblUngroupSelected(){
+  const id = selectedId;
+  const g = lblFindGroup(id);
+  if(!g){ toast('Select a group to ungroup','err'); return; }
+  const parent = lblParentGroupOf(id);
+  (g.children||[]).forEach(cid=>{
+    if(lblIsGroupId(cid)){
+      if(parent) parent.children.push(cid);
+      return;
+    }
+    const obj = sceneObjects.find(o=>o.id===cid) || (CURRENT_BLUEPRINT.objects||[]).find(o=>o.id===cid);
+    const mesh = meshMap.get(cid);
+    if(obj && mesh){
+      sceneGroup.attach(mesh); // preserves world transform while dropping out of the group
+      obj.position = [+mesh.position.x.toFixed(4), +mesh.position.y.toFixed(4), +mesh.position.z.toFixed(4)];
+      obj.rotation = [
+        +THREE.MathUtils.radToDeg(mesh.rotation.x).toFixed(2),
+        +THREE.MathUtils.radToDeg(mesh.rotation.y).toFixed(2),
+        +THREE.MathUtils.radToDeg(mesh.rotation.z).toFixed(2)
+      ];
+      obj.scale = [+mesh.scale.x.toFixed(4), +mesh.scale.y.toFixed(4), +mesh.scale.z.toFixed(4)];
+      obj.placement = 'explicit';
+    }
+    if(parent) parent.children.push(cid);
+  });
+  const groups = lblGroups();
+  const idx = groups.findIndex(x=>x.id===id);
+  if(idx>=0) groups.splice(idx,1);
+  selectedId = null; lblMultiSelectIds.clear();
+  rebuildFromBlueprint().then(()=>{ updateTree(); updateInspector(null); toast(`Ungrouped "${id}"`,''); });
+}
+
+
+// ── G11.5: Combine — TRUE merge of the selected parts into ONE object.
+// Unlike ⛓ Group (a rig — parts stay separate underneath, just move
+// together), this bakes every selected part's world-space geometry into a
+// single new blueprint object of the renderer's existing "mesh" type
+// (raw vertices/faces — see buildGeometryRaw's 'mesh' case above), so the
+// result is a genuinely single mesh: one id, one entry in the tree, one
+// texture, edited with the exact same Inspector/Texture panel as any other
+// part — nothing extra to build for that, it's just a normal part now.
+function lblCombineSelected(){
+  if(!CURRENT_BLUEPRINT){ toast('No scene loaded','err'); return; }
+  const ids = Array.from(lblSelectedIdsAll());
+  const leafIds = [];
+  ids.forEach(id=>{
+    if(lblIsGroupId(id)) leafIds.push(...lblGroupLeafPartIds(id));
+    else leafIds.push(id);
+  });
+  const uniqueLeafIds = Array.from(new Set(leafIds)).filter(id=>meshMap.has(id));
+  if(uniqueLeafIds.length < 2){ toast('Ctrl/Shift-click (or box-select) at least 2 parts to combine','err'); return; }
+
+  sceneGroup.updateMatrixWorld(true);
+  const vertices = [];
+  const faces = [];
+  let vOffset = 0;
+  uniqueLeafIds.forEach(id=>{
+    const mesh = meshMap.get(id);
+    if(!mesh || !mesh.isMesh || mesh.isInstancedMesh) return;
+    mesh.updateMatrixWorld(true);
+    const geo = mesh.geometry;
+    const posAttr = geo.attributes.position;
+    const localVertCount = posAttr.count;
+    const v = new THREE.Vector3();
+    for(let i=0;i<localVertCount;i++){
+      v.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+      v.applyMatrix4(mesh.matrixWorld); // bake this part's current world position/rotation/scale straight into the vertex
+      vertices.push([+v.x.toFixed(5), +v.y.toFixed(5), +v.z.toFixed(5)]);
+    }
+    const idx = geo.index;
+    const triCount = idx ? (idx.count/3)|0 : (localVertCount/3)|0;
+    for(let f=0; f<triCount; f++){
+      const a = idx ? idx.getX(f*3)   : f*3;
+      const b = idx ? idx.getX(f*3+1) : f*3+1;
+      const c = idx ? idx.getX(f*3+2) : f*3+2;
+      faces.push([a+vOffset, b+vOffset, c+vOffset]);
+    }
+    vOffset += localVertCount;
+  });
+  if(!faces.length){ toast('Nothing mergeable in that selection','err'); return; }
+
+  let n=1, newId='combined_'+n;
+  const existingIds = new Set([...lblGroups().map(g=>g.id), ...sceneObjects.map(o=>o.id)]);
+  while(existingIds.has(newId)){ n++; newId='combined_'+n; }
+
+  // The originals are now fully baked into the new merged object — remove
+  // them (and drop them out of any group they belonged to; a group left
+  // with zero children afterward is pointless, so it's dropped too).
+  CURRENT_BLUEPRINT.objects = (CURRENT_BLUEPRINT.objects||[]).filter(o=>!uniqueLeafIds.includes(o.id));
+  lblGroups().forEach(g=>{ if(Array.isArray(g.children)) g.children = g.children.filter(c=>!uniqueLeafIds.includes(c)); });
+  CURRENT_BLUEPRINT.groups = lblGroups().filter(g=>(g.children||[]).length>0);
+
+  CURRENT_BLUEPRINT.objects.push({
+    id:newId, type:'mesh', name:newId,
+    vertices, faces,
+    position:[0,0,0], rotation:[0,0,0], scale:[1,1,1],
+    __combinedFrom: uniqueLeafIds
+  });
+  lblMultiSelectIds.clear();
+  rebuildFromBlueprint().then(()=>{ selectObj(newId); toast(`Combined ${uniqueLeafIds.length} parts into one object ("${newId}")`,'ok'); });
+}
+
+// ── G12: group texture panel ──────────────────────────────────────────
+function lblRenderGroupPanel(){
+  const g = (selectedId && lblIsGroupId(selectedId)) ? lblFindGroup(selectedId) : null;
+  ['lbl-group-panel','mob-lbl-group-panel'].forEach(panelId=>{
+    const panel = document.getElementById(panelId);
+    if(!panel) return;
+    if(!g){ panel.innerHTML=''; return; }
+    panel.innerHTML = lblGroupPanelHtml(g);
+    lblWireGroupPanel(panel, g);
+  });
+}
+function lblGroupPanelHtml(g){
+  const has = !!g.textureImage;
+  const rep = Array.isArray(g.textureImageRepeat)?g.textureImageRepeat:[1,1];
+  const off = Array.isArray(g.textureImageOffset)?g.textureImageOffset:[0,0];
+  const rot = typeof g.textureImageRotation==='number'?g.textureImageRotation:0;
+  const n = lblGroupLeafPartIds(g.id).length;
+  return `<div class="tex-panel" data-groupid="${g.id}">
+    <div class="plabel">⛓ Group — ${n} part${n===1?'':'s'}</div>
+    <div class="insp-row"><div class="insp-key">Name</div><div class="insp-val"><input type="text" id="grp-name-in" value="${(g.name||g.id).replace(/"/g,'&quot;')}" style="width:100%"/></div></div>
+    <div class="plabel" style="margin-top:8px">🖼 Group Image Texture <span style="font-weight:400;color:var(--muted);font-size:10px">(applies to every part here without its own image)</span></div>
+    <div class="tex-row">
+      <button class="tex-choose-btn" id="grp-tex-choose-btn">📁 Choose file…</button>
+      <span class="tex-filename">${has?(g.__textureFilenameLabel||'image'):'no image'}</span>
+      ${has?`<img class="tex-preview" src="${g.textureImage}" alt="texture preview"/>`:''}
+    </div>
+    ${has?`
+    <div class="tex-field-row"><label>Repeat</label>
+      <input type="number" step="0.1" id="grp-tex-rep-u" value="${rep[0]}"/> U
+      <input type="number" step="0.1" id="grp-tex-rep-v" value="${rep[1]}"/> V
+    </div>
+    <div class="tex-field-row"><label>Offset</label>
+      <input type="number" step="0.05" id="grp-tex-off-u" value="${off[0]}"/> U
+      <input type="number" step="0.05" id="grp-tex-off-v" value="${off[1]}"/> V
+    </div>
+    <div class="tex-field-row"><label>Rotation</label>
+      <input type="number" step="1" id="grp-tex-rot" value="${rot}"/> °
+    </div>
+    <button class="tex-remove-btn" id="grp-tex-remove-btn">🗑 Remove group texture</button>
+    `:''}
+    <input type="file" id="grp-tex-file-input" accept="image/*" style="display:none"/>
+  </div>`;
+}
+function lblWireGroupPanel(panel, g){
+  const nameIn = panel.querySelector('#grp-name-in');
+  if(nameIn) nameIn.addEventListener('change', ()=>{ g.name = nameIn.value || g.id; updateTree(); });
+  const chooseBtn = panel.querySelector('#grp-tex-choose-btn');
+  const fileInput = panel.querySelector('#grp-tex-file-input');
+  if(chooseBtn && fileInput){
+    chooseBtn.addEventListener('click', ()=>fileInput.click());
+    fileInput.addEventListener('change', (e)=>{
+      const f = e.target.files[0]; if(!f) return;
+      lblFileToDataUrl(f).then(dataUrl=>{
+        g.textureImage = dataUrl; g.__textureFilenameLabel = f.name;
+        rebuildFromBlueprint().then(()=>selectObj(g.id));
+      });
+    });
+  }
+  function commitAndReselect(){ rebuildFromBlueprint().then(()=>selectObj(g.id)); }
+  const repU=panel.querySelector('#grp-tex-rep-u'), repV=panel.querySelector('#grp-tex-rep-v');
+  const offU=panel.querySelector('#grp-tex-off-u'), offV=panel.querySelector('#grp-tex-off-v');
+  const rotIn=panel.querySelector('#grp-tex-rot');
+  if(repU) repU.addEventListener('change', ()=>{ g.textureImageRepeat=[Number(repU.value)||1, Number(repV?.value)||1]; commitAndReselect(); });
+  if(repV) repV.addEventListener('change', ()=>{ g.textureImageRepeat=[Number(repU?.value)||1, Number(repV.value)||1]; commitAndReselect(); });
+  if(offU) offU.addEventListener('change', ()=>{ g.textureImageOffset=[Number(offU.value)||0, Number(offV?.value)||0]; commitAndReselect(); });
+  if(offV) offV.addEventListener('change', ()=>{ g.textureImageOffset=[Number(offU?.value)||0, Number(offV.value)||0]; commitAndReselect(); });
+  if(rotIn) rotIn.addEventListener('change', ()=>{ g.textureImageRotation=Number(rotIn.value)||0; commitAndReselect(); });
+  const removeBtn = panel.querySelector('#grp-tex-remove-btn');
+  if(removeBtn) removeBtn.addEventListener('click', ()=>{
+    delete g.textureImage; delete g.textureImageRepeat; delete g.textureImageOffset; delete g.textureImageRotation; delete g.__textureFilenameLabel;
+    commitAndReselect();
+    toast('Group texture removed','');
+  });
+}
+
+// ── G13: multi-select in the viewport — Ctrl/Shift-click + box-drag ──
+canvas.addEventListener('pointerup', (e)=>{
+  if(!(e.ctrlKey||e.metaKey||e.shiftKey)) return;
+  if(lblFaceSelectMode || lblGroupPickMode) return;
+  if(!lblPointerDownPos) return;
+  const dx=e.clientX-lblPointerDownPos.x, dy=e.clientY-lblPointerDownPos.y;
+  if(Math.hypot(dx,dy) > 4) return; // was a drag, handled by G14's box-select below
+  const rect = canvas.getBoundingClientRect();
+  const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
+  lblRaycaster.setFromCamera(pointer, camera);
+  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  const hits = lblRaycaster.intersectObjects(raycastTargets, true);
+  for(const h of hits){
+    let n=h.object;
+    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent) n=n.parent;
+    if(!n || (n.userData && n.userData.__helper)) continue;
+    for(const [id,m] of meshMap.entries()){
+      if(m===n){ e.stopImmediatePropagation(); lblToggleSelect(id); return; }
+    }
+  }
+}, true);
+
+// ── G13.5: group PICK MODE clicks — plain click (no modifier) on a part
+// while ⛓ Group is armed toggles that part in/out of the pending group.
+canvas.addEventListener('pointerup', (e)=>{
+  if(!lblGroupPickMode) return;
+  if(!lblPointerDownPos) return;
+  const dx=e.clientX-lblPointerDownPos.x, dy=e.clientY-lblPointerDownPos.y;
+  if(Math.hypot(dx,dy) > 4) return; // was a drag/orbit, not a pick
+  const rect = canvas.getBoundingClientRect();
+  const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
+  lblRaycaster.setFromCamera(pointer, camera);
+  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  const hits = lblRaycaster.intersectObjects(raycastTargets, true);
+  for(const h of hits){
+    let n=h.object;
+    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent) n=n.parent;
+    if(!n || (n.userData && n.userData.__helper)) continue;
+    for(const [id,m] of meshMap.entries()){
+      if(m===n){
+        e.stopImmediatePropagation();
+        if(lblGroupPickIds.has(id)) lblGroupPickIds.delete(id); else lblGroupPickIds.add(id);
+        lblRefreshGroupPickHighlight();
+        return;
+      }
+    }
+  }
+}, true);
+
+// ── G14: box-drag (marquee) multi-select ─────────────────────────────
+let lblBoxSelectStart = null;
+let lblBoxSelectEl = null;
+canvas.addEventListener('pointerdown', (e)=>{
+  if(lblFaceSelectMode || transformControls.dragging) return;
+  // Box-select only arms when a modifier is held at mousedown — a PLAIN
+  // drag on empty canvas must always fall straight through to OrbitControls
+  // untouched, or the model can no longer be rotated/zoomed by dragging.
+  if(!(e.shiftKey || e.ctrlKey || e.metaKey)) return;
+  const rect = canvas.getBoundingClientRect();
+  const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
+  lblRaycaster.setFromCamera(pointer, camera);
+  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  const hits = lblRaycaster.intersectObjects(raycastTargets, true);
+  if(!hits.length){
+    lblBoxSelectStart = {x:e.clientX, y:e.clientY, additive: true};
+  }
+}, true);
+window.addEventListener('pointermove', (e)=>{
+  if(!lblBoxSelectStart) return;
+  const dx=e.clientX-lblBoxSelectStart.x, dy=e.clientY-lblBoxSelectStart.y;
+  if(!lblBoxSelectEl && Math.hypot(dx,dy)<6) return;
+  if(!lblBoxSelectEl){
+    lblBoxSelectEl = document.createElement('div');
+    lblBoxSelectEl.className = 'lbl-selrect';
+    document.body.appendChild(lblBoxSelectEl);
+    controls.enabled = false;
+  }
+  const x = Math.min(e.clientX, lblBoxSelectStart.x), y = Math.min(e.clientY, lblBoxSelectStart.y);
+  Object.assign(lblBoxSelectEl.style, {left:x+'px', top:y+'px', width:Math.abs(dx)+'px', height:Math.abs(dy)+'px'});
+});
+window.addEventListener('pointerup', (e)=>{
+  if(!lblBoxSelectStart) return;
+  if(lblBoxSelectEl){
+    const rectPx = lblBoxSelectEl.getBoundingClientRect();
+    lblBoxSelectEl.remove(); lblBoxSelectEl = null;
+    controls.enabled = true;
+    lblApplyBoxSelect(rectPx, lblBoxSelectStart.additive);
+  }
+  lblBoxSelectStart = null;
+}, true);
+function lblApplyBoxSelect(rectPx, additive){
+  const canvasRect = canvas.getBoundingClientRect();
+  const hitIds = [];
+  meshMap.forEach((mesh, id)=>{
+    const box = new THREE.Box3().setFromObject(mesh);
+    if(box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const proj = center.clone().project(camera);
+    if(proj.z>=1 || proj.z<=-1) return;
+    const sx = canvasRect.left + (proj.x*0.5+0.5)*canvasRect.width;
+    const sy = canvasRect.top + (-proj.y*0.5+0.5)*canvasRect.height;
+    if(sx>=rectPx.left && sx<=rectPx.right && sy>=rectPx.top && sy<=rectPx.bottom) hitIds.push(id);
+  });
+  if(!hitIds.length) return;
+  if(additive){
+    const prevAll = lblSelectedIdsAll();
+    hitIds.forEach(id=>{ if(!prevAll.has(id)){ if(!selectedId) selectObj(id); else lblMultiSelectIds.add(id); } });
+  } else {
+    const primary = hitIds[hitIds.length-1], rest = hitIds.slice(0,-1);
+    selectObj(primary);
+    rest.forEach(id=>lblMultiSelectIds.add(id));
+  }
+  updateTree(); lblRefreshMultiSelectHighlight(); lblUpdateGroupButtons();
+}
+
+// ── G15: face-select mode + per-face texturing ───────────────────────
+let lblFaceSelectMode = false;
+let lblPendingFaceSel = { objId:null, faces:new Set() };
+let lblFaceHighlightMesh = null;
+
+document.getElementById('face-select-btn').addEventListener('click', ()=>{
+  if(lblGroupPickMode) lblExitGroupPickMode(); // modes are mutually exclusive
+  lblFaceSelectMode = !lblFaceSelectMode;
+  document.getElementById('face-select-btn').classList.toggle('active', lblFaceSelectMode);
+  if(!lblFaceSelectMode){
+    lblPendingFaceSel = { objId:null, faces:new Set() };
+    lblClearFaceHighlight();
+    lblRenderFaceTexPanel();
+  }
+  toast(lblFaceSelectMode ? 'Face-select on — click faces on a part, Shift-click to add more' : 'Face-select off','');
+  lblAttachGizmo();
+});
+
+window.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && lblGroupPickMode) lblExitGroupPickMode();
+});
+
+canvas.addEventListener('pointerup', (e)=>{
+  if(!lblFaceSelectMode) return;
+  if(!lblPointerDownPos) return;
+  const dx=e.clientX-lblPointerDownPos.x, dy=e.clientY-lblPointerDownPos.y;
+  if(Math.hypot(dx,dy) > 4) return;
+  e.stopImmediatePropagation();
+  const rect = canvas.getBoundingClientRect();
+  const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
+  lblRaycaster.setFromCamera(pointer, camera);
+  const targets = Array.from(meshMap.values()).filter(m=>m.isMesh && !m.isInstancedMesh);
+  const hits = lblRaycaster.intersectObjects(targets, false);
+  if(!hits.length) return;
+  const hit = hits[0];
+  let hitId = null;
+  for(const [id,m] of meshMap.entries()) if(m===hit.object){ hitId=id; break; }
+  if(!hitId || hit.faceIndex==null) return;
+  if(lblPendingFaceSel.objId && lblPendingFaceSel.objId!==hitId){
+    lblPendingFaceSel = { objId:null, faces:new Set() };
+  }
+  lblPendingFaceSel.objId = hitId;
+  const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+  if(!additive) lblPendingFaceSel.faces.clear();
+  if(lblPendingFaceSel.faces.has(hit.faceIndex)) lblPendingFaceSel.faces.delete(hit.faceIndex);
+  else lblPendingFaceSel.faces.add(hit.faceIndex);
+  selectObj(hitId);
+  lblRefreshFaceHighlight();
+  lblRenderFaceTexPanel();
+}, true);
+
+function lblClearFaceHighlight(){
+  if(lblFaceHighlightMesh){
+    if(lblFaceHighlightMesh.parent) lblFaceHighlightMesh.parent.remove(lblFaceHighlightMesh);
+    lblFaceHighlightMesh.geometry.dispose();
+    lblFaceHighlightMesh.material.dispose();
+    lblFaceHighlightMesh=null;
+  }
+}
+function lblRefreshFaceHighlight(){
+  lblClearFaceHighlight();
+  const {objId, faces} = lblPendingFaceSel;
+  if(!objId || !faces.size) return;
+  const mesh = meshMap.get(objId); if(!mesh) return;
+  const geo = lblExtractFacesGeometry(mesh.geometry, Array.from(faces));
+  if(!geo) return;
+  const mat = new THREE.MeshBasicMaterial({color:0x6c63ff, transparent:true, opacity:0.45, depthTest:true, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4});
+  lblFaceHighlightMesh = new THREE.Mesh(geo, mat);
+  lblFaceHighlightMesh.renderOrder = 999;
+  mesh.add(lblFaceHighlightMesh);
+}
+function lblExtractFacesGeometry(srcGeo, faceIndices){
+  const pos = srcGeo.attributes.position;
+  const uv = srcGeo.attributes.uv;
+  const idx = srcGeo.index;
+  const triCount = idx ? (idx.count/3)|0 : (pos.count/3)|0;
+  const outPos = [], outUv = [];
+  faceIndices.forEach(f=>{
+    if(f<0 || f>=triCount) return;
+    for(let k=0;k<3;k++){
+      const vi = idx ? idx.getX(f*3+k) : f*3+k;
+      outPos.push(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
+      if(uv) outUv.push(uv.getX(vi), uv.getY(vi));
+    }
+  });
+  if(!outPos.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(outPos,3));
+  if(outUv.length) geo.setAttribute('uv', new THREE.Float32BufferAttribute(outUv,2));
+  return geo;
+}
+function lblApplyFaceTexture(file){
+  if(!CURRENT_BLUEPRINT) return;
+  const {objId, faces} = lblPendingFaceSel;
+  if(!objId || !faces.size){ toast('Select some faces first (turn on ⬡ Faces, click/Shift-click on the part)','err'); return; }
+  lblFileToDataUrl(file).then(dataUrl=>{
+    const obj = sceneObjects.find(o=>o.id===objId) || (CURRENT_BLUEPRINT.objects||[]).find(o=>o.id===objId);
+    if(!obj) return;
+    if(!Array.isArray(obj.faceTextures)) obj.faceTextures=[];
+    let n=1, ftId='ftex_'+n;
+    const existing = new Set(obj.faceTextures.map(f=>f.id));
+    while(existing.has(ftId)){ n++; ftId='ftex_'+n; }
+    obj.faceTextures.push({ id:ftId, faces:Array.from(faces), textureImage:dataUrl, textureImageRepeat:[1,1], textureImageOffset:[0,0], textureImageRotation:0, __filenameLabel:file.name });
+    lblPendingFaceSel = { objId:null, faces:new Set() };
+    lblClearFaceHighlight();
+    rebuildFromBlueprint().then(()=>selectObj(objId));
+  });
+}
+function lblRenderFaceTexPanel(){
+  const obj = (selectedId && !lblIsGroupId(selectedId)) ? lblCurrentObj() : null;
+  ['lbl-facetex-panel','mob-lbl-facetex-panel'].forEach(panelId=>{
+    const panel = document.getElementById(panelId);
+    if(!panel) return;
+    if(!obj || CURRENT_TS_MODEL){ panel.innerHTML=''; return; }
+    const pending = (lblPendingFaceSel.objId===obj.id) ? lblPendingFaceSel.faces.size : 0;
+    const list = Array.isArray(obj.faceTextures) ? obj.faceTextures : [];
+    panel.innerHTML = `<div class="tex-panel">
+      <div class="plabel">⬡ Face Textures</div>
+      <div class="tex-hint">${lblFaceSelectMode
+        ? (pending ? `${pending} face${pending===1?'':'s'} selected — choose an image to texture just them.` : 'Click a face on this part; Shift-click to add more.')
+        : 'Turn on ⬡ Faces in the topbar, then click individual faces on this part.'}</div>
+      ${pending ? `<div class="tex-row">
+        <button class="tex-choose-btn" id="ftex-choose-btn">📁 Choose image for selected faces…</button>
+        <input type="file" id="ftex-file-input" accept="image/*" style="display:none"/>
+      </div>` : ''}
+      ${list.map(ft=>`
+        <div class="tex-row" style="margin-top:6px">
+          <img class="tex-preview" src="${ft.textureImage}" alt="face texture"/>
+          <span class="tex-filename">${ft.__filenameLabel||'image'} (${(ft.faces||[]).length} face${(ft.faces||[]).length===1?'':'s'})</span>
+          <button class="tex-choose-btn ftex-scale-btn" data-ftid="${ft.id}" title="Edit scale">⚙ Scale</button>
+          <button class="tex-remove-btn ftex-remove-btn" data-ftid="${ft.id}">🗑</button>
+        </div>
+        <div class="ftex-scale-panel" data-ftid="${ft.id}" style="display:none">
+          <div class="tex-field-row"><label>Repeat</label>
+            <input type="number" step="0.1" class="ftex-rep-u" data-ftid="${ft.id}" value="${(ft.textureImageRepeat||[1,1])[0]}"/> U
+            <input type="number" step="0.1" class="ftex-rep-v" data-ftid="${ft.id}" value="${(ft.textureImageRepeat||[1,1])[1]}"/> V
+          </div>
+          <div class="tex-field-row"><label>Offset</label>
+            <input type="number" step="0.05" class="ftex-off-u" data-ftid="${ft.id}" value="${(ft.textureImageOffset||[0,0])[0]}"/> U
+            <input type="number" step="0.05" class="ftex-off-v" data-ftid="${ft.id}" value="${(ft.textureImageOffset||[0,0])[1]}"/> V
+          </div>
+          <div class="tex-field-row"><label>Rotation</label>
+            <input type="number" step="1" class="ftex-rot" data-ftid="${ft.id}" value="${ft.textureImageRotation||0}"/> °
+          </div>
+        </div>`).join('')}
+    </div>`;
+    const chooseBtn = panel.querySelector('#ftex-choose-btn');
+    const fileInput = panel.querySelector('#ftex-file-input');
+    if(chooseBtn && fileInput){
+      chooseBtn.addEventListener('click', ()=>fileInput.click());
+      fileInput.addEventListener('change', (e)=>{ if(e.target.files[0]) lblApplyFaceTexture(e.target.files[0]); });
+    }
+    panel.querySelectorAll('.ftex-scale-btn').forEach(btn=>btn.addEventListener('click', ()=>{
+      const p = panel.querySelector(`.ftex-scale-panel[data-ftid="${btn.dataset.ftid}"]`);
+      if(p) p.style.display = p.style.display==='none' ? '' : 'none';
+    }));
+    panel.querySelectorAll('.ftex-remove-btn').forEach(btn=>btn.addEventListener('click', ()=>{
+      const o = sceneObjects.find(x=>x.id===obj.id) || (CURRENT_BLUEPRINT.objects||[]).find(x=>x.id===obj.id);
+      if(o && Array.isArray(o.faceTextures)) o.faceTextures = o.faceTextures.filter(f=>f.id!==btn.dataset.ftid);
+      rebuildFromBlueprint().then(()=>selectObj(obj.id));
+    }));
+    function findFt(ftId){
+      const o = sceneObjects.find(x=>x.id===obj.id) || (CURRENT_BLUEPRINT.objects||[]).find(x=>x.id===obj.id);
+      return o && Array.isArray(o.faceTextures) && o.faceTextures.find(f=>f.id===ftId);
+    }
+    panel.querySelectorAll('.ftex-rep-u,.ftex-rep-v').forEach(input=>input.addEventListener('change', ()=>{
+      const ft = findFt(input.dataset.ftid); if(!ft) return;
+      const u=panel.querySelector(`.ftex-rep-u[data-ftid="${input.dataset.ftid}"]`), v=panel.querySelector(`.ftex-rep-v[data-ftid="${input.dataset.ftid}"]`);
+      ft.textureImageRepeat=[Number(u?.value)||1, Number(v?.value)||1];
+      rebuildFromBlueprint().then(()=>selectObj(obj.id));
+    }));
+    panel.querySelectorAll('.ftex-off-u,.ftex-off-v').forEach(input=>input.addEventListener('change', ()=>{
+      const ft = findFt(input.dataset.ftid); if(!ft) return;
+      const u=panel.querySelector(`.ftex-off-u[data-ftid="${input.dataset.ftid}"]`), v=panel.querySelector(`.ftex-off-v[data-ftid="${input.dataset.ftid}"]`);
+      ft.textureImageOffset=[Number(u?.value)||0, Number(v?.value)||0];
+      rebuildFromBlueprint().then(()=>selectObj(obj.id));
+    }));
+    panel.querySelectorAll('.ftex-rot').forEach(input=>input.addEventListener('change', ()=>{
+      const ft = findFt(input.dataset.ftid); if(!ft) return;
+      ft.textureImageRotation = Number(input.value)||0;
+      rebuildFromBlueprint().then(()=>selectObj(obj.id));
+    }));
+  });
+}
+
+// ── G16: keyboard shortcut — Ctrl+G group, Ctrl+Shift+G ungroup ─────
+window.addEventListener('keydown', (e)=>{
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT') return;
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='g'){
+    e.preventDefault();
+    if(e.shiftKey) lblUngroupSelected(); else lblGroupSelected();
+  }
+});
+
+// ── G17: interactive "drag to position, click to fix" image placement ─
+// Works on a whole part's texture (incl. a Combined object — it's just a
+// normal part), or a Group's shared texture. Drag on the canvas to pan the
+// image, scroll to scale it, Alt+drag to rotate — all live, no rebuild
+// per-frame (the already-applied THREE.Texture is mutated directly for
+// instant feedback) — then ✓ Fix commits the final numbers into the
+// blueprint and does one real rebuild.
+let lblTexPosMode = null; // {kind:'part'|'group', id, dragging, lastX, lastY}
+
+function lblGetTexTargetDef(kind, id){
+  if(kind==='group') return lblFindGroup(id);
+  return sceneObjects.find(o=>o.id===id) || (CURRENT_BLUEPRINT && (CURRENT_BLUEPRINT.objects||[]).find(o=>o.id===id));
+}
+function lblStartTexPositioning(kind, id){
+  const def = lblGetTexTargetDef(kind, id);
+  if(!def || !def.textureImage){ toast('Add an image first','err'); return; }
+  if(!Array.isArray(def.textureImageRepeat)) def.textureImageRepeat=[1,1];
+  if(!Array.isArray(def.textureImageOffset)) def.textureImageOffset=[0,0];
+  if(typeof def.textureImageRotation!=='number') def.textureImageRotation=0;
+  lblTexPosMode = { kind, id, dragging:false, lastX:0, lastY:0 };
+  controls.enabled = false;
+  transformControls.enabled = false; transformControls.visible = false;
+  toast('Drag to move the image · scroll to scale · Alt+drag to rotate — click ✓ Fix when it looks right','');
+  lblRenderTexPosBanner();
+}
+function lblFixTexPositioning(){
+  if(!lblTexPosMode) return;
+  const {kind,id} = lblTexPosMode;
+  lblTexPosMode = null;
+  controls.enabled = true;
+  lblRemoveTexPosBanner();
+  rebuildFromBlueprint().then(()=>{ selectObj(id); });
+}
+function lblRenderTexPosBanner(){
+  lblRemoveTexPosBanner();
+  const el = document.createElement('div');
+  el.id = 'lbl-texpos-banner';
+  el.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:9999;'
+    +'background:var(--surface,#1b1e2b);border:1px solid var(--border,#333);border-radius:8px;'
+    +'padding:8px 12px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 18px rgba(0,0,0,.35);'
+    +'font-family:"Space Grotesk",sans-serif;font-size:12px;color:var(--text2,#ddd);';
+  el.innerHTML = `<span>🎯 Positioning image — drag to move · scroll to scale · Alt+drag to rotate</span>
+    <button id="texpos-fix-btn" style="height:26px;padding:0 10px;border-radius:6px;border:1px solid var(--border,#333);background:#6c63ff;color:#fff;cursor:pointer;font-size:11px;">✓ Fix</button>`;
+  document.body.appendChild(el);
+  document.getElementById('texpos-fix-btn').addEventListener('click', lblFixTexPositioning);
+}
+function lblRemoveTexPosBanner(){ const el=document.getElementById('lbl-texpos-banner'); if(el) el.remove(); }
+
+function lblLiveUpdateTexPos(){
+  const {kind, id} = lblTexPosMode;
+  const def = lblGetTexTargetDef(kind, id);
+  if(!def) return;
+  const affectedIds = kind==='group' ? lblGroupLeafPartIds(id) : [id];
+  affectedIds.forEach(pid=>{
+    const mesh = meshMap.get(pid);
+    if(!mesh) return;
+    const mats = Array.isArray(mesh.material)?mesh.material:[mesh.material];
+    mats.forEach(mat=>{
+      if(mat && mat.map){
+        mat.map.offset.set(def.textureImageOffset[0]||0, def.textureImageOffset[1]||0);
+        mat.map.repeat.set(def.textureImageRepeat[0]||1, def.textureImageRepeat[1]||1);
+        mat.map.rotation = THREE.MathUtils.degToRad(def.textureImageRotation||0);
+        mat.map.center.set(0.5,0.5);
+        mat.map.needsUpdate = true;
+      }
+    });
+  });
+}
+canvas.addEventListener('pointerdown', (e)=>{
+  if(!lblTexPosMode) return;
+  lblTexPosMode.dragging = true;
+  lblTexPosMode.lastX = e.clientX; lblTexPosMode.lastY = e.clientY;
+}, true);
+window.addEventListener('pointermove', (e)=>{
+  if(!lblTexPosMode || !lblTexPosMode.dragging) return;
+  const dx = e.clientX - lblTexPosMode.lastX, dy = e.clientY - lblTexPosMode.lastY;
+  lblTexPosMode.lastX = e.clientX; lblTexPosMode.lastY = e.clientY;
+  const def = lblGetTexTargetDef(lblTexPosMode.kind, lblTexPosMode.id);
+  if(!def) return;
+  const rect = canvas.getBoundingClientRect();
+  if(e.altKey){
+    def.textureImageRotation = (def.textureImageRotation||0) + dx*0.5;
+  } else {
+    const du = dx/rect.width, dv = -dy/rect.height;
+    def.textureImageOffset = [ (def.textureImageOffset[0]||0) + du, (def.textureImageOffset[1]||0) + dv ];
+  }
+  lblLiveUpdateTexPos();
+}, true);
+window.addEventListener('pointerup', ()=>{ if(lblTexPosMode) lblTexPosMode.dragging=false; }, true);
+canvas.addEventListener('wheel', (e)=>{
+  if(!lblTexPosMode) return;
+  e.preventDefault();
+  const def = lblGetTexTargetDef(lblTexPosMode.kind, lblTexPosMode.id);
+  if(!def) return;
+  const factor = e.deltaY>0 ? 1.06 : 0.94;
+  const rep = Array.isArray(def.textureImageRepeat)?def.textureImageRepeat:[1,1];
+  def.textureImageRepeat = [rep[0]*factor, rep[1]*factor];
+  lblLiveUpdateTexPos();
+}, {passive:false});
+
+// Injects a "🎯 Position Image on Model" button into the EXISTING (not
+// mine — this app already had one) per-part texture panel, and into the
+// Group texture panel above, whenever that selection currently has an
+// image. Pure DOM augmentation — doesn't touch how either panel builds
+// its own HTML.
+function lblAugmentTexturePanelsWithPositionButton(){
+  if(selectedId && !lblIsGroupId(selectedId)){
+    const obj = lblCurrentObj();
+    ['lbl-texture-panel','mob-lbl-texture-panel'].forEach(panelId=>{
+      const panel = document.getElementById(panelId);
+      const inner = panel && panel.querySelector('.tex-panel');
+      if(!inner || !obj || !obj.textureImage) return;
+      if(inner.querySelector('.texpos-btn')) return;
+      const btn = document.createElement('button');
+      btn.className = 'tex-choose-btn texpos-btn';
+      btn.textContent = '🎯 Position Image on Model';
+      btn.style.marginTop = '4px';
+      btn.addEventListener('click', ()=>lblStartTexPositioning('part', obj.id));
+      inner.appendChild(btn);
+    });
+  }
+  if(selectedId && lblIsGroupId(selectedId)){
+    const g = lblFindGroup(selectedId);
+    ['lbl-group-panel','mob-lbl-group-panel'].forEach(panelId=>{
+      const panel = document.getElementById(panelId);
+      const inner = panel && panel.querySelector('.tex-panel');
+      if(!inner || !g || !g.textureImage) return;
+      if(inner.querySelector('.texpos-btn')) return;
+      const btn = document.createElement('button');
+      btn.className = 'tex-choose-btn texpos-btn';
+      btn.textContent = '🎯 Position Image on Model';
+      btn.style.marginTop = '4px';
+      btn.addEventListener('click', ()=>lblStartTexPositioning('group', g.id));
+      inner.appendChild(btn);
+    });
+  }
+}
+const __lblOrigOnSelectionChangedG2 = lblOnSelectionChanged;
+lblOnSelectionChanged = function(){
+  __lblOrigOnSelectionChangedG2();
+  lblAugmentTexturePanelsWithPositionButton();
+};
+
+// Re-render once now in case a scene is already loaded (e.g. this script
+// section runs after a recipe/demo auto-loaded on startup).
+lblUpdateGroupButtons();
 
 // Initial UI sync (nothing selected at startup).
 lblOnSelectionChanged();
