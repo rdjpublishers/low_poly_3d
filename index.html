@@ -12515,35 +12515,91 @@ canvas.addEventListener('click',e=>{
 // shows "Model N / total · filename".
 const LBL_MODEL_STORE_MAX = 200;
 const LBL_MODEL_STORE_EXTS = ['js','jsx','json','ts','tsx'];
-// Try the public-hosting path first (most static sites serve public/ at /).
-// If the user is running the page over file:// or with a custom layout, we
-// fall back to a relative path automatically. A failed fetch on the first
-// path is fine — lblModelStoreFindExisting tries both.
-const LBL_MODEL_STORE_BASES = ['public/models/', 'models/', './public/models/', './models/'];
+// LBL UPDATE F6.1 — base-path coverage for the common GitHub / GitHub
+// Pages / static-host layouts. Each entry is tried in order; the FIRST
+// 200 response wins. We probe both the relative and the absolute
+// variants so the same loader works whether the user has:
+//   • `public/models/Model_1.json` in their repo served as-is by plain
+//     GitHub Pages (file lives at <site>/<repo>/public/models/...)
+//   • `public/models/...` served at `/models/...` by a static-site
+//     generator that auto-maps public/ to root
+//   • `models/...` at the repo root (some users will rename the folder)
+//   • Any custom base path they want (relative, absolute, with ./).
+const LBL_MODEL_STORE_BASES = [
+  // ── relative (resolves against the page URL — works on GitHub Pages
+  //    "as-is" deployment where public/ is just a folder) ──
+  'public/models/',
+  'models/',
+  './public/models/',
+  './models/',
+];
+// Computed at runtime: append the page's directory so absolute paths
+// resolve correctly under custom-domain + subpath hosting
+// (https://rdjpublishers.com/low_poly_3d/index.html → base is /low_poly_3d/).
+let LBL_MODEL_STORE_BASES_RUNTIME = null;
+function lblModelStoreComputeBases(){
+  if(LBL_MODEL_STORE_BASES_RUNTIME) return LBL_MODEL_STORE_BASES_RUNTIME;
+  const bases = LBL_MODEL_STORE_BASES.slice();
+  // Add a few absolute variants derived from the current page URL.
+  // window.location.pathname is the path portion of the page URL
+  // (e.g. "/low_poly_3d/index.html" on GitHub Pages subpath hosting).
+  let dir = '';
+  try{
+    const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '/';
+    dir = p.replace(/[^/]*$/, ''); // strip filename
+    if(!dir.endsWith('/')) dir += '/';
+  }catch(_){ dir = '/'; }
+  // Absolute variants (rooted at the current page's directory):
+  if(dir){
+    bases.push(dir + 'public/models/');
+    bases.push(dir + 'models/');
+  }
+  // Pure-root absolute (for sites where the page IS at root and public/
+  // is mapped to /):
+  bases.push('/models/');
+  // Dedupe
+  LBL_MODEL_STORE_BASES_RUNTIME = [...new Set(bases)];
+  return LBL_MODEL_STORE_BASES_RUNTIME;
+}
+
 let lblModelStoreIndex = 1; // currently loaded model number
 let lblModelStoreCount = 0; // total count discovered
 let lblModelStoreLoadedFilename = ''; // for the chip
 
 function lblModelStoreUrl(n, ext){
-  // Return the primary path (the first base) — actual probing happens
-  // in lblModelStoreFindExisting, which iterates bases × exts.
-  return LBL_MODEL_STORE_BASES[0] + 'Model_' + n + '.' + ext;
+  return lblModelStoreComputeBases()[0] + 'Model_' + n + '.' + ext;
+}
+
+async function lblModelStoreProbe(url){
+  // Some hosts (and the GitHub raw content endpoint) reject HEAD but
+  // happily serve GET. Try HEAD first (cheaper, no body), fall back to
+  // a ranged GET. Both must return 2xx for the URL to count.
+  try{
+    const head = await fetch(url, {method:'HEAD', cache:'no-store'});
+    if(head.ok) return true;
+  }catch(_){ /* fall through */ }
+  try{
+    const r = await fetch(url, {method:'GET', cache:'no-store', headers:{Range:'bytes=0-0'}});
+    if(r.ok || r.status === 206) return true;
+  }catch(_){ /* try next */ }
+  return false;
 }
 
 async function lblModelStoreFindExisting(n){
-  // Try each base × ext combination. First 200 response wins. This
-  // covers the three common hosting layouts:
-  //   • Vite/CRA/Next-style "public/models/" served at "/models/"
-  //   • Plain "models/" at the same level as index.html
-  //   • "./models/" or "./public/models/" relative (file://, custom server)
-  for(const base of LBL_MODEL_STORE_BASES){
+  // Try every (base, ext) combination. First 200 wins. Log every probe
+  // to the console so you can see what the loader is actually trying
+  // when debugging a "demo not loading" problem on a fresh deploy.
+  const bases = lblModelStoreComputeBases();
+  const tried = [];
+  for(const base of bases){
     for(const ext of LBL_MODEL_STORE_EXTS){
       const url = base + 'Model_' + n + '.' + ext;
-      try{
-        const r = await fetch(url, {method:'HEAD', cache:'no-store'});
-        if(r.ok) return {n, ext, url};
-      }catch(_){ /* network or CORS — try next */ }
+      tried.push(url);
+      if(await lblModelStoreProbe(url)) return {n, ext, url, tried};
     }
+  }
+  if(typeof console !== 'undefined'){
+    console.warn('[model-store] No model found. Tried', tried.length, 'URLs:', tried);
   }
   return null;
 }
@@ -12565,7 +12621,8 @@ async function lblModelStoreLoadByNumber(n){
   // the matching parser (JSON / JS / TS / TSX / JSX).
   const found = await lblModelStoreFindExisting(n);
   if(!found){
-    toast(`Model_${n} not found in ${LBL_MODEL_STORE_BASE} (tried ${LBL_MODEL_STORE_EXTS.join(', ')})`, 'err');
+    const sample = (found && found.tried || []).slice(0, 3).join(', ');
+    toast(`Model_${n} not found — make sure your model file is in the repo (e.g. public/models/Model_${n}.json) and was pushed. Tried: ${sample}…`, 'err');
     return false;
   }
   let text;
@@ -12578,6 +12635,9 @@ async function lblModelStoreLoadByNumber(n){
   }
   lblModelStoreIndex = n;
   lblModelStoreLoadedFilename = 'Model_' + n + '.' + found.ext;
+  if(typeof console !== 'undefined'){
+    console.log(`[model-store] Loaded ${lblModelStoreLoadedFilename} from ${found.url}`);
+  }
   // Dispatch to the same parser the file-input / paste flow uses so all
   // downstream behaviour (validation, build, undo snapshot, animations,
   // mesh registration) stays identical.
@@ -12619,10 +12679,10 @@ function lblModelStoreHideNav(){
 async function lblOpenModelStore(){
   // Called by the Demo button. First click: scan + load Model_1.
   if(!lblModelStoreCount){
-    toast('Scanning ' + LBL_MODEL_STORE_BASE + ' for Model_1…', '');
+    toast('Scanning for Model_1…', '');
     lblModelStoreCount = await lblModelStoreCountModels();
     if(!lblModelStoreCount){
-      toast('No Model_1 found in ' + LBL_MODEL_STORE_BASE + ' (tried ' + LBL_MODEL_STORE_EXTS.join(', ') + ')', 'err');
+      toast(`No Model_1 found. Place Model_1.json (or .js/.jsx/.ts/.tsx) under public/models/ in your repo and push.`, 'err');
       lblModelStoreHideNav();
       return;
     }
