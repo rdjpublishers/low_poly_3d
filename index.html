@@ -114,6 +114,30 @@ body.theme-light .demo-nav-btn:hover{
 body.theme-light #demo-label{
   background:rgba(255,255,255,.75);border-color:rgba(0,0,0,.15);color:#1a1d24;
 }
+/* Demo action buttons (Download Model Code / Download GLB File) */
+#demo-actions{
+  position:absolute;top:46px;left:50%;transform:translateX(-50%);
+  display:none;gap:7px;z-index:16;
+}
+#demo-actions.show{display:flex;}
+.demo-action-btn{
+  font-family:'Space Mono',monospace;font-size:10px;
+  background:rgba(18,21,28,.6);border:1px solid rgba(255,255,255,.18);
+  color:#fff;padding:6px 12px;border-radius:20px;cursor:pointer;
+  backdrop-filter:blur(6px);white-space:nowrap;letter-spacing:.3px;
+  display:flex;align-items:center;gap:5px;
+  transition:background .15s,border-color .15s,transform .15s,opacity .15s;
+}
+.demo-action-btn:hover{background:rgba(108,99,255,.28);border-color:var(--accent);}
+.demo-action-btn:active{transform:scale(.96);}
+.demo-action-btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none;}
+.demo-action-btn[disabled]:hover{background:rgba(18,21,28,.6);border-color:rgba(255,255,255,.18);}
+body.theme-light .demo-action-btn{
+  background:rgba(255,255,255,.75);border-color:rgba(0,0,0,.15);color:#1a1d24;
+}
+body.theme-light .demo-action-btn:hover{
+  background:rgba(108,99,255,.18);border-color:var(--accent);color:#0a0c10;
+}
 /* HUD chips in light mode */
 body.theme-light .hud-chip{
   background:rgba(255,255,255,.75);border-color:rgba(0,0,0,.15);color:#444c5e;
@@ -309,6 +333,8 @@ body{
 @media(max-width:640px){
   .demo-nav-btn{width:38px;height:38px;font-size:19px;}
   #demo-label{font-size:9px;padding:5px 11px;}
+  #demo-actions{top:42px;gap:5px;}
+  .demo-action-btn{font-size:9px;padding:5px 9px;}
 }
 
 /* Welcome */
@@ -1527,6 +1553,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
       </div>
     </div>
     <div id="demo-label"></div>
+    <div id="demo-actions">
+      <button class="demo-action-btn" id="demo-dl-code"  title="Download the original source file of the loaded model" disabled>↓ Download Model Code</button>
+      <button class="demo-action-btn" id="demo-dl-glb"   title="Export the current scene as a .glb file">↓ Download GLB File</button>
+    </div>
     <button class="demo-nav-btn left" id="demo-prev" aria-label="Previous model" title="Previous model">‹</button>
     <button class="demo-nav-btn right" id="demo-next" aria-label="Next model" title="Next model">›</button>
   </div>
@@ -12963,6 +12993,10 @@ async function lblModelStoreLoadByNumber(n){
   }
   lblModelStoreIndex = n;
   lblModelStoreLoadedFilename = 'Model_' + n + '.' + found.ext;
+  // LBL UPDATE F8 — remember the just-fetched source so the
+  // "Download Model Code" button can serve the exact file the user
+  // is currently previewing, without re-hitting the network.
+  lblSetDemoSource(text, lblModelStoreLoadedFilename, found.ext);
   if(typeof console !== 'undefined'){
     console.log(`[model-store] Loaded ${lblModelStoreLoadedFilename} from ${found.url} (${text.length} bytes)`);
   }
@@ -12989,30 +13023,101 @@ async function lblModelStoreLoadByNumber(n){
   return true;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// DEMO DOWNLOAD BUTTONS — LBL UPDATE F8
+// ═══════════════════════════════════════════════════════════════════
+// Two buttons that sit just below the demo chip in the viewport:
+//   • "Download Model Code" — serves the EXACT source file the loader
+//     just fetched (Model_1.ts, Model_2.ts, etc.), straight from
+//     memory. No extra HTTP round-trip, no manifest dependency, no
+//     surprise. The button is disabled until a demo model has been
+//     successfully loaded (so a hand-built scene can't accidentally
+//     download a stale file from a previous load).
+//   • "Download GLB File" — wraps the existing exportGLB() pipeline,
+//     which already exports whatever's in the live scene (works for
+//     both demo-loaded models AND hand-built scenes).
+//
+// The same show/hide lifecycle as #demo-label / prev / next: visible
+// only while the demo model store is in a "loaded" state, hidden
+// alongside the rest of the nav when the store is empty.
+const lblLastDemoSource = { text: '', filename: '', ext: '' };
+
+function lblSetDemoSource(text, filename, ext){
+  lblLastDemoSource.text     = text     || '';
+  lblLastDemoSource.filename = filename || '';
+  lblLastDemoSource.ext      = ext      || '';
+  const btn = document.getElementById('demo-dl-code');
+  if(btn) btn.disabled = !text;
+}
+
+function lblDownloadDemoSource(){
+  if(!lblLastDemoSource.text){
+    toast('No demo model source available — load a model first', 'err');
+    return;
+  }
+  const mime = ({
+    json: 'application/json',
+    ts:   'text/x-typescript',
+    tsx:  'text/x-tsx',
+    js:   'text/javascript',
+    jsx:  'text/jsx',
+  })[lblLastDemoSource.ext] || 'text/plain';
+  const blob = new Blob([lblLastDemoSource.text], { type: mime + ';charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = lblLastDemoSource.filename || 'model.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast(`Downloading ${lblLastDemoSource.filename}`, 'ok');
+}
+
+function lblDownloadDemoGlb(){
+  // exportGLB() already handles every scene state (TS-loaded model,
+  // blueprint-built scene, empty scene with a friendly toast) and
+  // disposes cloned geometries after parse. Just delegate.
+  if(typeof exportGLB === 'function'){
+    exportGLB();
+  } else {
+    toast('GLB export is not available in this build', 'err');
+  }
+}
+
 function lblUpdateModelStoreNav(){
-  const prev = document.getElementById('demo-prev');
-  const next = document.getElementById('demo-next');
-  const lbl  = document.getElementById('demo-label');
+  const prev    = document.getElementById('demo-prev');
+  const next    = document.getElementById('demo-next');
+  const lbl     = document.getElementById('demo-label');
+  const actions = document.getElementById('demo-actions');
   if(!prev || !next || !lbl) return;
   if(lblModelStoreCount > 0){
     prev.classList.add('show');
     next.classList.add('show');
     lbl.classList.add('show');
+    if(actions) actions.classList.add('show');
     lbl.textContent = `Model ${lblModelStoreIndex} / ${lblModelStoreCount} · ${lblModelStoreLoadedFilename}`;
   } else {
     prev.classList.remove('show');
     next.classList.remove('show');
     lbl.classList.remove('show');
+    if(actions) actions.classList.remove('show');
   }
 }
 
 function lblModelStoreHideNav(){
-  const prev = document.getElementById('demo-prev');
-  const next = document.getElementById('demo-next');
-  const lbl  = document.getElementById('demo-label');
+  const prev    = document.getElementById('demo-prev');
+  const next    = document.getElementById('demo-next');
+  const lbl     = document.getElementById('demo-label');
+  const actions = document.getElementById('demo-actions');
   if(prev) prev.classList.remove('show');
   if(next) next.classList.remove('show');
   if(lbl)  lbl.classList.remove('show');
+  if(actions) actions.classList.remove('show');
+  // LBL UPDATE F8 — clear the cached source so the disabled state
+  // reflects reality and a stale "Download Model Code" can't fire
+  // after the demo nav has been hidden.
+  lblSetDemoSource('', '', '');
 }
 
 async function lblOpenModelStore(){
@@ -13797,6 +13902,9 @@ document.getElementById('mob-dz-input').addEventListener('change',e=>{ if(e.targ
 document.getElementById('demo-btn').addEventListener('click',()=>lblOpenModelStore());
 document.getElementById('demo-prev').addEventListener('click',()=>lblModelStorePrev());
 document.getElementById('demo-next').addEventListener('click',()=>lblModelStoreNext());
+// LBL UPDATE F8 — demo download buttons
+document.getElementById('demo-dl-code').addEventListener('click', lblDownloadDemoSource);
+document.getElementById('demo-dl-glb') .addEventListener('click', lblDownloadDemoGlb);
 
 // LBL UPDATE F6.3 — pre-warm the model store scan in the background
 // right after the first paint, so the very first click of the Demo
