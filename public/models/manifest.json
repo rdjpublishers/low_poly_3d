@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "models": [
+    { "id": "Model_1", "file": "Model_1.ts" },
+    { "id": "Model_2", "file": "Model_2.ts" }
+  ]
+}
