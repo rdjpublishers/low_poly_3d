@@ -55,7 +55,6 @@ export interface SpiderSentryRuntime {
     torsoBall: THREE.Group;
     visorEye: THREE.Mesh;
     visorGlowLight: THREE.PointLight;
-    exhaustPipes: THREE.Group;
     gunMount: THREE.Group;
     gunPitchPivot: THREE.Group;
     gunReceiver: THREE.Group;
@@ -80,7 +79,6 @@ export interface SpiderSentryRuntime {
     darkSteel: THREE.MeshStandardMaterial;
     polishedSteel: THREE.MeshStandardMaterial;
     opticGlow: THREE.MeshStandardMaterial;
-    exhaustDark: THREE.MeshStandardMaterial;
   };
   animations: {
     clips: THREE.AnimationClip[];
@@ -312,13 +310,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
     roughness: 0.1,
     metalness: 0.1,
     name: 'Material_OpticSensorGlow',
-  });
-
-  const exhaustDark = new THREE.MeshStandardMaterial({
-    color: new THREE.Color('#141416'),
-    roughness: 0.7,
-    metalness: 0.6,
-    name: 'Material_ExhaustPipes',
   });
 
   const visorLens = new THREE.MeshStandardMaterial({
@@ -669,37 +660,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   sideCapLeft.position.set(-0.61, 0.02, 0);
   torsoBall.add(sideCapLeft);
 
-  const exhaustPipes = new THREE.Group();
-  exhaustPipes.name = 'Node_ExhaustPipes';
-  exhaustPipes.position.set(0.28, 0.15, -0.38);
-  torsoBall.add(exhaustPipes);
-
-  for (let p = 0; p < 4; p++) {
-    const pipe = new THREE.Group();
-    const pipeAngle = -0.35 + p * 0.18;
-    const pipeLength = 0.42 + p * 0.04;
-    pipe.position.set((p - 1.5) * 0.11, p * 0.04, -(p * 0.06));
-    pipe.rotation.x = -0.75;
-    pipe.rotation.y = pipeAngle;
-
-    const pipeMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.042, 0.048, pipeLength, 12, 1, true),
-      exhaustDark
-    );
-    pipeMesh.position.y = pipeLength * 0.5;
-    pipe.add(pipeMesh);
-
-    const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(0.045, 0.012, 8, 16),
-      darkSteel
-    );
-    rim.rotation.x = Math.PI / 2;
-    rim.position.y = pipeLength;
-    pipe.add(rim);
-
-    exhaustPipes.add(pipe);
-  }
-
   // D. GATLING CANNON TURRET
   const gunMount = new THREE.Group();
   gunMount.name = 'Node_GunMount';
@@ -860,10 +820,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
 
   helperApplyShadow(root);
 
-  // =========================================================================
-  // F. TRUE FORWARD-PROPULSION KINEMATIC ANIMATIONS (Quadruped Wave Gait)
-  // Legs reach forward along local Z, plant & push rearward along local -Z.
-  // =========================================================================
+  // F. BAKED ANIMATIONS
   const mixer = new THREE.AnimationMixer(root);
   const actions = new Map<string, THREE.AnimationAction>();
 
@@ -894,9 +851,8 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   const idleClip = new THREE.AnimationClip('idle', 3.0, idleTracks);
   actions.set('idle', mixer.clipAction(idleClip));
 
-  // 2. Realistic Walking Propulsion (Grounded Push & Extended Forward Swing)
+  // 2. Realistic Forward Propulsion Walk
   const walkTracks: THREE.KeyframeTrack[] = [
-    // Chassis heave, forward pitch dip, and roll sway
     new THREE.VectorKeyframeTrack('Node_BaseChassis.position', [0, 0.25, 0.5, 0.75, 1.0], [
       0, 1.25, 0,
       0, 1.31, 0.05,
@@ -908,8 +864,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
     new THREE.NumberKeyframeTrack('Node_BaseChassis.rotation[z]', [0, 0.25, 0.5, 0.75, 1.0], [0, 0.05, 0, -0.05, 0]),
     new THREE.NumberKeyframeTrack('Node_WaistSwivel.rotation[y]', [0, 0.25, 0.5, 0.75, 1.0], [0, -0.07, 0, 0.07, 0]),
 
-    // --- PAIR A (FrontLeft & RearRight): SWING FORWARD at 0.00-0.50, PUSH BACKWARD at 0.50-1.00 ---
-    // FrontLeft sweeps forward (Hip yaw positive, Thigh reaches out, Knee extends)
+    // Pair A: FrontLeft & RearRight
     new THREE.NumberKeyframeTrack('HipPivot_Leg_FrontLeft.rotation[y]', [0, 0.15, 0.35, 0.5, 0.75, 1.0], [
       -0.35, 0.1, 0.42, 0.38, -0.15, -0.35
     ]),
@@ -923,7 +878,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       -0.98, -0.52, -0.72, -0.8, -0.9, -0.98
     ]),
 
-    // RearRight pushes rearward to launch mech forward
     new THREE.NumberKeyframeTrack('HipPivot_Leg_RearRight.rotation[y]', [0, 0.15, 0.35, 0.5, 0.75, 1.0], [
       -0.35, 0.1, 0.42, 0.38, -0.15, -0.35
     ]),
@@ -937,7 +891,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       -0.98, -0.52, -0.72, -0.8, -0.9, -0.98
     ]),
 
-    // --- PAIR B (FrontRight & RearLeft): PUSH BACKWARD at 0.00-0.50, SWING FORWARD at 0.50-1.00 ---
+    // Pair B: FrontRight & RearLeft
     new THREE.NumberKeyframeTrack('HipPivot_Leg_FrontRight.rotation[y]', [0, 0.25, 0.5, 0.65, 0.85, 1.0], [
       -0.38, 0.15, 0.35, -0.1, -0.42, -0.38
     ]),
@@ -967,7 +921,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   const walkClip = new THREE.AnimationClip('walk', 1.0, walkTracks);
   actions.set('walk', mixer.clipAction(walkClip));
 
-  // 3. High-Velocity Predatory Run Sprint (Fast powerful stride, low forward chassis attack angle)
+  // 3. Predatory Sprint Run
   const runTracks: THREE.KeyframeTrack[] = [
     new THREE.VectorKeyframeTrack('Node_BaseChassis.position', [0, 0.125, 0.25, 0.375, 0.5], [
       0, 1.15, 0,
@@ -1065,7 +1019,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   deathAction.clampWhenFinished = true;
   actions.set('death', deathAction);
 
-  // Play walking animation on initialization
+  // Default initial animation: Walk
   const walkAct = actions.get('walk');
   if (walkAct) walkAct.play();
 
@@ -1155,16 +1109,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       meshName: 'Node_VisorEye',
       nodes: ['Node_VisorEye'],
     },
-    {
-      name: '4-Pipe Exhaust Manifold Assembly',
-      feature: 'Exhaust Manifold Pipes',
-      category: 'Power Plant',
-      pass: 'surface',
-      description: '4 angled cylindrical exhaust pipes with rim bevels on torso rear',
-      location: 'Torso Ball Rear',
-      meshName: 'Node_ExhaustPipes',
-      nodes: ['Node_ExhaustPipes'],
-    },
   ];
 
   const runtime: SpiderSentryRuntime = {
@@ -1175,7 +1119,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       torsoBall,
       visorEye,
       visorGlowLight,
-      exhaustPipes,
       gunMount,
       gunPitchPivot,
       gunReceiver,
@@ -1203,7 +1146,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       darkSteel,
       polishedSteel,
       opticGlow,
-      exhaustDark,
     },
     animations: {
       clips: [idleClip, walkClip, runClip, shootClip, stompClip, alertClip, deployClip, deathClip],
