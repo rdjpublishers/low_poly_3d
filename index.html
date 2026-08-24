@@ -13491,6 +13491,16 @@ function exportGLB(){
     // meshes in it, which is exactly why the exported .glb "loads" in a
     // viewer but shows nothing). Export the actual TS/TSX/JSX model directly.
     exportRoot=CURRENT_TS_MODEL.clone(true);
+    // v8 — Object3D.clone(true) clones the bones too, but SkinnedMesh
+    // objects hold their skeleton by reference to the ORIGINAL bones
+    // (Three.js limitation — clone doesn't deep-clone skeleton bone
+    // references).  Without this fixup the exported GLB ends up with
+    // `skin.joints = [null, null, …]` because GLTFExporter's nodeMap
+    // has the cloned bones but SkinnedMesh.skeleton.bones still points
+    // at the originals (which aren't in the map).  Rebuild the
+    // skeleton from the cloned bones by name and rebind each
+    // SkinnedMesh so the joints are wired correctly for the exporter.
+    rebuildSkeletonsAfterClone(exportRoot);
   } else {
     try{
       exportRoot=buildSkinnedHierarchyForExport();
@@ -13579,6 +13589,64 @@ function exportGLB(){
 }
 
 /* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Skeleton rebuild after Object3D.clone(true)
+ *
+ * Object3D.clone(true) deep-clones the bone hierarchy but does NOT
+ * rewrite the SkinnedMesh.skeleton.bones references — they still point
+ * to the original (pre-clone) bone objects.  When GLTFExporter later
+ * walks the cloned tree to build its nodeMap and then looks up the
+ * skin's joint objects, the lookup fails (the originals are no longer
+ * in the map) and the exported `skin.joints` array comes out as
+ * [null, null, …].  Result: an exported GLB with a skeleton declared
+ * in `skins` but no joints wired up — every external viewer (Blender,
+ * Unity, Babylon, Godot, modelviewer.dev) then refuses to play the
+ * animations because the rig is "broken" from its perspective.
+ *
+ * Fix: walk the cloned tree, find every SkinnedMesh, find its
+ * (originally-referenced) skeleton's first bone to anchor the
+ * Skeleton.bones array, rebuild the bones list by name from the
+ * CLONED tree, and call bind() again.  This is a no-op visually
+ * (positions haven't changed) but rewires all the internal
+ * references to point at the cloned bones.
+ * ─────────────────────────────────────────────────────────────────────── */
+function rebuildSkeletonsAfterClone(root){
+  // First pass: find all SkinnedMesh and the *original* skeleton they
+  // share.  We use the first encountered skeleton's bones (by name)
+  // as the canonical bone order — every SkinnedMesh in the model
+  // shares the same THREE.Skeleton in this codebase.
+  let sharedSkeleton = null;
+  const skinnedMeshes = [];
+  root.traverse(o => {
+    if(o.isSkinnedMesh){
+      skinnedMeshes.push(o);
+      if(!sharedSkeleton && o.skeleton) sharedSkeleton = o.skeleton;
+    }
+  });
+  if(!sharedSkeleton || skinnedMeshes.length === 0) return;
+
+  // Resolve the cloned bones by name, in the original skeleton's order.
+  const clonedBones = [];
+  for(const origBone of sharedSkeleton.bones){
+    const clone = root.getObjectByName(origBone.name);
+    if(!clone){
+      console.warn('[export] could not find cloned bone "' + origBone.name + '" — skeleton will be incomplete');
+      return;
+    }
+    clonedBones.push(clone);
+  }
+
+  // Build a fresh Skeleton from the cloned bones and rebind every
+  // SkinnedMesh.  THREE.Skeleton.calculateInverses() runs in the
+  // constructor, so inverseBindMatrices are computed from the cloned
+  // bones' current matrixWorld — same as the live model.
+  root.updateMatrixWorld(true);
+  const freshSkeleton = new THREE.Skeleton(clonedBones);
+  skinnedMeshes.forEach(sm => {
+    sm.bind(freshSkeleton);
+  });
+}
+
+/* ───────────────────────────────────────────────────────────────────────
  * LBL UPDATE — Animation export pass-through
  *
  * Collect every AnimationClip we can find on the export root and on the
@@ -13607,6 +13675,19 @@ function collectExportableClips(exportRoot){
     if(!clip || !clip.uuid) return;
     if(seen.has(clip.uuid)) return;
     if(runtimeOnly.has(clip.uuid)) return;
+    // The `userData.sculptRuntime.animations` hint format causes
+    // collectExportableClips() to rebuild each clip as a fresh
+    // THREE.AnimationClip with a NEW uuid — so the uuid dedupe above
+    // doesn't catch "same logical clip from two sources".  Fall back to
+    // a name-based dedupe so a hint clip with the same name as an
+    // already-added root.animations clip is dropped (root.animations is
+    // always the canonical source — the hint is just a legacy fallback
+    // for in-app viewer's lblCollectAnimations()).
+    if(clip.name){
+      for(const c of out){
+        if(c.name === clip.name){ return; }
+      }
+    }
     seen.add(clip.uuid);
     out.push(clip);
   }
