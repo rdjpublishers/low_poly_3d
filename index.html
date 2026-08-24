@@ -13647,6 +13647,176 @@ function rebuildSkeletonsAfterClone(root){
 }
 
 /* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Animation export sanitiser
+ *
+ * GLTFExporter accepts exactly four track-path families:
+ *   *.position               →  glTF translation   (Vector3)
+ *   *.quaternion             →  glTF rotation      (Quaternion)
+ *   *.scale                  →  glTF scale         (Vector3)
+ *   *.morphTargetInfluences  →  glTF weights       (scalar)
+ *
+ * Every other path Three.js's mixer can resolve — the most common
+ * offender being `*.rotation[x]`, `*.rotation[y]`, `*.rotation[z]`
+ * Euler sub-component tracks — is silently dropped on export with a
+ * "Could not export" warning.  Model authors who write animations the
+ * natural way (Euler sub-components for "rotate the upper arm on its
+ * Y axis") end up with an exported GLB that has no animation, even
+ * though the in-app viewer plays the animation correctly.
+ *
+ * `sanitizeClipForExport()` walks a clip's tracks and rewrites any
+ * non-exportable path into an exportable one BEFORE handing the clip
+ * to the GLTFExporter.  In particular:
+ *
+ *   `node.rotation[x]`     ─┐
+ *   `node.rotation[y]`     ─┼→  `node.quaternion`  (QuaternionKeyframeTrack)
+ *   `node.rotation[z]`     ─┘   per-node, bundled
+ *
+ *   `node.position[x]`     ─┐
+ *   `node.position[y]`     ─┼→  `node.position`    (VectorKeyframeTrack)
+ *   `node.position[z]`     ─┘   per-node, bundled
+ *
+ *   `node.scale[x]` / `[y]` / `[z]` → `node.scale`    (VectorKeyframeTrack)
+ *
+ * Already-correct tracks (`position`, `quaternion`, `scale`,
+ * `morphTargetInfluences[N]`) pass through unchanged.  Anything else
+ * is passed through too — the GLTFExporter will drop it with its
+ * usual warning, but at least we tried.
+ *
+ * The returned clip is a NEW THREE.AnimationClip; the original is
+ * untouched so the in-app viewer keeps playing it without interruption.
+ *
+ * Missing-axis behaviour: if a node has only `*.rotation[x]` and
+ * `*.rotation[z]` tracks (no `[y]`), the missing axis is treated as
+ * zero when building the quaternion.  This matches the behaviour of
+ * `THREE.Euler.set(rx, ry, rz, 'XYZ')` with `ry = 0`, which is the
+ * same assumption Three.js's mixer makes when interpolating a single
+ * Euler component track.
+ * ─────────────────────────────────────────────────────────────────────── */
+const _sanitizeEuler  = new THREE.Euler();
+const _sanitizeQuat   = new THREE.Quaternion();
+const _sanitizeVec    = new THREE.Vector3();
+function _eulerXYZToQuat(rx, ry, rz, out, off){
+  _sanitizeEuler.set(rx, ry, rz, 'XYZ');
+  _sanitizeQuat.setFromEuler(_sanitizeEuler);
+  out[off    ] = _sanitizeQuat.x;
+  out[off + 1] = _sanitizeQuat.y;
+  out[off + 2] = _sanitizeQuat.z;
+  out[off + 3] = _sanitizeQuat.w;
+}
+
+function sanitizeClipForExport(origClip){
+  if(!origClip) return origClip;
+  // Bucket tracks by (nodeName, kind):
+  //   kind = 'quat' | 'pos' | 'scale' — sub-components need bundling
+  //   pass-through tracks go straight to the output
+  const passThrough = [];
+  const quatBuckets = new Map(); // nodeName -> { times, rx[], ry[], rz[] }
+  const posBuckets  = new Map(); // nodeName -> { times, x[],  y[],  z[]  }
+  const scaleBuckets = new Map();
+  // Track whether we actually rewrote any track — only allocate a new
+  // clip when there's something to change.  (Track count alone isn't
+  // a reliable signal: a clip with one Euler `[x]` track and one
+  // `*.position` Vector track has the same count after sanitisation,
+  // but the Euler track has been replaced with a Quaternion one —
+  // i.e. a real transformation happened.)
+  let dirty = false;
+
+  for(const t of origClip.tracks){
+    if(!t || !t.name) continue;
+    const name = t.name;
+    // Euler sub-component rotation — bundle and convert to quaternion
+    let m = /^([^.]+)\.rotation\[([xyz])\]$/.exec(name);
+    if(m){
+      dirty = true;
+      const node = m[1], comp = m[2];
+      const times = Array.from(t.times);
+      const vals  = Array.from(t.values);
+      let bucket = quatBuckets.get(node);
+      if(!bucket){ bucket = { times, rx: null, ry: null, rz: null }; quatBuckets.set(node, bucket); }
+      if(comp === 'x') bucket.rx = vals;
+      else if(comp === 'y') bucket.ry = vals;
+      else bucket.rz = vals;
+      continue;
+    }
+    // Euler sub-component position — bundle and convert to position
+    m = /^([^.]+)\.position\[([xyz])\]$/.exec(name);
+    if(m){
+      dirty = true;
+      const node = m[1], comp = m[2];
+      const times = Array.from(t.times);
+      const vals  = Array.from(t.values);
+      let bucket = posBuckets.get(node);
+      if(!bucket){ bucket = { times, x: null, y: null, z: null }; posBuckets.set(node, bucket); }
+      if(comp === 'x') bucket.x = vals;
+      else if(comp === 'y') bucket.y = vals;
+      else bucket.z = vals;
+      continue;
+    }
+    // Euler sub-component scale — bundle and convert to scale
+    m = /^([^.]+)\.scale\[([xyz])\]$/.exec(name);
+    if(m){
+      dirty = true;
+      const node = m[1], comp = m[2];
+      const times = Array.from(t.times);
+      const vals  = Array.from(t.values);
+      let bucket = scaleBuckets.get(node);
+      if(!bucket){ bucket = { times, x: null, y: null, z: null }; scaleBuckets.set(node, bucket); }
+      if(comp === 'x') bucket.x = vals;
+      else if(comp === 'y') bucket.y = vals;
+      else bucket.z = vals;
+      continue;
+    }
+    // Otherwise leave the track alone.  VectorKeyframeTrack('*.position'),
+    // QuaternionKeyframeTrack('*.quaternion'), VectorKeyframeTrack('*.scale'),
+    // and NumberKeyframeTrack('*.morphTargetInfluences[N]') all export fine.
+    passThrough.push(t);
+  }
+
+  // Materialise each bucket
+  for(const [node, b] of quatBuckets){
+    const n = b.times.length;
+    const rx = b.rx || new Array(n).fill(0);
+    const ry = b.ry || new Array(n).fill(0);
+    const rz = b.rz || new Array(n).fill(0);
+    const qout = new Array(n * 4);
+    for(let i = 0; i < n; i++){
+      _eulerXYZToQuat(rx[i] || 0, ry[i] || 0, rz[i] || 0, qout, i * 4);
+    }
+    passThrough.push(new THREE.QuaternionKeyframeTrack(node + '.quaternion', b.times, qout));
+  }
+  for(const [node, b] of posBuckets){
+    const n = b.times.length;
+    const x = b.x || new Array(n).fill(0);
+    const y = b.y || new Array(n).fill(0);
+    const z = b.z || new Array(n).fill(0);
+    const vout = new Array(n * 3);
+    for(let i = 0; i < n; i++){
+      vout[i*3    ] = x[i] || 0;
+      vout[i*3 + 1] = y[i] || 0;
+      vout[i*3 + 2] = z[i] || 0;
+    }
+    passThrough.push(new THREE.VectorKeyframeTrack(node + '.position', b.times, vout));
+  }
+  for(const [node, b] of scaleBuckets){
+    const n = b.times.length;
+    const x = b.x || new Array(n).fill(1);
+    const y = b.y || new Array(n).fill(1);
+    const z = b.z || new Array(n).fill(1);
+    const vout = new Array(n * 3);
+    for(let i = 0; i < n; i++){
+      vout[i*3    ] = x[i] ?? 1;
+      vout[i*3 + 1] = y[i] ?? 1;
+      vout[i*3 + 2] = z[i] ?? 1;
+    }
+    passThrough.push(new THREE.VectorKeyframeTrack(node + '.scale', b.times, vout));
+  }
+
+  // If nothing was rewritten, return the original clip untouched.
+  if(!dirty) return origClip;
+  return new THREE.AnimationClip(origClip.name, origClip.duration, passThrough);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
  * LBL UPDATE — Animation export pass-through
  *
  * Collect every AnimationClip we can find on the export root and on the
@@ -13663,6 +13833,13 @@ function rebuildSkeletonsAfterClone(root){
  *   4. `root.userData.sculptRuntime.animations`        — legacy hint array
  *   5. Live mixer's `lblAnim.clips` (in-app viewer's loaded clips)
  *   6. Any nested Object3D's `.animations` array (recursive walk)
+ *
+ * Every collected clip is then routed through `sanitizeClipForExport()`
+ * which automatically rewrites non-glTF-exportable track formats
+ * (Euler sub-components etc.) into their glTF-compatible equivalents.
+ * This means model authors can write animations the natural way —
+ * `NumberKeyframeTrack('upperArm.rotation[y]', ...)` is fine — and
+ * the export will Just Work.
  *
  * Runtime-only clips (those listed in `userData.runtimeClips`) are
  * intentionally excluded — they target material properties or other
@@ -13782,7 +13959,11 @@ function collectExportableClips(exportRoot){
     });
   }
 
-  return out;
+  // Auto-sanitise every collected clip: any track format that
+  // GLTFExporter can't serialise (Euler sub-components, etc.) is
+  // rewritten into a glTF-compatible equivalent.  Model authors can
+  // write animations the natural way and the export Just Works.
+  return out.map(sanitizeClipForExport);
 }
 
 function exportOBJ(){
