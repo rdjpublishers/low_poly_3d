@@ -13500,6 +13500,25 @@ function exportGLB(){
       catch(e2){ console.warn('hierarchy export failed, exporting flat instead:',e2); exportRoot=sceneGroup; }
     }
   }
+  // ── Animation pass-through ─────────────────────────────────────────
+  // GLTFExporter will only serialize animation tracks if they're
+  // *explicitly* handed to it via options.animations (or attached to
+  // the root as `root.animations`, which the exporter also reads).
+  //
+  // We accept BOTH paths so models built either way work:
+  //   1. Modern TS factories publish `root.animations` (Three.js
+  //      standard slot). Object3D.clone(true) preserves that array.
+  //   2. Older TS factories published `root.userData.sculptRuntime
+  //      .animations` as a [{name, duration, tracks:[…]}] hint, which
+  //      lblCollectAnimations() reads — that path doesn't reach
+  //      GLTFExporter, so we synthesize THREE.AnimationClips from the
+  //      hint here too.
+  //   3. Blueprint-driven scenes — pull the live mixer clips if any.
+  //
+  // The result is a `clipsForExport: THREE.AnimationClip[]` we hand to
+  // the exporter so the .glb actually contains usable animations in
+  // Blender, Unity, Unreal, Godot, and glTF viewers.
+  const clipsForExport = collectExportableClips(exportRoot);
   // Base the downloaded filename on the source file when we loaded one
   // (works for JSON/JS/TS/MTS/CTS/TSX/JSX alike) instead of always the
   // generic "lowpoly3d_scene.glb", so e.g. "robot.tsx" → "robot.glb".
@@ -13523,7 +13542,9 @@ function exportGLB(){
       const blob=new Blob([glb],{type:'application/octet-stream'});
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
       a.download=baseName+'.glb'; a.click(); URL.revokeObjectURL(a.href);
-      toast('GLB exported ✓','ok');
+      const animCount = (clipsForExport && clipsForExport.length) || 0;
+      const boneCount = (()=>{ let n=0; exportRoot.traverse(o=>{ if(o.isBone) n++; }); return n; })();
+      toast(`GLB exported ✓ (${animCount} anim${animCount===1?'':'s'}, ${boneCount} bone${boneCount===1?'':'s'})`,'ok');
     } finally {
       // FIX-I-1 — dispose any geometry we created for this export. The
       // GLTFExporter copies the geometry data into the GLB binary, so
@@ -13554,7 +13575,100 @@ function exportGLB(){
       });
       toDispose.forEach(g => { if(g && g.dispose) g.dispose(); });
     }
-  },{binary:true});
+  },{binary:true, animations: clipsForExport});
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Animation export pass-through
+ *
+ * Collect every AnimationClip we can find on the export root and on the
+ * live scene, and rebuild any `sculptRuntime.animations` hints as real
+ * THREE.AnimationClip objects.  The GLTFExporter needs the clip array
+ * via `options.animations` — without this, the .glb has no animations
+ * even if the model has a perfectly good AnimationMixer in memory.
+ *
+ * Runtime-only clips (those listed in `userData.runtimeClips`) are
+ * intentionally excluded — they target material properties or other
+ * objects that aren't reachable through the glTF scene graph, and
+ * including them would just produce noisy "Could not export" warnings.
+ * ─────────────────────────────────────────────────────────────────────── */
+function collectExportableClips(exportRoot){
+  const out = [];
+  const seen = new Set(); // dedupe by clip.uuid
+  // Clips in this set are skipped — they're runtime-only, e.g. material
+  // pulses bound by uuid that GLTFExporter can't resolve.
+  const runtimeOnly = new Set();
+  const runtimeArr = exportRoot && exportRoot.userData && exportRoot.userData.runtimeClips;
+  if(Array.isArray(runtimeArr)){
+    runtimeArr.forEach(c => { if(c && c.uuid) runtimeOnly.add(c.uuid); });
+  }
+
+  function tryAdd(clip){
+    if(!clip || !clip.uuid) return;
+    if(seen.has(clip.uuid)) return;
+    if(runtimeOnly.has(clip.uuid)) return;
+    seen.add(clip.uuid);
+    out.push(clip);
+  }
+
+  // 1) root.animations — the standard Three.js slot, populated by
+  //    modern TS factories and by Object3D.clone(true) for them.
+  if(exportRoot && Array.isArray(exportRoot.animations)){
+    exportRoot.animations.forEach(tryAdd);
+  }
+
+  // 2) userData.sculptRuntime.animations — legacy hint format. Rebuild
+  //    as real AnimationClips so the exporter can serialize them.
+  const rt = exportRoot && exportRoot.userData && exportRoot.userData.sculptRuntime;
+  if(rt && Array.isArray(rt.animations)){
+    rt.animations.forEach((a, i)=>{
+      if(!a || !Array.isArray(a.tracks)) return;
+      try{
+        const tracks = a.tracks.map(t=>{
+          if(t && t.isKeyframeTrack) return t;
+          if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
+            // Pick the right track type based on the path suffix.
+            // .quaternion → quaternion (4 floats/frame)
+            // .position / .rotation / .scale → vector (3 floats/frame)
+            // everything else (e.g. .emissiveIntensity, .morphTargetInfluences[N]) → number
+            const name = t.name;
+            if(name.endsWith('.quaternion')){
+              return new THREE.QuaternionKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+            } else if(/\.(position|rotation|scale)$/.test(name) ||
+                      /\.(position|rotation|scale)\[.+\]$/.test(name)){
+              return new THREE.VectorKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+            } else {
+              return new THREE.NumberKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+            }
+          }
+          return null;
+        }).filter(Boolean);
+        if(tracks.length){
+          const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
+          tryAdd(clip);
+        }
+      }catch(err){ console.warn('[export] failed to build clip from sculptRuntime hint:', err); }
+    });
+  }
+
+  // 3) Live scene — if exportRoot is a fresh skinned-hierarchy group
+  //    and the live scene has a mixer with clips, copy those too.
+  if(lblAnim && Array.isArray(lblAnim.clips) && lblAnim.root){
+    lblAnim.clips.forEach(tryAdd);
+  }
+
+  // 4) Walk the exportRoot — any nested THREE.Group / Object3D in the
+  //    hierarchy may also carry its own .animations array.  Useful for
+  //    complex imported assets where multiple sub-objects have clips.
+  if(exportRoot && exportRoot.traverse){
+    exportRoot.traverse(o=>{
+      if(o && o !== exportRoot && Array.isArray(o.animations)){
+        o.animations.forEach(tryAdd);
+      }
+    });
+  }
+
+  return out;
 }
 
 function exportOBJ(){
