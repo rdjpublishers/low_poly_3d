@@ -13655,6 +13655,15 @@ function rebuildSkeletonsAfterClone(root){
  * via `options.animations` — without this, the .glb has no animations
  * even if the model has a perfectly good AnimationMixer in memory.
  *
+ * TS factories publish their clips in several places; we check them
+ * all so the export works no matter which one the model chose:
+ *   1. `root.animations`                  — Three.js standard slot
+ *   2. `root.userData.sculptRuntime.animations.clips`  ← Model_3 pattern
+ *   3. `root.userData.sculptRuntime.animations.mixer.getActions().map(a => a.clip)`
+ *   4. `root.userData.sculptRuntime.animations`        — legacy hint array
+ *   5. Live mixer's `lblAnim.clips` (in-app viewer's loaded clips)
+ *   6. Any nested Object3D's `.animations` array (recursive walk)
+ *
  * Runtime-only clips (those listed in `userData.runtimeClips`) are
  * intentionally excluded — they target material properties or other
  * objects that aren't reachable through the glTF scene graph, and
@@ -13698,38 +13707,62 @@ function collectExportableClips(exportRoot){
     exportRoot.animations.forEach(tryAdd);
   }
 
-  // 2) userData.sculptRuntime.animations — legacy hint format. Rebuild
-  //    as real AnimationClips so the exporter can serialize them.
+  // 2) userData.sculptRuntime.animations — multi-shape: Model_3 stores
+  //    an object like `{clips: AnimationClip[], mixer, actions}` here,
+  //    older Model_1-style factories stored a flat array of hint
+  //    objects `{name, duration, tracks:[{name, times, values}]}`.
+  //    Handle both forms.
   const rt = exportRoot && exportRoot.userData && exportRoot.userData.sculptRuntime;
-  if(rt && Array.isArray(rt.animations)){
-    rt.animations.forEach((a, i)=>{
-      if(!a || !Array.isArray(a.tracks)) return;
+  if(rt){
+    // 2a) Model_3 pattern: real AnimationClip[] at .animations.clips
+    const clips = rt.animations && rt.animations.clips;
+    if(Array.isArray(clips)){
+      clips.forEach(tryAdd);
+    }
+    // 2b) Model_3 also has a mixer whose actions point to those clips.
+    //     .getActions() returns live THREE.AnimationAction objects; the
+    //     `.clip` property on each is the real THREE.AnimationClip.
+    const mixer = rt.animations && rt.animations.mixer;
+    if(mixer && typeof mixer.getActions === 'function'){
       try{
-        const tracks = a.tracks.map(t=>{
-          if(t && t.isKeyframeTrack) return t;
-          if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
-            // Pick the right track type based on the path suffix.
-            // .quaternion → quaternion (4 floats/frame)
-            // .position / .rotation / .scale → vector (3 floats/frame)
-            // everything else (e.g. .emissiveIntensity, .morphTargetInfluences[N]) → number
-            const name = t.name;
-            if(name.endsWith('.quaternion')){
-              return new THREE.QuaternionKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
-            } else if(/\.(position|rotation|scale)$/.test(name) ||
-                      /\.(position|rotation|scale)\[.+\]$/.test(name)){
-              return new THREE.VectorKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
-            } else {
-              return new THREE.NumberKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+        mixer.getActions().forEach(action => {
+          if(action && action.clip) tryAdd(action.clip);
+        });
+      }catch(_){ /* mixer might not be initialised yet — safe to skip */ }
+    }
+    // 2c) Legacy hint array: each entry is {name, duration, tracks:[…]}.
+    //    Rebuild as real AnimationClips. Only used by older factories
+    //    that don't publish AnimationClip objects directly.
+    if(Array.isArray(rt.animations)){
+      rt.animations.forEach((a, i)=>{
+        if(!a || !Array.isArray(a.tracks)) return;
+        try{
+          const tracks = a.tracks.map(t=>{
+            if(t && t.isKeyframeTrack) return t;
+            if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
+              // Pick the right track type based on the path suffix.
+              // .quaternion → quaternion (4 floats/frame)
+              // .position / .rotation / .scale → vector (3 floats/frame)
+              // everything else (e.g. .emissiveIntensity, .morphTargetInfluences[N]) → number
+              const name = t.name;
+              if(name.endsWith('.quaternion')){
+                return new THREE.QuaternionKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+              } else if(/\.(position|rotation|scale)$/.test(name) ||
+                        /\.(position|rotation|scale)\[.+\]$/.test(name)){
+                return new THREE.VectorKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+              } else {
+                return new THREE.NumberKeyframeTrack(name, Array.from(t.times), Array.from(t.values));
+              }
             }
+            return null;
+          }).filter(Boolean);
+          if(tracks.length){
+            const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
+            tryAdd(clip);
           }
-          return null;
-        }).filter(Boolean);
-        if(tracks.length){
-          const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
-          tryAdd(clip);
-        }
-      }catch(err){ console.warn('[export] failed to build clip from sculptRuntime hint:', err); }
-    });
+        }catch(err){ console.warn('[export] failed to build clip from sculptRuntime hint:', err); }
+      });
+    }
   }
 
   // 3) Live scene — if exportRoot is a fresh skinned-hierarchy group
