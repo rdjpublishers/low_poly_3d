@@ -3,6 +3,114 @@ import * as THREE from 'three';
 export type ColorThemeId = 'hazard-orange' | 'stealth-black' | 'arctic-white' | 'military-olive' | 'cyber-chrome';
 export type AnimationName = 'idle' | 'walk' | 'run' | 'shoot' | 'stomp' | 'alert' | 'deploy' | 'death';
 
+/* =========================================================================
+ * EXPORT-READY CLIP CONVERSION
+ * =========================================================================
+ *
+ * GLTFExporter only serialises full `position` (VectorKeyframeTrack),
+ * `quaternion` (QuaternionKeyframeTrack), and `scale` (VectorKeyframeTrack)
+ * tracks.  The original Model_3 clips use
+ *   NumberKeyframeTrack('Node_*.rotation[x]', [...], [...])
+ * for individual Euler components — these are silently dropped on export,
+ * which is why the GLB used to come out animation-less.
+ *
+ * `convertToExportableClip()` rewrites a clip so every
+ * `Node_*.rotation[x|y|z]` triple becomes a single
+ * `Node_*.quaternion` QuaternionKeyframeTrack with the corresponding
+ * (qx, qy, qz, qw) values per keyframe.  All other tracks (position,
+ * scale, already-quaternion, morph, etc.) pass through unchanged.
+ *
+ * Tracks that target a single component of `*.rotation[...]` are bundled
+ * with any sibling `[x]`, `[y]`, `[z]` tracks for the same node into
+ * one quaternion track, so the result plays identically in the viewer
+ * and exports correctly.
+ *
+ * The conversion is conservative: if a node has only one rotation
+ * component animated, the missing components are assumed zero (Euler
+ * order XYZ).  This matches the original `switch`-style animation
+ * logic and produces a seamless loop.
+ */
+const _qEuler = new THREE.Euler();
+const _qQuat  = new THREE.Quaternion();
+function eulerToQuatArray(rx: number, ry: number, rz: number, out: number[], off: number): void {
+  _qEuler.set(rx, ry, rz, 'XYZ');
+  _qQuat.setFromEuler(_qEuler);
+  out[off]     = _qQuat.x;
+  out[off + 1] = _qQuat.y;
+  out[off + 2] = _qQuat.z;
+  out[off + 3] = _qQuat.w;
+}
+
+function convertToExportableClip(origClip: THREE.AnimationClip): THREE.AnimationClip | null {
+  if(!origClip) return null;
+  // Bucket tracks: by node + property kind
+  //  - pass-through: position, scale, quaternion, morphTargetInfluences
+  //  - bundle: per-node rotation[x|y|z] sub-component tracks → quaternion
+  const passThrough: THREE.KeyframeTrack[] = [];
+  // rotationBuckets: nodeName -> { times: number[], rx: number[], ry: number[], rz: number[], count: number }
+  // We need to merge by shared times — different sub-tracks on the same
+  // node MAY use different time arrays (in this codebase they happen to
+  // share times, but be defensive).  Strategy: pick the longest time
+  // array as the canonical one; for any other track, sample at the
+  // canonical times via linear interpolation.  In practice the existing
+  // clips always share times across sub-tracks, so we just take the
+  // first one and assume the rest match.
+  const rotBuckets = new Map<string, {
+    nodeName: string;
+    times: number[];
+    rx: number[] | null;
+    ry: number[] | null;
+    rz: number[] | null;
+  }>();
+
+  for(const t of origClip.tracks){
+    if(!(t instanceof THREE.KeyframeTrack)) continue;
+    const m = /^([^.]+)\.rotation\[([xyz])\]$/.exec(t.name);
+    if(m){
+      const nodeName = m[1];
+      const comp = m[2] as 'x' | 'y' | 'z';
+      let bucket = rotBuckets.get(nodeName);
+      if(!bucket){
+        // Pull times from the first track we see for this node
+        const times = Array.from((t as unknown as { times: ArrayLike<number> }).times);
+        bucket = { nodeName, times, rx: null, ry: null, rz: null };
+        rotBuckets.set(nodeName, bucket);
+      }
+      const vals = Array.from((t as unknown as { values: ArrayLike<number> }).values);
+      if(comp === 'x') bucket.rx = vals;
+      else if(comp === 'y') bucket.ry = vals;
+      else bucket.rz = vals;
+      continue;
+    }
+    // Pass-through: position (Vector), scale (Vector), quaternion (Quaternion),
+    // morphTargetInfluences[N] (Number) — all already in exporter-friendly form.
+    passThrough.push(t);
+  }
+
+  // Build quaternion tracks from each rotation bucket
+  for(const bucket of rotBuckets.values()){
+    const n = bucket.times.length;
+    const rx = bucket.rx || new Array<number>(n).fill(0);
+    const ry = bucket.ry || new Array<number>(n).fill(0);
+    const rz = bucket.rz || new Array<number>(n).fill(0);
+    const quatValues = new Array<number>(n * 4);
+    for(let i = 0; i < n; i++){
+      eulerToQuatArray(rx[i] || 0, ry[i] || 0, rz[i] || 0, quatValues, i * 4);
+    }
+    const quatTrack = new THREE.QuaternionKeyframeTrack(
+      bucket.nodeName + '.quaternion',
+      bucket.times,
+      quatValues
+    );
+    passThrough.push(quatTrack);
+  }
+
+  if(passThrough.length === 0) return null;
+  return new THREE.AnimationClip(origClip.name, origClip.duration, passThrough);
+}
+
+export { convertToExportableClip };
+
 export interface ColorScheme {
   id: ColorThemeId;
   name: string;
@@ -1298,6 +1406,42 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   root.userData.sculptRuntime = runtime;
   root.userData.runtime = runtime;
   root.userData.tick = (dt?: number) => runtime.tick(dt ?? 0.016);
+
+  // ── EXPORT-READY CLIPS ─────────────────────────────────────────
+  // The clips built above use `NumberKeyframeTrack('*.rotation[x]', …)`
+  // for individual Euler components — this works in the live Three.js
+  // viewer but GLTFExporter ONLY serialises full `position` (Vector),
+  // `quaternion` (Quaternion), and `scale` (Vector) tracks.  The
+  // sub-component rotation tracks would be silently dropped on export,
+  // which is why exported GLBs from this model used to come out
+  // animation-less.
+  //
+  // We build a second copy of each clip with the same data but the
+  // rotation[x|y|z] tracks converted to a single quaternion track per
+  // node, then publish those on root.animations so the exporter
+  // picks them up.  The original clips stay in the runtime (the
+  // in-app AnimationMixer keeps using them) — only the exported
+  // .glb sees the converted clips.
+  const exportClips: THREE.AnimationClip[] = [];
+  for (const origClip of [idleClip, walkClip, runClip, shootClip, stompClip, alertClip, deployClip, deathClip]) {
+    const converted = convertToExportableClip(origClip);
+    if (converted) exportClips.push(converted);
+  }
+  root.animations = exportClips;
+  // Also publish a hint in the legacy format for any in-app tooling
+  // that looks at it (and so the index.html export path can dedupe by
+  // name when collecting clips).
+  if (!root.userData.sculptRuntime.animations.clips_hint) {
+    root.userData.sculptRuntime.animations.clips_hint = exportClips.map((c) => ({
+      name: c.name,
+      duration: c.duration,
+      tracks: c.tracks.map((t) => ({
+        name: t.name,
+        times: Array.from((t as THREE.KeyframeTrack & { times: ArrayLike<number> }).times),
+        values: Array.from((t as THREE.KeyframeTrack & { values: ArrayLike<number> }).values)
+      }))
+    }));
+  }
 
   return root;
 }
