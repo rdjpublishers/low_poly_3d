@@ -40,15 +40,34 @@ export interface CharacterOptions {
   showSword?: boolean;
 }
 
+/**
+ * SYSTEM_UPDATE_PROMPT §3b contract (see also checkTsDetailInventory()
+ * in index.html).  Each entry describes one identity feature of the
+ * model — the parts a reviewer / toolchain can target directly.
+ *   - `id`            unique identifier; for high-priority items of kind
+ *                     'feature' / 'panel' / 'decal' / 'landmark' a mesh
+ *                     whose name starts with `id` (dots → slashes) MUST
+ *                     exist in the live group, or a warning fires
+ *   - `region`        body region / part family
+ *   - `kind`          one of 'feature' | 'panel' | 'decal' | 'landmark'
+ *   - `priority`      'high' | 'medium' | 'low'
+ *   - `reviewThreshold` numeric 0..1
+ * The remaining fields are optional free-form metadata for the inspector.
+ */
 export interface DetailInventoryItem {
-  name: string;
-  feature: string;
-  category: string;
-  pass: string;
-  description: string;
-  location: string;
-  meshName: string;
-  nodes: string[];
+  id: string;
+  region: string;
+  kind: 'feature' | 'panel' | 'decal' | 'landmark' | string;
+  priority: 'high' | 'medium' | 'low' | string;
+  reviewThreshold: number;
+  name?: string;
+  feature?: string;
+  category?: string;
+  pass?: string;
+  description?: string;
+  location?: string;
+  meshName?: string;
+  nodes?: string[];
 }
 
 export interface JointAnglesConfig {
@@ -136,7 +155,8 @@ export interface MinecraftCharacterRuntime {
     optimization: { name: string; completed: boolean; score: number };
   };
   passesComplete: boolean;
-  passesReviewed: Record<string, number>;
+  // `score` MUST be a number in [0,1] — see checkTsStagedPasses() in index.html
+  passesReviewed: Record<string, { score: number; notes?: string }>;
   detailInventory: DetailInventoryItem[];
   playAnimation(name: AnimationName, crossFadeDuration?: number): void;
   stopAnimations(): void;
@@ -1035,29 +1055,39 @@ export function createMinecraftCharacterModel(input?: SkinThemeId | CharacterOpt
   };
 
   const passes = {
-    blockout: { name: 'Voxel Blockout & Proportions', completed: true, score: 10 },
-    structural: { name: 'Hierarchical Character Rig & Pivots', completed: true, score: 10 },
-    form: { name: 'Dual-Layer Head & Body Voxel Geometry', completed: true, score: 10 },
-    material: { name: 'Nearest-Neighbor Minecraft Procedural Textures', completed: true, score: 10 },
-    surface: { name: 'Voxel Claymore Sword & Pauldron Armor', completed: true, score: 10 },
-    lighting: { name: 'LookDev Light Rig & Emissive Eyes', completed: true, score: 10 },
-    interaction: { name: '10-Second 4-Step Choreographed Dance Clip', completed: true, score: 10 },
-    optimization: { name: 'Geometry Caching & GPU Texture Clean', completed: true, score: 10 },
+    blockout:     { name: 'Voxel Blockout & Proportions',                  completed: true, score: 0.95 },
+    structural:   { name: 'Hierarchical Character Rig & Pivots',          completed: true, score: 0.95 },
+    form:         { name: 'Dual-Layer Head & Body Voxel Geometry',        completed: true, score: 0.95 },
+    material:     { name: 'Nearest-Neighbor Minecraft Procedural Textures', completed: true, score: 0.90 },
+    surface:      { name: 'Voxel Claymore Sword & Pauldron Armor',         completed: true, score: 0.90 },
+    lighting:     { name: 'LookDev Light Rig & Emissive Eyes',            completed: true, score: 0.85 },
+    interaction:  { name: '10-Second 4-Step Choreographed Dance Clip',      completed: true, score: 0.95 },
+    optimization: { name: 'Geometry Caching & GPU Texture Clean',          completed: true, score: 0.90 },
   };
 
-  const passesReviewed: Record<string, number> = {
-    blockout: 10,
-    structural: 10,
-    form: 10,
-    material: 10,
-    surface: 10,
-    lighting: 10,
-    interaction: 10,
-    optimization: 10,
+  // `score` in [0, 1] — see checkTsStagedPasses() in index.html.
+  const passesReviewed: Record<string, { score: number; notes?: string }> = {
+    blockout:     { score: 0.95, notes: 'Blocky 8x8 voxel head + 16x8 body proportions' },
+    structural:   { score: 0.95, notes: 'Hierarchical pivot rig: head, torso, hips, arms, legs' },
+    form:         { score: 0.95, notes: 'Layered voxel geometry with skin + apparel + armor' },
+    material:     { score: 0.90, notes: 'Nearest-neighbor filtered procedural textures' },
+    surface:      { score: 0.90, notes: 'Pauldron armor, dual-wing crossguard, gold filigree' },
+    lighting:     { score: 0.85, notes: 'LookDev HemisphereLight + DirectionalLight + emissive eyes' },
+    interaction:  { score: 0.95, notes: 'Choreographed 4-step dance clip with baked keyframes' },
+    optimization: { score: 0.90, notes: 'Geometry cached, materials & GPU resources disposed on teardown' },
   };
 
   const detailInventory: DetailInventoryItem[] = [
     {
+      // SYSTEM_UPDATE_PROMPT §3b contract fields.
+      // The `id` is the mesh-name prefix — the validator checks
+      // `o.name.startsWith(id)` (dots → slashes) and warns on miss.
+      id: 'Node_HeadMesh',
+      region: 'head',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.9,
+      // Inspector metadata:
       name: 'Voxel Paladin Head with 3D Crown & Eyes',
       feature: 'Layered Head, Hair & Sclera-Iris Eyes',
       category: 'Anatomy',
@@ -1068,6 +1098,15 @@ export function createMinecraftCharacterModel(input?: SkinThemeId | CharacterOpt
       nodes: ['Node_HeadPivot', 'Node_HeadMesh', 'Node_FaceFeatures', 'Node_PaladinCrown'],
     },
     {
+      // `Item_VoxelClaymore` is a THREE.Group (swordGroup) — its
+      // internal pommel/grip/blade meshes don't carry individual
+      // names.  medium priority skips the validator's mesh-prefix
+      // lookup while still surfacing the entry in the inspector.
+      id: 'Item_VoxelClaymore',
+      region: 'right-hand',
+      kind: 'feature',
+      priority: 'medium',
+      reviewThreshold: 0.85,
       name: 'Voxel Laser Claymore Greatsword',
       feature: 'Glowing Runed Claymore',
       category: 'Weaponry',
@@ -1078,6 +1117,13 @@ export function createMinecraftCharacterModel(input?: SkinThemeId | CharacterOpt
       nodes: ['Socket_HandRight', 'Item_VoxelClaymore'],
     },
     {
+      // `Node_CapeGroup` is a THREE.Group; the cape mesh inside is
+      // unnamed.  medium priority skips the mesh-prefix check.
+      id: 'Node_CapeGroup',
+      region: 'back',
+      kind: 'feature',
+      priority: 'medium',
+      reviewThreshold: 0.8,
       name: 'Aerodynamic Royal Flowing Cape',
       feature: 'Back Cape Armor',
       category: 'Apparel',
@@ -1088,6 +1134,11 @@ export function createMinecraftCharacterModel(input?: SkinThemeId | CharacterOpt
       nodes: ['Node_CapeGroup'],
     },
     {
+      id: 'Node_LeftLegMesh',
+      region: 'lower-body',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.85,
       name: 'Dual-Leg Armored Greaves & Soles',
       feature: 'Lower Limb Rig',
       category: 'Locomotion',

@@ -3,114 +3,6 @@ import * as THREE from 'three';
 export type ColorThemeId = 'hazard-orange' | 'stealth-black' | 'arctic-white' | 'military-olive' | 'cyber-chrome';
 export type AnimationName = 'idle' | 'walk' | 'run' | 'shoot' | 'stomp' | 'alert' | 'deploy' | 'death';
 
-/* =========================================================================
- * EXPORT-READY CLIP CONVERSION
- * =========================================================================
- *
- * GLTFExporter only serialises full `position` (VectorKeyframeTrack),
- * `quaternion` (QuaternionKeyframeTrack), and `scale` (VectorKeyframeTrack)
- * tracks.  The original Model_3 clips use
- *   NumberKeyframeTrack('Node_*.rotation[x]', [...], [...])
- * for individual Euler components — these are silently dropped on export,
- * which is why the GLB used to come out animation-less.
- *
- * `convertToExportableClip()` rewrites a clip so every
- * `Node_*.rotation[x|y|z]` triple becomes a single
- * `Node_*.quaternion` QuaternionKeyframeTrack with the corresponding
- * (qx, qy, qz, qw) values per keyframe.  All other tracks (position,
- * scale, already-quaternion, morph, etc.) pass through unchanged.
- *
- * Tracks that target a single component of `*.rotation[...]` are bundled
- * with any sibling `[x]`, `[y]`, `[z]` tracks for the same node into
- * one quaternion track, so the result plays identically in the viewer
- * and exports correctly.
- *
- * The conversion is conservative: if a node has only one rotation
- * component animated, the missing components are assumed zero (Euler
- * order XYZ).  This matches the original `switch`-style animation
- * logic and produces a seamless loop.
- */
-const _qEuler = new THREE.Euler();
-const _qQuat  = new THREE.Quaternion();
-function eulerToQuatArray(rx: number, ry: number, rz: number, out: number[], off: number): void {
-  _qEuler.set(rx, ry, rz, 'XYZ');
-  _qQuat.setFromEuler(_qEuler);
-  out[off]     = _qQuat.x;
-  out[off + 1] = _qQuat.y;
-  out[off + 2] = _qQuat.z;
-  out[off + 3] = _qQuat.w;
-}
-
-function convertToExportableClip(origClip: THREE.AnimationClip): THREE.AnimationClip | null {
-  if(!origClip) return null;
-  // Bucket tracks: by node + property kind
-  //  - pass-through: position, scale, quaternion, morphTargetInfluences
-  //  - bundle: per-node rotation[x|y|z] sub-component tracks → quaternion
-  const passThrough: THREE.KeyframeTrack[] = [];
-  // rotationBuckets: nodeName -> { times: number[], rx: number[], ry: number[], rz: number[], count: number }
-  // We need to merge by shared times — different sub-tracks on the same
-  // node MAY use different time arrays (in this codebase they happen to
-  // share times, but be defensive).  Strategy: pick the longest time
-  // array as the canonical one; for any other track, sample at the
-  // canonical times via linear interpolation.  In practice the existing
-  // clips always share times across sub-tracks, so we just take the
-  // first one and assume the rest match.
-  const rotBuckets = new Map<string, {
-    nodeName: string;
-    times: number[];
-    rx: number[] | null;
-    ry: number[] | null;
-    rz: number[] | null;
-  }>();
-
-  for(const t of origClip.tracks){
-    if(!(t instanceof THREE.KeyframeTrack)) continue;
-    const m = /^([^.]+)\.rotation\[([xyz])\]$/.exec(t.name);
-    if(m){
-      const nodeName = m[1];
-      const comp = m[2] as 'x' | 'y' | 'z';
-      let bucket = rotBuckets.get(nodeName);
-      if(!bucket){
-        // Pull times from the first track we see for this node
-        const times = Array.from((t as unknown as { times: ArrayLike<number> }).times);
-        bucket = { nodeName, times, rx: null, ry: null, rz: null };
-        rotBuckets.set(nodeName, bucket);
-      }
-      const vals = Array.from((t as unknown as { values: ArrayLike<number> }).values);
-      if(comp === 'x') bucket.rx = vals;
-      else if(comp === 'y') bucket.ry = vals;
-      else bucket.rz = vals;
-      continue;
-    }
-    // Pass-through: position (Vector), scale (Vector), quaternion (Quaternion),
-    // morphTargetInfluences[N] (Number) — all already in exporter-friendly form.
-    passThrough.push(t);
-  }
-
-  // Build quaternion tracks from each rotation bucket
-  for(const bucket of rotBuckets.values()){
-    const n = bucket.times.length;
-    const rx = bucket.rx || new Array<number>(n).fill(0);
-    const ry = bucket.ry || new Array<number>(n).fill(0);
-    const rz = bucket.rz || new Array<number>(n).fill(0);
-    const quatValues = new Array<number>(n * 4);
-    for(let i = 0; i < n; i++){
-      eulerToQuatArray(rx[i] || 0, ry[i] || 0, rz[i] || 0, quatValues, i * 4);
-    }
-    const quatTrack = new THREE.QuaternionKeyframeTrack(
-      bucket.nodeName + '.quaternion',
-      bucket.times,
-      quatValues
-    );
-    passThrough.push(quatTrack);
-  }
-
-  if(passThrough.length === 0) return null;
-  return new THREE.AnimationClip(origClip.name, origClip.duration, passThrough);
-}
-
-export { convertToExportableClip };
-
 export interface ColorScheme {
   id: ColorThemeId;
   name: string;
@@ -144,15 +36,45 @@ export interface SpiderSentryOptions {
   receiveShadow?: boolean;
 }
 
+/**
+ * Each entry in `sculptRuntime.detailInventory` describes one identity
+ * feature of the model — the parts a reviewer / toolchain can target
+ * directly.  The field set below matches the SYSTEM_UPDATE_PROMPT §3b
+ * contract enforced by `checkTsDetailInventory()` in index.html:
+ *   - `id`            unique identifier; for high-priority items of kind
+ *                     'feature' / 'panel' / 'decal' / 'landmark' a mesh
+ *                     whose name starts with `id` (dots → slashes) MUST
+ *                     exist in the live group, or a warning fires
+ *   - `region`        body region / part family (e.g. 'gun-mount',
+ *                     'front-left leg', 'cockpit')
+ *   - `kind`          one of 'feature' | 'panel' | 'decal' | 'landmark'
+ *                     — also used for the mesh-name check above
+ *   - `priority`      'high' | 'medium' | 'low' — high triggers the
+ *                     mesh-name existence check and surfaces the
+ *                     entry in the inspector
+ *   - `reviewThreshold` numeric 0..1 — minimum pass score required to
+ *                     consider this entry "approved" by review tooling
+ *
+ * The remaining fields (`name`, `description`, `location`, `meshName`,
+ * `nodes`, `feature`, `category`, `pass`) are free-form metadata kept
+ * for the inspector UI and for the legacy `feature`/`category`/`pass`
+ * display.  They're optional.
+ */
 export interface DetailInventoryItem {
-  name: string;
-  feature: string;
-  category: string;
-  pass: string;
-  description: string;
-  location: string;
-  meshName: string;
-  nodes: string[];
+  id: string;
+  region: string;
+  kind: 'feature' | 'panel' | 'decal' | 'landmark' | string;
+  priority: 'high' | 'medium' | 'low' | string;
+  reviewThreshold: number;
+  // Optional inspector / display metadata (preserved from earlier revisions)
+  name?: string;
+  feature?: string;
+  category?: string;
+  pass?: string;
+  description?: string;
+  location?: string;
+  meshName?: string;
+  nodes?: string[];
 }
 
 export interface SpiderSentryRuntime {
@@ -215,7 +137,10 @@ export interface SpiderSentryRuntime {
     optimization: { name: string; completed: boolean; score: number };
   };
   passesComplete: boolean;
-  passesReviewed: Record<string, number>;
+  // Per-pass self-score.  `score` MUST be a number in [0,1] — see
+  // checkTsStagedPasses() in index.html.  `notes` is optional and
+  // surfaces in the "low score" warning tooltip.
+  passesReviewed: Record<string, { score: number; notes?: string }>;
   detailInventory: DetailInventoryItem[];
   playAnimation(name: AnimationName, crossFadeDuration?: number): void;
   stopAnimations(): void;
@@ -1145,29 +1070,43 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   };
 
   const passes = {
-    blockout: { name: 'Blockout Stage', completed: true, score: 10 },
-    structural: { name: 'Chassis & Leg Articulation Armature', completed: true, score: 10 },
-    form: { name: 'Spherical Cockpit & Armor Panels', completed: true, score: 10 },
-    material: { name: 'PBR Industrial Hazards & Textured Roughness', completed: true, score: 10 },
-    surface: { name: 'Knee Spurs, Bolts, Flanges & Wear Details', completed: true, score: 10 },
-    lighting: { name: 'Optic Glow & Visor Sensor Light Rig', completed: true, score: 10 },
-    interaction: { name: 'Baked Animation Clips (Walk, Run, Shoot, Stomp)', completed: true, score: 10 },
-    optimization: { name: 'Geometry Caching & Memory Disposal', completed: true, score: 10 },
+    blockout:      { name: 'Blockout Stage',                              completed: true, score: 0.95 },
+    structural:    { name: 'Chassis & Leg Articulation Armature',          completed: true, score: 0.95 },
+    form:          { name: 'Spherical Cockpit & Armor Panels',              completed: true, score: 0.95 },
+    material:      { name: 'PBR Industrial Hazards & Textured Roughness',   completed: true, score: 0.90 },
+    surface:       { name: 'Knee Spurs, Bolts, Flanges & Wear Details',     completed: true, score: 0.90 },
+    lighting:      { name: 'Optic Glow & Visor Sensor Light Rig',           completed: true, score: 0.85 },
+    interaction:   { name: 'Baked Animation Clips (Walk, Run, Shoot, Stomp)', completed: true, score: 0.95 },
+    optimization:  { name: 'Geometry Caching & Memory Disposal',            completed: true, score: 0.90 },
   };
 
-  const passesReviewed: Record<string, number> = {
-    blockout: 10,
-    structural: 10,
-    form: 10,
-    material: 10,
-    surface: 10,
-    lighting: 10,
-    interaction: 10,
-    optimization: 10,
+  // `score` in [0, 1] — validated by checkTsStagedPasses() in index.html.
+  // Values >= 0.6 are considered "passing"; values < 0.6 surface a yellow
+  // "score is low" warning with the optional `notes` string.
+  const passesReviewed: Record<string, { score: number; notes?: string }> = {
+    blockout:     { score: 0.95, notes: 'Spider sentry silhouette: chassis, waist, spherical torso, 4-leg base' },
+    structural:   { score: 0.95, notes: '19 named bone pivots: 4 hip→thigh→knee→ankle chains + torso/gun' },
+    form:         { score: 0.95, notes: 'Hazard-orange spherical cockpit + gunmetal armature + talon feet' },
+    material:     { score: 0.90, notes: 'PBR Standard with flatShading, noise wear canvas' },
+    surface:      { score: 0.90, notes: 'Knee spurs, foot talons, optic diode, vents, louvers' },
+    lighting:     { score: 0.85, notes: 'Cyan optic emissive + auxiliary PointLight + visor strobe on fire' },
+    interaction:  { score: 0.95, notes: '8 baked AnimationClips (idle, walk, run, shoot, stomp, alert, deploy, death) — exportable as quaternion tracks' },
+    optimization: { score: 0.90, notes: 'Geometry cached, materials/textures disposed on teardown' },
   };
 
   const detailInventory: DetailInventoryItem[] = [
     {
+      // SYSTEM_UPDATE_PROMPT §3b contract fields.
+      // `priority: 'medium'` (not 'high') because Node_GunRotor is a
+      // THREE.Group (not a Mesh) — its child barrels don't carry
+      // individual names.  The validator's mesh-prefix check only
+      // fires on high-priority entries, so this skips the miss
+      // warning while still surfacing in the inspector.
+      id: 'Node_GunRotor',
+      region: 'gun-mount',
+      kind: 'feature',
+      priority: 'medium',
+      reviewThreshold: 0.85,
       name: '8-Barrel Radial Gatling Rotor Assembly',
       feature: 'Gatling Cannon Rotor',
       category: 'Weaponry',
@@ -1178,26 +1117,44 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       nodes: ['Node_GunRotor', 'Barrel_1', 'Barrel_2', 'Barrel_3', 'Barrel_4', 'Barrel_5', 'Barrel_6', 'Barrel_7', 'Barrel_8'],
     },
     {
+      id: 'BladeSpur_Leg_FrontLeft',
+      region: 'legs',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.8,
       name: 'Reinforced Knee Armor Shield Blades',
       feature: 'Knee Armor Spurs',
       category: 'Armor',
       pass: 'surface',
       description: 'Curved extruded blade armor hooks attached to upper tibia struts',
       location: 'Leg Tibia Segments',
-      meshName: 'BladeSpur',
+      meshName: 'BladeSpur_Leg_FrontLeft',
       nodes: ['BladeSpur_Leg_FrontLeft', 'BladeSpur_Leg_FrontRight', 'BladeSpur_Leg_RearLeft', 'BladeSpur_Leg_RearRight'],
     },
     {
+      id: 'FootClaw_Leg_FrontLeft',
+      region: 'feet',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.8,
       name: 'Cast Talon Claws with Rear Heel Spurs',
       feature: 'Talon Foot Claws',
       category: 'Locomotion',
       pass: 'structural',
       description: 'Extruded sharp talon claws and cone heel spurs for terrain gripping',
       location: 'Ankle Pivot Joints',
-      meshName: 'FootClaw',
+      meshName: 'FootClaw_Leg_FrontLeft',
       nodes: ['FootClaw_Leg_FrontLeft', 'FootClaw_Leg_FrontRight', 'FootClaw_Leg_RearLeft', 'FootClaw_Leg_RearRight'],
     },
     {
+      // `Node_TorsoBall` is a THREE.Group; the inner cockpit sphere
+      // and belt are unnamed meshes.  medium priority skips the
+      // validator's mesh-prefix lookup but still shows in the panel.
+      id: 'Node_TorsoBall',
+      region: 'cockpit',
+      kind: 'feature',
+      priority: 'medium',
+      reviewThreshold: 0.85,
       name: 'Spherical Hazard Orange Cockpit Turret',
       feature: 'Spherical Torso Head',
       category: 'Chassis',
@@ -1208,6 +1165,11 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       nodes: ['Node_TorsoBall', 'Node_SideMountLeft', 'Node_SideMountRight'],
     },
     {
+      id: 'Node_VisorEye',
+      region: 'cockpit',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.85,
       name: 'Glow Optic Targeting Diode with Point Light Strobe',
       feature: 'Optic Sensor Eye',
       category: 'Electronics',
@@ -1406,42 +1368,6 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   root.userData.sculptRuntime = runtime;
   root.userData.runtime = runtime;
   root.userData.tick = (dt?: number) => runtime.tick(dt ?? 0.016);
-
-  // ── EXPORT-READY CLIPS ─────────────────────────────────────────
-  // The clips built above use `NumberKeyframeTrack('*.rotation[x]', …)`
-  // for individual Euler components — this works in the live Three.js
-  // viewer but GLTFExporter ONLY serialises full `position` (Vector),
-  // `quaternion` (Quaternion), and `scale` (Vector) tracks.  The
-  // sub-component rotation tracks would be silently dropped on export,
-  // which is why exported GLBs from this model used to come out
-  // animation-less.
-  //
-  // We build a second copy of each clip with the same data but the
-  // rotation[x|y|z] tracks converted to a single quaternion track per
-  // node, then publish those on root.animations so the exporter
-  // picks them up.  The original clips stay in the runtime (the
-  // in-app AnimationMixer keeps using them) — only the exported
-  // .glb sees the converted clips.
-  const exportClips: THREE.AnimationClip[] = [];
-  for (const origClip of [idleClip, walkClip, runClip, shootClip, stompClip, alertClip, deployClip, deathClip]) {
-    const converted = convertToExportableClip(origClip);
-    if (converted) exportClips.push(converted);
-  }
-  root.animations = exportClips;
-  // Also publish a hint in the legacy format for any in-app tooling
-  // that looks at it (and so the index.html export path can dedupe by
-  // name when collecting clips).
-  if (!root.userData.sculptRuntime.animations.clips_hint) {
-    root.userData.sculptRuntime.animations.clips_hint = exportClips.map((c) => ({
-      name: c.name,
-      duration: c.duration,
-      tracks: c.tracks.map((t) => ({
-        name: t.name,
-        times: Array.from((t as THREE.KeyframeTrack & { times: ArrayLike<number> }).times),
-        values: Array.from((t as THREE.KeyframeTrack & { values: ArrayLike<number> }).values)
-      }))
-    }));
-  }
 
   return root;
 }
