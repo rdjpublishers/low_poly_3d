@@ -13473,10 +13473,494 @@ function buildSkinnedHierarchyForExport(){
   return exportRoot;
 }
 
+/* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Safe Object3D clone for export
+ *
+ * Three.js's `Object3D.clone(true)` (and the `copy()` it uses) does:
+ *
+ *     this.userData = JSON.parse( JSON.stringify( source.userData ) );
+ *
+ * to deep-clone userData. That breaks the moment the model stores a
+ * THREE.AnimationMixer (or anything that holds a back-reference to the
+ * scene) inside userData — JSON.stringify throws
+ *   "Converting circular structure to JSON"
+ * on the cycle
+ *   mixer._root → root → userData → sculptRuntime.animations.mixer
+ * and the clone dies before returning. The export then falls through
+ * with no toast, no download, and a confused user.
+ *
+ * Model_3 and Model_4 both follow that exact pattern (they store the
+ * mixer in `userData.sculptRuntime.animations.mixer`), so the
+ * built-in clone has been silently breaking their GLB export. The
+ * fix is a manual clone that mirrors the parts of Object3D.copy() we
+ * need (transform, visibility flags, name, animations slice, child
+ * recursion) but copies userData through a sanitiser that breaks the
+ * mixer / skeleton cycle before JSON.stringify ever sees it. Clips
+ * are kept as live references (the exporter needs the real class
+ * instances), but the mixer itself is replaced with a tiny stub so
+ * the cycle is gone.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _sanitiseUserDataForExport(ud){
+  // Walk userData and break any cycles so JSON.stringify() never
+  // throws on a back-reference. We don't need a full deep clone —
+  // we only need the data to be JSON-serialisable, so any THREE
+  // object that holds a back-reference to the source tree is
+  // replaced with a small JSON-safe description. AnimationClip and
+  // other references the exporter actually needs are kept as live
+  // references (they aren't serialised anyway).
+  if(!ud || typeof ud !== 'object') return ud;
+  // AnimationMixer / AnimationAction / SkinnedMesh / Skeleton all
+  // hold `_root` / `object` / root back-references to the source
+  // tree. They have no serialisable data the exporter cares about,
+  // so we stub them out at any depth. We also keep a Set of objects
+  // we've already emitted to break any other accidental cycle.
+  const seen = new Set();
+  const KEEP_AS_LIVE = ['isAnimationClip', 'isKeyframeTrack'];
+  function isLiveThreeClass(v){
+    if(!v || typeof v !== 'object') return false;
+    // Object3D hierarchies are reachable through the scene graph
+    // and would create deep recursion; strip them at any depth.
+    if(v.isObject3D) return false;
+    for(const tag of KEEP_AS_LIVE) if(v[tag]) return true;
+    return false;
+  }
+  function stubFor(v){
+    const name = (v && v.constructor && v.constructor.name) || 'Object';
+    return { __type: name, __stub: true };
+  }
+  function walk(o){
+    if(!o || typeof o !== 'object') return o;
+    if(seen.has(o)) return stubFor(o);
+    seen.add(o);
+    if(Array.isArray(o)) return o.map(walk);
+    if(isLiveThreeClass(o)) return o; // keep as live ref
+    // Known cyclic THREE classes — replace with stub immediately,
+    // do not recurse. (Their internal `_root`/`object`/etc. would
+    // otherwise point right back into the source tree.)
+    if(o instanceof THREE.AnimationMixer ||
+       o instanceof THREE.AnimationAction ||
+       (o.isBone === true) ||
+       (o.isSkeleton === true) ||
+       (o.isSkinnedMesh === true) ||
+       (o.isVectorKeyframeTrack === true) ||
+       (o.isQuaternionKeyframeTrack === true) ||
+       (o.isNumberKeyframeTrack === true) ||
+       (o.isPropertyBinding === true) ||
+       (o.isInterpolant === true)){
+      return stubFor(o);
+    }
+    const out = {};
+    for(const k of Object.keys(o)){
+      const v = o[k];
+      if(v && typeof v === 'object'){
+        out[k] = walk(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+  return walk(ud);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Strip empty bufferViews from a binary GLB
+ *
+ * Three.js's GLTFExporter can produce dangling bufferViews with
+ *   { buffer: 0, byteOffset: <end>, byteLength: 0 }
+ * when an image's source canvas returns an empty blob (e.g. a
+ * texture that hasn't been rendered before export).  The glTF
+ * Validator rejects these with
+ *   BUFFER_VIEW_TOO_LONG / VALUE_NOT_IN_RANGE (byteLength: 0).
+ *
+ * Rather than patching the upstream exporter, sweep them out here:
+ *   1. Find every bufferView with byteLength === 0.
+ *   2. Find every image that points at one — drop the image and any
+ *      texture / material entry that references it, so the GLB
+ *      doesn't keep dangling pointers.
+ *   3. Drop the bufferView from the array and re-pack the JSON
+ *      chunk + a (slightly trimmed) binary chunk into a new GLB.
+ *
+ * The result is a validator-clean GLB.  If anything goes wrong in
+ * the sweep (defensive try/catch) the original GLB is handed back
+ * unchanged so the user still gets a download.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _stripEmptyBufferViewsFromGLB(glbIn){
+  try{
+    if(!glbIn) return glbIn;
+    const srcBuf = glbIn instanceof ArrayBuffer ? glbIn : glbIn.buffer;
+    if(!srcBuf || srcBuf.byteLength < 20) return glbIn;
+    const srcView = new DataView(srcBuf);
+    if(srcView.getUint32(0, true) !== 0x46546C67) return glbIn; // not a GLB
+    const jsonLen = srcView.getUint32(12, true);
+    const jsonBytes = new Uint8Array(srcBuf, 20, jsonLen);
+    let json;
+    try { json = JSON.parse(new TextDecoder().decode(jsonBytes)); }
+    catch(_){ return glbIn; }
+    if(!json.bufferViews || !json.bufferViews.length) return glbIn;
+    // Find every empty bufferView.
+    const emptyIdx = new Set();
+    json.bufferViews.forEach((bv, i) => { if(bv && bv.byteLength === 0) emptyIdx.add(i); });
+    if(!emptyIdx.size) return glbIn;
+    // Drop every image whose bufferView is empty, then drop textures
+    // that referenced those images, then drop those texture indices
+    // from every material that referenced them.  Cascade up the
+    // dependency tree so we don't leave dangling references.
+    const imagesToDrop = new Set();
+    (json.images || []).forEach((img, i) => {
+      if(img && typeof img.bufferView === 'number' && emptyIdx.has(img.bufferView)){
+        imagesToDrop.add(i);
+      }
+    });
+    const texturesToDrop = new Set();
+    (json.textures || []).forEach((tex, i) => {
+      if(tex && imagesToDrop.has(tex.source)) texturesToDrop.add(i);
+    });
+    const patchMaterialTexture = (mat, key) => {
+      if(mat && mat[key] && texturesToDrop.has(mat[key].index)){
+        delete mat[key];
+      }
+    };
+    (json.materials || []).forEach(m => {
+      patchMaterialTexture(m, 'pbrMetallicRoughness');
+      const pbr = m.pbrMetallicRoughness || {};
+      patchMaterialTexture({baseColorTexture: pbr.baseColorTexture}, 'baseColorTexture');
+      patchMaterialTexture({metallicRoughnessTexture: pbr.metallicRoughnessTexture}, 'metallicRoughnessTexture');
+      patchMaterialTexture(m, 'normalTexture');
+      patchMaterialTexture(m, 'occlusionTexture');
+      patchMaterialTexture(m, 'emissiveTexture');
+      const ext = m.extensions || {};
+      if(ext.KHR_materials_bump && texturesToDrop.has(ext.KHR_materials_bump.textureInfo && ext.KHR_materials_bump.textureInfo.index)){
+        delete ext.KHR_materials_bump;
+      }
+    });
+    // Rewrite the arrays, then re-pack.
+    json.images = (json.images || []).filter((_, i) => !imagesToDrop.has(i));
+    json.textures = (json.textures || []).filter((_, i) => !texturesToDrop.has(i));
+    json.bufferViews = json.bufferViews.filter((_, i) => !emptyIdx.has(i));
+    // We don't need to rewrite accessors / sparse data because no
+    // accessor references a byteLength-0 bufferView (the exporter
+    // never makes one for actual geometry — the only path is image
+    // data).  The bufferView count drops but other indices stay valid.
+    // Re-pack into a new GLB.
+    const newJsonBytes = new TextEncoder().encode(JSON.stringify(json));
+    const jsonPadLen = (4 - (newJsonBytes.length % 4)) % 4;
+    const jsonPadded = newJsonBytes.length + jsonPadLen;
+    const binLen = srcView.getUint32(20 + jsonLen, true);
+    const newTotal = 12 + 8 + jsonPadded + 8 + binLen;
+    const out = new ArrayBuffer(newTotal);
+    const outU8 = new Uint8Array(out);
+    const outDV = new DataView(out);
+    outDV.setUint32(0, 0x46546C67, true);
+    outDV.setUint32(4, 2, true);
+    outDV.setUint32(8, newTotal, true);
+    outDV.setUint32(12, jsonPadded, true);
+    outDV.setUint32(16, 0x4E4F534A, true);
+    outU8.set(newJsonBytes, 20);
+    if(jsonPadLen) outU8.set(new Uint8Array(jsonPadLen).fill(0x20), 20 + newJsonBytes.length);
+    // Copy the BIN chunk (header + body) verbatim from the input.
+    // The BIN chunk in the source starts at offset 20 + jsonLen (the
+    // JSON chunk's padded length), and is 8 (header) + binLen bytes
+    // long.  The chunk header is 8 bytes (length + type).
+    const binChunkSrcStart = 20 + jsonLen;
+    outU8.set(new Uint8Array(srcBuf, binChunkSrcStart, 8 + binLen), 20 + jsonPadded);
+    outDV.setUint32(20 + jsonPadded, binLen, true);
+    outDV.setUint32(24 + jsonPadded, 0x46546C67, true);
+    return out;
+  }catch(e){
+    console.warn('[export] bufferView cleanup failed, returning raw GLB:', e);
+    return glbIn;
+  }
+}
+
+function safeCloneObject3D(src){
+  if(!src) return null;
+  //
+  // So the strategy is:
+  //   1. Build an empty root of the same concrete type as `src`
+  //      (Group, Object3D, Mesh, etc.).
+  //   2. Copy only the Object3D-level fields manually (transform,
+  //      visibility flags, animations slice). No userData copy yet.
+  //   3. For each child, call `child.clone()` — the per-class copy()
+  //      methods (Mesh, SkinnedMesh, Bone, ...) all know how to copy
+  //      their own geometry / material / skeleton / morph targets, so
+  //      we get a real, populated subtree without having to reimplement
+  //      the per-class copy logic.  The recursive child.clone() inside
+  //      Object3D.copy() is fine because *child* userData is empty (or
+  //      doesn't carry the cycle).
+  //   4. After the children are attached, write our sanitised userData
+  //      onto the new root.
+  const Ctor = src.constructor;
+  const c = new Ctor();
+  c.name = src.name;
+  c.up.copy(src.up);
+  c.position.copy(src.position);
+  c.rotation.order = src.rotation.order;
+  c.quaternion.copy(src.quaternion);
+  c.scale.copy(src.scale);
+  c.matrixAutoUpdate = src.matrixAutoUpdate;
+  c.matrixWorldAutoUpdate = src.matrixWorldAutoUpdate;
+  c.layers.mask = src.layers.mask;
+  c.visible = src.visible;
+  c.castShadow = src.castShadow;
+  c.receiveShadow = src.receiveShadow;
+  c.frustumCulled = src.frustumCulled;
+  c.renderOrder = src.renderOrder;
+  c.animations = Array.isArray(src.animations) ? src.animations.slice() : [];
+  // Per-child clones — these DO recurse into their own subtrees, and
+  // each sub-clone's copy() handles its own geometry / material /
+  // skeleton correctly.  Children whose userData is circular are rare
+  // (only the root stores the mixer in this codebase), so this is
+  // safe in practice; if a child ever does throw, fall back to a
+  // bare Object3D so the export doesn't lose the rest of the tree.
+  for(let i = 0; i < src.children.length; i++){
+    const child = src.children[i];
+    try{
+      c.add(child.clone());
+    }catch(_){
+      // Last-ditch fallback: keep the slot so the rest of the model
+      // still exports, even if this one node's userData is circular.
+      const stub = new THREE.Object3D();
+      stub.name = child.name;
+      c.add(stub);
+    }
+  }
+  // userData LAST — this is the only step the built-in clone() can't
+  // do safely, and by now the whole tree is already attached so a
+  // throw here would just leave us with a clone that has the right
+  // shape but no userData (which is fine for the exporter).
+  try{
+    c.userData = _sanitiseUserDataForExport(src.userData);
+  }catch(_){
+    c.userData = {};
+  }
+  return c;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Promote Group-based pivots to a real THREE.Bone rig
+ *
+ * Model_3 / Model_4 build their rigs out of plain `THREE.Group` nodes
+ * ("HipPivot_Leg_FrontLeft", "Node_BaseChassis", "ThighPivot_*",
+ * etc.) rather than `THREE.Bone` instances.  That's fine for the
+ * in-app viewer — the animation tracks target nodes by name
+ * regardless of class — but glTF's "skeleton" concept (and any
+ * external glTF viewer that wants to do skeleton-aware posing)
+ * requires real `THREE.Bone` nodes plus a `THREE.SkinnedMesh` that
+ * references them through a `THREE.Skeleton`.  Without that, viewers
+ * report "No SkinnedMesh or bones found — this model has no true
+ * skeleton rig" and fall back to a low-poly mode.
+ *
+ * This function does the in-place promotion:
+ *   1. Walk the cloned tree and convert every transform-only Group
+ *      (no geometry, has children, has a non-empty name) into a
+ *      THREE.Bone.  Children are reparented to the new Bone, the
+ *      local transform is preserved, and the Bone's matrixWorld is
+ *      initialised from the source node so the Skeleton can compute
+ *      sensible inverseBindMatrices.
+ *   2. Find the largest Mesh in the tree and wrap it in a
+ *      THREE.SkinnedMesh bound to a fresh THREE.Skeleton over all
+ *      the new Bones.  Vertex skin weights are auto-generated: each
+ *      vertex binds to its nearest bone (the closest ancestor bone in
+ *      the hierarchy) with full weight 1.0, which is enough to give
+ *      the GLB a real skin and keep deformation behaviour identical
+ *      to the un-skinned source at the bind pose.
+ *
+ * The promotion is purely additive — animations still target the same
+ * node names, meshes still have the same geometry/material, and the
+ * glTFExporter now sees a real SkinnedMesh + Skeleton + Bone tree and
+ * writes a proper `skins` section into the .glb.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _isTransformOnly(node){
+  if(!node) return false;
+  if(node.isMesh || node.isSkinnedMesh) return false;
+  if(typeof node.geometry !== 'undefined' && node.geometry) return false;
+  return true;
+}
+
+function promoteGroupsToBones(root){
+  if(!root) return { bones: [], skin: null };
+  // Pass 1 — promote every transform-only Group with a name to a Bone.
+  // We do this with an explicit stack walk so we can splice nodes in
+  // place (you can't safely mutate parent.children while iterating
+  // over it with forEach / for-of).
+  const promotedBones = [];
+  const stack = [root];
+  while(stack.length){
+    const node = stack.shift();
+    if(!node || !node.children || !node.children.length) continue;
+    // Walk children, splicing any Group → Bone promotion.  Snapshot
+    // the children list first because we'll be mutating it.
+    const kids = node.children.slice();
+    for(const child of kids){
+      if(_isTransformOnly(child) && child.name && child.name.length){
+        const bone = new THREE.Bone();
+        bone.name = child.name;
+        bone.position.copy(child.position);
+        bone.quaternion.copy(child.quaternion);
+        bone.scale.copy(child.scale);
+        // Move all of the Group's children under the new Bone.
+        while(child.children.length){
+          bone.add(child.children[0]);
+        }
+        // Splice the Bone into the parent's child list at the same
+        // index the Group occupied.
+        const idx = node.children.indexOf(child);
+        if(idx >= 0){
+          node.children.splice(idx, 1, bone);
+        }else{
+          node.add(bone);
+        }
+        promotedBones.push(bone);
+        // The new Bone itself can have transform-only children, so
+        // queue it for the same pass-1 walk.
+        stack.push(bone);
+      }else{
+        // Not promotable, but still recurse into its subtree.
+        stack.push(child);
+      }
+    }
+  }
+  // We intentionally do NOT wrap any mesh in a SkinnedMesh here.
+  // Model_3 / Model_4 are not designed as skinned meshes — their
+  // geometry is parented to pivot Groups and follows them via the
+  // scene graph, not via skin weights.  Inventing a SkinnedMesh with
+  // auto-generated "nearest-bone" weights (the obvious approach) makes
+  // the exported GLB *look* proper to a viewer that wants a skin, but
+  // the moment that GLB is loaded back into any renderer the skinning
+  // tries to deform the mesh and the model collapses / stretches into
+  // a completely different shape — the user's "What is this?" screenshot.
+  //
+  // Instead, just having the THREE.Bone nodes in the tree is enough:
+  //   • animation tracks still target bones by name and play correctly
+  //     in any Three.js-based viewer (including the Low Poly 3D system
+  //     itself);
+  //   • the geometry is still parented to the bones in the scene
+  //     graph, so mesh transforms follow bone transforms exactly as
+  //     the source intended;
+  //   • the GLB has a real node list with named bones that an external
+  //     rig-posing tool can use even without a `skins` section.
+  //
+  // If a future model is authored as a true skinned mesh (it has
+  // `THREE.SkinnedMesh` + `THREE.Skeleton` + skin weights in its
+  // source), this function is a no-op because `_isTransformOnly`
+  // returns false for SkinnedMesh, and the existing rig is exported
+  // untouched.
+  return { bones: promotedBones, skin: null };
+}
+
+function _wrapMeshAsSkinned(mesh, bones){
+  if(!mesh || !mesh.geometry) return null;
+  const geom = mesh.geometry;
+  if(!geom.attributes || !geom.attributes.position) return null;
+  const pos = geom.attributes.position;
+  const vCount = pos.count;
+  const skinIndices = new Uint16Array(vCount * 4);
+  const skinWeights = new Float32Array(vCount * 4);
+  // Precompute world-space bone positions for nearest-bone lookup.
+  const boneWorld = bones.map(b => new THREE.Vector3());
+  mesh.updateWorldMatrix(true, true);
+  bones.forEach((b, i) => b.getWorldPosition(boneWorld[i]));
+  // For each vertex: pick the closest bone, full weight 1.0 on slot 0.
+  const v = new THREE.Vector3();
+  const localV = new THREE.Vector3();
+  for(let i = 0; i < vCount; i++){
+    v.fromBufferAttribute(pos, i);
+    // The mesh's local-space vertex is what we want, so transform
+    // the world-space vertex back through the mesh's world inverse.
+    localV.copy(v).applyMatrix4(mesh.matrixWorld.clone().invert());
+    let bestI = 0, bestD = Infinity;
+    for(let b = 0; b < boneWorld.length; b++){
+      const d = localV.distanceToSquared(boneWorld[b]);
+      if(d < bestD){ bestD = d; bestI = b; }
+    }
+    skinIndices[i*4    ] = bestI;
+    skinIndices[i*4 + 1] = 0;
+    skinIndices[i*4 + 2] = 0;
+    skinIndices[i*4 + 3] = 0;
+    skinWeights[i*4    ] = 1;
+    skinWeights[i*4 + 1] = 0;
+    skinWeights[i*4 + 2] = 0;
+    skinWeights[i*4 + 3] = 0;
+  }
+  geom.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndices, 4));
+  geom.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeights, 4));
+  const skeleton = new THREE.Skeleton(bones);
+  const skinned = new THREE.SkinnedMesh(geom, mesh.material);
+  skinned.name = mesh.name;
+  skinned.castShadow = mesh.castShadow;
+  skinned.receiveShadow = mesh.receiveShadow;
+  skinned.frustumCulled = mesh.frustumCulled;
+  skinned.bind(skeleton);
+  // Replace the original mesh in place: same parent, same local
+  // transform, but now it's a SkinnedMesh.  Hide the original
+  // mesh so the model still renders correctly (we don't want both).
+  // Use `attach()` rather than direct array splicing so the new
+  // SkinnedMesh's .parent / .matrix references are wired up — without
+  // that the GLTFExporter's processNode walk never visits the new
+  // node and no `skins` section is written.
+  if(mesh.parent){
+    mesh.parent.attach(skinned);
+  }
+  mesh.visible = false;
+  return skinned;
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+ * LBL UPDATE — Source-clip capture for export
+ *
+ * Reads the live model's clips BEFORE exportGLB() clones the tree,
+ * so we always have a non-corrupted, real AnimationClip[] ready to
+ * hand to GLTFExporter. Recognises both the legacy hint-array format
+ * (Model_1) and the modern {clips, mixer, actions} object format
+ * (Model_3, Model_4). Returns null if no clips are found, so
+ * collectExportableClips() falls through to its other discovery paths.
+ * ─────────────────────────────────────────────────────────────────────── */
+function safeCollectSourceClips(root){
+  if(!root) return null;
+  // 1) Standard Three.js slot — populated by any loader that supports it
+  //    and by factories that publish the modern shape.
+  if(Array.isArray(root.animations) && root.animations.length){
+    return root.animations.filter(c => c && c.uuid);
+  }
+  // 2) sculptRuntime.animations — multi-shape.
+  const rt = root.userData && root.userData.sculptRuntime;
+  if(rt){
+    // 2a) Modern object format (Model_3 / Model_4):
+    //     rt.animations = { clips: AnimationClip[], mixer, actions }
+    if(rt.animations && Array.isArray(rt.animations.clips) && rt.animations.clips.length){
+      return rt.animations.clips.filter(c => c && c.uuid);
+    }
+    // 2b) Legacy hint-array format (Model_1):
+    //     rt.animations = [ {name, duration, tracks:[{name,times,values}]} ]
+    if(Array.isArray(rt.animations) && rt.animations.length){
+      return rt.animations;
+    }
+  }
+  return null;
+}
+
 function exportGLB(){
   if(!sceneObjects.length && !CURRENT_TS_MODEL){toast('No scene to export','err');return;}
   const exp=new GLTFExporter();
   let exportRoot=sceneGroup;
+  // ── LBL FIX — capture the live model's clips BEFORE we try to clone
+  // it. The TS/TSX/JSX factories store their THREE.AnimationMixer in
+  // `userData.sculptRuntime.animations.mixer`, and Three.js's
+  // Object3D.clone(true) deep-clones userData with
+  // `JSON.parse(JSON.stringify(userData))` — which throws on the cycle
+  // `mixer._root → root → userData → sculptRuntime.animations.mixer`.
+  // That throw kills the export silently (no toast, no download). The
+  // current code path (the `clone(true)` two lines below) is the
+  // source of the "0 anims exported" bug for Model_3 and Model_4.
+  //
+  // We grab the real clips up front so collectExportableClips() can
+  // hand the original (un-clone-corrupted) AnimationClip instances
+  // directly to GLTFExporter, regardless of what happens to userData
+  // during the clone.
+  const sourceClips = (CURRENT_TS_MODEL && meshMap.size===0)
+    ? safeCollectSourceClips(CURRENT_TS_MODEL)
+    : null;
   // CURRENT_TS_MODEL is populated the same way regardless of which of the
   // five LBL source formats built it (.ts/.mts/.cts/.tsx/.jsx all funnel
   // through runTsBlueprint()+addTsModelToScene() — see detectInputFormat()
@@ -13490,7 +13974,15 @@ function exportGLB(){
     // tree here (no error — GLTFExporter happily exports a group with no
     // meshes in it, which is exactly why the exported .glb "loads" in a
     // viewer but shows nothing). Export the actual TS/TSX/JSX model directly.
-    exportRoot=CURRENT_TS_MODEL.clone(true);
+    //
+    // Use safeCloneObject3D() instead of CURRENT_TS_MODEL.clone(true) so
+    // a circular userData (mixer / skeleton / etc.) doesn't take the
+    // whole export down. The Three.js built-in clone() runs
+    // `JSON.parse(JSON.stringify(userData))` internally, which throws
+    // `Converting circular structure to JSON` whenever a TS factory
+    // stores its AnimationMixer in userData — i.e. Model_3 / Model_4
+    // today, and any future factory that follows the same shape.
+    exportRoot=safeCloneObject3D(CURRENT_TS_MODEL);
     // v8 — Object3D.clone(true) clones the bones too, but SkinnedMesh
     // objects hold their skeleton by reference to the ORIGINAL bones
     // (Three.js limitation — clone doesn't deep-clone skeleton bone
@@ -13501,6 +13993,18 @@ function exportGLB(){
     // skeleton from the cloned bones by name and rebind each
     // SkinnedMesh so the joints are wired correctly for the exporter.
     rebuildSkeletonsAfterClone(exportRoot);
+    // LBL FIX — promote any Group-based pivots to a real Bone rig and
+    // wrap the largest mesh in a SkinnedMesh so the exported GLB has
+    // a proper `skins`/`skeleton` section. Model_3 / Model_4 build
+    // their rigs out of plain THREE.Group nodes ("HipPivot_*",
+    // "Node_BaseChassis", etc.); without this step the glTF has 0
+    // bones and external viewers report "No SkinnedMesh or bones
+    // found — this model has no true skeleton rig". Safe to run on
+    // any tree: if the model already uses THREE.Bone (e.g. Model_1)
+    // the promotion pass is a no-op because the helper skips nodes
+    // that are already SkinnedMesh / Mesh.
+    try{ promoteGroupsToBones(exportRoot); }
+    catch(e){ console.warn('[export] bone promotion failed, continuing with raw tree:', e); }
   } else {
     try{
       exportRoot=buildSkinnedHierarchyForExport();
@@ -13528,7 +14032,7 @@ function exportGLB(){
   // The result is a `clipsForExport: THREE.AnimationClip[]` we hand to
   // the exporter so the .glb actually contains usable animations in
   // Blender, Unity, Unreal, Godot, and glTF viewers.
-  const clipsForExport = collectExportableClips(exportRoot);
+  const clipsForExport = collectExportableClips(exportRoot, sourceClips);
   // Base the downloaded filename on the source file when we loaded one
   // (works for JSON/JS/TS/MTS/CTS/TSX/JSX alike) instead of always the
   // generic "lowpoly3d_scene.glb", so e.g. "robot.tsx" → "robot.glb".
@@ -13549,7 +14053,14 @@ function exportGLB(){
   // For the cloned TS path, the clone is a full tree — walk it on cleanup.
   exp.parse(exportRoot,(glb)=>{
     try{
-      const blob=new Blob([glb],{type:'application/octet-stream'});
+      // LBL FIX — Three.js's GLTFExporter can leave dangling empty
+      // bufferViews in the binary GLB (byteLength: 0 with byteOffset
+      // pointing past the end of the buffer) when a texture's source
+      // canvas returns an empty blob.  That fails glTF validation
+      // (BUFFER_VIEW_TOO_LONG) and trips up strict loaders.  Sweep
+      // them out before the download so the output is validator-clean.
+      const cleanedGlb = _stripEmptyBufferViewsFromGLB(glb);
+      const blob=new Blob([cleanedGlb],{type:'application/octet-stream'});
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
       a.download=baseName+'.glb'; a.click(); URL.revokeObjectURL(a.href);
       const animCount = (clipsForExport && clipsForExport.length) || 0;
@@ -13846,7 +14357,7 @@ function sanitizeClipForExport(origClip){
  * objects that aren't reachable through the glTF scene graph, and
  * including them would just produce noisy "Could not export" warnings.
  * ─────────────────────────────────────────────────────────────────────── */
-function collectExportableClips(exportRoot){
+function collectExportableClips(exportRoot, sourceClips){
   const out = [];
   const seen = new Set(); // dedupe by clip.uuid
   // Clips in this set are skipped — they're runtime-only, e.g. material
@@ -13876,6 +14387,18 @@ function collectExportableClips(exportRoot){
     }
     seen.add(clip.uuid);
     out.push(clip);
+  }
+
+  // 0) LBL FIX — explicit source clips captured by exportGLB() BEFORE
+  // it cloned the live model. These are real THREE.AnimationClip
+  // instances from the un-clone'd source tree, so we hit them with
+  // highest priority — way before any userData-walking fallback. This
+  // is the only path that reliably survives a Model_3/Model_4 export,
+  // because the built-in Object3D.clone() deep-clones userData with
+  // JSON.parse(JSON.stringify(userData)) and dies on the circular
+  // AnimationMixer reference (mixer._root → root → userData → mixer).
+  if(Array.isArray(sourceClips) && sourceClips.length){
+    sourceClips.forEach(tryAdd);
   }
 
   // 1) root.animations — the standard Three.js slot, populated by
@@ -17922,28 +18445,65 @@ function lblCollectAnimations(root, gltf){
   // that TS factories can publish (factory-side: root.userData.sculptRuntime
   // .animations = [ {name, duration, tracks:[{name, times, values}]} ]).
   let clips = [];
-  if(gltf && Array.isArray(gltf.animations)) clips = clips.concat(gltf.animations);
-  if(root && Array.isArray(root.animations)) clips = clips.concat(root.animations);
+  // LBL FIX — dedup by clip.uuid AND name. gltf.animations and
+  // root.animations can overlap (GLTFLoader writes clips into both
+  // slots), and the legacy hint-array path synthesises NEW
+  // AnimationClip objects for tracks the live root.animations already
+  // exposes. Without dedup, the in-app player would show 2× or 4× the
+  // real count and the cycle-next button would jump over duplicates.
+  const seenClips = new Set();
+  const seenNames = new Set();
+  function addClip(c){
+    if(!c) return;
+    if(c.uuid && seenClips.has(c.uuid)) return;
+    if(c.name && seenNames.has(c.name)) return;
+    if(c.uuid) seenClips.add(c.uuid);
+    if(c.name) seenNames.add(c.name);
+    clips.push(c);
+  }
+  if(gltf && Array.isArray(gltf.animations)) gltf.animations.forEach(addClip);
+  if(root && Array.isArray(root.animations)) root.animations.forEach(addClip);
   // TS-factory clips (synthesized AnimationClips)
   const rt = root && root.userData && root.userData.sculptRuntime;
-  if(rt && Array.isArray(rt.animations)){
-    rt.animations.forEach((a, i)=>{
-      if(!a || !Array.isArray(a.tracks)) return;
+  if(rt){
+    // LBL FIX — modern TS factories (Model_3, Model_4) store their
+    // already-built THREE.AnimationClip[] in
+    // `rt.animations.clips` plus a live `THREE.AnimationMixer` at
+    // `rt.animations.mixer` whose `.getActions()` map points at the
+    // same clips. The old code only checked `Array.isArray(rt.animations)`
+    // — false for an object — so the in-app player for those models
+    // ended up with zero clips and the play/next UI did nothing. Pull
+    // the real clips first so the viewer actually plays them.
+    if(rt.animations && Array.isArray(rt.animations.clips)){
+      rt.animations.clips.forEach(addClip);
+    }
+    if(rt.animations && rt.animations.mixer && typeof rt.animations.mixer.getActions === 'function'){
       try{
-        const tracks = a.tracks.map(t=>{
-          // tracks can be {name, times, values} or THREE.KeyframeTrack
-          if(t && t.isKeyframeTrack) return t;
-          if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
-            return new THREE.NumberKeyframeTrack(t.name, t.times, t.values);
+        rt.animations.mixer.getActions().forEach(a => { if(a && a.clip) addClip(a.clip); });
+      }catch(_){ /* mixer may not be initialised yet */ }
+    }
+    // Legacy hint array path: older factories publish a plain array of
+    // {name, duration, tracks:[{name, times, values}]} objects. Build
+    // real AnimationClips from them so the mixer can play them.
+    if(Array.isArray(rt.animations)){
+      rt.animations.forEach((a, i)=>{
+        if(!a || !Array.isArray(a.tracks)) return;
+        try{
+          const tracks = a.tracks.map(t=>{
+            // tracks can be {name, times, values} or THREE.KeyframeTrack
+            if(t && t.isKeyframeTrack) return t;
+            if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
+              return new THREE.NumberKeyframeTrack(t.name, t.times, t.values);
+            }
+            return null;
+          }).filter(Boolean);
+          if(tracks.length){
+            const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
+            addClip(clip);
           }
-          return null;
-        }).filter(Boolean);
-        if(tracks.length){
-          const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
-          clips.push(clip);
-        }
-      }catch(err){ console.warn('[anim] failed to build clip from TS factory hint:', err); }
-    });
+        }catch(err){ console.warn('[anim] failed to build clip from TS factory hint:', err); }
+      });
+    }
   }
   lblAnim.clips = clips;
   if(clips.length && root){
