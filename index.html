@@ -1174,10 +1174,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="stl-btn" title="Export STL — runs a manifold/printability check first">STL</button>
   <button class="tbtn primary" id="glb-btn">Export GLB</button>
 </div>
-<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx" style="display:none"/>
+<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts" style="display:none"/>
 <input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz" style="display:none"/>
-<!-- 3D-model uploads intentionally keep their own format list — .jsx/.tsx are
-     source code for the LBL TS factory pipeline (#file-input above), not
+<!-- 3D-model uploads intentionally keep their own format list — .ts/.mts/.cts
+     are source code for the LBL TS factory pipeline (#file-input above), not
      importable 3D model formats, so they don't belong on this input. -->
 
 <!-- NAV MENU (hamburger) -->
@@ -1264,7 +1264,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="dropzone">
-        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx,image/*"/>
+        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,image/*"/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Drop JSON / JS / TS here</div>
         <div class="dz-sub">or click to browse · drop an image onto a selected part to texture it</div>
@@ -1344,16 +1344,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
 
           <div class="lp-mode-card">
             <div class="lp-mode-head">
-              <h3>Pro+ <span class="lp-mode-tag">TSX / JSX</span></h3>
-              <p class="lp-mode-desc">Same real Three.js factory contract as Pro, wrapped as a React-style component file — .tsx is typed, .jsx is the untyped sibling.</p>
-            </div>
-            <div class="lp-dl-row">
-              <button class="lp-dl-btn" data-file="Prompt_To_Tsx.txt">⬇ Prompt_To_Tsx.txt</button>
-              <button class="lp-dl-btn" data-file="Image_To_Tsx.txt">⬇ Image_To_Tsx.txt</button>
-            </div>
-            <div class="lp-dl-row">
-              <button class="lp-dl-btn" data-file="Prompt_To_Jsx.txt">⬇ Prompt_To_Jsx.txt</button>
-              <button class="lp-dl-btn" data-file="Image_To_Jsx.txt">⬇ Image_To_Jsx.txt</button>
+              <h3>Pro+ <span class="lp-mode-tag">TypeScript</span></h3>
+              <p class="lp-mode-desc">Same real Three.js factory contract as Pro, written in modern .ts — fully typed, single-file ready, no extra build step needed.</p>
             </div>
             <p class="lp-dl-hint">Download this file → Paste it into any AI (ChatGPT, Claude, Gemini, etc.) together with your prompt or image.</p>
           </div>
@@ -1392,7 +1384,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
           </details>
           <details class="lp-faq-item">
             <summary>Can I edit a model after it loads?</summary>
-            <p>Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, or .ts/.tsx/.jsx.</p>
+            <p>Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, or .ts.</p>
           </details>
         </div>
 
@@ -1597,7 +1589,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="mob-dropzone" class="dropzone-box">
-        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,.jsx,.tsx,image/*" class="dropzone-input"/>
+        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" class="dropzone-input"/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Tap to browse JSON</div>
       </div>
@@ -11848,12 +11840,11 @@ function runJsBlueprint(code){
 // ═══════════════════════════════════════════
 // LBL TS INPUT PATH — SYSTEM_UPDATE_PROMPT__Add_TS_Output_to_LBL.md
 // ═══════════════════════════════════════════
-// A .ts/.tsx/.jsx input isn't a blueprint the way JSON/JS are — it's real
-// Three.js source code that exports a createXxxModel(options): THREE.Group
-// factory. Contract: Prompt_To_Ts.txt / Image_To_Ts.txt PART 1 for .ts,
-// Prompt_To_Tsx.txt / Image_To_Tsx.txt for .tsx, Prompt_To_Jsx.txt /
-// Image_To_Jsx.txt for .jsx (same runtime shape, .jsx is untyped —
-// no TypeScript syntax on that path, JSDoc only). buildScene() never
+// A .ts/.mts/.cts input isn't a blueprint the way JSON/JS are — it's
+// real Three.js source code that exports a createXxxModel(options):
+// THREE.Group factory. Contract: Prompt_To_Ts.txt / Image_To_Ts.txt
+// PART 1 (the .mts/.cts variants share the same spec — only the
+// file extension differs). buildScene() never
 // runs on this path: the factory builds its own Group and this file just
 // hosts it — clears sceneGroup, adds the Group, fits the camera, and (if
 // the factory set userData.tick) wires it into the render loop below.
@@ -11877,30 +11868,18 @@ function runJsBlueprint(code){
 // validateAndBuild() was already called with as its second argument — a
 // real filename when loaded from disk/drag-drop ("shotgun.ts"), or a
 // sentinel ("demo"/"editor") otherwise. Both are safe to test for a
-// .ts/.mts/.cts/.tsx/.jsx suffix since the sentinels never end that way; a
-// TS/TSX file pasted into the textarea (no filename at all) still gets
-// caught by the import/export + THREE heuristic. .jsx/.tsx route through
-// the exact same "ts" pipeline as .ts/.mts/.cts — runTsBlueprint() (below)
-// is the one that decides, per-file, whether to additionally turn on JSX
-// parsing, based on this same extension check plus a diagnostics-driven
-// fallback for pasted/extensionless scripts.
+// .ts/.mts/.cts suffix since the sentinels never end that way; a
+// TS file pasted into the textarea (no filename at all) still gets
+// caught by the import/export + THREE heuristic. runTsBlueprint() (below)
+// handles all three (.ts/.mts/.cts) identically with one compile pass.
 function detectInputFormat(text, sourceOrFilename){
   const name=(sourceOrFilename||'').toLowerCase();
-  if(/\.(ts|mts|cts|tsx|jsx)$/.test(name)) return 'ts';
+  if(/\.(ts|mts|cts)$/.test(name)) return 'ts';
   if(typeof text!=='string') return 'json'; // already-parsed object (e.g. a demo entry) is always a blueprint
   const trimmed=text.trim();
   if(/^(import|export)\s/.test(trimmed) && /THREE/.test(trimmed.slice(0,400))) return 'ts';
   if(trimmed.startsWith('{')||trimmed.startsWith('[')) return 'json';
   return 'js';
-}
-
-// Is `filename` a JSX-flavored source file (.jsx/.tsx)? Shared by
-// runTsBlueprint (to decide whether to turn on the TS compiler's JSX
-// transform) and the "Save source" button (to pick the right download
-// extension/mime type for a file that was never loaded from disk to begin
-// with — e.g. something pasted into the editor panel).
-function isJsxFilename(name){
-  return /\.(tsx|jsx)$/i.test((name||''));
 }
 
 // Lazily loads the TypeScript compiler from esm.sh and caches it — it's a
@@ -11936,15 +11915,9 @@ function rewriteImportsForRuntime(jsSrc){
   );
 }
 
-// Which OUTPUT CONTRACT spec a given filename should point to. .ts/.mts/.cts
-// use the original typed spec; .tsx and .jsx get their own siblings (same
-// runtime shape — see PART 1 of each — .jsx is just the untyped/no-TS-syntax
-// variant). Untitled pastes (no filename) default to the .ts pair since
-// that's the oldest/most-complete of the three.
+// Which OUTPUT CONTRACT spec a given filename should point to. Only the
+// .ts pair is shipped now (no JSX variants).
 function specNameFor(filename){
-  const ext=(filename||'').split('.').pop().toLowerCase();
-  if(ext==='tsx') return {prompt:'Prompt_To_Tsx.txt', image:'Image_To_Tsx.txt'};
-  if(ext==='jsx') return {prompt:'Prompt_To_Jsx.txt', image:'Image_To_Jsx.txt'};
   return {prompt:'Prompt_To_Ts.txt', image:'Image_To_Ts.txt'};
 }
 
@@ -11961,7 +11934,7 @@ function pickTsFactory(mod, filename){
   }
   if(typeof mod.default==='function') return {fn:mod.default, name:'default'};
   const spec=specNameFor(filename);
-  throw new Error(`No create*Model() export found in ${filename||'the pasted script'}. The .ts/.mts/.cts/.tsx/.jsx file must export a factory named createXxxModel(options): THREE.Group — see ${spec.prompt} PART 1 (OUTPUT CONTRACT).`);
+  throw new Error(`No create*Model() export found in ${filename||'the pasted script'}. The .ts/.mts/.cts file must export a factory named createXxxModel(options): THREE.Group — see ${spec.prompt} PART 1 (OUTPUT CONTRACT).`);
 }
 
 // Optional second export (Prompt_To_Ts.txt PART 1.3, or its Prompt_To_Tsx.txt
@@ -11992,28 +11965,14 @@ function pickTsLookDevLights(mod, factoryName){
 async function runTsBlueprint(text, filename){
   const ts=await getTsCompiler();
 
-  // JSX support: a .jsx/.tsx filename turns the compiler's JSX transform on
-  // up front. A pasted/extensionless script (editor panel, drag-drop with
-  // no name) gets one retry with JSX turned on ONLY if the first, JSX-off
-  // compile fails with a JSX-specific diagnostic (TS1005/TS1109-style "<"
-  // parse errors, or TS17004 "Cannot use JSX unless the '--jsx' flag is
-  // provided") — so plain .ts/.js/.mts/.cts files (the overwhelming common
-  // case) never pay for or risk a second compile pass.
-  let wantJsx=isJsxFilename(filename);
-
-  function tryCompile(withJsx){
+  // Only .ts/.mts/.cts are accepted now — no JSX.  Single compile
+  // pass with no retry / shim.
+  function tryCompile(){
     return ts.transpileModule(text,{
       compilerOptions:{
         target: ts.ScriptTarget.ES2020,
         module: ts.ModuleKind.ESNext,
         esModuleInterop: true,
-        // See withJsx: transpileModule's --jsx validator only accepts
-        // preserve/react/react-native/react-jsx/react-jsxdev, so the flag
-        // is either left OUT entirely (JsxEmit.None (0) reports diagnostic
-        // TS6046, a file-less diagnostic that reportDiagnostics below would
-        // misreport as a "TypeScript syntax error" on every plain .ts file)
-        // or set to JsxEmit.React when JSX support is actually wanted.
-        ...(withJsx ? {jsx: ts.JsxEmit.React} : {}),
         isolatedModules: true,
       },
       reportDiagnostics: true,
@@ -12022,15 +11981,7 @@ async function runTsBlueprint(text, filename){
 
   let jsSrc;
   try{
-    let out=tryCompile(wantJsx);
-    if(!wantJsx && out.diagnostics && out.diagnostics.length){
-      const d0=out.diagnostics[0];
-      const msg0=ts.flattenDiagnosticMessageText(d0.messageText, ' ');
-      if(d0.code===17004 || /\bJSX\b/.test(msg0)){
-        wantJsx=true;
-        out=tryCompile(true);
-      }
-    }
+    const out=tryCompile();
     if(out.diagnostics && out.diagnostics.length){
       const d=out.diagnostics[0];
       const msg=ts.flattenDiagnosticMessageText(d.messageText, ' ');
@@ -12045,22 +11996,7 @@ async function runTsBlueprint(text, filename){
     throw /^TypeScript syntax error/.test(e.message) ? e : new Error(`TypeScript syntax error: ${e.message}`);
   }
 
-  // The compiled JSX transform (when wantJsx is true) emits bare
-  // `React.createElement(...)` calls, but this app builds a THREE.Object3D
-  // imperatively — it has no React renderer to turn elements into meshes.
-  // Rather than let those calls fail with a cryptic "React is not defined",
-  // inject a tiny stand-in that fails LOUD and CLEAR the moment (if ever)
-  // JSX is actually evaluated, pointing the author back at the real
-  // contract (factory must return a THREE.Object3D built with `new
-  // THREE.Mesh(...)` etc., not JSX/React elements).
-  const reactShim = wantJsx
-    ? `const React={createElement:function(type){throw new Error('This file uses JSX ('+
-        (typeof type==="string"?"<"+type+">":(type&&type.name)||"<Component>")+
-        '), but Low Poly 3D only understands plain THREE.js code — JSX elements are never rendered to 3D. '+
-        'The factory must build and return a THREE.Object3D directly (new THREE.Mesh(...), group.add(...), etc.), not JSX.');}};\n`
-    : '';
-
-  const resolvedSrc=reactShim+rewriteImportsForRuntime(jsSrc);
+  const resolvedSrc=rewriteImportsForRuntime(jsSrc);
   const blob=new Blob([resolvedSrc],{type:'text/javascript'});
   const url=URL.createObjectURL(blob);
   let mod;
@@ -12145,10 +12081,10 @@ let CURRENT_TS_LIGHTS=null; // optional look-dev lights Group (PART 1.3), parent
 function updateFormatChip(fmt){
   const chip=document.getElementById('format-chip');
   if(!chip) return;
-  // detectInputFormat() folds .ts/.mts/.cts/.tsx/.jsx all into the single
-  // 'ts' bucket (they share one pipeline — see runTsBlueprint()), so the
-  // chip stays a general "Format: TS" for all five rather than growing a
-  // label per extension.
+  // detectInputFormat() folds .ts/.mts/.cts all into the single
+  // 'ts' bucket (they share one pipeline — see runTsBlueprint()), so
+  // the chip stays a general "Format: TS" rather than growing a label
+  // per extension.
   const labels={json:'Format: JSON', js:'Format: JS', ts:'Format: TS'};
   chip.textContent=labels[fmt] || 'Format: —';
   chip.classList.toggle('format-ts', fmt==='ts');
@@ -12799,7 +12735,7 @@ function lblModelStorePopulateFromManifest(manifest, base){
     const n = parseInt(String(m.id).replace(/^Model_/i, ''), 10);
     if(!Number.isFinite(n) || n < 1) continue;
     const ext = String(m.file).split('.').pop().toLowerCase();
-    if(!/^(ts|tsx|js|jsx|json)$/.test(ext)) continue;
+    if(!/^(ts|js|json)$/.test(ext)) continue;
     lblModelStoreUrlCache.set(n, { n, id: m.id, file: m.file, ext, url: base + m.file });
     if(n === highestContiguous + 1) highestContiguous = n;
   }
@@ -12857,7 +12793,7 @@ async function lblModelStoreFindExisting(n, signal){
 // in normal operation.
 // ═══════════════════════════════════════════════════════════════════
 const LBL_MODEL_STORE_BATCH = 20;
-const LBL_MODEL_STORE_EXTS  = ['js','jsx','json','ts','tsx'];
+const LBL_MODEL_STORE_EXTS  = ['js','json','ts'];
 let LBL_MODEL_STORE_BASES_RUNTIME = null;
 function lblModelStoreComputeBases(){
   if(LBL_MODEL_STORE_BASES_RUNTIME) return LBL_MODEL_STORE_BASES_RUNTIME;
@@ -13003,8 +12939,8 @@ async function lblModelStoreLoadByNumber(n){
   // Show the format-detection line BEFORE handing off to the parser, so
   // the user sees "Detected JSON" / "Detected TS" exactly like the
   // file-input / paste path shows.
-  const extLabel = ({js:'JS blueprint script', jsx:'JSX (JS factory)', ts:'TypeScript factory', tsx:'TSX (TS factory)', json:'JSON blueprint'})[found.ext] || found.ext;
-  const phase = (found.ext==='ts'||found.ext==='tsx'||found.ext==='jsx') ? 'compiling' : 'validating';
+  const extLabel = ({js:'JS blueprint script', ts:'TypeScript factory', json:'JSON blueprint'})[found.ext] || found.ext;
+  const phase = (found.ext==='ts') ? 'compiling' : 'validating';
   updateAllValLogs(`<span class="ok">✓ Downloaded ${lblModelStoreLoadedFilename} (${text.length.toLocaleString()} bytes)</span><br><span class="info">→ Detected ${extLabel} (${found.url.split('/').pop()})</span><br><span class="info">→ ${phase}…</span>`);
   setStatus(phase + '…', true);
   lblLoadingUpdate({ title: phase.charAt(0).toUpperCase()+phase.slice(1), message: `${extLabel} — ${text.length.toLocaleString()} bytes`, sub: `Building ${lblModelStoreLoadedFilename}…`, progress: 0.7 });
@@ -13013,7 +12949,7 @@ async function lblModelStoreLoadByNumber(n){
   // mesh registration) stays identical. validateAndBuild / validateAndBuildTs
   // overwrite the validator log with their own detailed lines, which is
   // what we want — we just primed the pump with the format-detect line.
-  if(found.ext === 'ts' || found.ext === 'tsx' || found.ext === 'jsx'){
+  if(found.ext === 'ts'){
     validateAndBuildTs(text, lblModelStoreLoadedFilename);
   } else {
     validateAndBuild(text, lblModelStoreLoadedFilename);
@@ -13058,9 +12994,7 @@ function lblDownloadDemoSource(){
   const mime = ({
     json: 'application/json',
     ts:   'text/x-typescript',
-    tsx:  'text/x-tsx',
     js:   'text/javascript',
-    jsx:  'text/jsx',
   })[lblLastDemoSource.ext] || 'text/plain';
   const blob = new Blob([lblLastDemoSource.text], { type: mime + ';charset=utf-8' });
   const url  = URL.createObjectURL(blob);
@@ -13584,6 +13518,13 @@ function _sanitiseUserDataForExport(ud){
  * The result is a validator-clean GLB.  If anything goes wrong in
  * the sweep (defensive try/catch) the original GLB is handed back
  * unchanged so the user still gets a download.
+ *
+ * ── v2 (LBL FIX): also handles animation bufferViews that the
+ *    GLTFExporter writes with byteLength: 0 (and byteOffset past the
+ *    end of the buffer) when a track has no real keyframe data, and
+ *    re-maps accessor / animation-channel indices so the surviving
+ *    channels don't end up pointing at the wrong bufferView (or out
+ *    of bounds) after the array is filtered.
  * ─────────────────────────────────────────────────────────────────────── */
 function _stripEmptyBufferViewsFromGLB(glbIn){
   try{
@@ -13593,15 +13534,49 @@ function _stripEmptyBufferViewsFromGLB(glbIn){
     const srcView = new DataView(srcBuf);
     if(srcView.getUint32(0, true) !== 0x46546C67) return glbIn; // not a GLB
     const jsonLen = srcView.getUint32(12, true);
+    // LBL FIX v2 — read the BIN chunk length up front so we can also
+    // detect bufferViews whose byteOffset+byteLength falls past the
+    // end of the buffer (the classic GLTFExporter "empty track"
+    // dangling-pointer bug).  Without this, the byteLength:0 case
+    // alone misses the offset-past-end case that the validator flags
+    // as BUFFER_VIEW_TOO_LONG.
+    const binLenSrc = srcView.getUint32(20 + jsonLen, true);
     const jsonBytes = new Uint8Array(srcBuf, 20, jsonLen);
     let json;
     try { json = JSON.parse(new TextDecoder().decode(jsonBytes)); }
     catch(_){ return glbIn; }
     if(!json.bufferViews || !json.bufferViews.length) return glbIn;
-    // Find every empty bufferView.
+    // Find every empty / dangling bufferView.  Two failure modes:
+    //   (a) byteLength === 0  — the exporter wrote the header but no
+    //       data (happens for blank image canvases and for animation
+    //       tracks whose source array was empty).
+    //   (b) byteOffset + byteLength > binLenSrc — the exporter
+    //       advanced the offset cursor but didn't write any data, so
+    //       the view points past the end of the actual buffer.  glTF
+    //       Validator flags these as BUFFER_VIEW_TOO_LONG.
     const emptyIdx = new Set();
-    json.bufferViews.forEach((bv, i) => { if(bv && bv.byteLength === 0) emptyIdx.add(i); });
+    json.bufferViews.forEach((bv, i) => {
+      if(!bv) return;
+      if(bv.byteLength === 0){ emptyIdx.add(i); return; }
+      if(typeof bv.byteOffset === 'number' && (bv.byteOffset + bv.byteLength) > binLenSrc){
+        emptyIdx.add(i);
+      }
+    });
     if(!emptyIdx.size) return glbIn;
+    // LBL FIX v2 — build the old-to-new bufferView index remap so we
+    // can re-wire every accessor / animation-channel that was sitting
+    // on a removed view.  Without this, animations whose INPUT/OUTPUT
+    // accessors pointed at the dropped views silently point at the
+    // wrong data (or out of bounds) after the array is filtered —
+    // that's the "0 frames played" / "no animations" symptom.
+    const oldBvCount = json.bufferViews.length;
+    const bvRemap = new Array(oldBvCount);
+    {
+      let n = 0;
+      for(let i = 0; i < oldBvCount; i++){
+        bvRemap[i] = emptyIdx.has(i) ? -1 : n++;
+      }
+    }
     // Drop every image whose bufferView is empty, then drop textures
     // that referenced those images, then drop those texture indices
     // from every material that referenced them.  Cascade up the
@@ -13636,17 +13611,158 @@ function _stripEmptyBufferViewsFromGLB(glbIn){
     });
     // Rewrite the arrays, then re-pack.
     json.images = (json.images || []).filter((_, i) => !imagesToDrop.has(i));
-    json.textures = (json.textures || []).filter((_, i) => !texturesToDrop.has(i));
+    // LBL FIX v3 — also drop any texture whose source image was removed
+    // (the old cascade only looked at `imagesToDrop` to find the
+    // dangling textures; if the image is removed for a different
+    // reason — e.g. its bufferView was empty AND the image was the
+    // last one in the chain — the texture stays as a dangling entry
+    // and any material pointing at it crashes the loader with
+    // "Cannot read properties of undefined (reading 'extensions')").
+    const allImagesAfter = new Set((json.images || []).map((_, i) => i));
+    json.textures = (json.textures || []).filter(t => {
+      if(!t) return false;
+      const src = (typeof t.source === 'number') ? t.source : -1;
+      return src >= 0 && allImagesAfter.has(src);
+    });
+    const allTexturesAfter = new Set((json.textures || []).map((_, i) => i));
     json.bufferViews = json.bufferViews.filter((_, i) => !emptyIdx.has(i));
-    // We don't need to rewrite accessors / sparse data because no
-    // accessor references a byteLength-0 bufferView (the exporter
-    // never makes one for actual geometry — the only path is image
-    // data).  The bufferView count drops but other indices stay valid.
+    // LBL FIX v3 — walk every material and drop any texture reference
+    // that points to a texture we just removed.  The previous version
+    // only checked `texturesToDrop` (the set of textures whose SOURCE
+    // image was dropped because that image's bufferView was empty).
+    // But `json.textures` may have shrunk for additional reasons
+    // (the allImagesAfter check above), and any stale
+    // `metallicRoughnessTexture.index = 5` style reference left
+    // dangling crashes the viewer on load with "Cannot read
+    // properties of undefined (reading 'extensions')".
+    if(Array.isArray(json.materials) && json.materials.length){
+      const texAlive = new Set((json.textures || []).map((_, i) => i));
+      const isValidTexIdx = (idx) => typeof idx === 'number' && texAlive.has(idx);
+      const dropTexRef = (ref) => {
+        // A texture reference is `{ index, texCoord?, extensions? }`.
+        // If index points at a removed texture, return null so the
+        // caller knows to drop the parent slot.
+        if(!ref) return null;
+        if(typeof ref.index === 'number' && !isValidTexIdx(ref.index)) return null;
+        return ref;
+      };
+      json.materials.forEach(mat => {
+        if(!mat) return;
+        // top-level slots
+        ['normalTexture','occlusionTexture','emissiveTexture'].forEach(slot => {
+          if(mat[slot] && !dropTexRef(mat[slot])) delete mat[slot];
+        });
+        // pbrMetallicRoughness sub-slots
+        if(mat.pbrMetallicRoughness){
+          const pbr = mat.pbrMetallicRoughness;
+          ['baseColorTexture','metallicRoughnessTexture'].forEach(slot => {
+            if(pbr[slot] && !dropTexRef(pbr[slot])) delete pbr[slot];
+          });
+        }
+        // Bump extensions — the GLTFExporter writes this as
+        // `EXT_materials_bump` (the actual current extension name)
+        // with the texture under `bumpTexture` rather than the
+        // older `KHR_materials_bump` + `textureInfo` shape.  Handle
+        // both so the cleanup matches whatever the exporter emits.
+        if(mat.extensions){
+          ['KHR_materials_bump','EXT_materials_bump'].forEach(extName => {
+            const bump = mat.extensions[extName];
+            if(!bump) return;
+            // Both `textureInfo` (KHR prefix) and `bumpTexture`
+            // (EXT prefix) are valid texture-ref slots here.
+            const ref = bump.textureInfo || bump.bumpTexture;
+            if(!ref){
+              delete mat.extensions[extName];
+              return;
+            }
+            if(!dropTexRef(ref)) delete mat.extensions[extName];
+          });
+          // If the extensions object is now empty, remove it entirely
+          // so the loader doesn't even try to dispatch into it.
+          if(Object.keys(mat.extensions).length === 0) delete mat.extensions;
+        }
+      });
+    }
+    // was removed is itself unresolvable — drop the accessor.  If
+    // that accessor was the INPUT or OUTPUT of an animation sampler,
+    // drop the corresponding channel too.  Surviving accessors get
+    // their bufferView index re-mapped through `bvRemap`, and the
+    // accessor indices themselves get re-mapped after the filter so
+    // animation samplers point at the right slot in the new
+    // accessors[].
+    let accRemap = null;
+    if(Array.isArray(json.accessors) && json.accessors.length){
+      accRemap = new Array(json.accessors.length);
+      const accToDrop = new Set();
+      json.accessors.forEach((acc, i) => {
+        if(acc && typeof acc.bufferView === 'number' && bvRemap[acc.bufferView] === -1){
+          accToDrop.add(i);
+          accRemap[i] = -1;
+        }else if(acc && typeof acc.bufferView === 'number' && bvRemap[acc.bufferView] !== undefined){
+          acc.bufferView = bvRemap[acc.bufferView];
+          accRemap[i] = i;
+        }else{
+          accRemap[i] = i;
+        }
+      });
+      if(accToDrop.size){
+        json.accessors = json.accessors.filter((_, i) => !accToDrop.has(i));
+        // After accessors are filtered, accessor indices in animation
+        // samplers need to shift too.
+        let aIdx = 0;
+        const newAccRemap = new Array(accRemap.length);
+        for(let i = 0; i < accRemap.length; i++){
+          newAccRemap[i] = accToDrop.has(i) ? -1 : aIdx++;
+        }
+        accRemap = newAccRemap;
+      }
+    }
+    // LBL FIX v2 — walk animations: drop channels whose target node
+    // was removed, drop channels whose sampler's INPUT or OUTPUT
+    // accessor was removed, and re-map surviving accessor indices.
+    if(Array.isArray(json.animations)){
+      json.animations.forEach(anim => {
+        if(!anim || !Array.isArray(anim.channels)) return;
+        const oldSamplers = anim.samplers || [];
+        const keepChannels = [];
+        const keepSamplers = [];
+        const samplerSlotByKey = new Map();
+        anim.channels.forEach(ch => {
+          if(!ch) return;
+          const tgt = ch.target;
+          if(tgt && typeof tgt.node === 'number' &&
+             Array.isArray(json.nodes) && json.nodes[tgt.node] === undefined) return;
+          const oldSm = oldSamplers[ch.sampler];
+          if(!oldSm) return;
+          let newIn = oldSm.input, newOut = oldSm.output;
+          if(accRemap){
+            if(typeof newIn === 'number' && accRemap[newIn] !== undefined){
+              if(accRemap[newIn] < 0) return;
+              newIn = accRemap[newIn];
+            }
+            if(typeof newOut === 'number' && accRemap[newOut] !== undefined){
+              if(accRemap[newOut] < 0) return;
+              newOut = accRemap[newOut];
+            }
+          }
+          const key = newIn + ':' + newOut + ':' + (oldSm.interpolation || 'LINEAR');
+          let sIdx = samplerSlotByKey.get(key);
+          if(sIdx === undefined){
+            sIdx = keepSamplers.length;
+            samplerSlotByKey.set(key, sIdx);
+            keepSamplers.push({ input: newIn, output: newOut, interpolation: oldSm.interpolation || 'LINEAR' });
+          }
+          keepChannels.push({ sampler: sIdx, target: ch.target });
+        });
+        anim.channels = keepChannels;
+        anim.samplers = keepSamplers;
+      });
+    }
     // Re-pack into a new GLB.
     const newJsonBytes = new TextEncoder().encode(JSON.stringify(json));
     const jsonPadLen = (4 - (newJsonBytes.length % 4)) % 4;
     const jsonPadded = newJsonBytes.length + jsonPadLen;
-    const binLen = srcView.getUint32(20 + jsonLen, true);
+    const binLen = binLenSrc;
     const newTotal = 12 + 8 + jsonPadded + 8 + binLen;
     const out = new ArrayBuffer(newTotal);
     const outU8 = new Uint8Array(out);
@@ -13665,7 +13781,17 @@ function _stripEmptyBufferViewsFromGLB(glbIn){
     const binChunkSrcStart = 20 + jsonLen;
     outU8.set(new Uint8Array(srcBuf, binChunkSrcStart, 8 + binLen), 20 + jsonPadded);
     outDV.setUint32(20 + jsonPadded, binLen, true);
-    outDV.setUint32(24 + jsonPadded, 0x46546C67, true);
+    // LBL FIX — the BIN chunk type was being written as 0x46546C67
+    // ("glTF" magic) instead of the correct 0x004E4942 ("BIN\0").
+    // glTF-Validator tolerated the wrong magic for a while, but the
+    // Three.js GLTFLoader's KHR_binary_glTF extension checks
+    // `body` to be non-null after parsing the chunks — and when the
+    // GLTFBinaryExtension constructor iterates chunks looking for
+    // the BIN type (0x004E4942), the wrong magic means the BIN
+    // chunk is treated as an unknown type and skipped, leaving
+    // `body === null`.  Every subsequent `buffer.slice()` then
+    // crashes the loader with "Cannot read properties of null".
+    outDV.setUint32(24 + jsonPadded, 0x004E4942, true);
     return out;
   }catch(e){
     console.warn('[export] bufferView cleanup failed, returning raw GLB:', e);
@@ -13961,12 +14087,12 @@ function exportGLB(){
   const sourceClips = (CURRENT_TS_MODEL && meshMap.size===0)
     ? safeCollectSourceClips(CURRENT_TS_MODEL)
     : null;
-  // CURRENT_TS_MODEL is populated the same way regardless of which of the
-  // five LBL source formats built it (.ts/.mts/.cts/.tsx/.jsx all funnel
+  // CURRENT_TS_MODEL is populated the same way regardless of which of
+  // the three LBL source formats built it (.ts/.mts/.cts all funnel
   // through runTsBlueprint()+addTsModelToScene() — see detectInputFormat()
-  // above), so this branch already covers .jsx/.tsx factories with no
-  // changes needed to the check itself: they're a real THREE.Object3D by
-  // the time exportGLB() ever sees them, indistinguishable from a .ts one.
+  // above), so this branch already covers all of them with no changes
+  // needed to the check itself: they're a real THREE.Object3D by the
+  // time exportGLB() ever sees them, indistinguishable from a .ts one.
   if(CURRENT_TS_MODEL && meshMap.size===0){
     // TS-loaded models never populate meshMap (that's a blueprint-only
     // data structure), so buildSkinnedHierarchyForExport/
@@ -14034,8 +14160,8 @@ function exportGLB(){
   // Blender, Unity, Unreal, Godot, and glTF viewers.
   const clipsForExport = collectExportableClips(exportRoot, sourceClips);
   // Base the downloaded filename on the source file when we loaded one
-  // (works for JSON/JS/TS/MTS/CTS/TSX/JSX alike) instead of always the
-  // generic "lowpoly3d_scene.glb", so e.g. "robot.tsx" → "robot.glb".
+  // (works for JSON/JS/TS/MTS/CTS alike) instead of always the generic
+  // "lowpoly3d_scene.glb", so e.g. "robot.ts" → "robot.glb".
   const srcName = CURRENT_TS_MODEL && CURRENT_TS_META && CURRENT_TS_META.source;
   const baseName = (srcName && /\.[a-z0-9]+$/i.test(srcName))
     ? srcName.replace(/\.[a-z0-9]+$/i, '')
@@ -14217,6 +14343,38 @@ function _eulerXYZToQuat(rx, ry, rz, out, off){
 
 function sanitizeClipForExport(origClip){
   if(!origClip) return origClip;
+  // LBL FIX — guard against the GLTFExporter empty-bufferView bug.
+  // The exporter writes a bufferView header (advancing the cursor)
+  // for every track it sees, even if the track's `times` or `values`
+  // array is empty.  The resulting GLB has 0-length bufferViews at
+  // positions past the end of the actual buffer, the glTF validator
+  // flags them as BUFFER_VIEW_TOO_LONG, and any external viewer
+  // refuses to play the affected animation.  Strip those tracks out
+  // here so the exporter never sees them.
+  if(!Array.isArray(origClip.tracks) || !origClip.tracks.length){
+    return null; // signal "no usable tracks" — caller drops the clip
+  }
+  const liveTracks = origClip.tracks.filter(t => {
+    if(!t || !t.name) return false;
+    if(!t.times || t.times.length === 0) return false;
+    if(!t.values || t.values.length === 0) return false;
+    // value size must agree with the array length, or the exporter
+    // will still produce empty / mismatched bufferViews.
+    const vs = (typeof t.getValueSize === 'function') ? t.getValueSize() : 0;
+    if(vs > 0 && t.values.length < vs) return false;
+    return true;
+  });
+  if(!liveTracks.length) return null;
+  let origClipForBuild = origClip;
+  if(liveTracks.length !== origClip.tracks.length){
+    // Re-stamp a private clip with the filtered tracks.  Build it
+    // directly rather than `origClip.clone()` — clone() recurses into
+    // every track's constructor which validates that `times` is
+    // non-empty, and any track the filter just dropped would throw
+    // here and take the whole export down.
+    const scrubbed = new THREE.AnimationClip(origClip.name, origClip.duration, liveTracks);
+    origClipForBuild = scrubbed;
+  }
   // Bucket tracks by (nodeName, kind):
   //   kind = 'quat' | 'pos' | 'scale' — sub-components need bundling
   //   pass-through tracks go straight to the output
@@ -14232,7 +14390,7 @@ function sanitizeClipForExport(origClip){
   // i.e. a real transformation happened.)
   let dirty = false;
 
-  for(const t of origClip.tracks){
+  for(const t of origClipForBuild.tracks){
     if(!t || !t.name) continue;
     const name = t.name;
     // Euler sub-component rotation — bundle and convert to quaternion
@@ -14322,8 +14480,10 @@ function sanitizeClipForExport(origClip){
     passThrough.push(new THREE.VectorKeyframeTrack(node + '.scale', b.times, vout));
   }
 
-  // If nothing was rewritten, return the original clip untouched.
-  if(!dirty) return origClip;
+  // If nothing was rewritten, return the scrubbed clip (which is
+  // either the original or the empty-track-filtered clone).
+  if(!dirty) return origClipForBuild;
+  if(!passThrough.length) return null; // nothing exportable left
   return new THREE.AnimationClip(origClip.name, origClip.duration, passThrough);
 }
 
@@ -14486,7 +14646,10 @@ function collectExportableClips(exportRoot, sourceClips){
   // GLTFExporter can't serialise (Euler sub-components, etc.) is
   // rewritten into a glTF-compatible equivalent.  Model authors can
   // write animations the natural way and the export Just Works.
-  return out.map(sanitizeClipForExport);
+  // LBL FIX — sanitizeClipForExport returns null for clips whose
+  // tracks are all empty / unexportable, so drop those here instead
+  // of handing the exporter a clip with zero valid samplers.
+  return out.map(sanitizeClipForExport).filter(Boolean);
 }
 
 function exportOBJ(){
@@ -15040,17 +15203,13 @@ document.getElementById('convert-ts-btn').addEventListener('click',()=>{
   toast('Convert to TS is experimental and not yet available — coming in a future update','');
 });
 document.getElementById('ts-btn').addEventListener('click',()=>{
-  if(!CURRENT_TS_META || typeof CURRENT_TS_META.text!=='string'){ toast('Load a .ts/.mts/.cts/.tsx/.jsx factory file first','err'); return; }
-  // Keep the original filename (any of .ts/.mts/.cts/.tsx/.jsx) when we
-  // have one; otherwise fall back to a sensible default that matches
-  // whichever flavor the source actually is, not always ".ts" — a pasted
-  // .tsx/.jsx script re-downloaded as "model.ts" would silently mislabel
-  // itself as plain TS (no JSX) the next time someone re-uploads it.
+  if(!CURRENT_TS_META || typeof CURRENT_TS_META.text!=='string'){ toast('Load a .ts/.mts/.cts factory file first','err'); return; }
+  // Keep the original filename when we have one; otherwise fall back
+  // to a plain .ts.  No JSX variants in scope.
   const src=CURRENT_TS_META.source;
-  const hasKnownExt = src && /\.(ts|mts|cts|tsx|jsx)$/i.test(src);
-  const fallbackExt = isJsxFilename(src) ? '.tsx' : '.ts';
-  const filename = hasKnownExt ? src : ('model'+fallbackExt);
-  const mimeByExt = {ts:'text/typescript', mts:'text/typescript', cts:'text/typescript', tsx:'text/tsx', jsx:'text/jsx'};
+  const hasKnownExt = src && /\.(ts|mts|cts)$/i.test(src);
+  const filename = hasKnownExt ? src : 'model.ts';
+  const mimeByExt = {ts:'text/typescript', mts:'text/typescript', cts:'text/typescript'};
   const ext=(filename.split('.').pop()||'ts').toLowerCase();
   const blob=new Blob([CURRENT_TS_META.text],{type:mimeByExt[ext]||'text/plain'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
