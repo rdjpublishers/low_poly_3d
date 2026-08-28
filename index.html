@@ -12052,6 +12052,356 @@ function runJsBlueprint(code){
   return result;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v8.0 — HIGH-QUALITY LOW-POLY TS MODEL SPECIFICATION (consolidated)
+//
+// This is the canonical spec every code-only .ts/.mts/.cts factory that
+// targets THIS renderer must follow. It synthesises:
+//   • the historical Prompt_To_Ts.txt / Image_To_Ts.txt contracts (PART 1 …),
+//   • the techniques the 9 reference factories shipped to rdjpublishers/
+//     low_poly_3d use in production (warhauler, sony_wf1000xm3,
+//     crown_chest, doraemon_house, issaca_shotgun, electric_mouse_mascot,
+//     gerber_knife, bmx_endurance_bike, low_poly_humanoid),
+//   • the runtime hooks this renderer is wired to discover and surface
+//     (see addTsModelToScene / tickAllTsModels / renderTsRuntimeInspector
+//     / lblCollectAnimations below).
+//
+// A factory that follows this spec will:
+//   1. Just work when dropped onto the page (drag-drop, file picker, paste),
+//   2. Auto-tick its animation (incl. any AnimationMixer it owns),
+//   3. Auto-frame the camera,
+//   4. Pick up optional look-dev lights,
+//   5. Expose named parts, sockets, materials, meshes, action hooks, and
+//      staged-pass / inventory / landmark metadata to the Inspector and the
+//      fidelity gate — no extra wiring required.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ▌PART 1 — OUTPUT CONTRACT
+//
+//   • One top-level export: a function named /^create\w+Model$/ (e.g.
+//     createWarHaulerModel, createCrownChestModel, createElectricMouseMascotModel)
+//     that takes ONE optional argument (an options object) and returns a
+//     THREE.Group (never null, never empty).
+//   • Optional second export: a look-dev lights factory. Accepted names:
+//     "<FactoryName>LookDevLights" (formal), or any export ending in
+//     "LookDevLights" (lenient). Must return a THREE.Group containing
+//     THREE.Light instances. The renderer parents it to the WORLD `scene`
+//     (not sceneGroup) so the model's own centering transform does not
+//     affect it.
+//   • Allowed imports: "three" and "three/addons/..." (or
+//     "three/examples/jsm/...", which the loader rewrites to the
+//     addons alias). Anything else throws.
+//   • No other top-level side effects — no DOM writes, no fetches, no
+//     network calls. The factory must be deterministic for the same
+//     (seed, options) pair.
+//
+// ▌PART 2 — MODELING TECHNIQUE
+//
+//   • Build from PRIMITIVES + SHAPE EXTRUSION; never ship a blob mesh.
+//     Preferred primitives, in order of vertex economy:
+//        THREE.RoundedBoxGeometry  (soft-beveled box — the workhorse;
+//          pull from 'three/addons/geometries/RoundedBoxGeometry.js')
+//        THREE.ExtrudeGeometry      (custom Shape with optional holes[];
+//          depth + bevel; the path to any "cut-out" silhouette — pierced
+//          deck, skeletonised tang, slotted muzzle brake)
+//        THREE.TubeGeometry         (along a CatmullRomCurve3; hoses,
+//          paracord helix, draped wires, knotted cord)
+//        THREE.LatheGeometry        (rotationally-symmetric: pegs, vases,
+//          crown, vase)
+//        THREE.CapsuleGeometry      (limbs, fingers, rounded pegs)
+//        THREE.TorusGeometry         (rims, halos, hose ribs, D-rings)
+//        THREE.CylinderGeometry      (axles, pegs, struts; 6-12 segments
+//          for low-poly, 24+ for high-detail)
+//        THREE.IcosahedronGeometry   (0 = 20-face; 1 = 80-face; 2 = 320-face;
+//          perfect for tree canopies / faceted blobs / organic volumes)
+//        THREE.SphereGeometry        (with reduced segments; 32x24 eyes,
+//          48x40 earbuds, 56x40 face caps)
+//        THREE.PlaneGeometry         (decal planes; never back-face culled,
+//          always polygonOffset to prevent Z-fight)
+//        THREE.BoxGeometry           (true flat slabs, hammered rivets,
+//          thin housings)
+//   • If the brief calls for a primitive the standard set doesn't cover,
+//     generate a custom BufferGeometry from a 2D Shape (LightningBoltGeometry
+//     in the Pikachu ref), an SDF + marching cubes (the humanoid ref
+//     polygonises a smin/smax capsule field in one shot — the "continuous
+//     sculpt" topology), or vertex-pushed parametric surfaces (saddle +
+//     dome + nose lift on the BMX saddle).
+//   • InstancedMesh for any repeated part (8 wall blocks, 4 spokes, 9
+//     jimping notches, 6 wheels, 12 lug bolts, 4 pegs). One geometry, one
+//     material, N transforms — N goes from 4 to N, vertices stay constant.
+//   • flatShading: true on MeshStandardMaterial for the faceted low-poly
+//     look. Combine with a low segment count on sphere / icosahedron /
+//     cylinder to get the "stylised" silhouettes the spec demands.
+//   • vertex count budget: keep a single sub-mesh under ~5k vertices;
+//     instance anything beyond that. A model with 20-30 sub-meshes is
+//     fine; one with 200 sub-meshes of 500 verts each is not.
+//
+// ▌PART 3 — MATERIAL SETUP (PBR)
+//
+//   • MeshStandardMaterial for opaque PBR. MeshPhysicalMaterial when
+//     clearcoat / transmission / sheen / ior / iridescence is required.
+//     MeshBasicMaterial ONLY for HUD decals that must not respond to
+//     light (eye highlights, surface-conformed face pads, billboard
+//     numbers).
+//   • Standard PBR contract (MeshStandardMaterial / MeshPhysicalMaterial):
+//        color: hex (post-ACES — see PART 5 tonemapping note)
+//        roughness: 0-1
+//        metalness: 0-1
+//        envMapIntensity: 0.5-2.0 (1.0 default; lift the metal)
+//        map, normalMap, roughnessMap, metalnessMap, aoMap, bumpMap,
+//          emissiveMap, clearcoatMap — all CanvasTexture or DataTexture
+//        polygonOffset + polygonOffsetFactor: -4 for any decal plane
+//          that sits flush against another mesh (otherwise Z-fight)
+//        transparent + depthWrite:false for cross-fading decals
+//        side: DoubleSide for fabric / leaves / membrane
+//   • PhysicalMaterial extensions, in priority order:
+//        clearcoat + clearcoatRoughness — car paint, enamel, nail polish,
+//          also the "wet eye" corneal highlight
+//        transmission + ior + thickness — glass, lens, water, also
+//          translucent nylon
+//        sheen + sheenColor + sheenRoughness — fabric, hair, leaves,
+//          also the cheap SSS stand-in for "skin" in this THREE version
+//        anisotropy + anisotropyRotation — brushed metal, vinyl, hair.
+//          REQUIRES the geometry to have an index, position, normal, AND
+//          uv attribute so computeTangents() doesn't early-return.
+//        specularIntensity, specularColor — F0 knob for dielectrics
+//   • Procedural textures are king — DO NOT load external image files.
+//     Make a CanvasTexture in a 256-2048 canvas: draw with the 2D
+//     context (createLinearGradient, createRadialGradient, paths,
+//     fillText, bezier curves), set wrapS/wrapT to RepeatWrapping where
+//     you need to tile, set anisotropy: 8 for grazing angles, set
+//     colorSpace: SRGBColorSpace for albedo/emissive/AO, leave
+//     colorSpace unset (defaults to NoColorSpace) for normalMap/roughness
+//     /metalness/bump data. For truly data-only maps (normal, height,
+//     curvature) use DataTexture with RGBAFormat Uint8Array data — no
+//     canvas round-trip.
+//   • onBeforeCompile: the supported way to add per-material shader
+//     effects. ALWAYS set a customProgramCacheKey() (a function
+//     returning a unique string) so identical materials don't share
+//     compiled programs with different intent. Injected varyings belong
+//     on <common>, vertex displacement on <begin_vertex>, fragment math
+//     on <color_fragment> (for diffuse mods) or <emissivemap_fragment>
+//     (for additive glow). Use convertSRGBToLinear() on the colour
+//     before stringifying into GLSL — otherwise the GLSL `mix` blends
+//     the sRGB value and the result washes out.
+//   • SpriteMaterial with AdditiveBlending + depthWrite:false for any
+//     bloom-able glow: headlight, muzzle flash, exhaust, LED, neon halo.
+//     Pair with a CanvasTexture radial-gradient sprite. Use
+//     toneMapped:false on the sprite's material so the glow stays bright
+//     through the ACES tonemapper.
+//   • shadow setup: castShadow + receiveShadow on every mesh that
+//     should self-shadow. The renderer sets a default key light at
+//     (5, 8, 5) with mapSize 2048; if the look-dev lights are loaded,
+//     the SHADOW-MAP from the most-influential DirectionalLight wins.
+//
+// ▌PART 4 — RIGGING / sculptRuntime
+//
+//   root.userData.sculptRuntime is THE action-ready registry. The
+//   renderer reads it on every model mount; the Inspector surfaces it
+//   as read-only metadata; the T-Pose button targets it; the action
+//   hooks panel (see PART 7) calls into it.
+//
+//   Mandatory shape (root.userData.sculptRuntime):
+//     nodes:      Record<string, THREE.Object3D>  — named parts.
+//                 These are the parts the T-Pose button and the gizmo
+//                 target. Naming convention: lower_snake_case for body
+//                 parts (hip_l, knee_r, head, jaw, arm-twist-l),
+//                 kebab-case for props (cord-helix, blade, edge-apex).
+//     sockets:    Record<string, THREE.Object3D>  — attachment anchors.
+//                 Each is an empty Object3D parented where the part
+//                 "attaches". Examples: muzzleSocket (a flash spawn
+//                 point), ejectionPort (a shell eject anchor), lidHinge
+//                 (hinge axis for an openable lid), handleMount (a
+//                 D-ring stud socket). Sockets also carry
+//                 `userData.socketFor = "<part id>"` so the renderer can
+//                 trace parent ↔ child.
+//     materials:  Record<string, THREE.Material>  — material registry.
+//                 Names referenced by action hooks or inspector.
+//     meshes:     Record<string, THREE.Mesh>      — per-mesh registry
+//                 (the BMX ref uses this; the humanoid ref prefers
+//                 `parts`). Either is acceptable.
+//     destructionGroups: string[] | Record<string, string[]|Object3D[]>
+//                 — explosion / break-apart sets ("blade", "tang",
+//                 "paracord", "pommel"). Renderer reads it but does not
+//                 act on it (a future "explode" action can iterate).
+//
+//   Optional but recommended:
+//     actions:    Record<string, Function>  — callable hooks. The
+//                 Inspector's "Action Hooks" panel surfaces every entry
+//                 as a button; clicking it invokes the function. Common
+//                 names: fire (recoil + muzzle flash + shell eject),
+//                 reset, openLid, setWheelSpeed, triggerElectric,
+//                 explode. Functions may take args; the panel calls with
+//                 no args and the factory decides defaults.
+//     animation:  Record<string, Function>  — ALIAS for `actions` with
+//                 the same calling convention. Use whichever name fits.
+//     vfx:        Record<string, Object3D|Array|Object>  — VFX pools
+//                 surfaced in the Inspector for the curious.
+//     colliders:  Record<string, Object3D>  — collision proxies (the
+//                 BMX ref has a wheel collider per wheel).
+//     parts:      Record<string, Object3D>  — alternative flat
+//                 namespace for per-mesh records (the humanoid ref
+//                 uses this instead of `meshes`).
+//
+//   Per-mesh metadata (set on each Object3D's userData):
+//     userData.sculptComponent = { id, parentId, role, sockets }
+//       — marks this Object3D as a component part, gives it a role
+//         ("body", "garment", "head", "skeleton-root", "character-root",
+//         "socket", "joint", "wheel", "barrel", "trigger", "magazine",
+//         "scope", "stock", "receiver", "crown-emblem", etc.) and
+//         declares which socket names it depends on.
+//     userData.actionProfile = { canGlow, canSpin, canOpen, canFire,
+//         canEject, canRecoil, canElectrify, canJump, canWiggle, canSway }
+//       — the Inspector's per-part gizmo reads this and offers
+//         1-click actions that drive the relevant `actions.*` hook.
+//     userData.animationRole = 'character-root' | 'skeleton-root' |
+//         'bone' | 'ik-target' | 'socket' | ...  — used by the
+//         lblCollectAnimations path to classify rigs.
+//     userData.socketFor = '<part id>'  — set on a socket to point at
+//         the part it serves. (Reciprocal of sockets: '<part>' =
+//         ref-to-Object3D.)
+//
+//   Constraint system (declarative + procedural):
+//   ──────────────────────────────────────────────────
+//   Constraints in the TS world are EMITTED by code, not by a data
+//   schema. The supported patterns are:
+//     a) parent/child pivot groups — every "hinged" element lives in a
+//        Group whose local origin is the hinge axis (lidPivot above
+//        body, recoilPivot at the grip, tailPivot at the rump base).
+//        Animation writes to .rotation; geometry follows.
+//     b) attach() / preserve-world — use THREE.Object3D.attach(child)
+//        to reparent without losing world-space position. The lid →
+//        lidHinge case is canonical.
+//     c) IK-like placement — pre-compute a rest position and rotation
+//        on construction, then in tick() lerp the local transform
+//        toward a target that depends on another part. The Earbuds
+//        ref's placeBud() is the canonical example (lerp position +
+//        rotation, ease bob with a sin, scale-bias).
+//     d) spring-damper lag — for cloth, hair, antennae, anything
+//        that should follow but not snap. State = current + velocity;
+//        per frame: velocity += (K * (target - state) - D * velocity)
+//        * dt; state += velocity * dt. K = 30-80, D = 6-12 tuned
+//        per material.
+//     e) aim constraint — every frame, child.lookAt(target.getWorldPosition),
+//        optionally slerped from a previous quaternion. The Bolt
+//        case in the Shotgun ref is a "look at the muzzle" effect.
+//     f) surface follow — sample an ellipsoid SDF (see Pikachu's
+//        frontSurfaceZ()) to project a 2D decal onto a 3D capsule.
+//        Equivalent: parametric projection of (x, y) into the
+//        remaining radial term of a known shape equation.
+//     g) mirror — when a part is duplicated across a plane (L/R
+//        hand, L/R earbud, mirrored decal), make the duplicate a
+//        child of a Group at the mirror plane with scale.x = -1 (or
+//        scale.z = -1, depending on which axis the mirror lives on).
+//        Triangle winding inverts automatically.
+//     h) attachment socket — the published `sockets` map is the
+//        "constraint" channel. The renderer exposes them as
+//        drag-targets in the Inspector; runtime code can reparent
+//        other meshes into a socket with attach().
+//
+// ▌PART 5 — ANIMATION (tick(dt, elapsed))
+//
+//   Wire ONE of:
+//     (a) root.userData.tick = (dt, elapsed) => void  — simplest path.
+//         Tick is called every frame AFTER controls.update() and
+//         BEFORE the render. dt is the wallclock seconds since the
+//         previous frame, clamped to 0.05 by the renderer to absorb
+//         tab-switch hitches. elapsed is the total seconds since the
+//         page loaded.
+//     (b) root.userData.sculptRuntime.animations = {
+//           clips:  THREE.AnimationClip[],
+//           mixer:  THREE.AnimationMixer,
+//           actions?: AnimationAction[] | Map<string, AnimationAction>,
+//         }
+//       — the renderer recognises this shape, silences the factory's
+//         own mixer (so the in-app player and the factory's mixer
+//         never fight), and ticks the factory's mixer at 60 fps via
+//         its own animation loop.
+//     (c) root.userData.sculptRuntime.animations = [
+//           { name, duration, tracks: [{ name, times, values }] }
+//         ]  — legacy hint-array path. The renderer synthesises
+//         THREE.NumberKeyframeTrack + AnimationClip from each entry
+//         and plays them.
+//     (d) root.userData.<customNamespace>.mixer / .update(elapsed)
+//       — recognised by name. The renderer auto-ticks any field
+//         named `mixer` on root.userData.<anything>, and any field
+//         named `update` (called with elapsed).
+//
+//   Inside the tick:
+//     • Loop with elapsed (e.g. `const t = elapsed % CYCLE`).
+//     • Easing — keep three at hand:
+//         const easeInOut = t => t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+//         const easeOut   = t => 1-Math.pow(1-t, 3);
+//         const smooth    = (x,a,b) => easeInOut(THREE.MathUtils.clamp((x-a)/(b-a),0,1));
+//     • Procedural oscillators — `Math.sin(elapsed * freq) * amp`. Use
+//       seeded mulberry32 for any per-particle phase so the same
+//       factory call yields the same animation phase across reloads.
+//     • Particle pools — class-shape { sprite, life, ttl, vel, seed }.
+//       Spawn into a hidden slot, increment life each frame, when
+//       life > ttl respawn from a base position with a new
+//       sin(seed * k)-derived offset. Use Math.sin(f * Math.PI) for
+//       an opacity envelope that ramps in and out.
+//     • Spring dampers — see PART 4(d).
+//     • State machines — a `state` object with `recoil`, `flash`,
+//       `sinceFire` and per-frame decay + auto-fire schedule. Reset
+//       by clamping: `state.recoil = Math.max(0, state.recoil - dt * k)`.
+//     • World anchors — never bake world positions; use
+//       `socket.getWorldPosition(tmpV)` to get the current
+//       world-space spawn point for a particle or shell.
+//
+// ▌PART 6 — ARCHITECTURE / EXPORTS
+//
+//   Standard factory shape:
+//     export interface XxxOptions {
+//       scale?:     number;   // 1 default
+//       shadows?:   boolean;  // true default
+//       animate?:   boolean;  // true default (used by idlerock-style models)
+//       autoFireInterval?: number;  // 2.4 default
+//       includeSpeechBubble?: boolean;  // true default
+//     }
+//     export function createXxxModel(options: XxxOptions = {}): THREE.Group {
+//       const scale   = options.scale   ?? 1;
+//       const shadows = options.shadows ?? true;
+//       const root = new THREE.Group();
+//       root.name = 'xxx-model';
+//       /* ... build, register nodes / sockets / materials ... */
+//       root.scale.setScalar(scale);
+//       root.userData.tick = (dt, elapsed) => { /* ... */ };
+//       root.userData.sculptRuntime = { nodes, sockets, materials, actions, ... };
+//       return root;
+//     }
+//
+//   Standard look-dev lights (optional):
+//     export function createXxxLookDevLights(): THREE.Group { /* ... */ }
+//     or
+//     export function createXxxModelLookDevLights(): THREE.Group { /* ... */ }
+//
+//   Optional studio background (used as scene.background if returned):
+//     export function makeXxxBackground(): THREE.Color | THREE.Texture { /* ... */ }
+//
+//   All exports are pure: same input → same output. No Date.now, no
+//   Math.random in geometry construction. Use mulberry32(seed) where
+//   stochastic placement is needed.
+//
+// ▌PART 7 — RUNTIME HOOKS / INSPECTOR METADATA
+//
+//   The renderer's Inspector surfaces:
+//     • nodes, sockets, meshes, destructionGroups, colliders  (read-only lists)
+//     • parts  (alias of meshes if the factory used that namespace)
+//     • top-level userData.nodes / userData.parts  (factories like the
+//       humanoid that hoist the registry to root.userData instead of
+//       into sculptRuntime — see lblFlattenRuntimeAliases below)
+//     • action hooks — every function in `sculptRuntime.actions` AND
+//       `sculptRuntime.animation` becomes a button.
+//     • fidelity metadata — `sculptRuntime.subject`, `detailInventory`,
+//       `landmarks`, `passes`, `passesComplete`, `passesReviewed`.
+//     • provenance — `userData.provenance`, `userData.sculptSpec`,
+//       `userData.actionReadiness` (read-only).
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// END v8.0 SPECIFICATION
+// ═══════════════════════════════════════════════════════════════════════════
+
 // ═══════════════════════════════════════════
 // LBL TS INPUT PATH — SYSTEM_UPDATE_PROMPT__Add_TS_Output_to_LBL.md
 // ═══════════════════════════════════════════
@@ -12533,23 +12883,96 @@ function renderTsFidelityTab(){
 // There's nothing to select/edit here, so this replaces updateInspector()
 // for this scene rather than trying to make that function understand code-
 // built content.
+//
+// v8.0 — adds a top-level "Action Hooks" panel listing every callable
+// in `sculptRuntime.actions` and `sculptRuntime.animation` (both supported
+// names; either or both — the panel surfaces whatever the factory shipped).
+// Clicking a button calls the function. Useful for fire(), reset(),
+// openLid(), setWheelSpeed(), triggerElectric(), etc.
 function renderTsRuntimeInspector(meta, group){
   const rt=(group.userData && group.userData.sculptRuntime) || {};
-  const groups=['nodes','sockets','meshes','destructionGroups','colliders'];
+  const groups=['nodes','sockets','meshes','parts','destructionGroups','colliders','materials','vfx'];
   const section=(label,obj)=>{
     const keys=Object.keys(obj||{});
     if(!keys.length) return '';
-    return `<div style="margin-top:10px"><b style="color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:uppercase">${label} (${keys.length})</b><div style="font-size:12px;line-height:1.7;margin-top:2px">${keys.map(k=>`• ${k}`).join('<br>')}</div></div>`;
+    return `<div style="margin-top:10px"><b style="color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:uppercase">${label} (${keys.length})</b><div style="font-size:12px;line-height:1.7;margin-top:2px">${keys.map(k=>{
+      // v is a Mesh / Material / Object3D; show its type for context
+      const v = obj[k];
+      const tag = v && v.isMesh ? 'mesh'
+        : v && v.isMaterial ? 'mat'
+        : v && v.isObject3D ? 'obj3d'
+        : (typeof v === 'function' ? 'fn' : typeof v);
+      const tip = `data-tip="${k} · ${tag}"`;
+      return `<span class="ts-rt-key" ${tip} style="cursor:help">${k}</span>`;
+    }).join(', ')}</div></div>`;
   };
   const anyHooks=groups.some(k=>rt[k] && Object.keys(rt[k]).length);
+  // Action hooks — collect every callable from BOTH `actions` and `animation`
+  // (whichever the factory shipped). Each becomes a click-to-invoke button.
+  const actionEntries = [];
+  for(const ns of ['actions','animation']){
+    const obj = rt[ns];
+    if(!obj) continue;
+    for(const k of Object.keys(obj)){
+      if(typeof obj[k] === 'function') actionEntries.push({ ns, k, fn: obj[k] });
+    }
+  }
+  const actionsHtml = actionEntries.length
+    ? `<div style="margin-top:10px"><b style="color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:uppercase">Action Hooks (${actionEntries.length})</b>`
+      + `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">`
+      + actionEntries.map(a=>`<button class="tbtn" data-action-ns="${a.ns}" data-action-key="${a.k}" style="font-size:11px;padding:4px 9px;border-radius:6px">${a.ns}.${a.k}()</button>`).join('')
+      + `</div></div>`
+    : '';
+  // Provenance + sculptSpec + actionReadiness — read-only metadata
+  const ud = group.userData || {};
+  const metaRows = [];
+  if(ud.provenance) metaRows.push(['provenance.route', ud.provenance.route||'—']);
+  if(ud.sculptSpec) {
+    if(ud.sculptSpec.source)  metaRows.push(['sculptSpec.source',  ud.sculptSpec.source]);
+    if(ud.sculptSpec.style)   metaRows.push(['sculptSpec.style',   ud.sculptSpec.style]);
+    if(ud.sculptSpec.heightUnits) metaRows.push(['sculptSpec.heightUnits', ud.sculptSpec.heightUnits]);
+  }
+  if(ud.actionReadiness && ud.actionReadiness.note) metaRows.push(['actionReadiness', ud.actionReadiness.note]);
+  const provenanceHtml = metaRows.length
+    ? `<div style="margin-top:10px"><b style="color:var(--muted);font-size:10px;letter-spacing:.04em;text-transform:uppercase">Provenance</b>`
+      + `<div style="font-size:11px;line-height:1.6;margin-top:2px;color:var(--muted)">`
+      + metaRows.map(([k,v])=>`<div><b>${k}</b>: <span style="color:var(--text)">${String(v).replace(/</g,'&lt;')}</span></div>`).join('')
+      + `</div></div>` : '';
   const html=`<div style="padding:14px;font-size:12px;line-height:1.6;text-align:left">
     <div style="font-weight:600">${meta.factoryName}</div>
     <div style="color:var(--muted);font-size:11px;margin-top:2px">TypeScript factory · ${meta.source||'pasted'}</div>
     <div style="color:var(--muted);font-size:11px;margin-top:8px">Loaded from code, not a blueprint — nothing here is live-editable. This is root.userData.sculptRuntime.</div>
     ${groups.map(k=>section(k.charAt(0).toUpperCase()+k.slice(1), rt[k])).join('')}
-    ${anyHooks?'':'<div style="color:var(--muted);margin-top:10px">No sculptRuntime was set on this model.</div>'}
+    ${actionsHtml}
+    ${provenanceHtml}
+    ${anyHooks||actionEntries.length||metaRows.length?'':'<div style="color:var(--muted);margin-top:10px">No sculptRuntime was set on this model.</div>'}
   </div>`;
   ['inspector','mob-inspector'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+  // Wire up action hook buttons (after innerHTML is committed)
+  ['inspector','mob-inspector'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.querySelectorAll('button[data-action-ns]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const ns = btn.dataset.actionNs, key = btn.dataset.actionKey;
+        const fn = rt[ns] && rt[ns][key];
+        if(typeof fn !== 'function'){ toast(`Action "${ns}.${key}" is not callable`, 'err'); return; }
+        try{
+          // Call with no args; the factory decides defaults.
+          const ret = fn();
+          if(ret && typeof ret.then === 'function'){
+            ret.then(()=>toast(`${ns}.${key}() ✓`,'ok'))
+               .catch(e=>toast(`${ns}.${key}() rejected: ${e.message}`,'err'));
+          } else {
+            toast(`${ns}.${key}() ✓`,'ok');
+          }
+        }catch(e){
+          console.error('[TS action]', e);
+          toast(`${ns}.${key}() threw: ${e.message}`, 'err');
+        }
+      });
+    });
+  });
 }
 
 function addTsModelToScene(group, meta, lightsGroup){
@@ -12570,12 +12993,20 @@ function addTsModelToScene(group, meta, lightsGroup){
   // PART 1.3 — parented to `scene` (world space), not sceneGroup, so it
   // isn't affected by the model's own centering/grounding transform above.
   if(lightsGroup){ scene.add(lightsGroup); CURRENT_TS_LIGHTS=lightsGroup; }
+  // v8.0 PART 7 — flatten well-known runtime aliases (root.userData.parts,
+  // .nodes, .meshes, custom <namespace>.mixer) into root.userData.sculptRuntime
+  // so the rest of the pipeline sees a single shape. Run BEFORE
+  // lblRegisterTsMeshes / lblCollectAnimations so they pick up the
+  // hoisted registries and AnimationMixer auto-tick.
+  lblFlattenRuntimeAliases(group);
   // LBL update H2/FIX — register every sub-mesh so the user can click and
   // select individual parts (gizmo, texture, face-texture all re-use the
   // meshMap infrastructure downstream). Skeleton / helper markers are
   // skipped inside the registration function.
   lblRegisterTsMeshes(group);
   // Pick up GLTF-style AnimationClips stored on the loaded group too.
+  // Re-pick the (possibly just-flattened) __gltf; the flatten pass doesn't
+  // touch it.
   if(typeof lblCollectAnimations === 'function') lblCollectAnimations(group, group.userData && group.userData.__gltf);
   frameCameraOnScene();
 
@@ -12590,15 +13021,129 @@ function addTsModelToScene(group, meta, lightsGroup){
   setTsExclusiveUiState(true);
 }
 
+// v8.0 PART 5 — root-level alias flattener. Some TS factories (e.g. the
+// Pikachu humanoid) hoist their registry to root.userData.{parts,nodes}
+// instead of into root.userData.sculptRuntime, and others stash a
+// AnimationMixer under root.userData.<customNamespace>.mixer. The renderer
+// treats every well-known alias as a transparent overlay on sculptRuntime
+// so the rest of the pipeline (Inspector, T-Pose, action hooks) Just Works
+// without the factory having to know which name we expect.
+function lblFlattenRuntimeAliases(group){
+  if(!group) return;
+  const ud = group.userData || (group.userData = {});
+  const rt = ud.sculptRuntime || (ud.sculptRuntime = {});
+  // 1) Hoist root.userData.parts → sculptRuntime.parts (if not already set)
+  if(ud.parts && !rt.parts){ rt.parts = ud.parts; }
+  // 2) Hoist root.userData.nodes → sculptRuntime.nodes (only when sculptor didn't define its own)
+  if(ud.nodes && !rt.nodes){ rt.nodes = ud.nodes; }
+  // 3) Mirror top-level meshes registry (the BMX ref exposes one)
+  if(ud.meshes && !rt.meshes){ rt.meshes = ud.meshes; }
+  if(ud.colliders && !rt.colliders){ rt.colliders = ud.colliders; }
+  // 4) Recognise an electric-mouse-style custom runtime
+  if(ud.electricMouseMascotRuntime && !rt.electricMouseMascotRuntime){
+    rt.electricMouseMascotRuntime = ud.electricMouseMascotRuntime;
+  }
+  // 5) Find an AnimationMixer reachable from anywhere on userData and
+  //    expose it under the standard sculptRuntime.animations shape so
+  //    lblCollectAnimations picks it up uniformly.
+  if(!rt.animations){
+    const mixer = lblFindAnimationMixer(ud);
+    const clips = lblFindAnimationClips(ud);
+    if(mixer || (clips && clips.length)){
+      rt.animations = { clips: clips || [], mixer: mixer || null };
+    }
+  }
+  return rt;
+}
+
+// Walk userData (and a couple of common custom-runtime namespaces) to
+// locate a THREE.AnimationMixer. The humanoid ref stores it on
+// userData.electricMouseMascotRuntime.mixer, the BMX ref exposes it via
+// sculptRuntime.animations.mixer; some factories may store it on a
+// namespace named anything. Cheap DFS, no allocations beyond the result.
+function lblFindAnimationMixer(root){
+  if(!root) return null;
+  // 1) Direct sculptRuntime.animations.mixer
+  const rt = root.sculptRuntime;
+  if(rt && rt.animations && rt.animations.mixer && typeof rt.animations.mixer.update === 'function'){
+    return rt.animations.mixer;
+  }
+  // 2) First-level userData fields
+  for(const k of Object.keys(root)){
+    const v = root[k];
+    if(v && typeof v === 'object'){
+      if(v.mixer && typeof v.mixer.update === 'function' && v.mixer._root) return v.mixer;
+      if(v.update && typeof v.update === 'function' && v._root) return v;
+      if(typeof v === 'object' && v.constructor && v.constructor.name === 'AnimationMixer') return v;
+    }
+  }
+  return null;
+}
+function lblFindAnimationClips(root){
+  if(!root) return null;
+  // 1) sculptRuntime.animations.clips
+  const rt = root.sculptRuntime;
+  if(rt && rt.animations && Array.isArray(rt.animations.clips)) return rt.animations.clips;
+  // 2) root.animations (legacy GLTFLoader / FBXLoader)
+  if(Array.isArray(root.animations)) return root.animations;
+  return null;
+}
+
 // Dispatched every frame from animate(), right after controls.update() —
 // see SYSTEM_UPDATE_PROMPT__Add_TS_Output_to_LBL.md §5. A TS factory owns
 // at most one live Group at a time (loading a new one replaces it, same as
 // the blueprint path replacing sceneGroup's contents), so there's no per-
 // model list to maintain.
+//
+// v8.0 PART 5 — extended to auto-tick:
+//   (1) root.userData.tick(dt, elapsed)            — primary; the factory
+//       is responsible for ticking its own AnimationMixer if it has one
+//   (2) any AnimationMixer reachable from root.userData via a custom
+//       runtime namespace — ONLY when there's no factory-supplied tick
+//       (otherwise we'd double-tick)
+//   (3) root.userData.<customNamespace>.update(elapsed) when no tick is
+//       set AND no mixer is reachable (the humanoid ref's
+//       electricMouseMascotRuntime.update(elapsed) is the canonical case
+//       — it manages its own clock internally and the factory chose not
+//       to wrap it in userData.tick)
+//
+// Safety: lblCollectAnimations() already calls lblSilenceRootPreExistingAnimations()
+// before installing the in-app player, which stops the factory's mixer
+// actions. The factory's tick still calls mixer.update(dt) but the
+// actions are stopped → no double-animation. If the in-app player is
+// also running, the in-app player wins.
 function tickAllTsModels(dt, elapsed){
-  if(CURRENT_TS_MODEL && typeof CURRENT_TS_MODEL.userData.tick==='function'){
+  if(!CURRENT_TS_MODEL) return;
+  const hasTick = typeof CURRENT_TS_MODEL.userData.tick === 'function';
+  // (1) factory-supplied tick — primary driver (already includes the
+  // factory's own mixer.update(dt) call if the factory wrote one)
+  if(hasTick){
     try{ CURRENT_TS_MODEL.userData.tick(dt, elapsed); }
     catch(e){ console.error('[TS tick]', e); }
+  }
+  if(!hasTick){
+    // (2) no factory tick — auto-tick the first AnimationMixer we can
+    // reach through userData. The humanoid's animationController pattern
+    // wraps its mixer in a tick anyway, so this only fires for the
+    // truly factory-less cases (root.userData.<ns>.mixer with no tick).
+    const mixer = lblFindAnimationMixer(CURRENT_TS_MODEL.userData);
+    if(mixer && typeof mixer.update === 'function'){
+      try{ mixer.update(dt); }catch(e){ console.error('[TS mixer]', e); }
+    }
+    // (3) factories that publish update(elapsed) on a custom namespace
+    // with no tick AND no mixer — the Pikachu ref's
+    // electricMouseMascotRuntime.update(elapsed) is the canonical case.
+    if(!mixer){
+      const ud = CURRENT_TS_MODEL.userData;
+      for(const k of Object.keys(ud)){
+        const v = ud[k];
+        if(v && typeof v === 'object' && typeof v.update === 'function'
+           && typeof v.tick !== 'function'
+           && v._root === CURRENT_TS_MODEL){
+          try{ v.update(elapsed); }catch(e){ console.error('[TS runtime update]', e); }
+        }
+      }
+    }
   }
 }
 

@@ -1,12 +1,31 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.2 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.3 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
-CHANGELOG — v1.2 (2026-07-31): added PARTs 19-23 (staged passes,
-detailInventory, landmarks, subject routing, post-render fidelity
-self-score) for img2threejs alignment. See
-LBL_img2threejs_Update_Plan.txt. Former PARTs 19-21 (renderer audit
-notes) renumbered to PARTs 24-26.
+CHANGELOG
+  v1.3 (2026-08-28) — Renderer-side additions to the TS path. New
+    PARTs 27-29 (Constraints, Advanced Shader & VFX Techniques, Root-
+    Level Runtime Aliases + AnimationMixer auto-tick). PART 5 extended
+    to cover the THREE.AnimationMixer + custom-runtime `update(elapsed)`
+    tick patterns (in addition to the existing `tick(dt, elapsed)`
+    primary driver). PART 6 extended with the full optional
+    `sculptRuntime` shape: `actions`, `animation`, `vfx`, `materials`,
+    `parts`, plus the per-mesh metadata convention (`sculptComponent`,
+    `actionProfile`, `animationRole`, `socketFor`). PART 3 cheat sheet
+    gains IcosahedronGeometry, CapsuleGeometry, and the Shape-with-
+    holes piercing technique. PART 12 (validation checklist) and
+    PART 15 (common mistakes) updated. v1.3 is the spec produced after
+    the renderer shipped `lblFlattenRuntimeAliases()` (which hoists
+    `userData.parts/nodes/meshes/colliders` + the factory's
+    AnimationMixer into `sculptRuntime` automatically) and the
+    "Action Hooks" inspector panel (which surfaces every function in
+    `sculptRuntime.actions` / `sculptRuntime.animation` as a
+    click-to-invoke button). v1.2 → v1.3 is fully backward compatible
+    with v1.2 files: every v1.2 factory still loads identically.
+  v1.2 (2026-07-31): added PARTs 19-23 (staged passes, detailInventory,
+    landmarks, subject routing, post-render fidelity self-score) for
+    img2threejs alignment. See LBL_img2threejs_Update_Plan.txt. Former
+    PARTs 19-21 (renderer audit notes) renumbered to PARTs 24-26.
 ================================================================================
 This document is the THIRD input-format spec in the LBL family, sitting
 alongside Prompt_To_Json.txt (master text→JSON), Prompt_To_Js.txt (master
@@ -389,6 +408,10 @@ the top, only reach further down if the top doesn't fit the shape.
   sphere            → SphereGeometry(r, ws, hs)
   ball / joint      → SphereGeometry(r, 16, 12) (low-poly)
   capsule / pill    → CapsuleGeometry(r, length, capSegs, radialSegs)
+  icosa / blob      → IcosahedronGeometry(r, detail)   — flat-shaded low-poly
+                       organic volumes (tree canopies, rocky clumps,
+                       melted/burnt caps). detail=0 → 20 faces, 1 → 80,
+                       2 → 320. Default detail=1 for low-poly look.
   cylinder / rod    → CylinderGeometry(rTop, rBot, h, radialSegs)
   cone / spike      → ConeGeometry(r, h, radialSegs)
   torus / wheel tyre→ TorusGeometry(R, r, radialSegs, tubularSegs)
@@ -398,6 +421,15 @@ the top, only reach further down if the top doesn't fit the shape.
   rim / disc        → CircleGeometry(r, segs) (flat)  OR  CylinderGeometry(r, r, t, segs) (thin disc)
   revolved body     → LatheGeometry(points, segs)
   extruded shape    → ExtrudeGeometry(shape, { depth, bevelEnabled, bevelThickness, bevelSize, bevelSegments })
+  extruded + holes  → ExtrudeGeometry(shape, { …, depth })  with
+                       shape.holes = [Path, Path, …]  — see 3.7
+  custom mesh       → BufferGeometry built from positions/normals/uvs/
+                       indices — see 3.6. Use for hair tufts, lightning
+                       bolts, sculpted teardrops, anything that cannot
+                       be expressed as one of the primitives above.
+  SDF + marching    → See 3.8 — polygonise a signed-distance field once
+   cubes             to get a single watertight "continuous-sculpt" mesh
+                       (the humanoid ref's body, the pikachu ref's head).
 
 Default segment counts for low-poly (PART 2 of the JSON/JS spec is your
 target, translated to real Three.js numbers):
@@ -406,9 +438,16 @@ target, translated to real Three.js numbers):
   - Cylinder: 12-20 radialSegments for hero parts, 6-8 for hidden
     structural cylinders, 4 for square cross-section beams
     (use a CylinderGeometry with 4 radialSegments + 90° rotation).
+  - Icosahedron: detail=0 for the lowest-poly look (flat-shaded
+    20-face blobs), detail=1 for the standard low-poly, detail=2
+    only when you actually need 320 faces for a curved silhouette.
   - Torus: 24-32 radial, 60-96 tubular for wheels; 8 radial, 16
     tubular for thin accent rings.
   - Box: no segments; geometry is already 1 quad per face.
+  - Capsule: capSegs 4-8, radialSegs 8-16. Always enable flatShading
+    on the material for the chunky low-poly look; with smooth
+    shading a Capsule reads as a pharmaceutical pill, not a
+    stylized limb.
 
 --------------------------------------------------------------------------
 3.2 — ROTATION CONVENTIONS
@@ -533,6 +572,115 @@ drill into it. If you have to go this route:
 PART 24 of the JSON/JS spec (mesh primitive, raw vertex/face geometry)
 describes a similar DSL feature; that section's guidance translates
 1:1 to BufferGeometry construction here.
+
+--------------------------------------------------------------------------
+3.7 — EXTRUDED SHAPE WITH HOLES (cut-outs without CSG)
+--------------------------------------------------------------------------
+The most powerful single pattern in this whole spec. THREE.Shape can
+carry holes[] — a list of THREE.Path that the triangulator
+subtracts from the outer shape. Use this for: a charger case with two
+oval earbud wells, a knife tang with skeletonising lanyard slots, a
+receiver body with a battery compartment cut, a deck plate with bolt
+holes, a weapon handguard with vent slots. The result is a SINGLE
+watertight mesh — no need for the (much heavier) three-bvh-csg library
+and no risk of the seams CSG leaves at boolean boundaries.
+
+  // Outer shape — stadium (rounded rectangle) outline
+  const shape = new THREE.Shape();
+  const hx = len / 2 - R, hz = depth / 2 - R;
+  shape.absarc(-hx, -hz, R, Math.PI,        Math.PI * 1.5);
+  shape.absarc( hx, -hz, R, Math.PI * 1.5, 0);
+  shape.absarc( hx,  hz, R, 0,              Math.PI * 0.5);
+  shape.absarc(-hx,  hz, R, Math.PI * 0.5,  Math.PI);
+
+  // Hole 1 — an oval earbud well
+  const wellL = new THREE.Path();
+  wellL.absellipse(-WELL_X, 0, WELL_RX, WELL_RZ, 0, Math.PI * 2, false, 0);
+  shape.holes.push(wellL);
+
+  // Hole 2 — mirrored oval
+  const wellR = new THREE.Path();
+  wellR.absellipse(WELL_X, 0, WELL_RX, WELL_RZ, 0, Math.PI * 2, false, 0);
+  shape.holes.push(wellR);
+
+  // One ExtrudeGeometry that has the wells as real openings
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: BODY_H - bevel * 2,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    bevelSegments: 4,
+    curveSegments: 48,
+  });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, bevel, 0);
+
+The Sony WF-1000XM3 ref's `piercedDeck` and the Gerber knife ref's
+`buildBladeTangShape` (with forwardSlot + ricassoHole + pommelHole)
+are the canonical examples. Rules:
+  - Winding order MATTERS: outer shape must be CCW (counterclockwise)
+    in 2D, holes must be CW (clockwise) — Three.js's Earcut
+    triangulator follows the convention that "interior to outer = hole".
+    `absarc(start, end, ccw=false)` produces a CCW arc; if your hole
+    looks like a solid island instead of a cut-out, you've got the
+    winding inverted.
+  - For a rounded slot, build it as two arcs + two lines, NOT as a
+    single rounded rectangle — `Shape.absellipse` + `absarc` are the
+    reliable building blocks. See the Gerber ref's `addRoundedSlot`.
+  - The hole's local frame matches the SHAPE's, not the world. After
+    `geo.rotateX(-Math.PI / 2)` and `geo.translate(...)` the holes
+    move with the rest of the geometry.
+
+--------------------------------------------------------------------------
+3.8 — SDF + MARCHING CUBES (continuous-sculpt topology)
+--------------------------------------------------------------------------
+For organic continuous-sculpt meshes (a humanoid body, a soft head
+where head blends into neck blends into shoulders with no visible
+panel break), build a signed-distance field in JS, then polygonise
+it once with a tiny marching-cubes pass. The result is a SINGLE
+watertight mesh whose vertex count you can dial by the grid
+resolution; it never has the seams that stacking separate
+RoundedBox primitives leaves.
+
+  // 1) Define capsules with smin/smax
+  function sdCapsule(px,py,pz, ax,ay,az, bx,by,bz, ra, rb) {
+    const pax=px-ax, pay=py-ay, paz=pz-az;
+    const bax=bx-ax, bay=by-ay, baz=bz-az;
+    const baLen2 = bax*bax + bay*bay + baz*baz;
+    let h = baLen2>0 ? (pax*bax + pay*bay + paz*baz)/baLen2 : 0;
+    h = h<0?0:h>1?1:h;
+    const dx = pax - bax*h, dy = pay - bay*h, dz = paz - baz*h;
+    return Math.sqrt(dx*dx + dy*dy + dz*dz) - (ra + (rb-ra)*h);
+  }
+  // Polynomial smooth minimum — k = blend radius in world units
+  function smin(a, b, k) {
+    if (k <= 0) return Math.min(a, b);
+    const h = Math.max(0, Math.min(1, 0.5 + 0.5*(b-a)/k));
+    return b*(1-h) + a*h - k*h*(1-h);
+  }
+
+  // 2) Build the field as a sum of capsules
+  function bodyField(x, y, z) {
+    let d = sdCapsule(x,y,z, 0, 1.5, 0,  0, -1.5, 0,  0.4, 0.3);   // torso
+    d = smin(d, sdCapsule(x,y,z, 0, 2.7, 0,  0.5, 2.5, 0.3, 0.18, 0.16), 0.3);
+    return d;
+  }
+
+  // 3) Polygonise once with marching cubes (implement or import)
+  const positions = marchCubes(bodyField, RESOLUTION, BOUNDS);
+
+  // 4) Build a BufferGeometry
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+
+The humanoid ref is the canonical example — body, head, hands, feet,
+ears, tail, all from one signed-distance field per body region. This
+is the only path in this spec that can produce a "continuous-sculpt"
+topology (the JSON/JS spec's `sdf_blob` field is the equivalent on
+the blueprint path). PART 11.1's "loss of seams" rule means: if your
+reference is one fused mass, this is the technique you need.
 
 ================================================================================
 PART 4 — IMPORTS & EXTERNAL DEPENDENCIES
@@ -714,6 +862,98 @@ animate should NOT have a tick — leave root.userData.tick undefined and
 the renderer won't call into your model per frame. Adding an empty tick
 function is a wasted dispatch.
 
+--------------------------------------------------------------------------
+5.6 — AnimationMixer + THREE.AnimationClip (skeletal animation)
+--------------------------------------------------------------------------
+For models with skeleton-driven animation (a walking/running/jumping
+character with bones, a machine whose arms articulate along authored
+curves), use THREE.AnimationMixer + THREE.AnimationClip instead of (or
+in addition to) procedural tick math. The renderer recognises this shape
+under `root.userData.sculptRuntime.animations` and:
+
+  (1) Auto-silences the factory's own mixer when the in-app animation
+      player is active, so two mixers never fight over the same bones
+      (a long-standing bug fixed in v1.3).
+  (2) Surfaces the clips in the renderer's play / next-clip UI.
+  (3) Auto-ticks the factory's mixer every frame (dt) at the renderer's
+      render-loop cadence.
+
+Three accepted shapes (the renderer tries them in this order):
+
+  // (a) Modern shape — mixer + clips, both reach into the renderer's UI
+  const mixer = new THREE.AnimationMixer(root);
+  const clips = [
+    new THREE.AnimationClip('idle',  2.0, [ /* …tracks… */ ]),
+    new THREE.AnimationClip('walk',  1.4, [ /* …tracks… */ ]),
+    new THREE.AnimationClip('attack', 0.8, [ /* …tracks… */ ]),
+  ];
+  const actions = clips.map(c => mixer.clipAction(c));
+  root.userData.sculptRuntime.animations = { clips, mixer, actions };
+  // Hand-off: the renderer silences the mixer on mount and ticks it
+  // itself at dt. Your `root.userData.tick` no longer needs to call
+  // `mixer.update(dt)` — duplicate the call and you'll see
+  // double-application.
+
+  // (b) Legacy hint-array — synthesised AnimationClips
+  // Older factories publish a plain array; the renderer builds real
+  // THREE.NumberKeyframeTrack + AnimationClip from each entry.
+  root.userData.sculptRuntime.animations = [
+    { name: 'drive', duration: 4.0, tracks: [
+        { name: 'wheel.rotation[x]', times: [0, 1, 2, 3, 4], values: [0, 1.5, 3, 4.5, 6] },
+        { name: 'body.position[y]',  times: [0, 1, 2, 3, 4], values: [0, 0.05, 0, 0.05, 0] },
+    ]},
+  ];
+
+  // (c) Custom namespace — if you keep the mixer on your own runtime
+  // object (e.g. root.userData.electricMouseMascotRuntime.mixer), the
+  // renderer finds it via the lblFindAnimationMixer() DFS in PART 29
+  // and ticks it. v1.3 added this so factories don't have to know
+  // which exact path the renderer reads.
+
+If you mix BOTH a procedural `userData.tick` AND an AnimationMixer, the
+factory's tick must own the mixer.update() call (otherwise the renderer
+silences it and your tick is the only thing keeping the pose alive). The
+recommended pattern from the humanoid ref:
+
+  const previousTick = root.userData.tick as ((dt: number, elapsed: number) => void) | undefined;
+  root.userData.tick = (dt: number, elapsed: number) => {
+    previousTick?.(dt, elapsed);   // any earlier tick (e.g. breath, sway)
+    controller.update(dt);         // ticks the AnimationMixer
+  };
+
+This way the factory has ONE tick entry point and the renderer never
+double-ticks.
+
+--------------------------------------------------------------------------
+5.7 — Custom-runtime `update(elapsed)` (no tick, no mixer)
+--------------------------------------------------------------------------
+Some models (the pikachu ref is the canonical example) keep their
+animation driver on a custom runtime namespace like
+`userData.electricMouseMascotRuntime` and expose a `.update(elapsed)`
+method on it — but DO NOT set `userData.tick` (because the entire
+animation logic lives inside the namespace, including a private
+elapsed clock). v1.3 added an auto-discovery path for this:
+
+  // The renderer walks root.userData after mount, finds the first
+  // object with both an `update(elapsed)` method AND a `_root`
+  // back-reference to the model, and calls it every frame with the
+  // renderer's elapsed time. No `root.userData.tick` needed.
+
+If you go this route, set `_root` on the runtime so the DFS finds it:
+
+  const runtime = {
+    _root: root,
+    update(elapsedSeconds: number) { /* … */ },
+  };
+  root.userData.electricMouseMascotRuntime = runtime;
+
+The rule of thumb: prefer `root.userData.tick` (PART 5.1) when
+practical — it's the simplest, no DFS, no `_root` back-reference, and
+the renderer will tick it deterministically. Reach for the custom-runtime
+pattern only when you need a private clock, multiple sub-states, or a
+clock that survives tab switches (the pikachu ref's "10K celebration"
+counter is one such case).
+
 ================================================================================
 PART 6 — sculptRuntime CONTRACT (the runtime hooks the inspector reads)
 ================================================================================
@@ -744,6 +984,90 @@ actors, colliders, destruction groups. Populate it; don't skip it.
   } satisfies ProceduralModelRuntime;
 
 The renderer's TS path stores this verbatim — your type IS the contract.
+
+--------------------------------------------------------------------------
+6.1B — FULL OPTIONAL SHAPE (the v1.3 expansion)
+--------------------------------------------------------------------------
+v1.3 expanded the contract with several OPTIONAL fields that the
+renderer actively uses. The complete shape the inspector + action-hooks
+panel + fidelity gate reads is:
+
+  export type ProceduralModelRuntime = {
+    // Required
+    nodes:            Record<string, THREE.Object3D>;
+    meshes:           Record<string, THREE.Mesh>;
+    sockets:          Record<string, THREE.Object3D>;
+    colliders:        Record<string, unknown>;
+    destructionGroups: Record<string, THREE.Object3D[]>;
+
+    // Optional — strongly recommended for any non-trivial model
+    parts:      Record<string, THREE.Object3D>;  // alt flat namespace
+                                                  // (Pikachu humanoid uses
+                                                  // this instead of meshes)
+    materials:  Record<string, THREE.Material>;   // material registry;
+                                                  // the inspector surfaces
+                                                  // each one with a tip
+                                                  // showing its kind
+                                                  // (mat / mesh / obj3d)
+
+    // Optional — action hooks (each function becomes a button in the
+    // renderer's "Action Hooks" inspector panel; clicking it calls the
+    // function with no args, the factory decides defaults)
+    actions:    Record<string, (...args: any[]) => any>;
+    animation:  Record<string, (...args: any[]) => any>;  // alias
+
+    // Optional — VFX / particle pools surfaced in the inspector
+    vfx:        Record<string, THREE.Object3D | any[] | object>;
+
+    // Optional — AnimationMixer + clips for skeletal animation
+    animations: {
+      clips:   THREE.AnimationClip[];
+      mixer:   THREE.AnimationMixer;
+      actions?: THREE.AnimationAction[] | Map<string, THREE.AnimationAction>;
+    };
+
+    // Optional — img2threejs-aligned fidelity metadata (PART 19-23)
+    subject:         { kind: 'character'|'vehicle'|'creature'|'hybrid'|... };
+    detailInventory: Array<{ id: string; region: string; kind: string; priority: 'high'|'medium'|'low'; reviewThreshold: number; description: string }>;
+    landmarks:       Record<string, [number, number]>;  // u,v in [0,1]
+    passes:          Record<'blockout'|'structural'|'form'|'material'|'surface'|'lighting'|'interaction'|'optimization', unknown>;
+    passesComplete:  boolean;
+    passesReviewed:  Record<string, { score: number; notes: string }>;
+    fidelity:        { overall: number; perPass: object; perItem: object; styleCoherent: boolean; notes: string };
+  };
+
+  // Optional — top-level aliases the renderer auto-flattens (PART 29):
+  // root.userData.parts         → sculptRuntime.parts
+  // root.userData.nodes         → sculptRuntime.nodes
+  // root.userData.meshes        → sculptRuntime.meshes
+  // root.userData.colliders     → sculptRuntime.colliders
+  // root.userData.electricMouseMascotRuntime (or any namespace) →
+  //   sculptRuntime.electricMouseMascotRuntime
+  // root.userData.<ns>.mixer / root.animations  →
+  //   sculptRuntime.animations.{mixer,clips}
+
+  // Optional — provenance + sculpt spec for the inspector
+  root.userData.provenance = {
+    route: 'code-only procedural',         // always this for TS path
+    exactnessTier: 'stylized-low-poly',   // or 'photoreal' etc.
+    inferred: string[],                   // e.g. ['rear hair', 'fine fingers']
+  };
+  root.userData.sculptSpec = {
+    source: '<a URL or path to your reference image>',
+    reference: '<local path or URL>',
+    style: '<from PART 48.1 vocabulary>',
+    heightUnits: 1.7,                     // canonical height for proportions
+  };
+  root.userData.actionReadiness = {
+    note: 'exposes fire/reset/openLid/setWheelSpeed in sculptRuntime.actions',
+  };
+
+Every optional field is safe to omit. The more you populate, the more
+the renderer's Inspector + fidelity gate + action-hooks panel can do.
+v1.2 files that only set nodes/meshes/sockets/colliders/
+destructionGroups keep working — all the new fields are pure additions.
+
+
 
 --------------------------------------------------------------------------
 6.2 — NAMING
@@ -822,6 +1146,68 @@ where lod0 is full quality and lod2 is the most decimated. TS factories
 that want their own LOD structure may overwrite this with a type that
 matches the same shape.
 
+--------------------------------------------------------------------------
+6.7 — PER-MESH METADATA (component role + action profile) [v1.3]
+--------------------------------------------------------------------------
+For complex models with many named parts, the renderer reads four
+OPTIONAL per-mesh metadata fields. None of them are required, but
+populating them turns the Inspector from a passive tree into a live
+gizmo that knows what each part IS and what you can do to it.
+
+  // 6.7.1 — sculptComponent: identity + role + parent + dependent sockets
+  node.userData.sculptComponent = {
+    id:       'cabin',                  // human-readable, surface in tools
+    parentId: 'body',                   // 'parent' component this hangs off
+    role:     'cabin' | 'shell' | 'garment' | 'head' | 'limb' |
+              'wheel' | 'barrel' | 'receiver' | 'trigger' | 'magazine' |
+              'scope' | 'stock' | 'joint' | 'bone' | 'ik-target' |
+              'socket' | 'mount' | 'handle' | 'crown-emblem' |
+              'character-root' | 'skeleton-root' | 'rig-root' |
+              /* …anything the host recognizes… */,
+    sockets:  ['cabin-socket'],         // socket names this part depends on
+  };
+
+  // 6.7.2 — actionProfile: which 1-click actions are valid for this part
+  node.userData.actionProfile = {
+    canSpin:    true,    // drives sculptRuntime.actions.spin
+    canGlow:    true,    // drives sculptRuntime.actions.glow
+    canFire:    true,    // drives sculptRuntime.actions.fire
+    canRecoil:  true,    // drives sculptRuntime.actions.recoil
+    canEject:   true,    // drives sculptRuntime.actions.eject
+    canOpen:    true,    // drives sculptRuntime.actions.openLid
+    canElectrify: true, // drives sculptRuntime.actions.triggerElectric
+    canJump:    true,    // drives sculptRuntime.actions.jump
+    canWiggle:  true,    // drives sculptRuntime.actions.wiggle
+    canSway:    true,    // drives sculptRuntime.actions.sway
+    canRecenter: true,  // drives sculptRuntime.actions.reset / recenter
+  };
+  // The Inspector reads this and shows only the relevant buttons. A
+  // barrel node with canFire + canRecoil + canEject gets three
+  // buttons; a foot node with canSway gets one.
+
+  // 6.7.3 — animationRole: classify nodes for skeletal animation
+  // The renderer's lblCollectAnimations path reads this when scanning
+  // THREE.Bone hierarchies; helps it know which objects to look at
+  // and which to skip.
+  node.userData.animationRole = 'character-root' | 'skeleton-root' |
+                                'rig-root' | 'bone' | 'ik-target' |
+                                'socket' | 'aim-target' | 'attachment';
+
+  // 6.7.4 — socketFor: trace parent ↔ child between a part and its
+  // socket. The reciprocal of `sockets: { id: socketObject3D }` — set
+  // this on a socket to point at the part it serves.
+  socket.userData.socketFor = 'cabin';   // matches a sculptRuntime.nodes key
+
+A few rules:
+  - Set these AFTER positioning the node in the scene (so the parent
+    id is the one actually being used as the parent).
+  - Names must match the same casing convention as sculptRuntime
+    (PART 6.2). 'frontTire' in the runtime MUST be 'frontTire' here.
+  - These fields are read by the renderer's INSPECTOR, the gizmo,
+    and the action-hooks panel. They do NOT change the rendered
+    scene. A factory that omits them is still valid; the Inspector
+    simply has less to show.
+
 ================================================================================
 PART 7 — MATERIALS: PBR RECIPES, ONE PER PRESET
 ================================================================================
@@ -866,6 +1252,50 @@ anisotropic streaks, transmission), upgrade to MeshPhysicalMaterial:
   new THREE.MeshPhysicalMaterial({
     color: 0x1a1a1c, roughness: 0.40, metalness: 0.55,
     clearcoat: 0.40, clearcoatRoughness: 0.20,
+  });
+
+  // v1.3 additions to the MeshPhysicalMaterial surface — listed in
+  // priority order, with the canonical reference example for each:
+
+  // transmission + ior + thickness (real glass, lens, water, nylon)
+  new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, roughness: 0.05, metalness: 0.0,
+    transmission: 0.9, transparent: true, opacity: 0.55,
+    ior: 1.45, thickness: 0.05,
+  });
+  // Refs: Sony WF-1000XM3's lens, the Shotgun's red-dot sight glass.
+
+  // sheen + sheenColor + sheenRoughness (fabric, hair, leather)
+  new THREE.MeshPhysicalMaterial({
+    color: 0x191919, roughness: 0.62, metalness: 0.0,
+    sheen: 0.4, sheenRoughness: 0.6, sheenColor: new THREE.Color(0x2a2a2a),
+  });
+  // Refs: BMX saddle's PU leather, the human character's hair mass.
+
+  // anisotropy + anisotropyRotation (brushed metal, hair, vinyl)
+  // REQUIRES computeTangents() on the geometry — index, position,
+  // normal, AND uv attributes all present. Without them the TBN frame
+  // is degenerate and the highlight samples wrong.
+  new THREE.MeshPhysicalMaterial({
+    color: 0x141414, roughness: 0.55, metalness: 0.5,
+    anisotropy: 0.6,
+    anisotropyRotation: Math.PI / 2,
+  });
+  // Refs: the human character's hairPhysical material.
+
+  // specularIntensity + specularColor (F0 knob for dielectrics)
+  new THREE.MeshPhysicalMaterial({
+    color: 0x222222, roughness: 0.55, metalness: 0.0,
+    specularIntensity: 0.28,   // < 1.0 darkens the rim highlight without
+                               //     changing albedo
+    specularColor: new THREE.Color(0x808080),
+  });
+
+  // iridescence (oil-slick, soap bubble, anodized titanium)
+  new THREE.MeshPhysicalMaterial({
+    color: 0x1a1a1c, roughness: 0.2, metalness: 0.4,
+    iridescence: 1.0, iridescenceIOR: 1.3,
+    iridescenceThicknessRange: [100, 800],
   });
 
 --------------------------------------------------------------------------
@@ -1371,6 +1801,8 @@ Run through it silently and fix any check before emitting the file.
   [ ] Options interface declares `scale?`, `shadows?`, `wireframe?` at minimum
   [ ] root.userData.sculptRuntime is populated and typed (PART 6.1)
   [ ] (If animated) root.userData.tick is a `(dt, elapsed) => void` function (PART 5.1)
+  [ ] (If skeletal) root.userData.sculptRuntime.animations has { clips, mixer } (PART 5.6)
+  [ ] (If custom-runtime) root.userData.<ns>._root points at the model root (PART 5.7)
   [ ] No `import.meta`, `process.env`, `Buffer`, `require`, `eval` (PART 1.5)
   [ ] `tsc --strict --target ES2020 --module ESNext --moduleResolution bundler` passes
 
@@ -1379,8 +1811,12 @@ Run through it silently and fix any check before emitting the file.
   [ ] No part is FLOATING (not attached to anything) — use tube/cable/parent.add (PART 11)
   [ ] No part is INSIDE another part it shouldn't intersect (sphere embedded in a box, etc.)
   [ ] No obvious gaps (limb that doesn't reach the torso, tyre floating above the rim)
-  [ ] Symmetric parts actually are symmetric (mirror across the model's symmetry plane)
+  [ ] Symmetric parts actually are symmetric (mirror across the model's symmetry plane, PART 27.7)
   [ ] The model is COMPLETE from every angle — the back is built, not just the front
+  [ ] Continuous-sculpt topology uses SDF + marching cubes (PART 3.8) — never stacked
+      touching primitives (PART 11.1)
+  [ ] Cut-outs use Shape + ExtrudeGeometry with holes[] (PART 3.7), NOT three-bvh-csg
+  [ ] Repetitive geometry (4+ identical parts) uses InstancedMesh (PART 28.5)
 
   MATERIALS
   [ ] Every distinct visible material has color, roughness, metalness
@@ -1388,6 +1824,13 @@ Run through it silently and fix any check before emitting the file.
   [ ] Emissive things actually have emissive + emissiveIntensity > 1
   [ ] Glass / transmission materials have a non-zero envMapIntensity
   [ ] Flat-shaded style uses MeshBasicMaterial / MeshToonMaterial, not a physically-lit preset
+  [ ] Physical material extensions (transmission, sheen, anisotropy, clearcoat) are
+      USED only when the visual justifies the cost — don't ship a fully flat surface
+      with clearcoat: 0.85
+  [ ] Glow / bloom elements use SpriteMaterial + AdditiveBlending + depthWrite:false
+      (PART 28.3), not emissive: 0xffffff + emissiveIntensity: 999
+  [ ] onBeforeCompile shaders always set customProgramCacheKey() (PART 28.1)
+  [ ] Converted-colour-into-GLSL uses .convertSRGBToLinear() on the source color
 
   SILHOUETTE / PROPORTIONS
   [ ] Silhouette is recognizable as the subject from at least the 3/4 front view
@@ -1402,6 +1845,8 @@ Run through it silently and fix any check before emitting the file.
   [ ] Decals read the right way up from the default camera angle
   [ ] No floating or duplicated detail (a screw that appears in two places, a decal
       that wraps the wrong way)
+  [ ] Hinged elements live in a pivot Group (PART 27.1), not directly in the body
+  [ ] Skinned / rigged parts have userData.animationRole set (PART 6.7.3)
 
   VFX (if applicable)
   [ ] tick uses `dt` for decay, `elapsed` for periodic motion
@@ -1409,12 +1854,23 @@ Run through it silently and fix any check before emitting the file.
   [ ] Spawned actors use a pre-allocated pool, no per-frame `new`
   [ ] Per-frame allocations are zero (or strictly bounded)
   [ ] tick never throws — wrap external calls in try/catch
+  [ ] Cloth / hair / antennae use spring-damper lag (PART 27.4), not direct snap
+  [ ] Aim / look-at constraints slerp from previous quaternion (PART 27.5)
+  [ ] Face decals on continuous-sculpt bodies use surface-follow with
+      depthTest:false + renderOrder 3-4 + castShadow:false (PART 27.6)
 
   RUNTIME HOOKS
   [ ] sculptRuntime.nodes names match the variable names in the geometry code
   [ ] Sockets have name + userData.socketType ('muzzle' | 'mount' | 'spawn' | 'attach')
   [ ] Destruction groups are named for what they break into
   [ ] All Object3Ds in sculptRuntime are reachable from root (no orphans)
+  [ ] Action hooks (sculptRuntime.actions / sculptRuntime.animation) are
+      no-arg-callable functions that drive meaningful state changes
+  [ ] Per-mesh metadata (sculptComponent, actionProfile) is consistent
+      with the part's actual role in the model
+  [ ] AnimationMixer is reachable from root.userData OR
+      root.userData.sculptRuntime.animations (PART 5.6) — the renderer
+      won't find a mixer living only on a deeply-nested child mesh
 
 ================================================================================
 PART 13 — MINIMAL WORKED EXAMPLE
@@ -1509,6 +1965,170 @@ landmarks to study in order:
       lights factory (PART 1.3).
 
 ================================================================================
+PART 14B — A v1.3 WORKED EXAMPLE (action hooks + tick + sculptRuntime) [v1.3]
+================================================================================
+
+The smallest "do something interactive" factory — a button you can
+click in the renderer's Action Hooks panel, with a tick for the
+visible state change. Demonstrates PART 5 (tick), PART 6 (full
+optional sculptRuntime), PART 6.7 (per-mesh metadata), PART 27.1
+(pivot group), PART 28.3 (additive glow sprite). Copy-paste-ready.
+
+  import * as THREE from 'three';
+  import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+
+  /**
+   * A power button: a rounded box with a glowing LED that toggles
+   * on click. Coordinate frame: standard — +y up, origin at the
+   * button's centre.
+   * Demonstrates: action hooks, tick animation, additive sprite,
+   * pivot group, per-mesh metadata, full optional sculptRuntime.
+   */
+  export interface PowerButtonOptions {
+    scale?: number;
+    shadows?: boolean;
+  }
+
+  const COL = {
+    body: 0x2b2e33, bodyDark: 0x14161a,
+    ledOn: 0x36d97c, ledOff: 0x2a1f24,
+    glowOn: 0x7fffb0, glowOff: 0x181018,
+  };
+
+  function makeGlowSprite(color: number, size: number, opacity = 1): THREE.Sprite {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 128;
+    const ctx = cv.getContext('2d')!;
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0,    'rgba(255,255,255,1)');
+    g.addColorStop(0.22, 'rgba(255,255,255,0.7)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.16)');
+    g.addColorStop(1,    'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(cv);
+    return new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, color, opacity, transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }));
+  }
+
+  export function createPowerButtonModel(options: PowerButtonOptions = {}): THREE.Group {
+    const scale   = options.scale   ?? 1;
+    const shadows = options.shadows ?? true;
+
+    const root = new THREE.Group();
+    root.name = 'Power Button';
+
+    // --- body
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: COL.body, roughness: 0.55, metalness: 0.4,
+    });
+    const body = new THREE.Mesh(
+      new RoundedBoxGeometry(1.0, 0.32, 0.6, 4, 0.05),
+      bodyMat,
+    );
+    body.castShadow = shadows;
+    body.receiveShadow = shadows;
+    body.userData.sculptComponent = {
+      id: 'body', parentId: '', role: 'shell',
+      sockets: [],
+    };
+    body.userData.actionProfile = { canGlow: true, canRecenter: true };
+    root.add(body);
+
+    // --- LED pivot (PART 27.1)
+    const ledPivot = new THREE.Group();
+    ledPivot.position.set(0, 0, 0.31);  // sits on the front face
+    root.add(ledPivot);
+
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: COL.ledOff, emissive: new THREE.Color(COL.ledOff),
+      emissiveIntensity: 0.4, roughness: 0.3, metalness: 0,
+    });
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 16, 12),
+      ledMat,
+    );
+    led.userData.sculptComponent = {
+      id: 'led', parentId: 'body', role: 'led', sockets: [],
+    };
+    ledPivot.add(led);
+
+    const glow = makeGlowSprite(COL.glowOff, 0.3, 0);
+    glow.position.copy(led.position).add(new THREE.Vector3(0, 0, 0.01));
+    ledPivot.add(glow);
+
+    // --- state + actions
+    const state = { on: false, pulse: 0 };
+    const setOn = (next: boolean) => {
+      state.on = next;
+      led.material.color.set(next ? COL.ledOn : COL.ledOff);
+      led.material.emissive.set(next ? COL.ledOn : COL.ledOff);
+      (glow.material as THREE.SpriteMaterial).color.set(
+        next ? COL.glowOn : COL.glowOff,
+      );
+      state.pulse = 1;     // one-shot scale pulse on change
+    };
+    const toggle = () => setOn(!state.on);
+    const reset   = () => setOn(false);
+
+    // --- tick: pulse + breathe
+    const tick = (dt: number, elapsed: number) => {
+      state.pulse = Math.max(0, state.pulse - dt * 4);
+      const breathe = 1 + Math.sin(elapsed * 1.6) * 0.05;
+      const scale = (state.on ? 1.0 + state.pulse * 0.4 : 1.0) * breathe;
+      led.scale.setScalar(scale);
+      glow.scale.setScalar(0.3 * scale);
+      (glow.material as THREE.SpriteMaterial).opacity =
+        (state.on ? 0.6 : 0.05) * (0.85 + Math.sin(elapsed * 4) * 0.15);
+    };
+
+    // --- runtime
+    root.userData.tick = tick;
+    root.userData.sculptRuntime = {
+      nodes: { body, led, ledPivot },
+      meshes: { body, led },
+      sockets: {},
+      colliders: {},
+      destructionGroups: {},
+      materials: { bodyMat, ledMat },
+      actions: { toggle, reset, setOn },       // PART 6.1B
+      animation: { toggle, reset, setOn },     // alias
+      vfx: { glow },
+    };
+    root.userData.provenance = {
+      route: 'code-only procedural',
+      exactnessTier: 'stylized-low-poly',
+      inferred: [],
+    };
+    root.userData.sculptSpec = {
+      source: 'inline', reference: 'inline', style: 'flat-low-poly', heightUnits: 0.32,
+    };
+    root.userData.actionReadiness = {
+      note: 'sculptRuntime.actions.{toggle, reset, setOn} surface as buttons.',
+    };
+
+    root.scale.setScalar(scale);
+    return root;
+  }
+
+  export function createPowerButtonLookDevLights(): THREE.Group {
+    const g = new THREE.Group();
+    const key = new THREE.DirectionalLight(0xffffff, 2.5);
+    key.position.set(3, 5, 4);
+    g.add(key);
+    g.add(new THREE.HemisphereLight(0xffffff, 0x444444, 0.6));
+    return g;
+  }
+
+Drop this into the page; the renderer's Action Hooks panel will show
+"actions.toggle()", "actions.reset()", and "actions.setOn()"
+buttons. Clicking them invokes the functions; the tick makes the
+change visible.
+
+================================================================================
 PART 15 — COMMON MISTAKES (read these, don't make them)
 ================================================================================
 
@@ -1566,25 +2186,72 @@ PART 15 — COMMON MISTAKES (read these, don't make them)
     11.1: either move that model to the JSON/JS path (real sdf_blob
     support) or hand-roll a marching-cubes BufferGeometry; positioning
     tweaks alone won't fix it here any more than on the blueprint path.
+  ✗ [v1.3] Using a custom-runtime `update(elapsed)` AND a `userData.tick`
+    for the same model. Pick one — the renderer will skip the
+    custom-runtime when tick exists. PART 5.7's `_root` back-reference
+    is only consulted when there's no tick.
+  ✗ [v1.3] Calling `mixer.update(dt)` in `userData.tick` AND publishing
+    the mixer under `sculptRuntime.animations.mixer`. The renderer
+    silences the factory's mixer on mount so the in-app player wins;
+    if your tick also calls mixer.update() with stopped actions, you
+    get a stuttering pose. Either omit the tick (let the renderer
+    auto-tick the mixer) or stop the mixer's actions in your tick
+    (the factory owns the clock).
+  ✗ [v1.3] Forgetting `customProgramCacheKey()` on a material that
+    uses onBeforeCompile. Two materials with different onBeforeCompile
+    bodies that don't set a cache key share a compiled program and
+    you get the wrong shader for at least one of them. PART 28.1.
+  ✗ [v1.3] Stringifying an sRGB colour directly into GLSL (without
+    `convertSRGBToLinear()`). The `mix` in the injected shader then
+    blends in sRGB space and the result washes out. PART 28.1.
+  ✗ [v1.3] Hinging a part without a pivot Group (PART 27.1). A bare
+    `mesh.rotation.x = …` rotates around the mesh's local origin, not
+    around a hinge. The lid pivots at the back-top edge; rotate the
+    whole lid-from-hinge Group, not the lid itself.
+  ✗ [v1.3] Trying to animate a part's position with `mesh.position = …`
+    when it's parented to a moving part. The position is local to the
+    parent — drive it via a captured rest pose + lerp (PART 27.3) or
+    via a spring-damper (PART 27.4), not via direct writes.
+  ✗ [v1.3] Mirror with `scale.x = -1` AND no winding-order check.
+    A flipped-mesh with `side: DoubleSide` shows the inside; with
+    `side: FrontSide` you get back-face culling that hides the
+    flipped half. PART 27.7's full rules.
+  ✗ [v1.3] Setting `emissive: 0xffffff` + `emissiveIntensity: 999`
+    to fake a glow. The renderer will tonemap it back to white and
+    you get a hot pixel, not a soft halo. Use a SpriteMaterial with
+    AdditiveBlending (PART 28.3) or a toneMapped: false ShaderMaterial
+    with a soft gradient.
+  ✗ [v1.3] Spawning `new` THREE.Object3Ds in tick() to add particles.
+    After 30 seconds at 60 fps you've allocated 1800 objects and
+    the renderer is GC-stuttering. PART 5.3's pool pattern.
 
 ================================================================================
 PART 16 — FILE METADATA (verifies you read the contract)
 ================================================================================
 
-  This file is v1.0 of the TS spec, current as of the LBL v7.9
+  This file is v1.3 of the TS spec. v1.0 was the original LBL v7.9
   master release (PART 61's organic sculpted-form decision framework
-  — see PART 11.1 below for this spec's own translation of it).
-  Earlier drafts of the LBL JSON/JS family called
-  this output format "code-only" / "img2threejs output" / "the
-  Three.js factory path" before landing on the unified "TS"
-  naming. The TS spec is the YOUNGEST of the four formats and
-  inherits a lot of its content from the sister img2threejs
-  project; the JSON/JS spec inherits more from the LBL v5.3
-  blueprint DSL. They are siblings, not parent/child — neither
-  is "more correct" than the other, they target different use
-  cases (the TS path is for code-only production-grade models;
-  the JSON/JS path is for fast AI iteration on a low-poly
-  domain-specific scene description).
+  — see PART 11.1 below for this spec's own translation of it). v1.2
+  added PARTs 19-23 (staged passes, detailInventory, landmarks,
+  subject routing, post-render fidelity self-score) for img2threejs
+  alignment. v1.3 (this version) added PARTs 27-29 (Constraints,
+  Advanced Shader & VFX Techniques, Root-Level Runtime Aliases +
+  AnimationMixer auto-tick), expanded PART 5 to cover the
+  AnimationMixer + custom-runtime `update(elapsed)` tick patterns,
+  expanded PART 6 with the full optional `sculptRuntime` shape
+  (actions, animation, vfx, materials, parts) + per-mesh metadata
+  (sculptComponent, actionProfile, animationRole, socketFor), and
+  added PART 3.7 (Shape + holes) + PART 3.8 (SDF + marching cubes).
+  Earlier drafts of the LBL JSON/JS family called this output
+  format "code-only" / "img2threejs output" / "the Three.js factory
+  path" before landing on the unified "TS" naming. The TS spec is
+  the YOUNGEST of the four formats and inherits a lot of its
+  content from the sister img2threejs project; the JSON/JS spec
+  inherits more from the LBL v5.3 blueprint DSL. They are siblings,
+  not parent/child — neither is "more correct" than the other, they
+  target different use cases (the TS path is for code-only
+  production-grade models; the JSON/JS path is for fast AI
+  iteration on a low-poly domain-specific scene description).
 
 ================================================================================
 PART 18 — TS PIXEL-PERFECT FIDELITY PASS (per pixel_perfect_3d_techniques.txt,
@@ -1903,6 +2570,480 @@ log" means "read the console," and it's exactly as mandatory a last step
 as PART 12 already says.
 
 ================================================================================
+PART 27 — CONSTRAINTS (declarative + procedural) [v1.3]
+================================================================================
+
+Constraints in the TS world are EMITTED by code, not by a data
+schema. The supported patterns are 8, in order of how often you'll
+reach for each:
+
+--------------------------------------------------------------------------
+27.1 — parent/child pivot groups
+--------------------------------------------------------------------------
+The most common constraint: a "hinged" element lives in a Group
+whose local origin IS the hinge axis. Animation writes to the
+Group's .rotation; geometry follows automatically. The lid on a
+treasure chest is the textbook case:
+
+  const lidHinge = new THREE.Group();
+  lidHinge.position.set(0, 0.06, -0.42);     // hinge axis
+  root.add(lidHinge);
+  const lid = new THREE.Mesh(lidGeo, enamel);
+  lid.position.set(0, 0.175, 0.42);          // offset from hinge
+  lidHinge.add(lid);
+  // later, in tick() or in an action:
+  lidHinge.rotation.x = -t * (Math.PI * 0.42);   // open 75°
+
+The same pattern: recoilPivot at the gun's grip, tailPivot at the
+rump, springLeaf at the elbow, antennaMount at the housing. Pivot
+groups are the right tool for ~70% of the constraints you'll write.
+
+--------------------------------------------------------------------------
+27.2 — attach() / preserve-world
+--------------------------------------------------------------------------
+THREE.Object3D.attach(child) reparents without losing the child's
+WORLD transform. Use this when a part needs to swap parents mid-life
+— a magazine that's inserted into a port, a barrel that's swapped for
+a silencer, a held prop that changes grip.
+
+  const heldItem = root.getObjectByName('heldItem');
+  socket.attach(heldItem);   // reparent + preserve world position
+
+The simple alternative is `socket.add(child)` but that RESETS the
+child's local transform, which looks like a teleport.
+
+--------------------------------------------------------------------------
+27.3 — IK-like placement
+--------------------------------------------------------------------------
+Pre-compute a rest position and rotation on construction, then in
+tick() lerp the local transform toward a target that depends on
+another part. The Sony earbuds ref's placeBud() is the canonical
+example:
+
+  const seat = { pos: new THREE.Vector3(...), rot: new THREE.Euler(...) };
+  function placeBud(bud, s, xSign, lift, spinTurn, bob) {
+    const upY = topY + 1.05 + bob;
+    const outX = s.pos.x + xSign * 0.28 * lift;
+    bud.position.set(
+      THREE.MathUtils.lerp(s.pos.x, outX, lift),
+      THREE.MathUtils.lerp(s.pos.y, upY, lift),
+      THREE.MathUtils.lerp(s.pos.z, 0.02, lift),
+    );
+    bud.rotation.y = spinTurn * lift;
+    bud.rotation.x = THREE.MathUtils.lerp(s.rot.x, -0.15, lift);
+  }
+
+  // in tick():
+  const lift = Math.max(riseO * (1 - fallO), 0);
+  placeBud(budL, seat.L, -1, lift, spinTurn, bob);
+  placeBud(budR, seat.R,  1, lift, spinTurn, bob);
+
+The keys: capture the rest pose on construction, drive one or more
+"lift / spin / bob" scalar values from elapsed time, and let the
+function interpolate to the target. This is hand-rolled, but
+predictable and cheap.
+
+--------------------------------------------------------------------------
+27.4 — spring-damper lag
+--------------------------------------------------------------------------
+For cloth, hair, antennae, anything that should follow but not snap.
+State = current + velocity; per frame:
+
+  velocity += (K * (target - state) - D * velocity) * dt;
+  state    += velocity * dt;
+
+K = stiffness (30-80 for cloth, 8-25 for hair); D = damping
+(6-12 for cloth, 2-5 for hair). Tune per material until the motion
+feels right. The humanoid ref's hairMassMesh uses this to make the
+hair lag behind the head, with a UV-driven weight so the crown is
+rigid and the lower edge moves most:
+
+  // v is 1 at the hairline, 0 at the crown
+  let w = uvAttr.getY(i) ** 3;            // cube it: top third rigid
+  // apply spring-damper to w, displace each vertex by the result
+
+For hair that has a private spring state, do the spring math
+once per frame and apply the resulting position offset to every
+vertex in the mesh's userData.
+
+--------------------------------------------------------------------------
+27.5 — aim constraint
+--------------------------------------------------------------------------
+Every frame, child.lookAt(target.getWorldPosition()), optionally
+slerped from a previous quaternion. The Shotgun ref's recoilPivot
+uses a slight aim toward the muzzle, the Bolt case is a "look at the
+muzzle" effect.
+
+  const tmpV = new THREE.Vector3();
+  muzzleSocket.getWorldPosition(tmpV);
+  flashLight.position.lerp(tmpV, 0.5);   // half follow
+
+For a more accurate IK rig, use a 2-bone IK solver (THREE doesn't
+ship one; the spec's recommended path is the cyclical-coordinate
+descent on page 117 of Geometric Tools for Computer Graphics).
+Reach for a real IK solver only when procedural aim breaks down.
+
+--------------------------------------------------------------------------
+27.6 — surface follow
+--------------------------------------------------------------------------
+Sample an analytic surface (an ellipsoid SDF, a torus, a parametric
+equation) to project a 2D decal onto a 3D shape so it reads as
+contact-mounted, not floating. The pikachu ref's frontSurfaceZ()
+is the canonical example:
+
+  // z = the front surface of a known ellipsoid at the given (x, y)
+  function frontSurfaceZ(x, y): number {
+    const nx = x / BODY_FACE_RX;
+    const ny = (y - BODY_FACE_CENTER_Y) / BODY_FACE_RY;
+    const remaining = Math.max(0.04, 1 - nx*nx - ny*ny);
+    return BODY_FACE_RZ * Math.sqrt(remaining);
+  }
+  // then for every vertex of a face decal:
+  vertex.setZ(frontSurfaceZ(vertex.x, vertex.y) + offset);
+
+  // the renderer's depthTest=false + renderOrder=3 + castShadow=false
+  // (PART 6.7.1's "sculptComponent.role = 'cheek'|'mouth'|'eye'") trick
+  // prevents the near-side shoulder from clipping a contact decal in
+  // 3/4 view.
+
+Other surfaces: a cylinder for tube decals (any angle, any height),
+a cone for conical surfaces, a plane for floor decals. A custom
+analytic surface is usually cheaper than a real CSG.
+
+--------------------------------------------------------------------------
+27.7 — mirror
+--------------------------------------------------------------------------
+When a part is duplicated across a plane (L/R hand, L/R earbud,
+mirrored decal), make the duplicate a child of a Group at the mirror
+plane with scale.x = -1 (or scale.z = -1, depending on which axis
+the mirror lives on). Triangle winding inverts automatically.
+
+  function makeEarbud(sign) { /* … same as the source … */ }
+  const budL = makeEarbud(-1);
+  const budR = makeEarbud(1);
+  budR.scale.x = -1;        // mirror across the YZ plane
+  budR.scale.z =  1;        // (X-axis flip; Z stays)
+  // The materials, shaders, and animation hooks are SHARED via the
+  // makeEarbud() function — change one, both update.
+
+Three caveats: (1) baked lighting in mirror'd vertices can look wrong
+if the light isn't symmetric — the renderer usually gets this right.
+(2) Animation that reads a local variable (`xSign = -1`) has to be
+written the same way for both halves — easier to pass `sign` as an
+arg than to track two parallel state objects. (3) If the model needs
+asymmetric detail (a scar, a chip), override the mirror at the end
+of the make function on the side that has it.
+
+--------------------------------------------------------------------------
+27.8 — attachment socket (the part-3 way)
+--------------------------------------------------------------------------
+The published `sockets` map is the "constraint" channel for things
+that aren't permanent children. A muzzle socket for a flash, an
+ejection port for shells, a lid hinge for an attached lid, a handle
+mount for a D-ring. The renderer exposes them as drag-targets in
+the Inspector; runtime code can reparent other meshes into a
+socket with `attach()`.
+
+The corresponding metadata (PART 6.7.4) makes the relationship
+explicit: `socket.userData.socketFor = '<part id>'` plus
+`node.userData.sculptComponent.sockets = ['<socket name>']`. A host
+that wants to add a new flash effect to every gun that exposes a
+`muzzle` socket just walks `nodes[*].sockets.muzzle` and attaches
+its own sprite.
+
+================================================================================
+PART 28 — ADVANCED SHADER & VFX TECHNIQUES [v1.3]
+================================================================================
+
+Beyond the recipes in PART 7, four techniques separate "looks like
+real material" from "looks like real effect". Use them when the
+preset recipe isn't enough.
+
+--------------------------------------------------------------------------
+28.1 — onBeforeCompile + customProgramCacheKey (per-material shader)
+--------------------------------------------------------------------------
+THREE compiles every PBR material from a template shader. When you
+need per-material shader effects (height-driven colour blend,
+per-pixel emissive injection, two-tone faces), the supported path is
+to register an onBeforeCompile hook that mutates the vertex and
+fragment shader strings in place. ALWAYS set a customProgramCacheKey
+return value — without it, identical materials with different
+onBeforeCompile bodies share a compiled program and you get the
+worst of both worlds.
+
+  // Height-driven patina: the upper portion of a mesh turns teal
+  // based on world-space Y, with a multi-octave sine-noise blotch
+  // pattern. Used on the warhauler ref's rear armour hump.
+  function makeWeatheredBrass(dirt, lo, hi) {
+    const mat = new THREE.MeshStandardMaterial({ /* … */ });
+    const patina = new THREE.Color(0x3f6f4c).convertSRGBToLinear();
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uLo = { value: lo };
+      shader.uniforms.uHi = { value: hi };
+      // vertex: pass world-space Y to the fragment
+      shader.vertexShader = 'varying vec3 vWPosW;\n' +
+        shader.vertexShader.replace(
+          '#include <worldpos_vertex>',
+          `#include <worldpos_vertex>
+           vWPosW = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+        );
+      // fragment: blend in patina above uLo, blotchy
+      shader.fragmentShader =
+        `varying vec3 vWPosW;\nuniform float uLo;\nuniform float uHi;\n` +
+        shader.fragmentShader.replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+           float _h = clamp((vWPosW.y - uLo) / (uHi - uLo), 0.0, 1.0);
+           float _n = 0.5 + 0.5 * sin(vWPosW.x * 7.3 + 1.7) * sin(vWPosW.z * 5.1 - 0.9);
+           _n += 0.35 * (0.5 + 0.5 * sin(vWPosW.x * 15.7 - 2.1) * sin(vWPosW.z * 12.3 + 0.4));
+           _n = clamp(_n / 1.35, 0.0, 1.0);
+           float _g = smoothstep(0.25, 0.9, _h) * smoothstep(0.25, 0.75, _n);
+           diffuseColor.rgb = mix(diffuseColor.rgb,
+             vec3(${patina.r.toFixed(4)}, ${patina.g.toFixed(4)}, ${patina.b.toFixed(4)}),
+             _g * 0.92);`,
+        );
+    };
+    mat.customProgramCacheKey = () => 'warhauler-patina-v2';
+    return mat;
+  }
+
+Rules:
+  - ALWAYS set customProgramCacheKey() to a unique-per-intent string.
+  - ALWAYS use `new THREE.Color(0x…).convertSRGBToLinear()` before
+    stringifying the colour into GLSL — otherwise the `mix` blends
+    in sRGB space and the result washes out.
+  - Inject varyings at the top of the shader with the matching
+    declaration in BOTH vertex and fragment (`varying vec3 vX;`).
+  - Inject math at the right chunk:
+      * vertex displacement  → `#include <begin_vertex>`
+      * per-vertex varying    → `#include <worldpos_vertex>` (or
+                                  any other chunk that has access
+                                  to modelMatrix)
+      * per-fragment colour   → `#include <color_fragment>`
+      * per-fragment emissive → `#include <emissivemap_fragment>`
+      * per-fragment normal   → `#include <normal_fragment_maps>`
+  - The pikachu ref uses onBeforeCompile to add a real-time breath
+    mask to a single body shader (without duplicating the material
+    per-region). The warhauler ref uses it to apply a height-driven
+    patina to a rounded box without a per-vertex colour attribute.
+
+--------------------------------------------------------------------------
+28.2 — ShaderMaterial (when onBeforeCompile isn't enough)
+--------------------------------------------------------------------------
+For effects that go beyond PBR (a lightning bolt with a travelling
+highlight, a custom hologram with a noise-driven hue shift, a sprite
+with a procedural halo), use a full THREE.ShaderMaterial with your
+own vertexShader + fragmentShader + uniforms:
+
+  const lightningMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime:        { value: 0 },
+      uIntensity:   { value: 0 },
+      uGlowColor:   { value: new THREE.Color(0xd98700) },
+      uInnerGlow:   { value: new THREE.Color(0xffd45a) },
+      uHighlight:   { value: new THREE.Color(0xffffd6) },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform float uIntensity;
+      uniform vec3 uGlowColor;
+      uniform vec3 uInnerGlow;
+      uniform vec3 uHighlight;
+      void main() {
+        float radial  = max(sin(vUv.y * 3.14159), 0.0);
+        float core    = pow(radial, 5.5);
+        float halo    = pow(radial, 1.05);
+        float taper   = smoothstep(0.0, 0.10, vUv.x) *
+                        (1.0 - smoothstep(0.90, 1.0, vUv.x));
+        float sweep   = fract(uTime * 0.42);
+        float sweepD  = abs(vUv.x - sweep);
+        sweepD = min(sweepD, 1.0 - sweepD);    // seamless at 0/1
+        float sweepL  = exp(-pow(sweepD / 0.085, 2.0));
+        float sweepA  = pow(radial, 0.72);
+        float movingH = (sweepL * sweepA) * taper;
+        float alpha   = uIntensity * (0.88 * halo * taper + movingH * 0.34);
+        vec3 col      = mix(uGlowColor, uInnerGlow, core);
+        col           = mix(col, uHighlight, clamp(movingH * 0.92, 0.0, 1.0));
+        gl_FragColor  = vec4(col, alpha);
+      }
+    `,
+    transparent: true,
+    depthTest:   false,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.DoubleSide,
+  });
+  // Refs: pikachu's celebration lightning + electric attack.
+  // Set `material.toneMapped = false` if the effect should bypass
+  // ACES — neon, glow, anything that should stay bright through the
+  // tonemapper.
+
+ShaderMaterial replaces the PBR lighting model entirely. You give up
+real PBR (IBL, shadows are manual) for full control. Use it for
+non-PBR effects (VFX, holograms, decals with custom alpha), not for
+"another way to make metal".
+
+--------------------------------------------------------------------------
+28.3 — SpriteMaterial + AdditiveBlending (glow / halo / spark)
+--------------------------------------------------------------------------
+For any bloom-able glow (headlight, muzzle flash, exhaust, LED, neon
+halo), use a THREE.Sprite with a SpriteMaterial set to
+AdditiveBlending + depthWrite: false + transparent: true:
+
+  function makeGlowSprite(color: number, size: number, opacity = 1): THREE.Sprite {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTexture(),
+      color, opacity, transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }));
+    s.scale.setScalar(size);
+    return s;
+  }
+  // glowTexture() — a CanvasTexture filled with a radial gradient
+  //   white centre → colour-bleed edge → transparent. See PART 8.3
+  //   for the canonical radial-gradient recipe.
+
+The renderer composites additively blended sprites in the order they
+appear in the scene graph; for "soft glow" effects this is
+indistinguishable from a real bloom pass. Add `material.toneMapped
+= false` if the glow should stay bright under ACES (you almost
+always want this).
+
+For moving glows (a muzzle flash that fades out over 70ms), animate
+the opacity in tick():
+  flashMat.opacity = state.flash / FLASH_DURATION;   // 1 → 0
+
+--------------------------------------------------------------------------
+28.4 — DataTexture (procedural normal / roughness / heightmap)
+--------------------------------------------------------------------------
+For data-only maps (normal, height, curvature, packed AO+roughness)
+the canvas round-trip is wasteful — go direct to a DataTexture:
+
+  function strandNormalTexture(): THREE.DataTexture {
+    const w = 128, h = 16, LANES = 16;
+    const data = new Uint8Array(w * h * 4);
+    for (let x = 0; x < w; x++) {
+      const phase = (x / w) * LANES * Math.PI * 2;
+      const nx = -0.62 * Math.sin(phase);
+      for (let y = 0; y < h; y++) {
+        const ny = 0.13 * Math.sin((y / h) * Math.PI * 2 + phase * 0.2);
+        const len = Math.hypot(nx, ny, 1);
+        const o = (y * w + x) * 4;
+        data[o]     = Math.round((nx / len * 0.5 + 0.5) * 255);
+        data[o + 1] = Math.round((ny / len * 0.5 + 0.5) * 255);
+        data[o + 2] = Math.round((1    / len * 0.5 + 0.5) * 255);
+        data[o + 3] = 255;
+      }
+    }
+    const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = 8;
+    tex.generateMipmaps = true;
+    tex.needsUpdate = true;
+    return tex;
+  }
+  // Ref: the humanoid ref's hair-strand normal + roughness maps.
+
+DataTexture is the cheaper, more direct equivalent of CanvasTexture
+for fully synthetic data — no canvas, no 2D context, no draw loop.
+For 16×128 hair strands, it's ~6 KB of typed array vs ~30 KB of
+canvas + draw overhead.
+
+--------------------------------------------------------------------------
+28.5 — InstancedMesh (repetitive geometry)
+--------------------------------------------------------------------------
+For any repeated part (8 wall blocks, 4 spokes, 9 jimping notches,
+6 wheels, 12 lug bolts, 4 pegs, 36 perimeter blocks), use
+THREE.InstancedMesh. One geometry, one material, N transforms:
+
+  const BOLT_GEO = new THREE.SphereGeometry(0.025, 8, 6);
+  function boltRow(count, from, to, mat) {
+    const inst = new THREE.InstancedMesh(BOLT_GEO, mat, count);
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < count; i++) {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      const p = from.clone().lerp(to, t);
+      m.makeTranslation(p.x, p.y, p.z);
+      inst.setMatrixAt(i, m);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    return inst;
+  }
+  // Refs: warhauler's bolt rows, BMX's perimeter cinder-block wall,
+  // shotgun's vent slots.
+
+Three rules:
+  - One InstancedMesh per (geometry, material) pair. Multiple
+    InstancedMesh objects can share the same geometry/material.
+  - `instanceMatrix.needsUpdate = true` AFTER setting all matrices.
+  - InstancedMesh does NOT support per-instance colour in the
+    standard pipeline; if you need per-instance variation, use a
+    custom onBeforeCompile shader injection (PART 28.1) or instance
+    attributes.
+
+For 4-12 instances the savings are marginal; for 50+ it's the
+difference between 5,000 vertices and 50,000. The BMX's perimeter
+wall is 200+ blocks; without instancing it would be 200 BoxGeometry
+meshes (~30,000 vertices) and the renderer would struggle to
+inspect them.
+
+================================================================================
+PART 29 — ROOT-LEVEL userData ALIASES + ANIMATIONMIXER AUTO-TICK [v1.3]
+================================================================================
+
+v1.3 added automatic alias-flattening. A factory can hoist any of the
+following to root.userData without writing into sculptRuntime; the
+renderer hoists them on mount so the rest of the pipeline sees a
+single uniform shape:
+
+  root.userData.parts         → sculptRuntime.parts
+  root.userData.nodes         → sculptRuntime.nodes
+  root.userData.meshes        → sculptRuntime.meshes
+  root.userData.colliders     → sculptRuntime.colliders
+  root.userData.<anyNs>       → sculptRuntime.<anyNs>   (preserved)
+
+For the AnimationMixer specifically, the renderer does a one-level
+DFS through root.userData and looks for an object with an `update`
+method whose `_root` back-reference points at the model root. If
+found, it's invoked every frame with `(elapsedSeconds)`. This means
+the pikachu ref's pattern of `root.userData.electricMouseMascotRuntime
+= { _root, mixer, update }` works without any extra wiring.
+
+  const runtime = {
+    _root: root,                     // back-reference is what the DFS
+                                      // matches on
+    mixer: animationMixer,           // optional — the renderer also
+                                      // finds this if it's set here
+    update(elapsed: number) { /* … */ },
+  };
+  root.userData.electricMouseMascotRuntime = runtime;
+
+The DFS is narrow on purpose — it walks ONE level deep into userData,
+checks each value for `_root === root` AND a callable `update`. This
+is safe to combine with anything else; it won't double-tick a
+`userData.tick` (PART 5.1) because the rule is: tick wins, mixer
+wins, custom-runtime-update is the fallback. Specifically:
+
+  - If `root.userData.tick` exists → tick handles everything; the
+    renderer does NOT also tick the mixer or the custom-runtime.
+  - If `root.userData.tick` is missing AND the factory has a mixer
+    (sculptRuntime.animations.mixer OR a discovered one) → the
+    renderer auto-ticks the mixer.
+  - If neither → the renderer auto-ticks a custom-runtime.update()
+    if it finds one.
+
+For the FULL optional sculptRuntime shape, see PART 6.1B.
 
 ================================================================================
 PART 19 — STAGED BUILD PASSES  (img2threejs alignment — added v1.2, 2026-07-31)
