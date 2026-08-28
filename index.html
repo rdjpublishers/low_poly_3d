@@ -372,6 +372,193 @@ body.theme-light #welcome{
   border-radius:20px;color:var(--muted);backdrop-filter:blur(6px);white-space:nowrap;
 }
 
+/* LBL update F4 — floating animation controls. Modern minimal
+   premium pill anchored to the bottom-center of the viewport.
+   Three parts: Play/Pause (circular, teal/green accent), the
+   "Animation N" cycle button (mimics a dropdown chevron but is
+   a toggle that advances to the next clip), and a small clip-name
+   badge pill. Whole panel is `hidden` until a model with
+   AnimationClips loads. Color theme: teal/green/blue to match
+   the rest of the page chrome. */
+:root{
+  --anim-accent:#22d3ee;          /* cyan-400 — primary */
+  --anim-accent-strong:#10b981;   /* emerald-500 — play icon */
+  --anim-accent-soft:rgba(34,211,238,.14);
+  --anim-accent-line:rgba(34,211,238,.45);
+  --anim-accent-glow:0 0 0 1px rgba(34,211,238,.22), 0 8px 24px -10px rgba(16,185,129,.55);
+}
+#anim-controls-panel{
+  position:fixed;
+  left:50%; bottom:96px;
+  transform:translateX(-50%);
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:7px;
+  pointer-events:none;
+  z-index:60;
+  background:linear-gradient(180deg, rgba(20,24,32,.86), rgba(14,17,24,.92));
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:999px;
+  box-shadow:0 10px 40px -10px rgba(0,0,0,.6), 0 0 0 1px rgba(34,211,238,.05) inset;
+  backdrop-filter:blur(14px) saturate(140%);
+  -webkit-backdrop-filter:blur(14px) saturate(140%);
+  /* Slight entrance animation when the panel un-hides */
+  animation:anim-panel-in .25s var(--ease, ease) both;
+}
+@keyframes anim-panel-in{
+  from{ opacity:0; transform:translate(-50%, 8px); }
+  to  { opacity:1; transform:translate(-50%, 0);   }
+}
+#anim-controls-panel[hidden]{ display:none !important; }
+
+/* Play / Pause — circular, prominent */
+#anim-controls-panel .anim-ctrl-play{
+  pointer-events:auto;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:38px;height:38px;
+  border-radius:50%;
+  background:linear-gradient(135deg, #10b981, #22d3ee);
+  border:0;
+  color:#062b22;
+  cursor:pointer;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 6px 18px -4px rgba(16,185,129,.55);
+  transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  position:relative;
+}
+#anim-controls-panel .anim-ctrl-play:hover{
+  transform:translateY(-1px);
+  box-shadow:0 0 0 1px rgba(255,255,255,.14) inset, 0 10px 24px -6px rgba(16,185,129,.7);
+  filter:brightness(1.05);
+}
+#anim-controls-panel .anim-ctrl-play:active{ transform:translateY(0); }
+#anim-controls-panel .anim-ctrl-play.paused{
+  background:linear-gradient(135deg, #1f2937, #0f172a);
+  color:#cbd5e1;
+  box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 4px 14px -4px rgba(0,0,0,.6);
+}
+#anim-controls-panel .anim-ctrl-play.paused:hover{ filter:brightness(1.15); }
+/* Soft pulsing ring while a clip is playing — premium feel */
+#anim-controls-panel .anim-ctrl-play::after{
+  content:"";
+  position:absolute;inset:-2px;border-radius:50%;
+  border:1px solid rgba(16,185,129,.45);
+  opacity:0;
+  pointer-events:none;
+  animation:anim-pulse 1.8s ease-out infinite;
+}
+#anim-controls-panel .anim-ctrl-play.paused::after{ animation:none; opacity:0; }
+@keyframes anim-pulse{
+  0%  { transform:scale(.92); opacity:.6;  }
+  70% { transform:scale(1.25); opacity:0;  }
+  100%{ transform:scale(1.25); opacity:0;  }
+}
+#anim-controls-panel .anim-ctrl-icon{
+  font-size:14px;line-height:1;display:inline-block;
+  transform:translate(1.5px, -.5px);
+  font-weight:700;
+}
+
+/* Cycle / "Animation N" button — looks like a dropdown, behaves
+   like a toggle (each click advances to the next clip). */
+#anim-controls-panel .anim-ctrl-cycle{
+  pointer-events:auto;
+  display:inline-flex;align-items:center;gap:8px;
+  height:38px;padding:0 14px 0 16px;
+  border-radius:999px;
+  background:transparent;
+  border:1px solid rgba(255,255,255,.07);
+  color:#e2e8f0;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:12.5px;font-weight:600;letter-spacing:.01em;
+  cursor:pointer;
+  transition:background .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+#anim-controls-panel .anim-ctrl-cycle:hover{
+  background:rgba(34,211,238,.08);
+  border-color:var(--anim-accent-line);
+  color:#a5f3fc;
+}
+#anim-controls-panel .anim-ctrl-cycle:active{ transform:scale(.98); }
+#anim-controls-panel .anim-ctrl-label{
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  white-space:nowrap;
+}
+#anim-controls-panel .anim-ctrl-chevron{
+  width:12px;height:12px;display:inline-block;
+  opacity:.65;
+  transition:transform .2s ease, opacity .15s ease;
+}
+#anim-controls-panel .anim-ctrl-cycle:hover .anim-ctrl-chevron{ opacity:1; transform:translateY(1px); }
+
+/* Clip-name badge — sits to the right of the cycle button, looks
+   like a teal-outlined pill. */
+#anim-controls-panel .anim-ctrl-badge{
+  pointer-events:none;
+  display:inline-flex;align-items:center;gap:6px;
+  height:38px;padding:0 14px;
+  border-radius:999px;
+  background:var(--anim-accent-soft);
+  border:1px solid var(--anim-accent-line);
+  color:#a5f3fc;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:12px;font-weight:600;letter-spacing:.02em;
+  text-transform:lowercase;
+  max-width:200px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  position:relative;
+}
+#anim-controls-panel .anim-ctrl-badge::before{
+  content:"";
+  width:6px;height:6px;border-radius:50%;
+  background:var(--anim-accent-strong);
+  box-shadow:0 0 8px rgba(16,185,129,.8);
+  flex-shrink:0;
+  animation:anim-badge-pulse 1.6s ease-in-out infinite;
+}
+#anim-controls-panel .anim-ctrl-badge.idle::before{
+  background:#64748b;box-shadow:none;animation:none;
+}
+@keyframes anim-badge-pulse{
+  0%,100%{ opacity:1;   transform:scale(1);   }
+  50%    { opacity:.55; transform:scale(.78); }
+}
+
+/* Light theme — switch to a clean white pill with teal accents */
+body.theme-light #anim-controls-panel{
+  background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(248,250,252,.92));
+  border-color:rgba(15,23,42,.08);
+  box-shadow:0 10px 32px -10px rgba(15,23,42,.18), 0 0 0 1px rgba(34,211,238,.05) inset;
+}
+body.theme-light #anim-controls-panel .anim-ctrl-cycle{
+  border-color:rgba(15,23,42,.08);
+  color:#1e293b;
+}
+body.theme-light #anim-controls-panel .anim-ctrl-cycle:hover{
+  background:rgba(34,211,238,.10);
+  border-color:var(--anim-accent-line);
+  color:#0e7490;
+}
+body.theme-light #anim-controls-panel .anim-ctrl-badge{
+  background:rgba(34,211,238,.10);
+  border-color:var(--anim-accent-line);
+  color:#0e7490;
+}
+
+@media (max-width:520px){
+  #anim-controls-panel{ bottom:100px; gap:6px; padding:6px; }
+  #anim-controls-panel .anim-ctrl-play{ width:34px; height:34px; }
+  #anim-controls-panel .anim-ctrl-cycle{ height:34px; padding:0 10px 0 12px; font-size:11px; white-space:nowrap; }
+  #anim-controls-panel .anim-ctrl-cycle .anim-ctrl-chevron{ width:10px; height:10px; }
+  #anim-controls-panel .anim-ctrl-badge{ height:34px; padding:0 12px; font-size:11px; max-width:140px; }
+  #anim-controls-panel .anim-ctrl-icon{ font-size:12px; }
+}
+
 /* RJS update 1, item 7 — perf budget bar. Sits under #perf-chip inside
    #hud; colour tier reflects renderer.info.render.triangles against a
    fixed set of use-case budgets (mobile/AR, browser realtime, desktop
@@ -812,6 +999,24 @@ body.theme-light #welcome{
     transform:translateY(0);opacity:1;visibility:visible;
     transition:transform .28s var(--ease),opacity .2s ease,visibility 0s linear 0s;
   }
+  /* RJS — when the mobile bottom sheet (#mob-left / #mob-right) is
+     open, the floating animation pill at bottom:96px would sit on
+     top of the sheet's Blueprint JSON / Validator / Scene Objects
+     content. Fade + hide it while the sheet covers that area, and
+     bring it back the moment the sheet closes. A small JS shim
+     (see end of script) mirrors the .open class to a body
+     data-attribute so this rule can win over the entrance
+     animation's animation-fill-mode: both — which otherwise keeps
+     opacity:1 applied above regular author rules. !important is
+     intentional. */
+  #anim-controls-panel{
+    transition:opacity .2s var(--ease), transform .2s var(--ease);
+  }
+  body[data-mob-open="true"] #anim-controls-panel{
+    opacity:0 !important;
+    transform:translate(-50%, 12px) !important;
+    pointer-events:none;
+  }
   .hud-chip{font-size:8px;padding:3px 7px;}
   #topbar{padding:0 10px;gap:6px;height:50px;}
   .tbtn{padding:0 10px;font-size:12px;height:34px;}
@@ -1108,11 +1313,11 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="parts-btn" title="Kitbash part library — save/reuse object definitions">📦 Parts</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
   <div class="vdiv"></div>
-  <!-- LBL update F4 — animation controls (only visible when the loaded
-       model actually has AnimationClips, e.g. an animated glTF) -->
-  <button class="tbtn hide-xs" id="anim-play-btn" title="Start / Stop animation playback" style="display:none">▶ Play</button>
-  <button class="tbtn hide-xs" id="anim-next-btn" title="Next animation" style="display:none">⏭ Next</button>
-  <span class="tbtn" id="anim-name-chip" style="display:none;pointer-events:none;font-family:'Space Mono',monospace;font-size:10px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2)">—</span>
+  <!-- LBL update F4 — animation controls moved out of the topbar into a
+       floating panel anchored to the bottom of the viewport (see
+       #anim-controls-panel below). Visibility, button labels and the
+       name display are managed by lblUpdateAnimUI() once a model with
+       AnimationClips is loaded. -->
   <div class="vdiv"></div>
   <!-- LBL update H1 — undo/redo -->
   <button class="tbtn" id="undo-btn" title="Undo (Ctrl+Z)" disabled>↶</button>
@@ -1404,7 +1609,25 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
         </div>
       </div>
     </div>
-    <!-- LBL update H8 — live axis gizmo overlay -->
+    <!-- LBL update F4 — floating animation controls. Lives in the
+         viewport (not the topbar) so it doesn't crowd the toolbar
+         real estate and so it sits close to the model it controls.
+         The whole panel is hidden until a model with AnimationClips
+         is loaded; lblUpdateAnimUI() flips it on/off and updates
+         the labels. Layout: Play/Pause button on the left, an
+         "Animation N" dropdown-style toggle button in the middle
+         (clicking it advances to the next clip), and a small
+         clip-name badge on the right. -->
+    <div id="anim-controls-panel" hidden>
+      <button class="anim-ctrl-btn anim-ctrl-play" id="anim-play-btn" title="Play / Pause animation" aria-label="Play / Pause animation">
+        <span class="anim-ctrl-icon" id="anim-play-icon">▶</span>
+      </button>
+      <button class="anim-ctrl-btn anim-ctrl-cycle" id="anim-next-btn" title="Switch to the next animation" aria-label="Next animation">
+        <span class="anim-ctrl-label" id="anim-next-label">Animation 1</span>
+        <svg class="anim-ctrl-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.25l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="anim-ctrl-badge" id="anim-name-display" aria-live="polite">—</div>
+    </div>    <!-- LBL update H8 — live axis gizmo overlay -->
     <div id="axis-gizmo-overlay"><span class="ax-x">X 0.00</span>&nbsp; <span class="ax-y">Y 0.00</span>&nbsp; <span class="ax-z">Z 0.00</span></div>
     <!-- LBL update H9 — starter recipes panel -->
     <div id="recipes-panel">
@@ -12593,8 +12816,26 @@ canvas.addEventListener('click',e=>{
   const isHelperHit=o=>{ while(o&&o!==sceneGroup){ if(o.userData&&o.userData.__helper) return true; o=o.parent; } return false; };
   const hit=hits.find(h=>!isHelperHit(h.object));
   if(hit){
+    // Walk up to the direct child of sceneGroup (matches the old behaviour
+    // for blueprint parts). For TS factories and uploaded 3D models, the
+    // root group is the direct child of sceneGroup and is NOT in meshMap
+    // (only its sub-meshes are), so the `meshMap.has(...)` guard below
+    // turns "click anywhere on the model" into a no-op for those models.
+    // This keeps the click purely as a camera-control gesture, so the
+    // model's animation can keep playing and the user can still orbit
+    // and zoom — selecting + Play/Pause are handled by the floating
+    // animation panel at the bottom of the viewport. We still detach
+    // the transform gizmo if one was attached (e.g. from a previous
+    // scene-tree selection) so its handles don't intercept drag input
+    // meant for OrbitControls.
     let m=hit.object; while(m.parent&&m.parent!==sceneGroup) m=m.parent;
-    if(m.name) selectObj(m.name);
+    if(m.name && meshMap && typeof meshMap.has === 'function' && meshMap.has(m.name)){
+      selectObj(m.name);
+    } else if(typeof transformControls !== 'undefined' && transformControls && typeof transformControls.detach === 'function' && transformControls.object){
+      transformControls.detach();
+      transformControls.enabled = false;
+      transformControls.visible = false;
+    }
   }
 });
 
@@ -15150,6 +15391,24 @@ window.showMobPanel=function(tab){
   el.classList.add('open');
   document.getElementById(wantsLeft?'tab-scene':'tab-insp').classList.add('active');
 };
+// RJS — mirror the .open class on the mobile bottom sheet to a
+// body data-attribute so CSS can react to it without relying on
+// :has() (which loses to the animation's animation-fill-mode: both
+// cascade). MutationObserver covers every call site (showMobPanel,
+// showMobExport, mob-apply-btn, etc.) so we don't have to thread
+// the body-class toggle through each of them.
+(function syncMobOpenToBody(){
+  const leftEl=document.getElementById('mob-left'),
+        rightEl=document.getElementById('mob-right');
+  if(!leftEl || !rightEl) return;
+  const apply=()=>{
+    const open = leftEl.classList.contains('open') || rightEl.classList.contains('open');
+    document.body.dataset.mobOpen = open ? 'true' : 'false';
+  };
+  new MutationObserver(apply).observe(leftEl,  {attributes:true, attributeFilter:['class']});
+  new MutationObserver(apply).observe(rightEl, {attributes:true, attributeFilter:['class']});
+  apply();
+})();
 window.showMobExport=function(){
   // If the menu is already open, this click should CLOSE it (toggle off) and stop here.
   if(document.getElementById('exp-menu')){ closeMobExportMenu(); return; }
@@ -18789,7 +19048,13 @@ let lblAnim = {
   actions: [],            // THREE.AnimationAction[]
   currentIdx: -1,         // which action is playing (-1 = none)
   isPlaying: false,
-  root: null              // the THREE.Object3D the mixer is bound to
+  root: null,             // the THREE.Object3D the mixer is bound to
+  initialPose: null,      // snapshot of bone/object transforms (used by
+                          // the cycle path to clean-snap between clips)
+  pausedTime: 0          // the action.time captured at the moment of
+                          // pause. On resume we restore this so the
+                          // animation picks up exactly where it was
+                          // paused, not from t=0.
 };
 
 function lblCollectAnimations(root, gltf){
@@ -18864,6 +19129,21 @@ function lblCollectAnimations(root, gltf){
   }
   lblAnim.clips = clips;
   if(clips.length && root){
+    // IMPORTANT — stop the model's own animation driver before we
+    // install ours. Many TS factories (Model_1, Model_3, …) build
+    // their own THREE.AnimationMixer and tick it from
+    // `root.userData.tick`, and they pre-play a default clip ("drive"
+    // / "idle" / …) on load. If we don't silence that, two mixers
+    // share the same root bones and you get the classic "two
+    // animations stacked on top of each other" effect — and the
+    // pause button looks broken because the second mixer keeps
+    // applying the pose every frame.
+    lblSilenceRootPreExistingAnimations(root);
+    // Snapshot the rest pose so the pause button can restore it. We do
+    // this AFTER silencing the model's pre-existing driver so we capture
+    // the true rest transforms, not whatever mid-animation frame the
+    // model was on.
+    lblAnim.initialPose = lblSnapshotPose(root);
     lblAnim.mixer = new THREE.AnimationMixer(root);
     lblAnim.actions = clips.map(c=>lblAnim.mixer.clipAction(c));
     lblAnim.actions.forEach(a=>{ a.setLoop(THREE.LoopRepeat, Infinity); a.clampWhenFinished = false; });
@@ -18874,40 +19154,162 @@ function lblCollectAnimations(root, gltf){
   }
 }
 
+// Stop every pre-existing animation driver on the given root so the
+// lblAnim system is the sole mixer running. Handles all the patterns
+// the demo + user-uploaded TS factories currently use.
+function lblSilenceRootPreExistingAnimations(root){
+  if(!root) return;
+  // (a) Modern factories expose { clips, mixer, actions } on the
+  // sculptRuntime. Silence the mixer and stop every action.
+  const rt = root.userData && root.userData.sculptRuntime;
+  if(rt){
+    if(rt.animations && rt.animations.mixer){
+      try{ rt.animations.mixer.stopAllAction(); }catch(_){ }
+      try{ rt.animations.mixer.uncacheRoot(root); }catch(_){ }
+    }
+    if(rt.animations && rt.animations.actions){
+      const acts = rt.animations.actions;
+      const arr = (acts instanceof Map) ? Array.from(acts.values())
+              : Array.isArray(acts)    ? acts
+                                      : Object.values(acts);
+      arr.forEach(a => { if(a && typeof a.stop === 'function'){ try{ a.stop(); }catch(_){ } } });
+    }
+    // (b) Factories that publish a runtime helper with stopAnimations()
+    if(typeof rt.stopAnimations === 'function'){ try{ rt.stopAnimations(); }catch(_){ } }
+  }
+  // (c) Some factories (Model_1) attach a top-level stop() on the root
+  // itself, which cancels their internal rAF loop and stops the
+  // actions on their own mixer.
+  if(typeof root.stop === 'function'){ try{ root.stop(); }catch(_){ } }
+  // (d) Belt-and-braces — also walk any pre-existing THREE.AnimationActions
+  // on this root (e.g. from GLTFLoader) and stop them so nothing else
+  // fights our new mixer.
+  if(root.animations && Array.isArray(root.animations)){
+    // nothing to do here — the actions are owned by the loader's mixer
+    // which we don't have a handle to; the lblAnim mixer below will
+    // re-create them on this root with stop() before play().
+  }
+}
+
 function lblTeardownAnimations(){
   if(lblAnim.mixer){
     try{ lblAnim.mixer.stopAllAction(); }catch(_){}
     try{ lblAnim.mixer.uncacheRoot(lblAnim.root); }catch(_){}
   }
-  lblAnim = { mixer:null, clips:[], actions:[], currentIdx:-1, isPlaying:false, root:null };
+  lblAnim = { mixer:null, clips:[], actions:[], currentIdx:-1, isPlaying:false, root:null, initialPose:null, pausedTime:0 };
   lblUpdateAnimUI();
 }
 
+// Capture every descendant's local transform so we can put the model
+// back to its rest pose later (used by the pause button).
+function lblSnapshotPose(root){
+  if(!root) return null;
+  const pose = [];
+  root.updateMatrixWorld(true);
+  root.traverse(obj => {
+    pose.push({
+      obj,
+      position: obj.position.clone(),
+      quaternion: obj.quaternion.clone(),
+      scale: obj.scale.clone(),
+    });
+  });
+  return pose;
+}
+
+function lblRestorePose(pose){
+  if(!pose) return;
+  for(let i=0; i<pose.length; i++){
+    const p = pose[i];
+    if(!p || !p.obj) continue;
+    p.obj.position.copy(p.position);
+    p.obj.quaternion.copy(p.quaternion);
+    p.obj.scale.copy(p.scale);
+    // Make sure the cached matrix is refreshed so the next render
+    // picks up the restored transforms immediately.
+    p.obj.updateMatrix();
+    if(p.obj.parent) p.obj.updateMatrixWorld(true);
+  }
+}
+
 function lblUpdateAnimUI(){
+  const panel = document.getElementById('anim-controls-panel');
   const playBtn = document.getElementById('anim-play-btn');
+  const playIcon = document.getElementById('anim-play-icon');
   const nextBtn = document.getElementById('anim-next-btn');
-  const chip = document.getElementById('anim-name-chip');
-  if(!playBtn || !nextBtn) return;
+  const nextLabel = document.getElementById('anim-next-label');
+  const nameEl = document.getElementById('anim-name-display');
+  if(!panel || !playBtn || !nextBtn) return;
   const has = lblAnim.clips.length > 0;
-  playBtn.style.display = has ? '' : 'none';
-  nextBtn.style.display = (has && lblAnim.clips.length > 1) ? '' : 'none';
-  if(chip) chip.style.display = has ? '' : 'none';
-  if(!has){ if(chip) chip.textContent='—'; return; }
-  // Play/Pause label
-  playBtn.textContent = lblAnim.isPlaying ? '⏸ Pause' : '▶ Play';
-  playBtn.classList.toggle('active', !!lblAnim.isPlaying);
-  const name = (lblAnim.clips[lblAnim.currentIdx] && lblAnim.clips[lblAnim.currentIdx].name) || `anim ${lblAnim.currentIdx+1}`;
-  if(chip) chip.textContent = `${lblAnim.currentIdx+1}/${lblAnim.clips.length} · ${name}`;
+  // Whole panel is hidden when the loaded model has no animations.
+  panel.hidden = !has;
+  if(!has){
+    if(playIcon) playIcon.textContent = '▶';
+    if(nextLabel) nextLabel.textContent = 'Animation 1';
+    if(nameEl) nameEl.textContent = '—';
+    playBtn.classList.remove('active','paused');
+    if(nameEl) nameEl.classList.add('idle');
+    return;
+  }
+  // The CSS swaps the play button between the green-gradient + ▶
+  // triangle (playing) and a dark-gray pill + ⏸ (paused) via the
+  // `paused` class. The badge's pulsing dot also goes flat gray when
+  // paused via the `idle` class.
+  const playing = !!lblAnim.isPlaying;
+  if(playIcon) playIcon.textContent = playing ? '⏸' : '▶';
+  playBtn.classList.toggle('paused', !playing);
+  playBtn.classList.toggle('active', playing);
+  if(nameEl) nameEl.classList.toggle('idle', !playing);
+  // Cycle button shows "Animation N" (1-based) matching the current clip.
+  // The actual clip name is rendered in the badge pill on the right.
+  const idx = Math.max(0, lblAnim.currentIdx);
+  if(nextLabel) nextLabel.textContent = `Animation ${idx + 1}`;
+  const currentClip = lblAnim.clips[idx];
+  const clipName = (currentClip && currentClip.name) || `anim ${idx + 1}`;
+  if(nameEl) nameEl.textContent = clipName;
 }
 
 function lblAnimToggle(){
   if(!lblAnim.mixer || !lblAnim.actions.length) return;
+  const cur = lblAnim.actions[Math.max(0, lblAnim.currentIdx)];
   if(lblAnim.isPlaying){
-    lblAnim.actions.forEach(a=>a.pause());
+    // PAUSE — capture the current frame of the playing action, then
+    // stop() every action. We use stop() (not pause()) because on
+    // skinned-mesh rigs a paused action can still re-apply its pose
+    // on the next mixer.update() with subtle bone drift — stop()
+    // fully removes the action from the mixer so the bones freeze
+    // at exactly the last applied frame. We also remember the time
+    // so the next Play() can resume from this exact frame, not
+    // from t=0, and the user stays on the same animation
+    // (currentIdx is preserved).
+    lblAnim.pausedTime = cur ? cur.time : 0;
+    lblAnim.actions.forEach(a => { try{ a.stop(); }catch(_){ } });
+    // Push a zero-delta update so the mixer drops any pending
+    // interpolated values for the just-stopped action.
+    try{ lblAnim.mixer.update(0); }catch(_){ }
     lblAnim.isPlaying = false;
   } else {
-    // Start the current one (and stop the others so only one runs at a time).
-    lblAnim.actions.forEach((a,i)=>{ if(i===lblAnim.currentIdx) a.reset().play(); else a.stop(); });
+    // PLAY / RESUME — stop every OTHER action, then play() the
+    // current one. After play() restores the saved time so we
+    // resume from exactly the frame we paused at (not from t=0,
+    // and definitely not on a different animation).
+    lblAnim.actions.forEach((a, i) => {
+      if(i !== lblAnim.currentIdx){
+        try{ a.stop(); }catch(_){ }
+      }
+    });
+    if(cur){
+      try{
+        cur.play();
+        // Restore the paused time so the animation continues from
+        // where it was paused. cur.time is in seconds within the
+        // clip; clamped to the clip duration so we can't run past
+        // the end if the user paused near the loop point.
+        const dur = (lblAnim.clips[lblAnim.currentIdx] && lblAnim.clips[lblAnim.currentIdx].duration) || 0;
+        const t = lblAnim.pausedTime || 0;
+        cur.time = (dur > 0) ? Math.min(t, dur - 0.0001) : t;
+      }catch(_){ }
+    }
     lblAnim.isPlaying = true;
   }
   lblUpdateAnimUI();
@@ -18915,14 +19317,30 @@ function lblAnimToggle(){
 
 function lblAnimNext(){
   if(!lblAnim.mixer || !lblAnim.actions.length) return;
+  // Cycle to the next clip. We STOP every other action first (this
+  // fully removes their influence on the bones — a `pause()` would
+  // leave the last pose in place), then reset().play() the new one
+  // so the new clip starts from t=0. We also briefly restore the rest
+  // pose between clips so the previous clip's last frame doesn't
+  // leak into the new one (a visible "pop" otherwise). The new
+  // action becomes isPlaying=true, mirroring the behaviour of
+  // clicking Play.
+  lblAnim.actions.forEach(a => { try{ a.stop(); }catch(_){ } });
+  lblRestorePose(lblAnim.initialPose);
+  try{ lblAnim.mixer.update(0); }catch(_){ }
   lblAnim.currentIdx = (lblAnim.currentIdx + 1) % lblAnim.actions.length;
-  lblAnim.actions.forEach((a,i)=>{ if(i===lblAnim.currentIdx) a.reset().play(); else a.stop(); });
+  const cur = lblAnim.actions[lblAnim.currentIdx];
+  if(cur){ try{ cur.reset(); cur.play(); }catch(_){ } }
+  lblAnim.pausedTime = 0; // new clip starts from t=0
   lblAnim.isPlaying = true;
   lblUpdateAnimUI();
 }
 
-// Wire up the buttons (the elements exist in the topbar; this just hooks
-// them up — they stay display:none until a model with clips is loaded).
+// Wire up the buttons (they live in the floating #anim-controls-panel
+// now, not the topbar — but the IDs are the same, so the wiring is
+// unchanged. lblUpdateAnimUI() handles the show/hide via the
+// [hidden] attribute on the panel itself, instead of per-button
+// display:none).
 document.getElementById('anim-play-btn').addEventListener('click', lblAnimToggle);
 document.getElementById('anim-next-btn').addEventListener('click', lblAnimNext);
 // Spacebar shortcut for play/pause when no input is focused
