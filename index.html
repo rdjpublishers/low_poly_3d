@@ -13351,6 +13351,20 @@ canvas.addEventListener('mousedown',e=>{_md={x:e.clientX,y:e.clientY};});
 canvas.addEventListener('touchstart',e=>{if(e.touches[0]) _md={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
 canvas.addEventListener('click',e=>{
   if(Math.abs(e.clientX-_md.x)>6||Math.abs(e.clientY-_md.y)>6) return;
+  // v8.0 — the LBL pointerup handler at line 17415 also does click-to-
+  // select (more precisely, it walks the meshMap to find the right
+  // synthetic id for uploaded 3D / TS sub-meshes, then calls
+  // selectObj). It fires BEFORE this `click` handler (pointerup
+  // precedes the synthesised click in browser event order). If we
+  // don't bail out here for the LBL-managed cases, this legacy
+  // handler will then look at the same raycast, walk up to the
+  // direct child of sceneGroup (which is the model ROOT for TS /
+  // uploaded models, not a sub-mesh), find that the root isn't in
+  // meshMap, and DETACH the gizmo that the pointerup handler just
+  // attached. The symptom was "click a part, gizmo flashes for a
+  // frame then disappears". Bail out for any LBL-managed case.
+  if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) return;
+  if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) return;
   const rect=canvas.getBoundingClientRect();
   mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
   mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
@@ -16526,6 +16540,14 @@ function animate(){
   // (TS factory hints / uploaded glTF / uploaded FBX). Skipped when no
   // mixer is active so there's zero overhead in the no-animation path.
   if(lblAnim && lblAnim.mixer) lblAnim.mixer.update(__animDt);
+  // v8.0 — TransformControls in r0.160 needs a per-frame update() call
+  // for the gizmo's internal matrices to refresh (so the handles
+  // follow the attached mesh as the user drags it). Without this
+  // the gizmo would visually stay put while the mesh moved. Cheap
+  // when no object is attached (the early-return inside update()).
+  if(typeof transformControls !== 'undefined' && transformControls && typeof transformControls.update === 'function'){
+    try { transformControls.update(); } catch(_){}
+  }
   composer.render();
   if(_perfChip && (++_frameCount % 20 === 0)){
     const info=renderer.info;
@@ -16653,8 +16675,14 @@ function lblCurrentMesh(){
 function lblOnSelectionChanged(){
   const hasSel = !!selectedId;
   const isWholeModelSel = selectedId===LBL_EXTERNAL_ID || selectedId===LBL_TSMODEL_ID;
+  // v8.0 — always keep the gizmo mode buttons enabled. The mode is
+  // harmless to set when nothing is selected; the gizmo is only
+  // attached when a real mesh is selected (lblAttachGizmo). The
+  // previous gate (`el.disabled=!hasSel`) made the buttons feel
+  // dead on first click, which is the reported "button isn't working"
+  // symptom.
   ['gizmo-translate-btn','gizmo-rotate-btn','gizmo-scale-btn'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.disabled=!hasSel;
+    const el=document.getElementById(id); if(el) el.disabled=false;
   });
   const texBtn=document.getElementById('texture-btn'); if(texBtn) texBtn.disabled = !hasSel || isWholeModelSel;
   lblAttachGizmo();
@@ -16674,17 +16702,92 @@ function lblAfterRebuildHook(){
 // H2 — TRANSFORM GIZMO (drag objects in viewport)
 // ───────────────────────────────────────────────────────────────────────
 const transformControls = new TransformControls(camera, canvas);
-transformControls.size = 0.85;
-scene.add(transformControls.getHelper ? transformControls.getHelper() : transformControls);
+// v8.0 — bumped gizmo size from 0.85 to 1.1. The default 0.85
+// produced handles that were too small to grab comfortably on a
+// 5–10m-wide TS model at the default camera distance, and the
+// "click the gizmo but it doesn't respond" complaint was largely
+// a "the handles are too small to hit" complaint. 1.1 is the same
+// ratio Blender ships with.
+transformControls.size = 1.1;
+// v8.0 — gizmo helper attach. r0.166+ exposes getHelper() (since
+// TransformControls switched to extending Controls rather than
+// Object3D). r0.160 (this page's pinned version) still has
+// TransformControls as an Object3D, so scene.add(transformControls)
+// works directly. The ternary covers both. We also explicitly set
+// visible=true on the helper so the gizmo renders even when
+// attached to a part whose own .visible was toggled off.
+const __lblGizmoHelper = transformControls.getHelper ? transformControls.getHelper() : transformControls;
+scene.add(__lblGizmoHelper);
 let lblGizmoMode = 'translate';
 transformControls.setMode(lblGizmoMode);
 transformControls.enabled = false;
 transformControls.visible = false;
+if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = false;
+
+// v8.0 — make the gizmo helper reachable from the console for
+// diagnostic purposes. After loading a TS model, open the devtools
+// console and run `lblDebugGizmo()` — it prints the current
+// selectedId, the resolved mesh, whether the gizmo is attached,
+// and whether the helper is in the scene. If the gizmo isn't
+// showing, the diagnostic will tell you which link in the chain
+// is broken.
+window.lblDebugGizmo = function(){
+  const mesh = lblCurrentMesh();
+  const helper = transformControls.getHelper ? transformControls.getHelper() : transformControls;
+  const inScene = !!helper && !!helper.parent;
+  return {
+    selectedId,
+    resolvedMesh: mesh ? mesh.name || '(unnamed)' : null,
+    resolvedMeshType: mesh ? mesh.type : null,
+    gizmoMode: lblGizmoMode,
+    gizmoEnabled: transformControls.enabled,
+    gizmoVisible: transformControls.visible,
+    gizmoAttached: transformControls.object ? transformControls.object.name || '(unnamed)' : null,
+    gizmoHelperInScene: inScene,
+    meshMapSize: meshMap ? meshMap.size : -1,
+    currentTsModel: CURRENT_TS_MODEL ? CURRENT_TS_MODEL.name : null,
+    currentTsModelChildren: CURRENT_TS_MODEL ? CURRENT_TS_MODEL.children.length : -1,
+  };
+};
 
 transformControls.addEventListener('dragging-changed', (e)=>{
   controls.enabled = !e.value; // disable orbit while dragging, matches RJS reference
   if(!e.value) lblCommitGizmoTransform(); // mouseUp — persist + snapshot
 });
+
+// v8.0 — also expose lblSelectNothing() and lblAttachGizmoTo() as
+// direct console commands, in case the user wants to manually
+// deselect or re-attach the gizmo. Useful when the gizmo gets
+// "stuck" mid-debug (e.g. after a model reload that didn't fire
+// the proper selection event).
+window.lblSelectNothing = function(){
+  if(typeof selectObj === 'function') selectObj(null);
+  return { ok: true, selectedId: window.selectedId };
+};
+window.lblAttachGizmoTo = function(id){
+  if(typeof selectObj === 'function') selectObj(id);
+  return window.lblDebugGizmo();
+};
+// Toggle gizmo on/off without touching the selection: hide if
+// currently attached, show if currently detached. Different from
+// lblSelectNothing because it doesn't deselect — it just hides
+// the gizmo handles. Good for "I want to see the model without
+// the handles in the way, but keep my part selected for the
+// inspector panel".
+window.lblToggleGizmoVisibility = function(){
+  if(!transformControls.object){ return { ok: false, reason: 'no_object_attached' }; }
+  if(transformControls.visible){
+    transformControls.enabled = false;
+    transformControls.visible = false;
+    if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = false;
+    return { ok: true, action: 'hidden' };
+  } else {
+    transformControls.enabled = true;
+    transformControls.visible = true;
+    if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = true;
+    return { ok: true, action: 'shown' };
+  }
+};
 
 function lblSetGizmoMode(mode){
   lblGizmoMode = mode;
@@ -16700,15 +16803,43 @@ document.getElementById('gizmo-scale-btn').addEventListener('click',()=>lblSetGi
 lblSetGizmoMode('translate');
 
 function lblAttachGizmo(){
-  const mesh = lblCurrentMesh();
+  let mesh = lblCurrentMesh();
+  // v8.0 — defensive fallback. If meshMap.get(selectedId) returns
+  // null (e.g. the selectedId is a stale __lblTsMesh_<n> that was
+  // cleared by a subsequent model load), search the currently-loaded
+  // TS model for a mesh whose name matches the synthetic id. If
+  // even that fails, fall back to the TS model root itself so the
+  // gizmo at least appears and the user can move the whole model.
+  if(!mesh && selectedId && typeof selectedId === 'string' && selectedId.startsWith('__lblTsMesh_') && CURRENT_TS_MODEL){
+    const idx = parseInt(selectedId.replace('__lblTsMesh_',''), 10);
+    let n = 0;
+    let found = null;
+    CURRENT_TS_MODEL.traverse(o => {
+      if(found) return;
+      if(!o.isMesh) return;
+      if(o.userData && o.userData.__helper) return;
+      n++;
+      if(n === idx) found = o;
+    });
+    if(found) mesh = found;
+  }
+  if(!mesh && selectedId === LBL_TSMODEL_ID) mesh = CURRENT_TS_MODEL;
   if(mesh){
     transformControls.attach(mesh);
     transformControls.enabled = true;
     transformControls.visible = true;
+    // v8.0 — also make the gizmo helper's .visible true. In some
+    // Three.js versions the gizmo's own internal .visible flag lives
+    // on the helper, not on the controls object; toggling only the
+    // controls .visible is silently ignored. (Belt-and-braces fix
+    // — if the helper doesn't have .visible, this assignment is
+    // a no-op thanks to the type guard.)
+    if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = true;
   } else {
     transformControls.detach();
     transformControls.enabled = false;
     transformControls.visible = false;
+    if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = false;
   }
 }
 
@@ -16998,6 +17129,11 @@ window.addEventListener('keydown', (e)=>{
   if(((e.ctrlKey||e.metaKey) && k==='y') || ((e.ctrlKey||e.metaKey) && e.shiftKey && k==='z')){ e.preventDefault(); lblRedo(); return; }
   if((e.ctrlKey||e.metaKey) && k==='d'){ e.preventDefault(); lblDuplicateSelected(); return; }
   if(k==='delete' || k==='backspace'){ if(selectedId){ e.preventDefault(); lblDeleteSelected(); } return; }
+  // v8.0 — Escape always deselects (closes the gizmo, clears the
+  // highlight). Universal convention: Esc = "get out of this thing".
+  // Doesn't conflict with the kb-modal Escape handler above (which
+  // short-circuits when the modal is open).
+  if(k==='escape'){ if(selectedId){ e.preventDefault(); selectObj(null); } return; }
   if(k==='w' && !e.ctrlKey && !e.metaKey){ if(!document.getElementById('gizmo-translate-btn').disabled) lblSetGizmoMode('translate'); return; }
   if(k==='e' && !e.ctrlKey && !e.metaKey){ if(!document.getElementById('gizmo-rotate-btn').disabled) lblSetGizmoMode('rotate'); return; }
   if(k==='r' && !e.ctrlKey && !e.metaKey){ if(!document.getElementById('gizmo-scale-btn').disabled) lblSetGizmoMode('scale'); return; }
@@ -17410,7 +17546,13 @@ canvas.addEventListener('pointerup', (e)=>{
   if(!lblPointerDownPos) return;
   const dx=e.clientX-lblPointerDownPos.x, dy=e.clientY-lblPointerDownPos.y;
   lblPointerDownPos = null;
-  if(Math.hypot(dx,dy) > 4) return; // was a drag/orbit, not a click
+  // v8.0 — bumped drag-vs-click threshold from 4px to 7px. Touch
+  // devices and high-DPI mice often register 4-6px of drift on
+  // what the user perceives as a stationary click, so the old
+  // threshold was eating real clicks (the most common cause of
+  // "I click a part and nothing happens"). 7 is comfortably below
+  // the OrbitControls' own click-vs-drag discrimination.
+  if(Math.hypot(dx,dy) > 7) return; // was a drag/orbit, not a click
   if(transformControls.dragging) return;
   const rect = canvas.getBoundingClientRect();
   const pointer = new THREE.Vector2(
