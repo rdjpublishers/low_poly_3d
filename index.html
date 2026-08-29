@@ -13390,10 +13390,8 @@ canvas.addEventListener('click',e=>{
     let m=hit.object; while(m.parent&&m.parent!==sceneGroup) m=m.parent;
     if(m.name && meshMap && typeof meshMap.has === 'function' && meshMap.has(m.name)){
       selectObj(m.name);
-    } else if(typeof transformControls !== 'undefined' && transformControls && typeof transformControls.detach === 'function' && transformControls.object){
-      transformControls.detach();
-      transformControls.enabled = false;
-      transformControls.visible = false;
+    } else if(typeof lblForceDetachGizmo === 'function' && typeof transformControls !== 'undefined' && transformControls && transformControls.object){
+      lblForceDetachGizmo();
     }
   }
 });
@@ -16718,6 +16716,49 @@ transformControls.size = 1.1;
 // attached to a part whose own .visible was toggled off.
 const __lblGizmoHelper = transformControls.getHelper ? transformControls.getHelper() : transformControls;
 scene.add(__lblGizmoHelper);
+// BUGFIX — gizmo render: depthTest=false + a high renderOrder so the
+// handles always draw ON TOP of the model, never occluded by its own
+// geometry. Without this, a handle positioned "inside"/behind a large
+// TS mesh from the current camera angle is invisible and ungrabbable,
+// which reads as "the gizmo doesn't work". One-time traversal is
+// sufficient — TransformControlsGizmo pre-builds every mode's meshes
+// in its constructor (translate/rotate/scale all exist simultaneously,
+// only their .visible toggles per mode), so nothing is created later.
+__lblGizmoHelper.traverse(o=>{
+  o.renderOrder = 9999;
+  const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+  mats.forEach(m=>{ m.depthTest = false; m.depthWrite = false; });
+});
+
+// BUGFIX — gizmo stuck: TransformControls.dragging (r0.160) is set on
+// pointerDown and only cleared by the library's OWN pointerup handler —
+// which bails out early (does nothing) if transformControls.enabled is
+// false at that instant, and detach() never touches .dragging either.
+// Reading transformControls.dragging directly from OUR pointerup handler
+// is also unreliable: its internal listener was registered first (in
+// the constructor above) so it already fires and resets .dragging before
+// our own handler runs, making the .dragging check pass right through
+// even for a real gizmo-drag release. lblGizmoDragActive sidesteps both
+// problems: it's set the instant a real drag starts (from this same
+// dragging-changed event) and explicitly consumed exactly once by our
+// pointerup handler below, regardless of net pixel movement or listener
+// order — so a drag release is NEVER misread as a click-to-select.
+let lblGizmoDragActive = false;
+
+// Single shared "fully idle" path for the gizmo, used everywhere the
+// code detaches it. Forcibly clears .dragging too (belt-and-braces for
+// the enabled=false-mid-drag edge case above) so the gizmo can never be
+// left in a state where a future pointerHover/pointerDown silently
+// no-ops because the library still thinks a drag is in progress.
+function lblForceDetachGizmo(){
+  if(transformControls.dragging) transformControls.dragging = false;
+  transformControls.detach();
+  transformControls.enabled = false;
+  transformControls.visible = false;
+  if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = false;
+  lblGizmoDragActive = false;
+}
+
 let lblGizmoMode = 'translate';
 transformControls.setMode(lblGizmoMode);
 transformControls.enabled = false;
@@ -16744,6 +16785,8 @@ window.lblDebugGizmo = function(){
     gizmoVisible: transformControls.visible,
     gizmoAttached: transformControls.object ? transformControls.object.name || '(unnamed)' : null,
     gizmoHelperInScene: inScene,
+    gizmoDragActive: lblGizmoDragActive, // BUGFIX — should be false whenever nothing is being actively dragged
+    gizmoInternalDragging: transformControls.dragging, // r0.160's own flag — should track gizmoDragActive
     meshMapSize: meshMap ? meshMap.size : -1,
     currentTsModel: CURRENT_TS_MODEL ? CURRENT_TS_MODEL.name : null,
     currentTsModelChildren: CURRENT_TS_MODEL ? CURRENT_TS_MODEL.children.length : -1,
@@ -16752,6 +16795,7 @@ window.lblDebugGizmo = function(){
 
 transformControls.addEventListener('dragging-changed', (e)=>{
   controls.enabled = !e.value; // disable orbit while dragging, matches RJS reference
+  if(e.value) lblGizmoDragActive = true; // BUGFIX — latch for the pointerup handler, see lblGizmoDragActive above
   if(!e.value) lblCommitGizmoTransform(); // mouseUp — persist + snapshot
 });
 
@@ -16836,10 +16880,7 @@ function lblAttachGizmo(){
     // a no-op thanks to the type guard.)
     if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = true;
   } else {
-    transformControls.detach();
-    transformControls.enabled = false;
-    transformControls.visible = false;
-    if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = false;
+    lblForceDetachGizmo(); // BUGFIX — was a manual 3-line detach; now shared + dragging-safe
   }
 }
 
@@ -17515,6 +17556,48 @@ function lblRegisterExternalMeshes(group){
   });
 }
 
+// BUGFIX — shared by every canvas picking handler (main click-to-select,
+// Ctrl/Shift multi-select, group-pick-mode click). Resolves a raycast hit
+// to its meshMap id by walking UP from the EXACT mesh that was hit,
+// checking each ancestor's OWN identity — userData.__lblId (set directly
+// on the mesh by lblRegisterTsMeshes/lblRegisterExternalMeshes above) for
+// TS/uploaded sub-meshes, or .name for blueprint parts — against meshMap,
+// stopping once the model root is reached. Also reports whether the walk
+// passed through a userData.__helper node (skeleton joint marker, contact
+// shadow, convex-hull proxy, wireframe overlay), so callers can treat that
+// as "nothing selectable here" rather than falling through to a
+// whole-model selection.
+//
+// This replaces two previously-separate, both-broken approaches:
+//  - The old click-to-select logic walked hit.object up to the model
+//    root's DIRECT CHILD first and only THEN searched meshMap, using
+//    `target.getObjectById(hit.object.id)` — a check that doesn't depend
+//    on the loop's current [id, m] pair, so it matched the FIRST meshMap
+//    entry for ANY hit nested more than one level deep (bones, pivots,
+//    sub-groups — i.e. most non-trivial TS models). Every part except the
+//    first-registered one was therefore permanently unselectable, and the
+//    gizmo appeared "stuck" on that one part no matter what was clicked.
+//  - The multi-select / group-pick-mode handlers walked hit.object up
+//    without CURRENT_TS_MODEL as a stop condition, so for a TS model the
+//    walk continued past the actual part all the way to the model ROOT
+//    (whose parent is sceneGroup) — which is never itself a meshMap
+//    entry, so the exact-match lookup silently matched nothing. Ctrl/
+//    Shift-click and group-pick-mode therefore did nothing at all on any
+//    TS model part.
+// Both were confirmed with standalone Node reproductions before this fix.
+function lblResolveHitId(node){
+  let n = node, sawHelper = false;
+  while(n){
+    if(n.userData && n.userData.__helper){ sawHelper = true; break; }
+    const byId = n.userData && n.userData.__lblId;
+    if(byId && meshMap.has(byId)) return {id: byId, helper:false};
+    if(n.name && meshMap.has(n.name)) return {id: n.name, helper:false};
+    if(n===sceneGroup || n===loaded3dGroup || n===CURRENT_TS_MODEL) break;
+    n = n.parent;
+  }
+  return {id: null, helper: sawHelper};
+}
+
 // Highlight a single TS/external mesh (when the user picks one instead of
 // the whole-model sentinel), mirroring the meshMap-based highlight loop
 // in selectObj() but scoped to ONE mesh.
@@ -17546,6 +17629,12 @@ canvas.addEventListener('pointerup', (e)=>{
   if(!lblPointerDownPos) return;
   const dx=e.clientX-lblPointerDownPos.x, dy=e.clientY-lblPointerDownPos.y;
   lblPointerDownPos = null;
+  // BUGFIX — gizmo stuck: a gizmo-handle drag release must NEVER be
+  // treated as a click-to-select, no matter how small the net pixel
+  // movement was (fine adjustments can be a few px) — see
+  // lblGizmoDragActive above for why .dragging/pixel-distance alone
+  // aren't reliable signals for this. Consume the latch exactly once.
+  if(lblGizmoDragActive){ lblGizmoDragActive = false; return; }
   // v8.0 — bumped drag-vs-click threshold from 4px to 7px. Touch
   // devices and high-DPI mice often register 4-6px of drift on
   // what the user perceives as a stationary click, so the old
@@ -17553,7 +17642,7 @@ canvas.addEventListener('pointerup', (e)=>{
   // "I click a part and nothing happens"). 7 is comfortably below
   // the OrbitControls' own click-vs-drag discrimination.
   if(Math.hypot(dx,dy) > 7) return; // was a drag/orbit, not a click
-  if(transformControls.dragging) return;
+  if(transformControls.dragging) return; // extra safety net — see lblGizmoDragActive above, which is the primary guard
   const rect = canvas.getBoundingClientRect();
   const pointer = new THREE.Vector2(
     ((e.clientX-rect.left)/rect.width)*2-1,
@@ -17571,42 +17660,29 @@ canvas.addEventListener('pointerup', (e)=>{
   if(loaded3dGroup) raycastTargets.push(loaded3dGroup);
   if(CURRENT_TS_MODEL) raycastTargets.push(CURRENT_TS_MODEL);
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
-  const hit = hits.find(h=>{
-    let n=h.object;
-    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent!==CURRENT_TS_MODEL && n.parent) n=n.parent;
-    return n && !n.userData?.__helper;
-  });
+  // v6.3/BUGFIX — skeleton joint marker spheres (and other decoration:
+  // contact shadow, convex-hull proxy, wireframe overlay) are flagged
+  // userData.__helper and shouldn't be selectable — skip past them to
+  // the next hit along the ray, mirroring the original "find the first
+  // non-helper hit" behavior. lblResolveHitId (declared above, near
+  // lblRegisterTsMeshes — shared with the multi-select and group-pick-
+  // mode handlers below) reports this via .helper so the chain only
+  // needs walking once per hit instead of twice.
+  let hit = null, newId = null;
+  for(const h of hits){
+    const r = lblResolveHitId(h.object);
+    if(r.helper) continue; // pure decoration — try the next hit along the ray
+    hit = h; newId = r.id; break;
+  }
   if(hit){
-    // Determine the new target id from the hit, BEFORE we call selectObj —
-    // we need to know if the click landed on the SAME thing that's already
-    // selected so we can toggle the gizmo off (per the new requirement:
-    // clicking the same part again hides the gizmo).
-    let newId = null;
-    let target = hit.object;
-    while(target && target.parent!==sceneGroup && target.parent!==loaded3dGroup && target.parent!==CURRENT_TS_MODEL && target.parent) target = target.parent;
-    if(target && target.userData && target.userData.__helper) return;
-    // 1) Direct meshMap hit (blueprint parts)
-    for(const [id, m] of meshMap.entries()){
-      if(m===target || target===hit.object || (target && target.getObjectById && target.getObjectById(hit.object.id))){
-        newId = id; break;
-      }
-    }
-    if(!newId){
-      // Fallback: walk hit.object up until we find a mesh present in meshMap.
-      let n = hit.object;
-      while(n && !newId){
-        for(const [id,m] of meshMap.entries()){ if(m===n){ newId = id; break; } }
-        n = n.parent;
-      }
-    }
-    // 2) Per-mesh selection inside an uploaded 3D model — meshes were
-    //    registered in meshMap with a synthetic "__lblExtMesh_<n>" id when
-    //    the model was loaded (see registerExternalMeshes), so a hit on
-    //    any sub-mesh lands here.
-    // 3) Per-mesh selection inside a TS-generated model — same scheme,
-    //    see registerTsMeshes.
-    // 4) Whole-model fallback — if nothing more specific matched, fall
-    //    back to the whole-uploaded-model or whole-TS-model sentinel.
+    // newId came from lblResolveHitId above. We need to know if the click
+    // landed on the SAME thing that's already selected so we can toggle
+    // the gizmo off (per the new requirement: clicking the same part
+    // again hides the gizmo).
+    // Whole-model fallback — if no specific sub-mesh matched (e.g. a
+    // factory-authored mesh that was never registered), fall back to the
+    // whole-uploaded-model or whole-TS-model sentinel so the object is at
+    // least selectable/movable as one rigid piece.
     if(!newId && loaded3dGroup){
       let m=hit.object;
       while(m){ if(m===loaded3dGroup){ newId = LBL_EXTERNAL_ID; break; } m=m.parent; }
@@ -17626,8 +17702,9 @@ canvas.addEventListener('pointerup', (e)=>{
         selectObj(newId);
       }
     } else {
-      // Hit a helper / decoration with no associated scene object — treat
-      // as "click on empty space" and deselect.
+      // Hit something with no meshMap entry and no whole-model owner
+      // (e.g. a factory-authored mesh nobody registered) — treat as
+      // "click on empty space" and deselect.
       if(selectedId !== null) selectObj(null);
     }
   } else {
@@ -18159,7 +18236,7 @@ lblCurrentMesh = function(){
 };
 const __lblOrigAttachGizmoG = lblAttachGizmo;
 lblAttachGizmo = function(){
-  if(lblFaceSelectMode){ transformControls.detach(); transformControls.enabled=false; transformControls.visible=false; return; }
+  if(lblFaceSelectMode){ lblForceDetachGizmo(); return; }
   __lblOrigAttachGizmoG();
 };
 const __lblOrigCommitGizmoTransformG = lblCommitGizmoTransform;
@@ -18582,13 +18659,16 @@ canvas.addEventListener('pointerup', (e)=>{
   lblRaycaster.setFromCamera(pointer, camera);
   const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
+  // BUGFIX — was walking hit.object up with no CURRENT_TS_MODEL stop
+  // condition, so for a TS model the walk continued past the actual
+  // part all the way to the model root (whose parent is sceneGroup) —
+  // never itself a meshMap entry, so Ctrl/Shift-click silently matched
+  // nothing on any TS model part. lblResolveHitId (shared, declared
+  // near lblRegisterTsMeshes) resolves each hit correctly regardless
+  // of nesting depth. Confirmed with a standalone Node reproduction.
   for(const h of hits){
-    let n=h.object;
-    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent) n=n.parent;
-    if(!n || (n.userData && n.userData.__helper)) continue;
-    for(const [id,m] of meshMap.entries()){
-      if(m===n){ e.stopImmediatePropagation(); lblToggleSelect(id); return; }
-    }
+    const r = lblResolveHitId(h.object);
+    if(r.id){ e.stopImmediatePropagation(); lblToggleSelect(r.id); return; }
   }
 }, true);
 
@@ -18604,17 +18684,17 @@ canvas.addEventListener('pointerup', (e)=>{
   lblRaycaster.setFromCamera(pointer, camera);
   const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
+  // BUGFIX — same root cause as G13 above: no CURRENT_TS_MODEL stop
+  // condition meant this always walked past the clicked part to the
+  // TS model root, which is never a meshMap entry — group-pick-mode
+  // clicking silently did nothing on any TS model part.
   for(const h of hits){
-    let n=h.object;
-    while(n && n.parent!==sceneGroup && n.parent!==loaded3dGroup && n.parent) n=n.parent;
-    if(!n || (n.userData && n.userData.__helper)) continue;
-    for(const [id,m] of meshMap.entries()){
-      if(m===n){
-        e.stopImmediatePropagation();
-        if(lblGroupPickIds.has(id)) lblGroupPickIds.delete(id); else lblGroupPickIds.add(id);
-        lblRefreshGroupPickHighlight();
-        return;
-      }
+    const r = lblResolveHitId(h.object);
+    if(r.id){
+      e.stopImmediatePropagation();
+      if(lblGroupPickIds.has(r.id)) lblGroupPickIds.delete(r.id); else lblGroupPickIds.add(r.id);
+      lblRefreshGroupPickHighlight();
+      return;
     }
   }
 }, true);
@@ -18966,7 +19046,7 @@ function lblStartTexPositioning(kind, id){
   if(typeof def.textureImageRotation!=='number') def.textureImageRotation=0;
   lblTexPosMode = { kind, id, dragging:false, lastX:0, lastY:0 };
   controls.enabled = false;
-  transformControls.enabled = false; transformControls.visible = false;
+  lblForceDetachGizmo();
   toast('Drag to move the image · scroll to scale · Alt+drag to rotate — click ✓ Fix when it looks right','');
   lblRenderTexPosBanner();
 }
@@ -18987,7 +19067,7 @@ let lblFaceTexPos = null; // { objId, ftId }
 function lblStartFaceTexPositioning(objId, ftId){
   lblFaceTexPos = { objId, ftId };
   controls.enabled = false;
-  transformControls.enabled = false; transformControls.visible = false;
+  lblForceDetachGizmo();
   toast('Drag to position face texture · scroll to zoom · Alt+drag to rotate — click ✓ Fix when it looks right','');
   lblRenderTexPosBanner();
 }
