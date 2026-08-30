@@ -1342,6 +1342,12 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn" id="gizmo-translate-btn" title="Translate (W)" disabled>⇄ Move</button>
   <button class="tbtn" id="gizmo-rotate-btn" title="Rotate (E)" disabled>↻ Rotate</button>
   <button class="tbtn" id="gizmo-scale-btn" title="Scale (R)" disabled>⤢ Scale</button>
+  <!-- LBL FIX H2.b — explicit gizmo show/hide toggle (G). Auto-attach after
+       a model load is now OFF (v8.2) so the gizmo only appears once the
+       user actually wants it. This button is the single, clear way to
+       show or hide the gizmo for the current selection without
+       deselecting. Shortcut: G. -->
+  <button class="tbtn" id="gizmo-toggle-btn" title="Toggle the gizmo on/off (G) — click to hide the gizmo handles without deselecting" aria-pressed="false">🎯 Gizmo</button>
   <div class="vdiv"></div>
   <!-- LBL update H3 — view presets -->
   <div class="seg-group" id="view-preset-group" title="Camera view presets (1-4)">
@@ -13004,7 +13010,41 @@ function addTsModelToScene(group, meta, lightsGroup){
   sceneGroup.position.set(0,0,0);
   CURRENT_BLUEPRINT=null; // this scene didn't come from a blueprint — every blueprint-only feature correctly no-ops against null
 
-  sceneGroup.add(group);
+  // LBL FIX — gizmo centering. The transform gizmo (TransformControls) renders
+  // at the WORLD position of whatever it's attached to. Attaching it to the
+  // model root means the gizmo sits at the model's local origin, which (for
+  // these factories) is the BOTTOM of the visual content — the train's wheels,
+  // the spider's feet, the character's boots. That made the gizmo look like
+  // it was floating way below the model, and (worse) the handles frequently
+  // clipped the ground plane.
+  //
+  // To put the gizmo at the visual center, wrap the model in a centering
+  // Group positioned at the bounding-box center. The wrapper IS what gets
+  // registered as CURRENT_TS_MODEL — it inherits the original group's
+  // userData (sculptRuntime, animations, tick, etc.) so all downstream code
+  // (inspector, T-Pose, action hooks, animation mixer tick, GLB export)
+  // works unchanged. The original group becomes a single child of the
+  // wrapper, with its own position shifted by -center so the model is
+  // visually identical to before the wrap.
+  group.updateMatrixWorld(true);
+  const __lblModelBb = new THREE.Box3().setFromObject(group);
+  const __lblModelCenter = new THREE.Vector3();
+  __lblModelBb.getCenter(__lblModelCenter);
+
+  const __lblGizmoAnchor = new THREE.Group();
+  __lblGizmoAnchor.name = '__lblGizmoAnchor';
+  __lblGizmoAnchor.position.copy(__lblModelCenter);
+  __lblGizmoAnchor.userData = group.userData; // inherit sculptRuntime / animations / tick
+  // Shift the model so its bounding box is centered on the wrapper's local origin
+  group.position.sub(__lblModelCenter);
+  __lblGizmoAnchor.add(group);
+  sceneGroup.add(__lblGizmoAnchor);
+
+  // All downstream code uses `group` as the model reference; rebind it to the
+  // wrapper so lblFlattenRuntimeAliases / lblRegisterTsMeshes / etc. see the
+  // wrapper (which has the same userData + the same mesh hierarchy beneath).
+  group = __lblGizmoAnchor;
+
   // PART 1.3 — parented to `scene` (world space), not sceneGroup, so it
   // isn't affected by the model's own centering/grounding transform above.
   if(lightsGroup){ scene.add(lightsGroup); CURRENT_TS_LIGHTS=lightsGroup; }
@@ -13768,18 +13808,19 @@ async function lblModelStoreLoadByNumber(n){
   } else {
     await validateAndBuild(text, lblModelStoreLoadedFilename);
   }
-  // v8.1 — MOBILE FIX. After the build resolves, the model is sitting in
-  // the scene but nothing has been selected yet, so the gizmo isn't
-  // attached. On desktop the user can click the model to select it; on
-  // mobile that tap is flaky (the canvas lblRaycaster bug + a touch-vs-
-  // click threshold + an easy way to accidentally orbit the camera) and
-  // the user is left staring at a model with no gizmo. Auto-select the
-  // whole model after every successful store-load so the gizmo is
-  // guaranteed to appear. The user can still deselect by tapping empty
-  // space if they want it gone.
+  // v8.2 — LBL FIX. Previously this auto-selected the whole model on load
+  // ("v8.1 MOBILE FIX"), which is what made the gizmo permanently visible
+  // across every demo swap (screenshots 1/3/4 all show the gizmo stuck on
+  // top of the model). The user complaint was "the gizmo was always active
+  // and causes some problem for the models" — the auto-attach was the
+  // cause. Now we leave the model UN-selected after a store-load; the gizmo
+  // stays hidden until the user explicitly taps/clicks the model, or hits
+  // the "Gizmo" toggle button we now expose. lblForceDetachGizmo() makes
+  // sure any gizmo from a previous model is also removed.
+  lblForceDetachGizmo();
+  selectedId = null;
   try{
-    if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) selectObj(LBL_TSMODEL_ID);
-    else if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) selectObj(LBL_EXTERNAL_ID);
+    if(typeof selectObj === 'function') selectObj(null);
   }catch(_){ /* selectObj might not be in scope yet in some build paths */ }
   lblLoadingUpdate({ progress: 1.0, message: `Built ${lblModelStoreLoadedFilename}` });
   lblUpdateModelStoreNav();
@@ -16746,14 +16787,20 @@ const transformControls = new TransformControls(camera, canvas);
 // v8.1 — MOBILE FIX. 1.1 is tuned for desktop. On a phone canvas
 // (~360–400 CSS px wide, devicePixelRatio 2–3) the arrow handles
 // shrink to ~30 px which is fat-finger territory. Detect a coarse
-// pointer OR a small viewport and bump the size up to 1.7 so the
-// handles become ~50 px on the same phone. Also re-apply on resize
-// so a desktop user who resizes the window down still gets the
-// bigger handles. Stays out of the way for desktop.
+// pointer OR a small viewport and bump the size up so the handles
+// stay grabbable. Also re-apply on resize so a desktop user who
+// resizes the window down still gets the bigger handles. Stays out
+// of the way for desktop.
+// v8.2 — LBL FIX. The previous 1.7 / 1.4 mobile value made the gizmo
+// arrows so large they covered most of the model on the screen and
+// made selection ambiguous (the user couldn't tell if they were
+// tapping the gizmo or the model). Dropped mobile size to 0.95 —
+// handles are still ~35 px on a phone, easy to hit, but the gizmo
+// no longer dominates the viewport.
 function lblGizmoSizeForViewport(){
   const isCoarse = (window.matchMedia && (matchMedia('(pointer: coarse)').matches || matchMedia('(hover: none)').matches)) || false;
   const isNarrow = window.innerWidth <= 900;
-  return (isCoarse || isNarrow) ? 1.4 : 1.1;
+  return (isCoarse || isNarrow) ? 0.95 : 1.0;
 }
 transformControls.size = lblGizmoSizeForViewport();
 window.addEventListener('resize', () => {
@@ -16879,14 +16926,46 @@ window.lblToggleGizmoVisibility = function(){
     transformControls.enabled = false;
     transformControls.visible = false;
     if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = false;
+    lblSyncGizmoToggleBtn();
     return { ok: true, action: 'hidden' };
   } else {
     transformControls.enabled = true;
     transformControls.visible = true;
     if(__lblGizmoHelper && 'visible' in __lblGizmoHelper) __lblGizmoHelper.visible = true;
+    lblSyncGizmoToggleBtn();
     return { ok: true, action: 'shown' };
   }
 };
+
+// LBL FIX H2.b — keep the new gizmo-toggle button's pressed state in sync
+// with the actual gizmo visibility. The button starts as un-pressed because
+// lblOnSelectionChanged / lblAttachGizmo flip visibility as the user
+// selects / deselects / auto-shows.
+function lblSyncGizmoToggleBtn(){
+  const btn = document.getElementById('gizmo-toggle-btn');
+  if(!btn) return;
+  const pressed = !!(transformControls && transformControls.object && transformControls.visible);
+  btn.classList.toggle('active', pressed);
+  btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  btn.textContent = pressed ? '🎯 Gizmo ✓' : '🎯 Gizmo';
+}
+
+// Wire the button + the G shortcut to the same toggle.
+const __lblGizmoToggleBtn = document.getElementById('gizmo-toggle-btn');
+if(__lblGizmoToggleBtn){
+  __lblGizmoToggleBtn.addEventListener('click', ()=>{
+    // If nothing is selected yet, the gizmo isn't attached — select the
+    // current whole model (or uploaded model) and show the gizmo, so a
+    // single tap on a fresh-loaded demo immediately reveals the handles.
+    if(!transformControls.object){
+      if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) selectObj(LBL_TSMODEL_ID);
+      else if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) selectObj(LBL_EXTERNAL_ID);
+      return;
+    }
+    window.lblToggleGizmoVisibility();
+  });
+  lblSyncGizmoToggleBtn();
+}
 
 function lblSetGizmoMode(mode){
   lblGizmoMode = mode;
@@ -16937,6 +17016,9 @@ function lblAttachGizmo(){
   } else {
     lblForceDetachGizmo(); // BUGFIX — was a manual 3-line detach; now shared + dragging-safe
   }
+  // LBL FIX H2.b — keep the toggle button's pressed state in sync with the
+  // actual gizmo state after every attach/detach.
+  if(typeof lblSyncGizmoToggleBtn === 'function') lblSyncGizmoToggleBtn();
 }
 
 // On mouseUp: write the mesh's current local transform back onto the
@@ -17233,6 +17315,19 @@ window.addEventListener('keydown', (e)=>{
   if(k==='w' && !e.ctrlKey && !e.metaKey){ if(!document.getElementById('gizmo-translate-btn').disabled) lblSetGizmoMode('translate'); return; }
   if(k==='e' && !e.ctrlKey && !e.metaKey){ if(!document.getElementById('gizmo-rotate-btn').disabled) lblSetGizmoMode('rotate'); return; }
   if(k==='r' && !e.ctrlKey && !e.metaKey){ if(!document.getElementById('gizmo-scale-btn').disabled) lblSetGizmoMode('scale'); return; }
+  // LBL FIX H2.b — Q toggles the gizmo on/off (alternative to the new
+  // 🎯 Gizmo button). If nothing is selected, also auto-select the
+  // current whole model first, so Q is a one-key "show the gizmo" on
+  // a freshly-loaded demo. G is already taken for grid toggle.
+  if(k==='q' && !e.ctrlKey && !e.metaKey){
+    if(!transformControls.object){
+      if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) selectObj(LBL_TSMODEL_ID);
+      else if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) selectObj(LBL_EXTERNAL_ID);
+    } else {
+      window.lblToggleGizmoVisibility();
+    }
+    return;
+  }
   if(k==='g'){ lblToggleGrid(); return; }
   if(k==='z' && !e.ctrlKey && !e.metaKey){ lblToggleWireframeShortcut(); return; }
   if(k==='s' && !e.ctrlKey && !e.metaKey){ lblToggleStats(); return; }
