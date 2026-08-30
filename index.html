@@ -306,6 +306,21 @@ body{
 /* ── VIEWPORT ── */
 /* Fallback colour shown before WebGL first paints */
 #viewport-wrap{flex:1;position:relative;overflow:hidden;}#viewport{width:100%;height:100%;display:block;touch-action:none;}
+/* v8.1 — MOBILE FIX. Topbar buttons respond ~300 ms faster on
+   touch devices when we ask the browser not to wait for a possible
+   double-tap-to-zoom. Keep the canvas above at none (we still want
+   to fully suppress gestures over the 3D viewport). */
+#topbar .tbtn, #mob-tabs .mob-tab, #gizmo-translate-btn, #gizmo-rotate-btn, #gizmo-scale-btn{
+  touch-action: manipulation;
+}
+/* On coarse pointers, also make the gizmo-mode buttons themselves
+   larger so the thumb can hit them reliably. */
+@media (pointer: coarse), (hover: none){
+  #gizmo-translate-btn, #gizmo-rotate-btn, #gizmo-scale-btn{
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+}
 
 /* Demo carousel nav */
 .demo-nav-btn{
@@ -13346,6 +13361,15 @@ function updateAllValLogs(html){
 // RAYCASTER (click to select)
 // ═══════════════════════════════════════════
 const raycaster=new THREE.Raycaster(), mouse=new THREE.Vector2();
+// v8.1 — BUGFIX. The click-to-select / multi-pick / group-pick / face-pick
+// handlers below all reference `lblRaycaster`, but the only variable that
+// was ever defined is `raycaster` (right above). On every platform the
+// pointerup handler crashed with "lblRaycaster is not defined" the moment
+// you tapped an object, so selectObj() was never called, lblOnSelectionChanged
+// never fired, and the gizmo never attached — exactly the "I tap the model
+// and nothing happens" symptom on mobile. Define the alias right here so
+// every existing reference resolves to the same instance.
+const lblRaycaster = raycaster;
 let _md={x:0,y:0};
 canvas.addEventListener('mousedown',e=>{_md={x:e.clientX,y:e.clientY};});
 canvas.addEventListener('touchstart',e=>{if(e.touches[0]) _md={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
@@ -13740,10 +13764,23 @@ async function lblModelStoreLoadByNumber(n){
   // overwrite the validator log with their own detailed lines, which is
   // what we want — we just primed the pump with the format-detect line.
   if(found.ext === 'ts'){
-    validateAndBuildTs(text, lblModelStoreLoadedFilename);
+    await validateAndBuildTs(text, lblModelStoreLoadedFilename);
   } else {
-    validateAndBuild(text, lblModelStoreLoadedFilename);
+    await validateAndBuild(text, lblModelStoreLoadedFilename);
   }
+  // v8.1 — MOBILE FIX. After the build resolves, the model is sitting in
+  // the scene but nothing has been selected yet, so the gizmo isn't
+  // attached. On desktop the user can click the model to select it; on
+  // mobile that tap is flaky (the canvas lblRaycaster bug + a touch-vs-
+  // click threshold + an easy way to accidentally orbit the camera) and
+  // the user is left staring at a model with no gizmo. Auto-select the
+  // whole model after every successful store-load so the gizmo is
+  // guaranteed to appear. The user can still deselect by tapping empty
+  // space if they want it gone.
+  try{
+    if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) selectObj(LBL_TSMODEL_ID);
+    else if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) selectObj(LBL_EXTERNAL_ID);
+  }catch(_){ /* selectObj might not be in scope yet in some build paths */ }
   lblLoadingUpdate({ progress: 1.0, message: `Built ${lblModelStoreLoadedFilename}` });
   lblUpdateModelStoreNav();
   return true;
@@ -16706,7 +16743,25 @@ const transformControls = new TransformControls(camera, canvas);
 // "click the gizmo but it doesn't respond" complaint was largely
 // a "the handles are too small to hit" complaint. 1.1 is the same
 // ratio Blender ships with.
-transformControls.size = 1.1;
+// v8.1 — MOBILE FIX. 1.1 is tuned for desktop. On a phone canvas
+// (~360–400 CSS px wide, devicePixelRatio 2–3) the arrow handles
+// shrink to ~30 px which is fat-finger territory. Detect a coarse
+// pointer OR a small viewport and bump the size up to 1.7 so the
+// handles become ~50 px on the same phone. Also re-apply on resize
+// so a desktop user who resizes the window down still gets the
+// bigger handles. Stays out of the way for desktop.
+function lblGizmoSizeForViewport(){
+  const isCoarse = (window.matchMedia && (matchMedia('(pointer: coarse)').matches || matchMedia('(hover: none)').matches)) || false;
+  const isNarrow = window.innerWidth <= 900;
+  return (isCoarse || isNarrow) ? 1.4 : 1.1;
+}
+transformControls.size = lblGizmoSizeForViewport();
+window.addEventListener('resize', () => {
+  // Don't fight the user mid-drag — only resize the gizmo when not actively dragging.
+  if(!transformControls.dragging){
+    transformControls.size = lblGizmoSizeForViewport();
+  }
+});
 // v8.0 — gizmo helper attach. r0.166+ exposes getHelper() (since
 // TransformControls switched to extending Controls rather than
 // Object3D). r0.160 (this page's pinned version) still has
