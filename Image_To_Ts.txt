@@ -1,8 +1,24 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.3 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.4 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.4 (2026-08-31) — New PART 30 (Rigging & Animation Authoring
+    Standard), reproduced unchanged from Prompt_To_Ts.txt v1.4:
+    formalizes pivot-hierarchy armatures (nested THREE.Group joints,
+    not THREE.Skeleton), resolves the nested-vs-flat hierarchy
+    question (jointed models MUST nest — verified no flat-hierarchy
+    requirement exists anywhere in the renderer), rest-pose
+    discipline, per-joint DOF minimization, a documented pattern for
+    authoring named AnimationClips (idle/walk/run/jump/etc.) wired
+    into the existing PART 5.6 mixer contract and PART 6.1B actions
+    map, AND new PART 30.5 GLB export-safety guidance (quaternion-
+    track authoring, root-descendant discipline, helper-node export
+    exclusion) — verified against the renderer's actual GLTFExporter
+    integration, which does exist and was previously mis-scoped out
+    of this spec. PART 12 checklist gains a rigging/animation/export
+    addendum (PART 30.6), including a reminder that mirrored limbs
+    count toward PART 1's ~30k triangle budget.
   v1.3 (2026-08-28) — Renderer-side additions to the TS path. New
     PARTs 27-29 (Constraints, Advanced Shader & VFX Techniques, Root-
     Level Runtime Aliases + AnimationMixer auto-tick). PART 5 extended
@@ -2198,7 +2214,9 @@ PART 10's boolean union is real.
 PART 12 — VALIDATION CHECKLIST (run through silently before output)
 ================================================================================
 
-This is the TS-path equivalent of PART 21 of the JSON/JS spec.
+This is the TS-path equivalent of PART 21 of the JSON/JS spec. If the
+model has joints/limbs/articulation, also run the addendum in PART
+30.6 (rigging, animation & export).
 Run through it silently and fix any check before emitting the file.
 
   SHAPE / CONTRACT
@@ -3442,6 +3460,212 @@ auto-discovers. The two cases the image fork usually needs:
     with `_root`; the renderer finds and ticks it.
 
 For the FULL optional sculptRuntime shape, see PART 6.1B.
+
+================================================================================
+PART 30 — RIGGING & ANIMATION AUTHORING STANDARD (articulated models) [v1.4]
+================================================================================
+This PART formalizes how to build an articulated model (anything with
+joints that pose or animate — characters, creatures, walkers, mechs,
+turrets, anything with more than a static tick sway) so it renders
+correctly in THIS renderer. It does not replace PART 5 (tick/
+AnimationMixer contract) or PART 6 (sculptRuntime contract) — it tells
+you HOW to build the joint hierarchy and author clips that plug into
+those two contracts cleanly.
+
+--------------------------------------------------------------------------
+30.0 — WHAT DOES / DOES NOT APPLY HERE
+--------------------------------------------------------------------------
+This renderer loads a native Three.js factory module directly in the
+browser (PART 1) — that's the primary contract, and it does NOT need a
+separate Blender/Unity/Unreal/Godot IMPORT step; those workflows are
+for someone consuming an already-exported .glb in another engine and
+must NOT appear in this file's output.
+
+HOWEVER: the renderer DOES include a working GLB EXPORT feature
+(`THREE.GLTFExporter`, wired up in the app) that can export your
+factory's built model to a downloadable .glb. So export-safety is a
+real constraint, not a hypothetical one — see PART 30.6.
+
+If you are translating rigging notes from an external glTF-style rig
+guide for a DIFFERENT specific asset, treat that asset's exact bone
+coordinates and named clips as reference data only, not as this
+model's content — re-express the STRUCTURE (pivot hierarchy, DOF
+discipline, named-clip authoring) using the pattern below, built for
+whatever subject you're actually generating.
+
+--------------------------------------------------------------------------
+30.1 — COORDINATE STANDARD
+--------------------------------------------------------------------------
+Standard Three.js right-handed, Y-up world space — the renderer applies
+no coordinate remapping. Do not invent a different up-axis or handedness
+for "compatibility with other engines"; there is only one engine here.
+
+--------------------------------------------------------------------------
+30.2 — PIVOT HIERARCHY (the "armature" for this renderer)
+--------------------------------------------------------------------------
+NESTED, not flat. A jointed model requires a nested parent-child chain
+— that IS how a rotation at the hip propagates down through the knee
+to the foot. There is no flat-hierarchy requirement anywhere in this
+renderer (checked: it isn't enforced by the loader, the inspector, or
+the export path), and a genuinely flat hierarchy is structurally
+incompatible with articulation — a knee that isn't parented under a
+thigh can't inherit the thigh's rotation. Reserve a flat, single-level
+child list for the case it actually fits: a fully RIGID, non-jointed
+prop or static-pose model with no moving parts, where there's nothing
+to propagate. The moment a part needs to rotate relative to a parent
+part at runtime, it needs to be an actual child Group of that parent.
+
+There is no THREE.Skeleton/THREE.Bone requirement — a plain nested
+THREE.Group hierarchy IS the armature. Each joint is a THREE.Group
+whose ORIGIN is the actual rotation point (not the mesh's bounding-box
+center), with the child mesh/sub-hierarchy offset inside it. Rotate the
+group; never rotate a mesh directly if it has children that must follow.
+
+  const hipL   = new THREE.Group(); hipL.position.set(-0.20, 0.55, 0);
+  const thighL = new THREE.Group(); thighL.position.set(0, 0, 0);   // hinge at hip
+  const kneeL  = new THREE.Group(); kneeL.position.set(0, -0.28, -0.03); // offset FROM thigh pivot
+  const shinL  = buildLowPolyLeg(); shinL.position.set(0, 0, 0);    // hinge at knee
+
+  hipL.add(thighL); thighL.add(kneeL); kneeL.add(shinL); root.add(hipL);
+
+Before authoring the hierarchy, write a short comment table above the
+factory function listing every pivot: id, parent, local offset (the
+translation from PARENT pivot to THIS pivot, not world position),
+one-line function, and which axis/axes it's allowed to rotate on. This
+is documentation for future edits, not a runtime object — keep it
+terse:
+
+  // PIVOT TABLE (local offsets, parent → child)
+  // hipL      root        (-0.20, 0.55, 0)   yaw+pitch+roll swing
+  // thighL    hipL        (0, 0, 0)          pitch only (forward/back swing)
+  // kneeL     thighL      (0, -0.28, -0.03)  pitch only (flexion, one direction)
+  // shinL     kneeL       (0, 0, 0)          rigid (no further joint)
+
+Keep each joint to the MINIMUM degrees of freedom it actually needs —
+a knee that can only bend one way should only ever be driven on one
+Euler axis. This avoids gimbal artifacts and keeps clip authoring
+sane. Reserve full 3-DOF rotation for shoulder/hip-socket-style joints.
+
+Register every pivot in `sculptRuntime.nodes` (PART 6.1) using the same
+name you used in the pivot table, and set `node.userData.animationRole
+= 'bone'` (PART 6.7.3) on each one so the renderer's animation tooling
+recognizes the chain. Mark the top of the chain with `'skeleton-root'`
+or `'rig-root'`.
+
+--------------------------------------------------------------------------
+30.3 — REST POSE
+--------------------------------------------------------------------------
+Assemble and position every pivot in a neutral REST POSE first (all
+joint rotations at their zero/default value) and get the silhouette
+right in rest pose before authoring any clip. Every AnimationClip
+you build afterward is a set of OFFSETS from this rest pose — if the
+rest pose is wrong, every clip inherits the error.
+
+--------------------------------------------------------------------------
+30.4 — NAMED ACTION CLIPS
+--------------------------------------------------------------------------
+For each distinct action (idle, walk, run, attack, jump, power-down,
+whatever the subject calls for), author it as its own
+THREE.AnimationClip per PART 5.6(a), using
+THREE.QuaternionKeyframeTrack for joint rotation and
+THREE.VectorKeyframeTrack for root/COM translation (bounce, crouch,
+launch height). Document each clip with a short block comment
+BEFORE the code that builds it — this is what actually keeps a
+multi-clip character maintainable:
+
+  // ACTION: walk — 1.2s seamless loop
+  // Tracks: pelvis.position (bob + weight transfer), mainBody.quaternion
+  //   (forward tilt + counter-yaw), thighL/R.quaternion (swing, 180°
+  //   phase offset), kneeL/R.quaternion (flexion), ankleL/R.quaternion
+  //   (ground-alignment compensation = -(thighAngle + kneeAngle))
+  // Profile: pelvis Y oscillates between 0.55-0.59, thigh swing ±18°,
+  //   knee flexes 0°→22° on forward swing, -7° on trailing push.
+  function buildWalkClip(): THREE.AnimationClip { /* … */ }
+
+Guidelines for the profile paragraph:
+  - State the DURATION and whether it loops (seamless) or clamps
+    (plays once and holds/stops) — this matters for how you author the
+    first/last keyframe (loop clips need frame 0 === last frame).
+  - Name which tracks move, not just "the legs move".
+  - For legged locomotion, phase-offset left/right limbs by 180°
+    (`workingElapsed` vs `workingElapsed + duration/2`) rather than
+    authoring two near-duplicate keyframe sets by hand.
+  - Ground-contact joints (ankles, feet) should compensate so the
+    foot doesn't visibly slide or tilt through the floor — the
+    simplest version is ankle angle ≈ -(sum of upstream joint
+    angles), corrected by eye against the rest-pose foot orientation.
+  - Secondary motion (an antenna, a cape, loose cable) should read as
+    driven by the primary motion (inertia/drag), not moving on its
+    own unrelated cycle.
+
+Publish the finished set via `sculptRuntime.animations = { clips,
+mixer, actions }` (PART 5.6a) so the renderer's play/next-clip UI
+picks them up, AND add matching entries to `sculptRuntime.actions`
+(PART 6.1B) for any clip that should also be one-click-triggerable
+from the Action Hooks panel:
+
+  const clipActions = new Map(clips.map(c => [c.name, mixer.clipAction(c)]));
+  sculptRuntime.actions = {
+    jump: () => { clipActions.get('jump')?.reset().play(); },
+  };
+
+--------------------------------------------------------------------------
+30.5 — GLB EXPORT SAFETY (the renderer's export button is real — plan for it)
+--------------------------------------------------------------------------
+The renderer can export your built model via `THREE.GLTFExporter`. It
+already sanitizes some common mistakes for you (Euler rotation
+sub-tracks are auto-converted to quaternion tracks; circular userData
+references are stripped before serialization) — but don't rely on the
+safety net when authoring is just as easy:
+
+  - Author joint rotation with `node.quaternion` / QuaternionKeyframeTrack
+    directly (PART 30.4 already tells you this) rather than animating
+    `node.rotation.x/y/z` — quaternion tracks export cleanly with no
+    conversion step, and dodge the wraparound issues Euler tracks can
+    hit with the sanitizer.
+  - Every pivot/mesh you want to survive export must be a real
+    descendant of the returned root Group — don't build a detached
+    THREE.Object3D purely for internal bookkeeping and expect it in
+    the export.
+  - Track target names are matched against actual node names in the
+    scene graph — this is why PART 6.2's naming discipline (consistent
+    names between the geometry code and `sculptRuntime`) matters for
+    export, not just for the Inspector.
+  - Helper-only objects (debug gizmos, outline meshes, wireframe
+    overlays) should NOT be part of the exported result — if you add
+    any such helper node, this renderer's convention is
+    `node.userData.__helper = true` (or `__noExport`) to keep it out
+    of the export, matching the pattern used elsewhere in the app.
+
+--------------------------------------------------------------------------
+30.6 — VALIDATION ADDITIONS (append to PART 12's checklist)
+--------------------------------------------------------------------------
+  [ ] Every joint pivot's origin is the rotation point, not a mesh
+      bounding-box center
+  [ ] Rest pose (all joints at zero) has a correct, complete silhouette
+      before any clip was authored
+  [ ] Each joint is driven on the minimum DOF it needs — no
+      full-3-axis rotation on a hinge joint
+  [ ] Loop clips have identical first/last keyframe values
+  [ ] Legged locomotion clips phase-offset left/right by half the
+      clip duration instead of duplicating hand-authored keys
+  [ ] `sculptRuntime.nodes` names match the pivot-table names exactly;
+      each pivot has `userData.animationRole` set (PART 6.7.3)
+  [ ] `sculptRuntime.animations.{clips,mixer,actions}` is populated
+      per PART 5.6(a) — not just a bare `tick`, if the model has
+      named actions
+  [ ] Mirrored/repeated limbs (arms, legs) haven't quietly doubled the
+      triangle count past the ~30k whole-model budget in PART 1 —
+      count actual geometry, not just "it's just two arms"
+  [ ] Joint rotation is authored via quaternion/QuaternionKeyframeTrack,
+      not raw Euler `.rotation.x/y/z` animation (PART 30.5)
+  [ ] Every animated pivot is a real descendant of the returned root
+      Group; no detached bookkeeping-only Object3D expected to export
+  [ ] The factory file itself contains no GLTFExporter calls (export
+      is the renderer's job, not the model file's) and no
+      external-engine import walkthroughs (PART 30.0) — only build the
+      model; the renderer's existing export button + PART 30.5 handle
+      the rest
 
 ================================================================================
 PART 19 — STAGED BUILD PASSES  (img2threejs alignment — added v1.2, 2026-07-31)
