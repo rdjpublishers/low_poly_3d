@@ -214,29 +214,57 @@ export const COLOR_THEMES: Record<ColorThemeId, ColorScheme> = {
   },
 };
 
-function createProceduralNoiseCanvas(width = 512, height = 512, type: 'wear' | 'metal' = 'wear'): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
+function createProceduralNoiseTexture(width = 256, height = 256, type: 'wear' | 'metal' = 'wear'): THREE.Texture {
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = type === 'wear' ? '#808080' : '#a0a0a0';
+        ctx.fillRect(0, 0, width, height);
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const noise = (Math.random() - 0.5) * 40;
+          const scratches = Math.random() > 0.985 ? (Math.random() - 0.5) * 120 : 0;
+          const val = Math.min(255, Math.max(0, data[i] + noise + scratches));
+          data[i] = val;
+          data[i + 1] = val;
+          data[i + 2] = val;
+          data[i + 3] = 255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 2);
+        return tex;
+      }
+    } catch (_) {
+      /* Fallback below */
+    }
+  }
 
-  ctx.fillStyle = type === 'wear' ? '#808080' : '#a0a0a0';
-  ctx.fillRect(0, 0, width, height);
-
-  const imgData = ctx.getImageData(0, 0, width, height);
-  const data = imgData.data;
-
+  // Safe DataTexture fallback for Node.js / SSR
+  const data = new Uint8Array(width * height * 4);
+  const baseVal = type === 'wear' ? 128 : 160;
   for (let i = 0; i < data.length; i += 4) {
     const noise = (Math.random() - 0.5) * 40;
     const scratches = Math.random() > 0.985 ? (Math.random() - 0.5) * 120 : 0;
-    const val = Math.min(255, Math.max(0, data[i] + noise + scratches));
+    const val = Math.min(255, Math.max(0, baseVal + noise + scratches));
     data[i] = val;
     data[i + 1] = val;
     data[i + 2] = val;
+    data[i + 3] = 255;
   }
-  ctx.putImageData(imgData, 0, 0);
-  return canvas;
+  const tex = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  tex.needsUpdate = true;
+  return tex;
 }
 
 function createBeveledCylinder(radiusTop: number, radiusBottom: number, height: number, radialSegments = 24): THREE.BufferGeometry {
@@ -298,11 +326,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   const castShadow = options.castShadow ?? true;
   const receiveShadow = options.receiveShadow ?? true;
 
-  const noiseCanvas = createProceduralNoiseCanvas(256, 256, 'wear');
-  const noiseTexture = new THREE.CanvasTexture(noiseCanvas);
-  noiseTexture.wrapS = THREE.RepeatWrapping;
-  noiseTexture.wrapT = THREE.RepeatWrapping;
-  noiseTexture.repeat.set(2, 2);
+  const noiseTexture = createProceduralNoiseTexture(256, 256, 'wear');
 
   const primaryPaint = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.primaryOrange),
@@ -1252,7 +1276,7 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
       runtimeState.isFiring = firing;
       if (firing) {
         this.playAnimation('shoot');
-      } else if (runtimeState.currentAnimation === 'shoot' || runtimeState.currentAnimation === 'fire') {
+      } else if (runtimeState.currentAnimation === 'shoot') {
         this.playAnimation('walk');
       }
     },

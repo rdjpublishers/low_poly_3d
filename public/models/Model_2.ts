@@ -423,3 +423,31 @@ export function createTrainModel(options: any = {}): THREE.Group {
     return train;
 }
 
+export function getLookDevLights(): THREE.Group {
+    const lightRig = new THREE.Group();
+    lightRig.name = 'Train_LookDevLights';
+
+    const ambient = new THREE.AmbientLight(0xfff5ea, 0.7);
+    lightRig.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xfffaed, 1.8);
+    sun.position.set(6, 10, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    lightRig.add(sun);
+
+    const fill = new THREE.DirectionalLight(0x60a5fa, 0.8);
+    fill.position.set(-6, 4, -6);
+    lightRig.add(fill);
+
+    const warmRim = new THREE.DirectionalLight(0xf59e0b, 1.2);
+    warmRim.position.set(0, 6, -8);
+    lightRig.add(warmRim);
+
+    return lightRig;
+}
+
+export const createModel = createTrainModel;
+export default createTrainModel;
+

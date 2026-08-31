@@ -317,52 +317,102 @@ function createVoxelTexture(
   grain = 0.08,
   accentHex?: string,
   glowPattern = false
-): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = w * 16;
-  canvas.height = h * 16;
-  const ctx = canvas.getContext('2d');
+): THREE.Texture {
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = w * 16;
+      canvas.height = h * 16;
+      const ctx = canvas.getContext('2d');
 
-  if (ctx) {
-    const c1 = new THREE.Color(primaryHex);
-    const c2 = new THREE.Color(secondaryHex);
-    const pixelSize = 16;
+      if (ctx) {
+        const c1 = new THREE.Color(primaryHex);
+        const c2 = new THREE.Color(secondaryHex);
+        const pixelSize = 16;
 
+        for (let x = 0; x < w; x++) {
+          for (let y = 0; y < h; y++) {
+            const noise = (Math.random() - 0.5) * grain;
+            const wave = (Math.sin(x * 0.45) + Math.cos(y * 0.45)) * 0.06;
+            const mixRatio = THREE.MathUtils.clamp(Math.random() * 0.6 + wave + 0.2, 0, 1);
+            const col = c1.clone().lerp(c2, mixRatio);
+
+            col.r = THREE.MathUtils.clamp(col.r + noise, 0, 1);
+            col.g = THREE.MathUtils.clamp(col.g + noise, 0, 1);
+            col.b = THREE.MathUtils.clamp(col.b + noise, 0, 1);
+
+            ctx.fillStyle = `#${col.getHexString()}`;
+            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+
+            if (accentHex && ((x + y) % 4 === 0 || x === 0 || y === 0 || x === w - 1)) {
+              ctx.fillStyle = accentHex;
+              ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+            }
+
+            if (glowPattern && (x === 1 || x === w - 2) && y > 1 && y < h - 2) {
+              ctx.fillStyle = accentHex || '#00f5d4';
+              ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+            }
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.09)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          }
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        texture.generateMipmaps = false;
+        return texture;
+      }
+    } catch (_) {
+      /* Fallback to DataTexture below */
+    }
+  }
+
+  // Safe DataTexture fallback for Node.js
+  const totalW = w * 16;
+  const totalH = h * 16;
+  const data = new Uint8Array(totalW * totalH * 4);
+  const c1 = new THREE.Color(primaryHex);
+  const c2 = new THREE.Color(secondaryHex);
+  const accCol = accentHex ? new THREE.Color(accentHex) : null;
+  const glowCol = new THREE.Color(accentHex || '#00f5d4');
+
+  for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      for (let y = 0; y < h; y++) {
-        const noise = (Math.random() - 0.5) * grain;
-        const wave = (Math.sin(x * 0.45) + Math.cos(y * 0.45)) * 0.06;
-        const mixRatio = THREE.MathUtils.clamp(Math.random() * 0.6 + wave + 0.2, 0, 1);
-        const col = c1.clone().lerp(c2, mixRatio);
+      const noise = (Math.random() - 0.5) * grain;
+      const wave = (Math.sin(x * 0.45) + Math.cos(y * 0.45)) * 0.06;
+      const mixRatio = THREE.MathUtils.clamp(Math.random() * 0.6 + wave + 0.2, 0, 1);
+      let col = c1.clone().lerp(c2, mixRatio);
+      col.r = THREE.MathUtils.clamp(col.r + noise, 0, 1);
+      col.g = THREE.MathUtils.clamp(col.g + noise, 0, 1);
+      col.b = THREE.MathUtils.clamp(col.b + noise, 0, 1);
 
-        col.r = THREE.MathUtils.clamp(col.r + noise, 0, 1);
-        col.g = THREE.MathUtils.clamp(col.g + noise, 0, 1);
-        col.b = THREE.MathUtils.clamp(col.b + noise, 0, 1);
+      if (accCol && ((x + y) % 4 === 0 || x === 0 || y === 0 || x === w - 1)) {
+        col = accCol;
+      }
+      if (glowPattern && (x === 1 || x === w - 2) && y > 1 && y < h - 2) {
+        col = glowCol;
+      }
 
-        ctx.fillStyle = `#${col.getHexString()}`;
-        ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-
-        if (accentHex && ((x + y) % 4 === 0 || x === 0 || y === 0 || x === w - 1)) {
-          ctx.fillStyle = accentHex;
-          ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+      for (let py = 0; py < 16; py++) {
+        for (let px = 0; px < 16; px++) {
+          const idx = ((y * 16 + py) * totalW + (x * 16 + px)) * 4;
+          data[idx] = Math.round(col.r * 255);
+          data[idx + 1] = Math.round(col.g * 255);
+          data[idx + 2] = Math.round(col.b * 255);
+          data[idx + 3] = 255;
         }
-
-        if (glowPattern && (x === 1 || x === w - 2) && y > 1 && y < h - 2) {
-          ctx.fillStyle = accentHex || '#00f5d4';
-          ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-        }
-
-        ctx.strokeStyle = 'rgba(0,0,0,0.09)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
       }
     }
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = new THREE.DataTexture(data, totalW, totalH, THREE.RGBAFormat);
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.generateMipmaps = false;
+  texture.needsUpdate = true;
   return texture;
 }
 
