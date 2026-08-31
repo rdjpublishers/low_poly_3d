@@ -6719,6 +6719,14 @@ function applyOperations(mesh, ops, allMeshes, objId, pendingCSGOps){
       case 'distribute_even':
       case 'evendistribute': applyDistributeEven(mesh,p,allMeshes); break;
       case 'glow':{
+        // matcap-shaded parts have no emissive uniform (baked-lighting
+        // texture lookup, not a lit material) — warn instead of silently
+        // no-op'ing, since the author's "glow" request would otherwise
+        // just vanish with no feedback.
+        if(!mesh.material || !('emissive' in mesh.material)){
+          console.warn(`"glow" modifier on "${objId}" has no effect — its material (e.g. matcap shading) has no emissive uniform`);
+          break;
+        }
         const col=p.color||'#00ff88';
         mesh.material.emissive=new THREE.Color(col);
         mesh.material.emissiveIntensity=clampEmissiveIntensity(p.intensity??1.2, mesh.name); break;
@@ -9982,6 +9990,7 @@ function selectObj(id){
   }
   controls.autoRotate=false;
   meshMap.forEach((m,mid)=>{
+    if(!m.material || !('emissive' in m.material)) return; // MeshBasicMaterial etc. have no emissive uniform
     m.material.emissive=new THREE.Color(mid===id?0x6c63ff:0x000000);
     m.material.emissiveIntensity=mid===id?0.22:0;
   });
@@ -18260,7 +18269,7 @@ function lblRefreshMultiSelectHighlight(){
   _lblPrevHighlighted.forEach(mid => {
     if(!lblMultiSelectIds.has(mid) && !groupMemberIds.has(mid)){
       const m = meshMap.get(mid);
-      if(m && mid !== selectedId){
+      if(m && mid !== selectedId && m.material && ('emissive' in m.material)){
         m.material.emissive = new THREE.Color(0x000000);
         m.material.emissiveIntensity = 0;
       }
@@ -18269,7 +18278,7 @@ function lblRefreshMultiSelectHighlight(){
   _lblPrevGroupMembers.forEach(mid => {
     if(!lblMultiSelectIds.has(mid) && !groupMemberIds.has(mid)){
       const m = meshMap.get(mid);
-      if(m && mid !== selectedId){
+      if(m && mid !== selectedId && m.material && ('emissive' in m.material)){
         m.material.emissive = new THREE.Color(0x000000);
         m.material.emissiveIntensity = 0;
       }
@@ -18279,7 +18288,7 @@ function lblRefreshMultiSelectHighlight(){
   lblMultiSelectIds.forEach(mid => {
     if(!_lblPrevHighlighted.has(mid) && mid !== selectedId){
       const m = meshMap.get(mid);
-      if(m){
+      if(m && m.material && ('emissive' in m.material)){
         m.material.emissive = new THREE.Color(0x3d3670);
         m.material.emissiveIntensity = 0.16;
       }
@@ -18288,7 +18297,7 @@ function lblRefreshMultiSelectHighlight(){
   groupMemberIds.forEach(mid => {
     if(!lblMultiSelectIds.has(mid) && !_lblPrevGroupMembers.has(mid) && mid !== selectedId){
       const m = meshMap.get(mid);
-      if(m){
+      if(m && m.material && ('emissive' in m.material)){
         m.material.emissive = new THREE.Color(0x6c63ff);
         m.material.emissiveIntensity = 0.22;
       }
@@ -18336,6 +18345,7 @@ selectObj = function(id){
     controls.autoRotate = false;
     const memberIds = new Set(lblGroupLeafPartIds(id));
     meshMap.forEach((m,mid)=>{
+      if(!m.material || !('emissive' in m.material)) return; // MeshBasicMaterial etc. have no emissive uniform
       const on = memberIds.has(mid);
       m.material.emissive = new THREE.Color(on?0x6c63ff:0x000000);
       m.material.emissiveIntensity = on?0.22:0;
@@ -18362,7 +18372,7 @@ selectObj = function(id){
     // Clear blueprint-part highlights, then highlight this sub-mesh only.
     meshMap.forEach((m,mid)=>{
       if(lblTsMeshIds.includes(mid) || lblExtMeshIds.includes(mid)) return; // handled below
-      if(!m.material) return;
+      if(!m.material || !('emissive' in m.material)) return; // MeshBasicMaterial etc. have no emissive uniform
       m.material.emissive = new THREE.Color(0x000000);
       m.material.emissiveIntensity = 0;
     });
@@ -18565,6 +18575,7 @@ function lblRefreshGroupPickHighlight(){
     row.classList.toggle('lbl-grouppick', lblGroupPickIds.has(row.dataset.id));
   });
   meshMap.forEach((m,mid)=>{
+    if(!m.material || !('emissive' in m.material)) return; // MeshBasicMaterial etc. have no emissive uniform
     if(lblGroupPickIds.has(mid)){
       m.material.emissive = new THREE.Color(0xffb020);
       m.material.emissiveIntensity = 0.25;
