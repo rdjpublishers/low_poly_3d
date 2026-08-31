@@ -12,13 +12,15 @@ CHANGELOG
     discipline, per-joint DOF minimization, a documented pattern for
     authoring named AnimationClips (idle/walk/run/jump/etc.) wired
     into the existing PART 5.6 mixer contract and PART 6.1B actions
-    map, AND new PART 30.5 GLB export-safety guidance (quaternion-
-    track authoring, root-descendant discipline, helper-node export
-    exclusion) — verified against the renderer's actual GLTFExporter
-    integration, which does exist and was previously mis-scoped out
-    of this spec. PART 12 checklist gains a rigging/animation/export
-    addendum (PART 30.6), including a reminder that mirrored limbs
-    count toward PART 1's ~30k triangle budget.
+    map, new PART 30.5 GLB export-safety guidance (quaternion-track
+    authoring, root-descendant discipline, helper-node export
+    exclusion — verified against the renderer's actual GLTFExporter
+    integration), and an explicit PART 30.0/30.6 reminder that all
+    rigging code must be assembled inside a real `export function
+    createXxxModel(...)` (PART 1.2) rather than left as unwrapped
+    standalone helpers — the exact failure mode behind a "No
+    create*Model() export found" loader rejection. PART 12 checklist
+    gains a rigging/animation/export addendum (PART 30.6).
   v1.3 (2026-08-28) — Renderer-side additions to the TS path. New
     PARTs 27-29 (Constraints, Advanced Shader & VFX Techniques, Root-
     Level Runtime Aliases + AnimationMixer auto-tick). PART 5 extended
@@ -3475,6 +3477,21 @@ those two contracts cleanly.
 --------------------------------------------------------------------------
 30.0 — WHAT DOES / DOES NOT APPLY HERE
 --------------------------------------------------------------------------
+REMINDER (the single most common failure mode this PART risks causing):
+everything below — the pivot hierarchy, the clip-building functions,
+all of it — MUST be assembled and returned from inside your file's
+`export function createXxxModel(options?): THREE.Group` (PART 1.2).
+Rigging helper functions on their own (a standalone `buildSkeleton()`,
+a standalone `buildWalkClip()`) are fine as internal helpers CALLED BY
+that factory — but if the factory export itself is missing, renamed,
+or doesn't match `/^create\w+Model$/`, the renderer's loader rejects
+the file outright with "No create*Model() export found", regardless of
+how correct the rigging inside it is. If you're translating rigging
+code from an external, non-createXxxModel-shaped source (a standalone
+skeleton-builder script, an export-pipeline file), the FIRST thing to
+fix is wrapping the actual model construction in a real
+`createXxxModel` factory — not a later step.
+
 This renderer loads a native Three.js factory module directly in the
 browser (PART 1) — that's the primary contract, and it does NOT need a
 separate Blender/Unity/Unreal/Godot IMPORT step; those workflows are
@@ -3640,6 +3657,11 @@ safety net when authoring is just as easy:
 --------------------------------------------------------------------------
 30.6 — VALIDATION ADDITIONS (append to PART 12's checklist)
 --------------------------------------------------------------------------
+  [ ] All rigging/pivot/clip code is assembled and returned from
+      inside a real `export function createXxxModel(...)` (PART 1.2)
+      — not left as standalone helpers with no createXxxModel wrapper
+      calling them (PART 30.0). This is checked FIRST because it's a
+      hard load-time rejection, not a quality issue.
   [ ] Every joint pivot's origin is the rotation point, not a mesh
       bounding-box center
   [ ] Rest pose (all joints at zero) has a correct, complete silhouette
