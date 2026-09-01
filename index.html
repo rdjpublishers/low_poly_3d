@@ -8999,15 +8999,48 @@ function deduplicateInstanceableMeshes(){
     inst.castShadow=first.castShadow; inst.receiveShadow=first.receiveShadow;
     inst.name=first.name+'_dedup_inst';
     inst.userData.__helper=true;
+    // LBL FIX (v8.2) — tag the InstancedMesh and every mesh it replaced so
+    // a last-resort export (see restoreDedupInstancesForExport(), used
+    // only when exportRoot falls all the way back to the live sceneGroup)
+    // can identify and reverse this viewport-only optimization: without
+    // it, GLTFExporter's default onlyVisible:true would silently drop
+    // every one of these `mesh.visible=false` originals AND the
+    // InstancedMesh carries __helper=true (also excluded), so that
+    // fallback path would export the whole dedup'd group as nothing at
+    // all rather than as genuinely separate parts.
+    inst.userData.__dedupInstance=true;
     const m=new THREE.Matrix4();
     meshes.forEach((mesh,i)=>{
       m.compose(mesh.position, mesh.quaternion, mesh.scale); // local transform — mesh.parent===sceneGroup was already verified above
       inst.setMatrixAt(i,m);
       mesh.visible=false; // same convention buildInstancedArray uses — stays in meshMap/graph for selection, just not rendered twice
+      mesh.userData.__dedupHidden=true;
     });
     inst.instanceMatrix.needsUpdate=true;
     sceneGroup.add(inst);
   });
+}
+
+// LBL FIX (v8.2) — companion to deduplicateInstanceableMeshes()'s new
+// __dedupHidden/__dedupInstance tags. Only relevant to the last-resort
+// `exportRoot=sceneGroup` fallback in exportGLB() (both
+// buildSkinnedHierarchyForExport() and buildPlainHierarchyForExport()
+// rebuild fresh trees straight from meshMap and never see the
+// InstancedMesh substitution at all, so this normally never has
+// anything to do) — but if that fallback IS reached, restores every
+// dedup-hidden original to visible and removes the InstancedMesh
+// stand-in so PART 63's "genuinely separate mesh per part" requirement
+// holds even in that degraded path, instead of the whole dedup'd group
+// silently exporting as nothing.
+function restoreDedupInstancesForExport(root){
+  const restored=[];
+  root.traverse(node=>{
+    if(node.userData && node.userData.__dedupHidden){ node.visible=true; restored.push(node); }
+  });
+  const insts=[];
+  root.traverse(node=>{ if(node.isInstancedMesh && node.userData && node.userData.__dedupInstance) insts.push(node); });
+  insts.forEach(inst=>{ if(inst.parent) inst.parent.remove(inst); });
+  return restored;
 }
 
 // v7.8 (PART 54) — Technique: DECALS. Top-level blueprint field
@@ -14019,6 +14052,12 @@ function buildPlainHierarchyForExport(){
     mesh.updateMatrixWorld(true);
     const clone=new THREE.Mesh(mesh.geometry, mesh.material);
     clone.name=mesh.name;
+    // LBL FIX (v8.2): same missing-userData bug as the skinned path just
+    // above (buildSkinnedHierarchyForExport) — this fallback clone never
+    // inherited mesh.userData either, so isPickable/partName (PART 63)
+    // and everything else would vanish here too if this path is ever
+    // reached. See that fix's comment for why a plain spread is enough.
+    clone.userData = mesh.userData ? {...mesh.userData} : {};
     clone.position.copy(mesh.position);
     clone.quaternion.copy(mesh.quaternion);
     clone.scale.copy(mesh.scale);
@@ -14273,6 +14312,19 @@ function buildSkinnedHierarchyForExport(){
 
     const skinned=new THREE.SkinnedMesh(geo, srcMesh.material);
     skinned.name=srcMesh.name;
+    // LBL FIX (v8.2): Object3D.userData defaults to {} on every new mesh —
+    // nothing here was ever copying srcMesh.userData (== the blueprint
+    // object itself, via buildScene()'s `mesh.userData=obj`) onto this
+    // freshly-constructed SkinnedMesh. That silently dropped every custom
+    // field the blueprint author set — including PART 63's isPickable/
+    // partName — from every export produced via this (primary, non-TS)
+    // path, even though the source mesh in the live scene had them all
+    // along. GLTFExporter's serializeUserData() only reads what's present
+    // on THIS object at export time, so it never saw them. Plain object
+    // spread is enough (no need for a deep clone or the TS path's cycle-
+    // breaking sanitiser): srcMesh.userData here is the blueprint's own
+    // JSON-shaped object literal, not a live THREE class instance graph.
+    skinned.userData = srcMesh.userData ? {...srcMesh.userData} : {};
     // bind() is called with every bone already in its final bind-pose
     // matrixWorld, so THREE.Skeleton's auto-computed inverse-bind matrices
     // exactly cancel out at this pose regardless of skinIndex/skinWeight —
@@ -14894,6 +14946,106 @@ function promoteGroupsToBones(root){
   return { bones: promotedBones, skin: null };
 }
 
+/* ───────────────────────────────────────────────────────────────────────
+ * LBL FIX (v8.3) — real skinning for the TS export path
+ *
+ * promoteGroupsToBones() above deliberately stops short of creating any
+ * SkinnedMesh (see its comment) because a PRIOR attempt — _wrapMeshAsSkinned()
+ * just below, still present but no longer called anywhere — bound every
+ * vertex of the model's single largest mesh to its geometrically NEAREST
+ * bone. That's a fundamentally different (and much riskier) technique
+ * from what actually already ships safely on the JSON/JS blueprint export
+ * path (buildSkinnedHierarchyForExport(), above): nearest-vertex binding
+ * can easily assign neighboring vertices to different bones with no
+ * regard for which part they actually belong to, and any small error in
+ * that assignment or in bindMatrix timing visibly deforms the model the
+ * moment a viewer applies skinning — exactly the "collapses / stretches"
+ * regression that got it reverted.
+ *
+ * This function instead reuses the JSON/JS path's proven-safe recipe,
+ * generalized to walk an arbitrary already-built tree instead of
+ * meshMap/attachTo chains: every mesh is bound RIGIDLY (weight 1.0) to
+ * its OWN single nearest-ANCESTOR bone — never split across multiple
+ * bones — with its geometry pre-baked into export-root-relative space
+ * and the resulting SkinnedMesh added flat as a sibling of the bone
+ * tree, exactly like buildSkinnedHierarchyForExport() does. Whole-mesh-
+ * to-one-bone rigid binding is mathematically identical to ordinary
+ * scene-graph parenting at bind pose — it only changes the node's type
+ * (Mesh -> SkinnedMesh) and where its vertices are expressed, never
+ * their resulting world position — so it carries none of the earlier
+ * technique's deformation risk.
+ *
+ * Call this AFTER promoteGroupsToBones() so every relevant Bone already
+ * exists; pass its returned `bones` array straight through.
+ * ─────────────────────────────────────────────────────────────────────── */
+function bindMeshesToPromotedBones(root, bones){
+  if(!root || !bones || !bones.length) return null;
+  root.updateMatrixWorld(true);
+  // No boneInverses argument — THREE.Skeleton computes them itself from
+  // each bone's CURRENT matrixWorld, which is why the updateMatrixWorld
+  // above must happen immediately before this line, with nothing in
+  // between that could move a bone.
+  const skeleton = new THREE.Skeleton(bones);
+  const rootInv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+
+  // Snapshot every skinnable mesh + its nearest ancestor Bone BEFORE
+  // mutating the tree — splicing children while traversing is unsafe.
+  const jobs = [];
+  root.traverse(node=>{
+    if(!node.isMesh || node.isSkinnedMesh) return;
+    if(node.userData && (node.userData.__helper || node.userData.__noExport)) return;
+    let cursor=node.parent, bone=null;
+    while(cursor){ if(cursor.isBone){ bone=cursor; break; } cursor=cursor.parent; }
+    if(!bone) return; // not under any bone — leave as a plain Mesh, unskinned; no crash, just no rig-test pick for this one part
+    jobs.push({ mesh: node, bone });
+  });
+
+  jobs.forEach(({mesh,bone})=>{
+    mesh.updateMatrixWorld(true);
+    const localWorld=new THREE.Matrix4().multiplyMatrices(rootInv, mesh.matrixWorld);
+    // Clone (never mutate in place) — geometry may be shared by several
+    // sibling meshes in these hand-authored factories (e.g. Model_1's
+    // five wheel spokes all share one BufferGeometry instance), and this
+    // whole pass only ever runs on exportGLB()'s CLONED exportRoot, never
+    // on the live scene, so mutating a shared geometry here would corrupt
+    // every other mesh referencing it back in the actual viewport too.
+    const geo=mesh.geometry.clone();
+    geo.applyMatrix4(localWorld);
+
+    const vCount=geo.attributes.position.count;
+    const skinIndex=new Uint16Array(vCount*4);
+    const skinWeight=new Float32Array(vCount*4);
+    const boneIndex=bones.indexOf(bone);
+    for(let i=0;i<vCount;i++){ skinIndex[i*4]=boneIndex; skinWeight[i*4]=1; }
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndex,4));
+    geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeight,4));
+
+    const skinned=new THREE.SkinnedMesh(geo, mesh.material);
+    skinned.name=mesh.name;
+    skinned.castShadow=mesh.castShadow;
+    skinned.receiveShadow=mesh.receiveShadow;
+    skinned.frustumCulled=mesh.frustumCulled;
+    // PART 63/30.7 tags (and anything else the source mesh carried)
+    // ride straight through, same reasoning as the buildSkinnedHierarchy
+    // ForExport / buildPlainHierarchyForExport userData fixes above.
+    skinned.userData = mesh.userData ? {...mesh.userData} : {};
+
+    root.add(skinned); // flat, sibling of the bone tree — same placement buildSkinnedHierarchyForExport() uses
+    // Explicit bindMatrix (root.matrixWorld, captured once above) instead
+    // of letting bind() read skinned.matrixWorld itself: a freshly-
+    // constructed node's matrixWorld is the THREE.Matrix4 default
+    // (identity) until an explicit updateMatrixWorld() call recomputes
+    // it, and skipping that here would silently bind at the wrong pose
+    // whenever root.matrixWorld isn't itself identity (e.g. a model
+    // root that isn't perfectly centered at the origin).
+    skinned.bind(skeleton, root.matrixWorld);
+
+    if(mesh.parent) mesh.parent.remove(mesh);
+  });
+
+  return skeleton;
+}
+
 function _wrapMeshAsSkinned(mesh, bones){
   if(!mesh || !mesh.geometry) return null;
   const geom = mesh.geometry;
@@ -15088,15 +15240,36 @@ function exportGLB(){
     // any tree: if the model already uses THREE.Bone (e.g. Model_1)
     // the promotion pass is a no-op because the helper skips nodes
     // that are already SkinnedMesh / Mesh.
-    try{ promoteGroupsToBones(exportRoot); }
-    catch(e){ console.warn('[export] bone promotion failed, continuing with raw tree:', e); }
+    try{
+      const { bones } = promoteGroupsToBones(exportRoot);
+      // LBL FIX (v8.3) — bones alone still leave the GLB with no `skins`
+      // section, which is exactly what the external rig-test viewer's
+      // log ("No SkinnedMesh or bones found... Using 1 mesh/group
+      // part(s)... low-poly mode") is gated on — see
+      // bindMeshesToPromotedBones()'s own comment for why this specific
+      // technique (whole-mesh-to-one-bone, not per-vertex-nearest-bone)
+      // is safe where a prior attempt wasn't.
+      if(bones && bones.length) bindMeshesToPromotedBones(exportRoot, bones);
+    }
+    catch(e){ console.warn('[export] bone promotion / skinning failed, continuing with raw tree:', e); }
   } else {
     try{
       exportRoot=buildSkinnedHierarchyForExport();
     }catch(e){
       console.warn('skinned rig export failed, falling back to plain hierarchy:',e);
       try{ exportRoot=buildPlainHierarchyForExport(); }
-      catch(e2){ console.warn('hierarchy export failed, exporting flat instead:',e2); exportRoot=sceneGroup; }
+      catch(e2){
+        console.warn('hierarchy export failed, exporting flat instead:',e2);
+        exportRoot=sceneGroup;
+        // LBL FIX (v8.2) — this is the ONE path that exports sceneGroup's
+        // live tree directly, so it's the only place deduplicateInstanceable
+        // Meshes()'s InstancedMesh substitution (see that function) can
+        // actually reach GLTFExporter. Reverse it here so this degraded
+        // path still exports genuinely separate parts (PART 63) instead of
+        // silently dropping every deduped original.
+        try{ restoreDedupInstancesForExport(exportRoot); }
+        catch(e3){ console.warn('dedup restore for export failed, continuing:',e3); }
+      }
     }
   }
   // ── Animation pass-through ─────────────────────────────────────────
