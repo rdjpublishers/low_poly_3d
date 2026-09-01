@@ -14710,28 +14710,70 @@ function safeCloneObject3D(src){
   c.frustumCulled = src.frustumCulled;
   c.renderOrder = src.renderOrder;
   c.animations = Array.isArray(src.animations) ? src.animations.slice() : [];
-  // Per-child clones — these DO recurse into their own subtrees, and
-  // each sub-clone's copy() handles its own geometry / material /
-  // skeleton correctly.  Children whose userData is circular are rare
-  // (only the root stores the mixer in this codebase), so this is
-  // safe in practice; if a child ever does throw, fall back to a
-  // bare Object3D so the export doesn't lose the rest of the tree.
+  // Copy geometry/material for renderable node types. The generic `new
+  // Ctor()` above doesn't populate these (Mesh/SkinnedMesh/Bone/Line/
+  // Points constructors need explicit args), so do the same shallow,
+  // reference-sharing assignment Three.js's own Mesh.copy() does —
+  // geometry/material are never circular, so this is always safe.
+  if(src.isMesh || src.isSkinnedMesh || src.isLine || src.isPoints){
+    if(src.geometry) c.geometry = src.geometry;
+    if(src.material) c.material = Array.isArray(src.material) ? src.material.slice() : src.material;
+  }
+  // LBL FIX — Per-child clones now RECURSE into safeCloneObject3D()
+  // itself instead of calling the built-in `child.clone()`.
+  //
+  // The old code below looked reasonable but was the actual cause of
+  // the "model loaded, nothing visible" GLB export bug for Model_1 /
+  // Model_3 / Model_4:
+  //
+  //   c.add(child.clone());               // built-in Object3D.clone(true)
+  //
+  // Three.js's built-in `Object3D.copy()` does
+  //   this.userData = JSON.parse(JSON.stringify(source.userData));
+  // for EVERY node in the subtree, not just the root — and it does
+  // this BEFORE recursing into children. Model_1/3/4 store their
+  // THREE.AnimationMixer at `<modelRoot>.userData.sculptRuntime...
+  // .mixer` (or `.animations.mixer`), and `mixer._root` points right
+  // back at `<modelRoot>` — a genuine circular reference. The comment
+  // above claimed "only the root stores the mixer in this codebase",
+  // but `<modelRoot>` here is the model's OWN group (Node_Chassis's
+  // parent for Model_1, Node_BaseChassis's parent for Model_3, etc.) —
+  // which is a CHILD of the wrapper `safeCloneObject3D()` was called
+  // on (`addTsModelToScene()` wraps every TS model in a
+  // `__lblGizmoAnchor` centering group). So `child.clone()` — called
+  // on that model-root child — throws
+  // "Converting circular structure to JSON" *before* it ever visits a
+  // single mesh, the catch block below fires, and the ENTIRE model
+  // subtree (every mesh) is silently replaced with one empty, geometry-
+  // less `THREE.Object3D` stub. The exported .glb still has a
+  // correctly-named root node (so viewers report "model loaded") but
+  // contains zero geometry — hence "nothing visible in glTF viewer /
+  // Blender". Model_2 has no mixer in its userData, so `child.clone()`
+  // never throws for it, which is why it was the only one that worked.
+  //
+  // The fix: never call the built-in (unsanitized) clone on ANY node.
+  // Recurse into our OWN safeCloneObject3D(), which runs every node's
+  // userData through `_sanitiseUserDataForExport()` (which already
+  // correctly strips AnimationMixer/Bone/Skeleton/etc. back-references
+  // at any depth) instead of raw JSON.stringify. This preserves the
+  // full mesh hierarchy regardless of which node in the tree happens
+  // to hold the circular reference.
   for(let i = 0; i < src.children.length; i++){
     const child = src.children[i];
     try{
-      c.add(child.clone());
+      c.add(safeCloneObject3D(child));
     }catch(_){
       // Last-ditch fallback: keep the slot so the rest of the model
-      // still exports, even if this one node's userData is circular.
+      // still exports, even if this one node is somehow still
+      // unclonable for an unrelated reason.
       const stub = new THREE.Object3D();
       stub.name = child.name;
       c.add(stub);
     }
   }
-  // userData LAST — this is the only step the built-in clone() can't
-  // do safely, and by now the whole tree is already attached so a
-  // throw here would just leave us with a clone that has the right
-  // shape but no userData (which is fine for the exporter).
+  // userData LAST — matches the original ordering; by now the whole
+  // tree is already attached so a throw here just leaves a clone with
+  // the right shape but empty userData (fine for the exporter).
   try{
     c.userData = _sanitiseUserDataForExport(src.userData);
   }catch(_){
@@ -14945,6 +14987,23 @@ function safeCollectSourceClips(root){
 
 function exportGLB(){
   if(!sceneObjects.length && !CURRENT_TS_MODEL){toast('No scene to export','err');return;}
+  // BUG-2 FIX — the entire setup phase below (clip capture, cloning,
+  // bone promotion, clip collection) previously ran with NO top-level
+  // error handling. GLTFExporter's own async errors were caught fine
+  // (the `err=>{...}` callback passed to exp.parse() below), but any
+  // *synchronous* throw during setup — e.g. a circular-userData clone
+  // failure that slipped past a narrower try/catch, or the now-removed
+  // duplicate buildSkinnedHierarchyForExport() call — propagated
+  // straight out of exportGLB() uncaught. No toast fired, no cleanup
+  // ran, exp.parse() was never reached, and the click silently did
+  // nothing. Depending on what mutable state the failed setup left
+  // half-updated, a second export attempt could fail the same way —
+  // matching the "works once, then I have to refresh the page"
+  // report. Wrapping the setup in try/catch guarantees the user always
+  // gets a toast (so a real failure is visible and reportable) and
+  // that exportGLB() always returns cleanly instead of leaving
+  // anything in a stuck, refresh-required state.
+  try{
   const exp=new GLTFExporter();
   let exportRoot=sceneGroup;
   // ── LBL FIX — capture the live model's clips BEFORE we try to clone
@@ -15070,13 +15129,32 @@ function exportGLB(){
   // the cloned exportRoot (when it was a clone made for TS models).
   // Without this, every TS model export left a deep-clone hierarchy in
   // memory (the parse() callback doesn't free it).
-  const isClonedRoot = (exportRoot !== sceneGroup) &&
-                       !buildSkinnedHierarchyForExport && false; // buildSkinned returns sceneGroup or a new Group
-  // buildSkinnedHierarchyForExport returns a fresh Group; we own that
-  // object and need to dispose it after the parse callback finishes.
-  const ownsExportRoot = (exportRoot !== sceneGroup) && (exportRoot !== buildSkinnedHierarchyForExport());
-  // Simpler: always track a list of geometries we own; dispose in finally.
-  // For the cloned TS path, the clone is a full tree — walk it on cleanup.
+  //
+  // BUG-2 FIX — this used to also compute an `ownsExportRoot` flag via
+  //   const ownsExportRoot = (exportRoot !== sceneGroup) &&
+  //                          (exportRoot !== buildSkinnedHierarchyForExport());
+  // Note the CALL: `buildSkinnedHierarchyForExport()` was invoked a
+  // SECOND time here, unconditionally, on every export — even for TS
+  // models — purely to compare its return value against `exportRoot`.
+  // The result (`ownsExportRoot`) was never read anywhere else in this
+  // function (the real disposal logic below re-derives its own
+  // `liveGeos`/`toDispose` from scratch); it was dead code. But the
+  // call itself was NOT dead — it re-walked `meshMap`, rebuilt an
+  // entire duplicate Bone hierarchy, and called `srcMesh.geometry
+  // .clone()` for every mesh a second time, with no try/catch around
+  // it and no reference kept to dispose the result. Two problems
+  // followed: (1) every export leaked a full duplicate set of cloned
+  // geometries (never disposed, since nothing pointed at them), and
+  // (2) because this line has no try/catch, ANY throw inside that
+  // extra rebuild (or in the clone/promote calls above it) propagates
+  // straight out of exportGLB() uncaught — skipping `exp.parse()`
+  // entirely, skipping the error toast, and leaving `exp`/`exportRoot`
+  // half-built with no cleanup. The user sees nothing happen on that
+  // click, and because no toast/cleanup ran, the app can be left in a
+  // state where a *subsequent* export attempt fails too — the
+  // "must refresh the page to export again" symptom. Removed: it was
+  // unused, expensive, and unsafe. See the try/catch now wrapping the
+  // whole export below for the actual fix to that symptom.
   exp.parse(exportRoot,(glb)=>{
     try{
       // LBL FIX — Three.js's GLTFExporter can leave dangling empty
@@ -15123,6 +15201,15 @@ function exportGLB(){
       toDispose.forEach(g => { if(g && g.dispose) g.dispose(); });
     }
   },{binary:true, animations: clipsForExport});
+  }catch(e){
+    // BUG-2 FIX — surface any synchronous setup failure the same way
+    // exp.parse()'s own error callback does, instead of letting it
+    // silently abort the function. See the comment at the top of
+    // exportGLB() for why an uncaught throw here was the likely cause
+    // of "export works once, then needs a page refresh".
+    console.error('[exportGLB] setup failed:', e);
+    toast('Export failed: '+(e && e.message ? e.message : e),'err');
+  }
 }
 
 /* ───────────────────────────────────────────────────────────────────────

@@ -1,8 +1,30 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.4 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.5 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.5 (2026-09-01) — CORRECTNESS FIX to PART 30.5, reproduced
+    unchanged from Prompt_To_Ts.txt v1.5: the v1.4 claim that the
+    renderer's export clone "strips circular userData references
+    before serialization" was inaccurate for any node OTHER than the
+    root of the tree being cloned. In practice this meant the exact
+    shape PART 5.6(a) tells you to publish — `sculptRuntime.animations
+    .mixer` on the model's own root Group — reliably broke GLB export:
+    `mixer._root` points back at that same Group, which is a CHILD of
+    the renderer's centering wrapper, not the clone root; the old
+    clone code sanitized userData only at the wrapper and used the
+    raw, unsanitized `Object3D.clone()` for every descendant, which
+    threw on that circular reference and got silently replaced with
+    an empty placeholder node. Net effect: the .glb still "loaded" (a
+    correctly named root node) but showed no geometry in any viewer —
+    affecting any model built to the PART 5.6(a) mixer contract. This
+    was a renderer-side bug, now fixed (the export clone sanitizes
+    userData at every node, not just the root). No authoring guidance
+    changes as a result — PART 5.6 and PART 30.5's mixer/quaternion
+    advice were correct all along; only the "already sanitizes /
+    stripped before serialization" claim in PART 30.5 has been
+    corrected below to describe the fixed behavior accurately instead
+    of overclaiming what the (buggy) renderer actually did.
   v1.4 (2026-08-31) — New PART 30 (Rigging & Animation Authoring
     Standard), reproduced unchanged from Prompt_To_Ts.txt v1.4:
     formalizes pivot-hierarchy armatures (nested THREE.Group joints,
@@ -3630,10 +3652,13 @@ from the Action Hooks panel:
 30.5 — GLB EXPORT SAFETY (the renderer's export button is real — plan for it)
 --------------------------------------------------------------------------
 The renderer can export your built model via `THREE.GLTFExporter`. It
-already sanitizes some common mistakes for you (Euler rotation
-sub-tracks are auto-converted to quaternion tracks; circular userData
-references are stripped before serialization) — but don't rely on the
-safety net when authoring is just as easy:
+sanitizes some common mistakes for you (Euler rotation sub-tracks are
+auto-converted to quaternion tracks; circular userData references —
+including the `AnimationMixer` PART 5.6(a) tells you to publish under
+`sculptRuntime.animations.mixer`, whose `_root` points back into the
+model — are sanitized at EVERY node of the cloned export tree, not
+just the root) — but don't rely on the safety net when authoring is
+just as easy:
 
   - Author joint rotation with `node.quaternion` / QuaternionKeyframeTrack
     directly (PART 30.4 already tells you this) rather than animating
