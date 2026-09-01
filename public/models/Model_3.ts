@@ -1393,6 +1393,19 @@ export function createSpiderSentryMechModel(options: SpiderSentryOptions = {}): 
   root.userData.runtime = runtime;
   root.userData.tick = (dt?: number) => runtime.tick(dt ?? 0.016);
 
+  // LBL PART 30.7 — tag every part mesh for external rig-test/GLB-viewer
+  // pickability. Inert to this renderer (nothing here reads these two
+  // fields); external glTF-based rig-test tools read node.extras
+  // (GLTFExporter serializes userData -> extras) to enumerate
+  // separately-pickable parts instead of falling back to a single
+  // whole-model "low-poly mode" target.
+  root.traverse((node) => {
+    if (node instanceof THREE.Mesh) {
+      node.userData.isPickable = true;
+      node.userData.partName = node.name || `part_${node.id}`;
+    }
+  });
+
   return root;
 }
 

@@ -796,6 +796,19 @@ export function createSupercarModel(options: SupercarOptions = {}): SupercarInst
   carRoot.setBodyColor = setBodyColor;
   carRoot.dispose = dispose;
 
+  // LBL PART 30.7 — tag every part mesh for external rig-test/GLB-viewer
+  // pickability. Inert to this renderer (nothing here reads these two
+  // fields); external glTF-based rig-test tools read node.extras
+  // (GLTFExporter serializes userData -> extras) to enumerate
+  // separately-pickable parts instead of falling back to a single
+  // whole-model "low-poly mode" target.
+  carRoot.traverse((node) => {
+    if ((node as THREE.Mesh).isMesh) {
+      node.userData.isPickable = true;
+      node.userData.partName = node.name || `part_${node.id}`;
+    }
+  });
+
   return carRoot;
 }
 
