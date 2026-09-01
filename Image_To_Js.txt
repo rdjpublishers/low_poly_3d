@@ -8090,6 +8090,17 @@ needs named nodes to exist, not multiple meshes, so a single-mesh export
 can look completely broken in a rig-test viewer while looking completely
 fine in this renderer and in plain clip playback. This PART is the fix.
 
+NOTE (v8.3, informational — no change needed in this path): a companion
+investigation on the TS authoring path (Prompt_To_Ts.txt / Image_To_Ts.txt
+PART 30.7) found that path's external-viewer "1 part" fallback was
+actually gated on a MISSING glTF `skins` section, not on mesh count.
+That does not apply here — this blueprint path's export
+(buildSkinnedHierarchyForExport in the renderer) has always
+auto-generated a real skinned rig for every model, unconditionally, so
+the skeleton itself was never the blocker for JSON/JS-authored models.
+The multi-part-mesh + isPickable/partName rules in this PART are the
+complete fix for this authoring path.
+
 --------------------------------------------------------------------------
 63.1 — RULE: KEEP BODY PARTS AS SEPARATE TOP-LEVEL MESH ENTRIES
 --------------------------------------------------------------------------

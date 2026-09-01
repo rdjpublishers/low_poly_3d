@@ -1,8 +1,31 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.6 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.7 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.7 (2026-09-01) — CORRECTION to v1.6's diagnosis, plus the real fix,
+    reproduced unchanged from Prompt_To_Ts.txt v1.7. v1.6 (below) fixed
+    a genuine problem (whole-model single-mesh fusion) but a second
+    field-test round against the same external viewer showed its OWN
+    log message was more specific than assumed: "No SkinnedMesh or
+    bones found... No skeleton found. Using 1 mesh/group part(s)...
+    (low-poly mode)" — that fallback is gated purely on whether the
+    .glb has a real glTF `skins` section, not on mesh count or
+    userData/extras, so v1.6's isPickable/partName fix alone could
+    never satisfy it. Root cause: this renderer's Bone promotion (PART
+    30.2) stopped at creating named THREE.Bone nodes with no skin — and
+    a bare Bone has no special marker in glTF at all (there's no
+    distinct "bone" node type; a node is only ever a joint by being
+    referenced in some skins[].joints array), so it exported as an
+    ordinary, undetectable node. Fixed (renderer-side, v8.3): every
+    mesh under a promoted Bone is now also auto-bound, rigidly and
+    one-mesh-to-one-bone, into a real skin — the same technique already
+    proven safe on this system's JSON/JS blueprint export path,
+    generalized here. No authoring change needed beyond confirming PART
+    30.2's existing pivot-`.name` requirement is followed (now stated
+    explicitly, with `.name=` added to that PART's code example). PART
+    30.7 rewritten to describe the real mechanism; PART 30.6 gains one
+    more checklist item.
   v1.6 (2026-09-01) — MULTI-PART MESH EXPORT FIX, reproduced unchanged
     from Prompt_To_Ts.txt v1.6 (source: an external GLB viewer's
     rig-test-mode field report showing "1 mesh/group part(s)" for
@@ -3582,15 +3605,27 @@ prop or static-pose model with no moving parts, where there's nothing
 to propagate. The moment a part needs to rotate relative to a parent
 part at runtime, it needs to be an actual child Group of that parent.
 
-There is no THREE.Skeleton/THREE.Bone requirement — a plain nested
-THREE.Group hierarchy IS the armature. Each joint is a THREE.Group
-whose ORIGIN is the actual rotation point (not the mesh's bounding-box
-center), with the child mesh/sub-hierarchy offset inside it. Rotate the
-group; never rotate a mesh directly if it has children that must follow.
+There is no THREE.Skeleton/THREE.Bone requirement in YOUR code — a plain
+nested THREE.Group hierarchy IS the armature you author. As of v8.3 the
+renderer itself auto-promotes every NAMED transform-only Group into a
+real THREE.Bone and auto-binds every mesh beneath it into a real,
+single-bone-per-part skin at GLB-export time (see PART 30.7) — you never
+write Skeleton/Bone/skin-weight code yourself, and the exported .glb
+still ends up with a genuine `skins` section either way. The ONE thing
+this promotion depends on: every pivot Group MUST have a non-empty,
+unique `.name` (not just a JS variable name) — an unnamed Group is
+invisible to the promotion pass and stays a plain, un-skinned Group in
+the export. Each joint is a THREE.Group whose ORIGIN is the actual
+rotation point (not the mesh's bounding-box center), with the child
+mesh/sub-hierarchy offset inside it. Rotate the group; never rotate a
+mesh directly if it has children that must follow.
 
-  const hipL   = new THREE.Group(); hipL.position.set(-0.20, 0.55, 0);
-  const thighL = new THREE.Group(); thighL.position.set(0, 0, 0);   // hinge at hip
-  const kneeL  = new THREE.Group(); kneeL.position.set(0, -0.28, -0.03); // offset FROM thigh pivot
+  const hipL   = new THREE.Group(); hipL.name = 'hipL';
+  hipL.position.set(-0.20, 0.55, 0);
+  const thighL = new THREE.Group(); thighL.name = 'thighL';
+  thighL.position.set(0, 0, 0);   // hinge at hip
+  const kneeL  = new THREE.Group(); kneeL.name = 'kneeL';
+  kneeL.position.set(0, -0.28, -0.03); // offset FROM thigh pivot
   const shinL  = buildLowPolyLeg(); shinL.position.set(0, 0, 0);    // hinge at knee
 
   hipL.add(thighL); thighL.add(kneeL); kneeL.add(shinL); root.add(hipL);
@@ -3746,22 +3781,52 @@ just as easy:
       still its own separate THREE.Mesh (PART 30.7).
   [ ] [v1.5] Every part-level Mesh has userData.isPickable = true and
       userData.partName set (PART 30.7).
+  [ ] [v1.6] Every pivot/joint Group has a non-empty, unique `.name`
+      (not just a JS variable name) — required for the renderer's
+      automatic Bone-promotion + skinning pass to find it at export
+      time (PART 30.2, PART 30.7).
 
 --------------------------------------------------------------------------
-30.7 — v1.5 ADDITION: MULTI-PART MESH EXPORT FOR EXTERNAL RIG-TEST VIEWERS
+30.7 — v1.6 UPDATE: REAL SKELETON EXPORT FOR EXTERNAL RIG-TEST VIEWERS
 --------------------------------------------------------------------------
-Source: field report against an external GLB viewer's rig-test mode. This
-renderer has no rig-test mode of its own — external viewers load the
-exported .glb independently and enumerate its mesh nodes to decide what's
-individually pickable/riggable. If the factory built the whole model as
-one fused mesh (PART 11.1's option 3 stretched across the entire body
-instead of one limb — see that PART's CAVEAT), that enumeration finds
-exactly ONE part no matter how much internal detail it has, and the
-external tool reports something like "Using 1 mesh/group part(s) as
-rig-test targets" even though the model's clips (PART 5/30.4) still play
-back fine — clip playback only needs named nodes to exist, not multiple
-meshes, so a single-mesh export can look completely broken in a rig-test
-viewer while looking completely fine in this renderer.
+Source: field reports against an external GLB viewer's rig-test mode,
+across two rounds. Round 1 showed "Using 1 mesh/group part(s) as
+rig-test targets (low-poly mode)" for every exported model. Round 2,
+after the model factories were confirmed to build genuinely separate
+per-part meshes (this renderer's export path had a since-fixed bug that
+was silently dropping userData in transit — nothing you do differently
+here), showed the REAL cause in the same viewer's own log: "No
+SkinnedMesh or bones found — this model has no true skeleton rig" /
+"No skeleton found. Using 1 mesh/group part(s)... (low-poly mode)".
+That fallback is gated purely on whether the .glb has a real glTF
+`skins` section — NOT on mesh count and NOT on extras/userData. A
+THREE.Bone with no skin binding has no special marker in glTF at all
+(glTF has no distinct "bone" node type — a node is only ever identified
+as a joint by appearing in some `skins[].joints` array), so it exports
+as an utterly ordinary node, indistinguishable from a plain Group. An
+earlier version of this renderer promoted named pivot Groups to
+THREE.Bone but stopped there, on the reasoning that "the GLB has a real
+node list with named bones an external tool can use even without a
+skins section" — that reasoning was untested and wrong; the field data
+above is what actually happens.
+
+FIXED (v8.3, renderer-side, no authoring change needed beyond PART
+30.2's `.name` requirement): the renderer now also auto-binds every
+mesh under a promoted Bone into a real, single-bone-per-part skin —
+each mesh rigidly bound 100% to its own one bone (the same technique
+already used for years on this system's JSON/JS blueprint export path,
+generalized here), never split across multiple bones per vertex. A
+whole-mesh-to-one-bone rigid bind is mathematically identical to plain
+scene-graph parenting at bind pose, so it changes nothing about how the
+model looks or animates — it only gives the export a real `skins`
+section. You do not write any of this yourself; it happens automatically
+at export time as long as PART 30.2's pivot-naming rule is followed.
+
+This is now the PRIMARY thing that satisfies an external rig-test
+viewer's skeleton check. The rules below remain necessary in addition
+to it — a real skin still needs genuinely separate per-part meshes to
+skin, and isPickable/partName remain valuable for any viewer/tool that
+reads extras instead of (or in addition to) skin data:
 
 RULE — every distinct body part (head, each pivot-driven limb segment
 per PART 30.2, each hand/foot, and any prop) must be its own separate
