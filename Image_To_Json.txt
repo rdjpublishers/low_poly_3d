@@ -61,7 +61,14 @@ which were re-checked against the same file while writing it, and PART
 3d_modeling_texturing_techniques.txt, a 35-technique reference list)
 cross-checked against the same file again on 2026-07-30 — it likewise
 introduces no new field or renderer behavior, only documentation of what
-the existing renderer already does or doesn't do against that list.
+the existing renderer already does or doesn't do against that list, and
+PART 63's v8.1 multi-part mesh export fix (source: an external GLB
+viewer's rig-test-mode field report showing "1 mesh/group part(s)" for
+whole-model sdf_blob/CSG-union exports) added 2026-08-31 — a
+decision-layer caveat on PART 61.2 plus a new PART 63 requiring separate
+exportable meshes per body part and isPickable/partName userData
+fields, no renderer-code change required since buildScene() already
+copies each object literal onto its mesh's userData verbatim.
 Anywhere a
 documented feature could not be found in the code at all, it is
 explicitly marked "ASPIRATIONAL / NOT IMPLEMENTED" rather than silently
@@ -1790,6 +1797,11 @@ PART 21 — VALIDATION CHECKLIST (run through silently before output)
       regardless of color (PART 50.4).
   [ ] [v7.7] The 11-item pre-output self-check (PART 51.1) has been run
       and every box is checked before JSON is emitted.
+  [ ] [v8.1] No single sdf_blob or CSG boolean-union chain spans the
+      ENTIRE model; the final object set has multiple separate mesh
+      entries, not one (PART 63.1).
+  [ ] [v8.1] Every visible part-level object carries "isPickable": true
+      and "partName" in its top-level literal (PART 63.2).
 
 
 ================================================================================
@@ -7394,6 +7406,21 @@ geometry. Pick per-reference, not reflexively:
               and a matte/smooth material (61.5 / PART 26.3) for a clean
               sculpted look without needing any merge technique at all.
 
+CAVEAT — RIG-TEST / EXTERNAL-VIEWER EXPORT (see PART 63): Q1's sdf_blob
+and Q2's CSG boolean union are both genuine single-mesh techniques by
+design — that's WHY they read as seamless. Applied to a FEW parts (one
+limb's balls, a car body's 4-5 panels) that's exactly the intended,
+correct use. Do NOT extend either technique to fuse the ENTIRE model —
+head, torso, all limbs — into one blob/union chain just because the
+model happens to be organic or hard-surface overall. A whole-model
+single mesh is invisible in THIS renderer (it still looks seamless) but
+means the exported .glb has exactly one mesh/group, which fails
+external rig-test viewers outright (PART 63) and defeats per-part
+picking. Scope Q1/Q2 to the smallest region that actually needs to read
+as fused — one limb, one panel cluster — and keep the rest (head vs.
+torso vs. other limbs vs. props) as genuinely separate top-level mesh
+entries per PART 63's multi-part requirement.
+
 If the render still shows visible facets after picking the right branch:
 bump "detail" to 3 (primitives) or "resolution" to 48 (sdf_blob) — see
 61.5 — before assuming the technique choice itself was wrong.
@@ -7925,3 +7952,95 @@ this renderer (same reasoning as 62.19). Generating a texture from a
 prompt/sample via GAN or diffusion model would need external inference
 infrastructure this single-file offline renderer doesn't have and isn't
 built to have.
+
+================================================================================
+PART 63 — v8.1 ADDITIONS: MULTI-PART MESH EXPORT FOR EXTERNAL RIG-TEST VIEWERS
+================================================================================
+Source: field report against an external GLB viewer's rig-test mode. This
+renderer has no rig-test mode of its own — external viewers (glTF
+inspectors, animation/rigging tools) load the exported .glb independently
+and enumerate its mesh nodes to decide what's individually pickable/
+riggable. If the whole model collapsed to one mesh/group during
+generation (whole-model sdf_blob, whole-model CSG boolean union — see the
+CAVEAT at the end of PART 61.2 — or any other full-body merge), that
+enumeration finds exactly ONE part regardless of how much internal detail
+the mesh actually has, and the external tool reports something like
+"Using 1 mesh/group part(s) as rig-test targets" even though animation
+clips (PART 18/19's tracks) still play back fine — clip playback only
+needs named nodes to exist, not multiple meshes, so a single-mesh export
+can look completely broken in a rig-test viewer while looking completely
+fine in this renderer and in plain clip playback. This PART is the fix.
+
+--------------------------------------------------------------------------
+63.1 — RULE: KEEP BODY PARTS AS SEPARATE TOP-LEVEL MESH ENTRIES
+--------------------------------------------------------------------------
+Every distinct body part or component (head, torso, each arm — whether
+authored as one "chain" per PART 40 or as separate upper/lower segments,
+each hand, each leg, each foot, and any prop) MUST remain its own object
+entry in the "objects" array, producing its own separate THREE.Mesh at
+render time. Never let PART 61's Q1 (sdf_blob) or Q2 (CSG boolean union)
+branch swallow the WHOLE model into one continuous result — those
+techniques stay scoped to the smallest region that genuinely needs to
+read as fused (PART 61.2's CAVEAT). A model is NOT required to hit any
+specific triangle-level fusion; it IS required to still contain multiple
+independent mesh entries after every operation/CSG/decimation pass runs.
+
+Target for a character-scale model: roughly 10-15 separate mesh nodes in
+the exported .glb — head, torso, upper-arm/forearm or whole-arm-chain ×2,
+hand ×2, upper-leg/lower-leg or whole-leg-chain ×2, foot ×2, plus any
+held props or accessories. A simple prop/vehicle/furniture model can
+legitimately have fewer — the requirement is "genuinely more than one",
+not a hard minimum that forces artificial part-splitting on a subject
+that doesn't call for it.
+
+--------------------------------------------------------------------------
+63.2 — RULE: MARK EVERY PART MESH FOR EXTERNAL PICKABILITY
+--------------------------------------------------------------------------
+The renderer already copies each object's full literal onto its mesh —
+`mesh.name = obj.id; mesh.userData = obj;` (buildScene()) — so any extra
+fields you add directly to an object's top-level literal ride along into
+`userData` automatically, with no renderer code change needed. Add these
+two fields to EVERY visible part-level object (skip pure CSG tool objects
+that carry no geometry of their own — same exception PART 21 already
+makes for "baseColor"):
+
+  {
+    "id": "head", "type": "sphere", ...,
+    "isPickable": true,
+    "partName": "head"
+  }
+
+`"partName"` should equal the object's own `"id"` (or a clearer
+human-readable label if the id is a generated/opaque string) — this is
+exactly what an external glTF-based rig-test tool reads to enumerate and
+label separately-pickable parts. These two fields are inert to THIS
+renderer (nothing here currently reads `isPickable`/`partName`) — they
+exist purely for external-viewer compatibility and never change how the
+model looks or behaves in-app.
+
+--------------------------------------------------------------------------
+63.3 — RULE: PARTS STAY REAL SIBLINGS/DESCENDANTS OF THE SCENE ROOT
+--------------------------------------------------------------------------
+Ordinary top-level "objects" entries already land as direct children of
+`sceneGroup` (or of their `attachTo` parent, which is itself in that same
+tree) — no extra step is needed for the flat-vs-nested requirement here,
+UNLESS an object is deliberately routed through a whole-model merge
+technique (63.1). Do not invent a wrapper/grouping object purely to
+"organize" parts in the JSON — every part must be independently reachable
+by GLTFExporter's node walk, which flat/attachTo placement already
+guarantees.
+
+--------------------------------------------------------------------------
+63.4 — VALIDATION ADDITIONS (append to PART 21's checklist)
+--------------------------------------------------------------------------
+  [ ] [v8.1] No single sdf_blob or CSG boolean-union chain spans the
+      ENTIRE model — each is scoped to one limb/panel-cluster at most
+      (PART 61.2 CAVEAT, PART 63.1). The final object set still contains
+      multiple genuinely separate mesh entries, not one.
+  [ ] [v8.1] Every visible part-level object carries "isPickable": true
+      and "partName" (matching its "id") in its top-level literal (PART
+      63.2) — skip only CSG tool-only objects with no geometry of their
+      own.
+  [ ] [v8.1] A character-scale model has roughly 10-15 separate exportable
+      mesh parts (fewer is fine for a genuinely simple prop) — not 1
+      (PART 63.1).

@@ -1,8 +1,23 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.5 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.6 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.6 (2026-09-01) — MULTI-PART MESH EXPORT FIX (source: an external
+    GLB viewer's rig-test-mode field report showing "1 mesh/group
+    part(s)" for exported models, despite animation clips playing back
+    correctly). Root cause: PART 11.1's option 3 ("fake a single mass
+    read" via one continuous Lathe/Tube path) had no explicit limit
+    stopping it from being applied to the WHOLE model instead of one
+    limb, which collapses the exported .glb to one mesh node — fine in
+    this renderer's own viewport (which has no rig-test mode to catch
+    it) but a hard failure for any external rig-test tool. Added a
+    CAVEAT after PART 11.1 scoping that technique to a single limb/
+    panel run, and a new PART 30.7 requiring every body part to remain
+    its own separate THREE.Mesh plus userData.isPickable/partName on
+    each one (both fields are inert to this renderer — pure external-
+    viewer compatibility, no behavior change here). PART 30.6
+    checklist gains two matching items.
   v1.5 (2026-09-01) — CORRECTNESS FIX to PART 30.5. The v1.4 claim that
     the renderer's export clone "strips circular userData references
     before serialization" was inaccurate for any node OTHER than the
@@ -1825,6 +1840,18 @@ tightly-overlapping primitives and matching materials, same caveat as
 above, or move that model to the JSON/JS path where PART 10's boolean
 union is real.
 
+CAVEAT — RIG-TEST / EXTERNAL-VIEWER EXPORT (see PART 30.7): whichever
+option you pick above (thread a continuous Lathe/Tube through the whole
+torso-to-limb path, or approximate with tightly-overlapping primitives),
+never let it collapse the ENTIRE model into one mesh. Option 3's "one
+continuous mesh" is meant for a SINGLE limb or panel run at most — the
+head, the torso, and every other limb must still come out of your
+factory as separate THREE.Mesh objects. A whole-model single mesh looks
+fine in this renderer's own viewport but leaves the exported .glb with
+exactly one exportable part, which fails external rig-test viewers
+outright even though this renderer has no rig-test mode of its own to
+catch it locally.
+
 ================================================================================
 PART 12 — VALIDATION CHECKLIST (run through silently before output)
 ================================================================================
@@ -3313,6 +3340,56 @@ just as easy:
       external-engine import walkthroughs (PART 30.0) — only build the
       model; the renderer's existing export button + PART 30.5 handle
       the rest
+  [ ] [v1.5] No single fused mesh (PART 11.1 option 3, or any other
+      technique) stands in for the ENTIRE model — every body part is
+      still its own separate THREE.Mesh (PART 30.7).
+  [ ] [v1.5] Every part-level Mesh has userData.isPickable = true and
+      userData.partName set (PART 30.7).
+
+--------------------------------------------------------------------------
+30.7 — v1.5 ADDITION: MULTI-PART MESH EXPORT FOR EXTERNAL RIG-TEST VIEWERS
+--------------------------------------------------------------------------
+Source: field report against an external GLB viewer's rig-test mode. This
+renderer has no rig-test mode of its own — external viewers load the
+exported .glb independently and enumerate its mesh nodes to decide what's
+individually pickable/riggable. If the factory built the whole model as
+one fused mesh (PART 11.1's option 3 stretched across the entire body
+instead of one limb — see that PART's CAVEAT), that enumeration finds
+exactly ONE part no matter how much internal detail it has, and the
+external tool reports something like "Using 1 mesh/group part(s) as
+rig-test targets" even though the model's clips (PART 5/30.4) still play
+back fine — clip playback only needs named nodes to exist, not multiple
+meshes, so a single-mesh export can look completely broken in a rig-test
+viewer while looking completely fine in this renderer.
+
+RULE — every distinct body part (head, each pivot-driven limb segment
+per PART 30.2, each hand/foot, and any prop) must be its own separate
+`THREE.Mesh` inside the returned root Group — never one fused
+BufferGeometry standing in for the whole articulated model. This does
+NOT conflict with PART 30.2's NESTED pivot hierarchy: a part mesh being
+a descendant of a joint Group (`kneeL.add(shinL)`) is exactly right and
+still counts as "its own separate Mesh" — nesting is about the transform
+hierarchy, not about fusing geometry. The only thing this rule forbids
+is literally merging multiple parts' vertex/index data into one shared
+BufferGeometry (or one Lathe/Tube path standing in for the entire body).
+
+Mark every part mesh for external pickability right after you construct
+it — these two fields are inert to THIS renderer (nothing here currently
+reads them) but are exactly what an external glTF-based rig-test tool
+uses to enumerate and label separately-pickable parts:
+
+  const headMesh = buildLowPolyHead();
+  headMesh.userData.isPickable = true;
+  headMesh.userData.partName = 'head';   // match the sculptRuntime.nodes
+                                          // name (PART 6.1) when this
+                                          // part also doubles as a pivot
+
+Target for a character-scale model: roughly 10-15 separate mesh nodes in
+the exported .glb (head, torso, upper-arm/forearm or whole-arm-chain ×2,
+hand ×2, upper-leg/lower-leg or whole-leg-chain ×2, foot ×2, plus any
+held props) — not 1. A simple, non-articulated prop can legitimately
+have fewer; the requirement is "genuinely more than one part where the
+subject actually has more than one part", not a forced minimum.
 
 ================================================================================
 PART 19 — STAGED BUILD PASSES  (img2threejs alignment — added v1.2, 2026-07-31)
