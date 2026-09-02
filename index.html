@@ -14022,15 +14022,41 @@ async function lblOpenModelStore(){
   }
 }
 
+// LBL FIX (v8.4) — guard against overlapping model-switch / export
+// operations. Both lblModelStoreLoadByNumber() (fetch + parse + rebuild
+// the whole scene) and exportGLB() (clone + texture-merge, genuinely
+// async via GLTFExporter's internal Promise.all for image processing)
+// take real wall-clock time. Nothing previously stopped a user from
+// tapping "next model" while a GLB export was still mid-flight, or
+// starting a second export while a model was still loading — either
+// overlap can leave CURRENT_TS_MODEL / sceneGroup being read by one
+// operation while the other is actively tearing it down and rebuilding
+// it, which matches a "works once, then the next one silently does
+// nothing until I refresh" symptom far better than anything in the
+// synchronous export logic itself (that logic was verified correct,
+// including across model switches, via a standalone harness replaying
+// the real export pipeline against the real GLTFExporter — see the
+// PR/issue this fix references for the test matrix). A single shared
+// flag with an explicit toast is a minimal, safe fix regardless of
+// which exact interleaving turns out to be the culprit.
+let lblExportOrLoadBusy = false;
 async function lblModelStorePrev(){
   if(!lblModelStoreCount) return;
-  const n = lblModelStoreIndex > 1 ? lblModelStoreIndex - 1 : lblModelStoreCount;
-  await lblModelStoreLoadByNumber(n);
+  if(lblExportOrLoadBusy){ toast('Please wait for the current export/load to finish', 'err'); return; }
+  lblExportOrLoadBusy = true;
+  try{
+    const n = lblModelStoreIndex > 1 ? lblModelStoreIndex - 1 : lblModelStoreCount;
+    await lblModelStoreLoadByNumber(n);
+  } finally { lblExportOrLoadBusy = false; }
 }
 async function lblModelStoreNext(){
   if(!lblModelStoreCount) return;
-  const n = lblModelStoreIndex < lblModelStoreCount ? lblModelStoreIndex + 1 : 1;
-  await lblModelStoreLoadByNumber(n);
+  if(lblExportOrLoadBusy){ toast('Please wait for the current export/load to finish', 'err'); return; }
+  lblExportOrLoadBusy = true;
+  try{
+    const n = lblModelStoreIndex < lblModelStoreCount ? lblModelStoreIndex + 1 : 1;
+    await lblModelStoreLoadByNumber(n);
+  } finally { lblExportOrLoadBusy = false; }
 }
 // ═══════════════════════════════════════════
 // EXPORT
@@ -15139,6 +15165,23 @@ function safeCollectSourceClips(root){
 
 function exportGLB(){
   if(!sceneObjects.length && !CURRENT_TS_MODEL){toast('No scene to export','err');return;}
+  // LBL FIX (v8.4) — other half of the lblModelStorePrev/Next guard
+  // (see that comment for the full reasoning). exportGLB() itself is
+  // synchronous on the outside but kicks off a genuinely async
+  // GLTFExporter write (texture merging etc.) that can still be running
+  // when this function returns — so the flag is set here and only
+  // cleared inside the exp.parse() success/error callbacks below, not
+  // at the end of this function body.
+  if(lblExportOrLoadBusy){ toast('Please wait for the current export/load to finish', 'err'); return; }
+  lblExportOrLoadBusy = true;
+  // LBL FIX (v8.4) — belt-and-suspenders: if exp.parse() never calls
+  // either callback at all (a genuine hang somewhere inside the
+  // exporter, as opposed to a normal success/error/throw — all three of
+  // which already clear the flag above/below), this guarantees the flag
+  // still can't get stuck true forever. 20s is generous for any export
+  // this app produces; if it fires, the export has already effectively
+  // failed from the user's perspective anyway.
+  const __exportBusyTimeout = setTimeout(()=>{ lblExportOrLoadBusy = false; }, 20000);
   // BUG-2 FIX — the entire setup phase below (clip capture, cloning,
   // bone promotion, clip collection) previously ran with NO top-level
   // error handling. GLTFExporter's own async errors were caught fine
@@ -15360,6 +15403,11 @@ function exportGLB(){
         });
         toDispose.forEach(g => { if(g && g.dispose) g.dispose(); });
       }
+      // LBL FIX (v8.4) — release the export/load guard now that the
+      // async write (and its cleanup, just above) has actually finished
+      // — not when exportGLB() first returned synchronously.
+      clearTimeout(__exportBusyTimeout);
+      lblExportOrLoadBusy = false;
     }
   },err=>{
     toast('Export failed: '+err,'err');
@@ -15373,6 +15421,8 @@ function exportGLB(){
       });
       toDispose.forEach(g => { if(g && g.dispose) g.dispose(); });
     }
+    clearTimeout(__exportBusyTimeout);
+    lblExportOrLoadBusy = false; // LBL FIX (v8.4) — same release on the error path
   },{binary:true, animations: clipsForExport});
   }catch(e){
     // BUG-2 FIX — surface any synchronous setup failure the same way
@@ -15382,6 +15432,15 @@ function exportGLB(){
     // of "export works once, then needs a page refresh".
     console.error('[exportGLB] setup failed:', e);
     toast('Export failed: '+(e && e.message ? e.message : e),'err');
+    // LBL FIX (v8.4) — this synchronous-failure path never reaches
+    // exp.parse(), so neither of the two flag-clearing points above
+    // would ever run — without this, a setup failure would leave
+    // lblExportOrLoadBusy stuck true forever, permanently blocking every
+    // future export/model-switch attempt until a page refresh. This is
+    // the exact "stuck until refresh" symptom the guard exists to
+    // prevent, so it must not itself be able to cause it.
+    clearTimeout(__exportBusyTimeout);
+    lblExportOrLoadBusy = false;
   }
 }
 
