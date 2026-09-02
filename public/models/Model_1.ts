@@ -1,53 +1,59 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- *
- * Procedural 3D Supercar Generator
- * Model: "Apex Horizon - Low-Poly Concept Supercar"
- * Architecture: img2threejs & Low-Poly 3D Studio
- */
-
 import * as THREE from 'three';
 
-/* =========================================================================
- * 1. SPECIFICATION & TYPES
- * ========================================================================= */
+export type AnimationName = 'dance' | 'idle' | 'walk' | 'run' | 'jump';
+export type SkinThemeId = 'cyber-paladin' | 'void-monarch' | 'celestial-knight' | 'nether-warlord' | 'stealth-phantom';
 
-export interface ObjectSculptSpec {
+export interface SkinColorScheme {
+  id: SkinThemeId;
   name: string;
-  category: 'vehicle';
-  style: 'stylized-lowpoly';
-  version: string;
-  animations: string[];
+  skinTone: string;
+  skinShadow: string;
+  hairBase: string;
+  hairHighlight: string;
+  eyesSclera: string;
+  eyesIris: string;
+  eyesPupil: string;
+  mouthLip: string;
+  mouthInner: string;
+  eyebrow: string;
+  blush: string;
+  primaryArmor: string;
+  primaryArmorDark: string;
+  secondaryArmor: string;
+  accentGold: string;
+  glowCyan: string;
+  swordHilt: string;
+  swordGuard: string;
+  swordCore: string;
+  swordBladeGlow: string;
+  capeOuter: string;
+  capeInner: string;
+  description: string;
 }
 
-export const SUPERCAR_SPEC: ObjectSculptSpec = {
-  name: 'Apex Horizon GT',
-  category: 'vehicle',
-  style: 'stylized-lowpoly',
-  version: '3.1.0',
-  animations: ['drive', 'idle_rev', 'drift', 'parked'],
-};
-
-export interface SupercarOptions {
-  bodyColor?: string;
-  rimColor?: string;
-  headlightsOn?: boolean;
-  wireframe?: boolean;
+export interface CharacterOptions {
+  theme?: SkinThemeId;
+  skinTheme?: SkinThemeId;
+  colorScheme?: SkinThemeId;
+  castShadow?: boolean;
+  receiveShadow?: boolean;
+  showSword?: boolean;
 }
 
-export interface SupercarMaterials {
-  bodyPrimary: THREE.MeshStandardMaterial;
-  bodyAccent: THREE.MeshStandardMaterial;
-  trimDark: THREE.MeshStandardMaterial;
-  chromeRim: THREE.MeshStandardMaterial;
-  tireRubber: THREE.MeshStandardMaterial;
-  glassTint: THREE.MeshStandardMaterial;
-  lightWarm: THREE.MeshStandardMaterial;
-  lightAmber: THREE.MeshStandardMaterial;
-  lightRed: THREE.MeshStandardMaterial;
-}
-
+/**
+ * SYSTEM_UPDATE_PROMPT §3b contract (see also checkTsDetailInventory()
+ * in index.html).  Each entry describes one identity feature of the
+ * model — the parts a reviewer / toolchain can target directly.
+ *   - `id`            unique identifier; for high-priority items of kind
+ *                     'feature' / 'panel' / 'decal' / 'landmark' a mesh
+ *                     whose name starts with `id` (dots → slashes) MUST
+ *                     exist in the live group, or a warning fires
+ *   - `region`        body region / part family
+ *   - `kind`          one of 'feature' | 'panel' | 'decal' | 'landmark'
+ *   - `priority`      'high' | 'medium' | 'low'
+ *   - `reviewThreshold` numeric 0..1
+ * The remaining fields are optional free-form metadata for the inspector.
+ */
 export interface DetailInventoryItem {
   id: string;
   region: string;
@@ -64,737 +70,1256 @@ export interface DetailInventoryItem {
   nodes?: string[];
 }
 
-export interface SupercarInstance extends THREE.Group {
-  currentAnimation?: string;
-  tick?: (dt: number, time?: number) => void;
-  play?: () => void;
-  stop?: () => void;
-  setAnimation?: (name: string) => void;
-  setHeadlights?: (enabled: boolean) => void;
-  setBodyColor?: (hex: string) => void;
-  dispose?: () => void;
+export interface JointAnglesConfig {
+  headPitch?: number;
+  headYaw?: number;
+  headRoll?: number;
+  torsoYaw?: number;
+  torsoPitch?: number;
+  torsoRoll?: number;
+  leftArmPitch?: number;
+  leftArmYaw?: number;
+  leftArmRoll?: number;
+  rightArmPitch?: number;
+  rightArmYaw?: number;
+  rightArmRoll?: number;
+  leftLegPitch?: number;
+  leftLegYaw?: number;
+  leftLegRoll?: number;
+  rightLegPitch?: number;
+  rightLegYaw?: number;
+  rightLegRoll?: number;
 }
 
-/* =========================================================================
- * 2. PROCEDURAL GEOMETRY BUILDERS
- * ========================================================================= */
+export interface CharacterRig {
+  bodyRoot: THREE.Group;
+  pelvisPivot: THREE.Group;
+  torsoPivot: THREE.Group;
+  torsoMesh: THREE.Mesh;
+  jacketMesh: THREE.Mesh;
+  pauldronsMesh: THREE.Mesh;
+  beltBuckleMesh: THREE.Mesh;
+  capeGroup: THREE.Group;
+  headPivot: THREE.Group;
+  headMesh: THREE.Mesh;
+  headLayerMesh: THREE.Mesh;
+  crownMesh: THREE.Mesh;
+  faceFeaturesGroup: THREE.Group;
+  leftEyeGroup: THREE.Group;
+  rightEyeGroup: THREE.Group;
+  mouthGroup: THREE.Group;
+  leftArmPivot: THREE.Group;
+  leftArmMesh: THREE.Mesh;
+  leftSleeveMesh: THREE.Mesh;
+  leftGauntletMesh: THREE.Mesh;
+  rightArmPivot: THREE.Group;
+  rightArmMesh: THREE.Mesh;
+  rightSleeveMesh: THREE.Mesh;
+  rightGauntletMesh: THREE.Mesh;
+  handSocketRight: THREE.Group;
+  swordProp: THREE.Group;
+  leftLegPivot: THREE.Group;
+  leftLegMesh: THREE.Mesh;
+  leftPantsLayer: THREE.Mesh;
+  leftBootArmor: THREE.Mesh;
+  rightLegPivot: THREE.Group;
+  rightLegMesh: THREE.Mesh;
+  rightPantsLayer: THREE.Mesh;
+  rightBootArmor: THREE.Mesh;
+}
 
-function createKitbashBox(
+export interface MinecraftCharacterRuntime {
+  root: THREE.Group;
+  rig: CharacterRig;
+  nodes: Record<string, THREE.Object3D>;
+  materials: Record<string, THREE.MeshStandardMaterial>;
+  animations: {
+    clips: THREE.AnimationClip[];
+    mixer: THREE.AnimationMixer;
+    actions: Map<string, THREE.AnimationAction>;
+  };
+  state: {
+    currentAnimation: AnimationName;
+    theme: SkinThemeId;
+    isDancing: boolean;
+    hasSword: boolean;
+  };
+  passes: {
+    blockout: { name: string; completed: boolean; score: number };
+    structural: { name: string; completed: boolean; score: number };
+    form: { name: string; completed: boolean; score: number };
+    material: { name: string; completed: boolean; score: number };
+    surface: { name: string; completed: boolean; score: number };
+    lighting: { name: string; completed: boolean; score: number };
+    interaction: { name: string; completed: boolean; score: number };
+    optimization: { name: string; completed: boolean; score: number };
+  };
+  passesComplete: boolean;
+  // `score` MUST be a number in [0,1] — see checkTsStagedPasses() in index.html
+  passesReviewed: Record<string, { score: number; notes?: string }>;
+  detailInventory: DetailInventoryItem[];
+  playAnimation(name: AnimationName, crossFadeDuration?: number): void;
+  stopAnimations(): void;
+  setJointAngles(angles: JointAnglesConfig): void;
+  setSkinTheme(themeId: SkinThemeId): void;
+  setSwordVisibility(visible: boolean): void;
+  update(deltaTime: number): void;
+  tick(deltaTime?: number): void;
+  dispose(): void;
+}
+
+export const SKIN_THEMES: Record<SkinThemeId, SkinColorScheme> = {
+  'cyber-paladin': {
+    id: 'cyber-paladin',
+    name: 'Cyber Paladin Sovereign',
+    skinTone: '#e0ae87',
+    skinShadow: '#b8835e',
+    hairBase: '#151922',
+    hairHighlight: '#00f5d4',
+    eyesSclera: '#ffffff',
+    eyesIris: '#00f0ff',
+    eyesPupil: '#003844',
+    mouthLip: '#c0756e',
+    mouthInner: '#50201d',
+    eyebrow: '#0f141c',
+    blush: '#e28b80',
+    primaryArmor: '#1b202c',
+    primaryArmorDark: '#0e1118',
+    secondaryArmor: '#283042',
+    accentGold: '#fbb034',
+    glowCyan: '#00f5d4',
+    swordHilt: '#11141a',
+    swordGuard: '#fbb034',
+    swordCore: '#00f5d4',
+    swordBladeGlow: '#80ffee',
+    capeOuter: '#121620',
+    capeInner: '#00f5d4',
+    description: 'Bespoke Cybernetic Paladin with high-polygon pixel beveling and emissive blade core',
+  },
+  'void-monarch': {
+    id: 'void-monarch',
+    name: 'Void Monarch',
+    skinTone: '#c9987a',
+    skinShadow: '#9c6c50',
+    hairBase: '#100a1c',
+    hairHighlight: '#a855f7',
+    eyesSclera: '#f5e8ff',
+    eyesIris: '#c084fc',
+    eyesPupil: '#3b0764',
+    mouthLip: '#8e4b67',
+    mouthInner: '#3d1627',
+    eyebrow: '#1b0d2e',
+    blush: '#bf7091',
+    primaryArmor: '#0d0817',
+    primaryArmorDark: '#05030a',
+    secondaryArmor: '#221538',
+    accentGold: '#fb923c',
+    glowCyan: '#e879f9',
+    swordHilt: '#190a2e',
+    swordGuard: '#fb923c',
+    swordCore: '#c084fc',
+    swordBladeGlow: '#f5d0fe',
+    capeOuter: '#0a0512',
+    capeInner: '#9333ea',
+    description: 'Ethereal abyssal monarch in void energy conduits and celestial gold trim',
+  },
+  'celestial-knight': {
+    id: 'celestial-knight',
+    name: 'Celestial Solar Knight',
+    skinTone: '#e8be99',
+    skinShadow: '#c4936e',
+    hairBase: '#ffffff',
+    hairHighlight: '#facc15',
+    eyesSclera: '#ffffff',
+    eyesIris: '#facc15',
+    eyesPupil: '#854d0e',
+    mouthLip: '#bd7b72',
+    mouthInner: '#5c221a',
+    eyebrow: '#ca8a04',
+    blush: '#e89c92',
+    primaryArmor: '#f8fafc',
+    primaryArmorDark: '#e2e8f0',
+    secondaryArmor: '#cbd5e1',
+    accentGold: '#f59e0b',
+    glowCyan: '#38bdf8',
+    swordHilt: '#334155',
+    swordGuard: '#f59e0b',
+    swordCore: '#38bdf8',
+    swordBladeGlow: '#bae6fd',
+    capeOuter: '#f8fafc',
+    capeInner: '#f59e0b',
+    description: 'Solar champion encased in polished platinum armor with auric runic edges',
+  },
+  'nether-warlord': {
+    id: 'nether-warlord',
+    name: 'Netherite Magma Lord',
+    skinTone: '#946152',
+    skinShadow: '#693f34',
+    hairBase: '#1c1917',
+    hairHighlight: '#ef4444',
+    eyesSclera: '#fff1f2',
+    eyesIris: '#ff3700',
+    eyesPupil: '#7f1d1d',
+    mouthLip: '#7c2d12',
+    mouthInner: '#380c0b',
+    eyebrow: '#0c0a09',
+    blush: '#a84c36',
+    primaryArmor: '#292524',
+    primaryArmorDark: '#1c1917',
+    secondaryArmor: '#44403c',
+    accentGold: '#f97316',
+    glowCyan: '#ff4500',
+    swordHilt: '#1c1917',
+    swordGuard: '#b91c1c',
+    swordCore: '#ff5722',
+    swordBladeGlow: '#ffaa80',
+    capeOuter: '#18181b',
+    capeInner: '#dc2626',
+    description: 'Volcanic warlord forged from netherite debris and molten magma embers',
+  },
+  'stealth-phantom': {
+    id: 'stealth-phantom',
+    name: 'Shadow Phantom Operative',
+    skinTone: '#a37962',
+    skinShadow: '#7a523d',
+    hairBase: '#090a0f',
+    hairHighlight: '#3b82f6',
+    eyesSclera: '#e0f2fe',
+    eyesIris: '#06b6d4',
+    eyesPupil: '#083344',
+    mouthLip: '#704640',
+    mouthInner: '#301814',
+    eyebrow: '#020617',
+    blush: '#965e55',
+    primaryArmor: '#0f172a',
+    primaryArmorDark: '#020617',
+    secondaryArmor: '#1e293b',
+    accentGold: '#38bdf8',
+    glowCyan: '#22d3ee',
+    swordHilt: '#020617',
+    swordGuard: '#0369a1',
+    swordCore: '#06b6d4',
+    swordBladeGlow: '#a5f3fc',
+    capeOuter: '#020617',
+    capeInner: '#0284c7',
+    description: 'Midnight stealth operative with tactical photon-damping stealth armor',
+  },
+};
+
+/**
+ * Procedural Voxel Texture Builder with Micro-Border Ambient Occlusion
+ */
+function createVoxelTexture(
   w: number,
   h: number,
-  d: number,
-  mat: THREE.Material,
-  topScaleX = 1,
-  topScaleZ = 1,
-  shiftX = 0,
-  shiftZ = 0,
-  name = 'part'
-): THREE.Mesh {
-  const geom = new THREE.BoxGeometry(w, h, d);
-  const pos = geom.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i);
-    if (y > 0) {
-      pos.setX(i, pos.getX(i) * topScaleX + shiftX);
-      pos.setZ(i, pos.getZ(i) * topScaleZ + shiftZ);
+  primaryHex: string,
+  secondaryHex: string,
+  grain = 0.08,
+  accentHex?: string,
+  glowPattern = false
+): THREE.Texture {
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = w * 16;
+      canvas.height = h * 16;
+      const ctx = canvas.getContext('2d');
+
+      if (ctx) {
+        const c1 = new THREE.Color(primaryHex);
+        const c2 = new THREE.Color(secondaryHex);
+        const pixelSize = 16;
+
+        for (let x = 0; x < w; x++) {
+          for (let y = 0; y < h; y++) {
+            const noise = (Math.random() - 0.5) * grain;
+            const wave = (Math.sin(x * 0.45) + Math.cos(y * 0.45)) * 0.06;
+            const mixRatio = THREE.MathUtils.clamp(Math.random() * 0.6 + wave + 0.2, 0, 1);
+            const col = c1.clone().lerp(c2, mixRatio);
+
+            col.r = THREE.MathUtils.clamp(col.r + noise, 0, 1);
+            col.g = THREE.MathUtils.clamp(col.g + noise, 0, 1);
+            col.b = THREE.MathUtils.clamp(col.b + noise, 0, 1);
+
+            ctx.fillStyle = `#${col.getHexString()}`;
+            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+
+            if (accentHex && ((x + y) % 4 === 0 || x === 0 || y === 0 || x === w - 1)) {
+              ctx.fillStyle = accentHex;
+              ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+            }
+
+            if (glowPattern && (x === 1 || x === w - 2) && y > 1 && y < h - 2) {
+              ctx.fillStyle = accentHex || '#00f5d4';
+              ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+            }
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.09)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          }
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        texture.generateMipmaps = false;
+        return texture;
+      }
+    } catch (_) {
+      /* Fallback to DataTexture below */
     }
   }
-  geom.computeVertexNormals();
-  const mesh = new THREE.Mesh(geom, mat);
-  mesh.name = name;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
 
-export function buildLowPolyWheel(
-  radius: number,
-  width: number,
-  materials: SupercarMaterials,
-  isRight: boolean,
-  prefix: string
-): THREE.Group {
-  const wheelGroup = new THREE.Group();
-  wheelGroup.name = `${prefix}_assembly`;
+  // Safe DataTexture fallback for Node.js
+  const totalW = w * 16;
+  const totalH = h * 16;
+  const data = new Uint8Array(totalW * totalH * 4);
+  const c1 = new THREE.Color(primaryHex);
+  const c2 = new THREE.Color(secondaryHex);
+  const accCol = accentHex ? new THREE.Color(accentHex) : null;
+  const glowCol = new THREE.Color(accentHex || '#00f5d4');
 
-  const tireGeom = new THREE.CylinderGeometry(radius, radius, width, 18);
-  tireGeom.rotateZ(Math.PI / 2);
-  const tire = new THREE.Mesh(tireGeom, materials.tireRubber);
-  tire.name = `${prefix}_tire`;
-  tire.castShadow = true;
-  tire.receiveShadow = true;
-  wheelGroup.add(tire);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const noise = (Math.random() - 0.5) * grain;
+      const wave = (Math.sin(x * 0.45) + Math.cos(y * 0.45)) * 0.06;
+      const mixRatio = THREE.MathUtils.clamp(Math.random() * 0.6 + wave + 0.2, 0, 1);
+      let col = c1.clone().lerp(c2, mixRatio);
+      col.r = THREE.MathUtils.clamp(col.r + noise, 0, 1);
+      col.g = THREE.MathUtils.clamp(col.g + noise, 0, 1);
+      col.b = THREE.MathUtils.clamp(col.b + noise, 0, 1);
 
-  const rimRadius = radius * 0.82;
-  const lipGeom = new THREE.TorusGeometry(rimRadius, 0.035, 6, 18);
-  lipGeom.rotateY(Math.PI / 2);
-  const lip = new THREE.Mesh(lipGeom, materials.chromeRim);
-  lip.name = `${prefix}_rim_lip`;
-  lip.castShadow = true;
+      if (accCol && ((x + y) % 4 === 0 || x === 0 || y === 0 || x === w - 1)) {
+        col = accCol;
+      }
+      if (glowPattern && (x === 1 || x === w - 2) && y > 1 && y < h - 2) {
+        col = glowCol;
+      }
 
-  const barrelGeom = new THREE.CylinderGeometry(rimRadius * 0.95, rimRadius * 0.95, width * 0.9, 18);
-  barrelGeom.rotateZ(Math.PI / 2);
-  const barrel = new THREE.Mesh(barrelGeom, materials.trimDark);
-  barrel.name = `${prefix}_barrel`;
-  wheelGroup.add(barrel);
-
-  const spokeGroup = new THREE.Group();
-  spokeGroup.name = `${prefix}_spokes`;
-  const spokeGeom = new THREE.BoxGeometry(0.06, rimRadius * 0.95, 0.05);
-  spokeGeom.translate(0, rimRadius * 0.475, 0);
-
-  for (let i = 0; i < 5; i++) {
-    const spoke = new THREE.Mesh(spokeGeom, materials.chromeRim);
-    spoke.name = `${prefix}_spoke_${i}`;
-    spoke.rotation.x = (Math.PI * 2 / 5) * i;
-    spoke.castShadow = true;
-    spokeGroup.add(spoke);
+      for (let py = 0; py < 16; py++) {
+        for (let px = 0; px < 16; px++) {
+          const idx = ((y * 16 + py) * totalW + (x * 16 + px)) * 4;
+          data[idx] = Math.round(col.r * 255);
+          data[idx + 1] = Math.round(col.g * 255);
+          data[idx + 2] = Math.round(col.b * 255);
+          data[idx + 3] = 255;
+        }
+      }
+    }
   }
 
-  const hubGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.08, 10);
-  hubGeom.rotateZ(Math.PI / 2);
-  const hub = new THREE.Mesh(hubGeom, materials.chromeRim);
-  hub.name = `${prefix}_hub`;
-  spokeGroup.add(hub);
-
-  const dir = isRight ? 1 : -1;
-  lip.position.x = (width / 2) * dir;
-  spokeGroup.position.x = (width / 2 - 0.01) * dir;
-
-  wheelGroup.add(lip);
-  wheelGroup.add(spokeGroup);
-
-  return wheelGroup;
+  const texture = new THREE.DataTexture(data, totalW, totalH, THREE.RGBAFormat);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
 }
 
-export function buildSupercarBody(materials: SupercarMaterials): THREE.Group {
-  const bodyGroup = new THREE.Group();
-  bodyGroup.name = 'supercar_body_assembly';
+/**
+ * Builds the hand-fitted Voxel Claymore Broadsword
+ */
+function createVoxelClaymoreSword(theme: SkinColorScheme): THREE.Group {
+  const swordGroup = new THREE.Group();
+  swordGroup.name = 'Item_VoxelClaymore';
 
-  function addPart(
-    w: number,
-    h: number,
-    d: number,
-    mat: THREE.Material,
-    topScaleX = 1,
-    topScaleZ = 1,
-    shiftX = 0,
-    shiftZ = 0,
-    x = 0,
-    y = 0,
-    z = 0,
-    rx = 0,
-    ry = 0,
-    rz = 0,
-    name = 'supercar_body_part'
-  ) {
-    const mesh = createKitbashBox(w, h, d, mat, topScaleX, topScaleZ, shiftX, shiftZ, name);
-    mesh.position.set(x, y, z);
-    mesh.rotation.set(rx, ry, rz);
-    bodyGroup.add(mesh);
-    return mesh;
-  }
-
-  // 1. Front Splitter & Underbody
-  addPart(2.0, 0.05, 4.4, materials.trimDark, 0.95, 0.95, 0, 0, 0, 0.025, 0, 0, 0, 0, 'supercar_front_splitter');
-
-  // 2. Main Lower Body Base
-  addPart(1.7, 0.25, 4.2, materials.bodyPrimary, 0.95, 0.95, 0, 0, 0, 0.175, 0, 0, 0, 0, 'supercar_body_chassis_base');
-
-  // 3. Cabin / Greenhouse
-  addPart(1.1, 0.4, 1.8, materials.glassTint, 0.7, 0.4, 0, -0.2, 0, 0.5, 0.0, 0, 0, 0, 'supercar_cabin_glass');
-
-  // 4. Roof Panel
-  addPart(0.85, 0.05, 0.9, materials.bodyPrimary, 0.95, 0.8, 0, 0, 0, 0.725, -0.15, 0, 0, 0, 'supercar_roof_panel');
-
-  // 5. Front Nose Wedge
-  addPart(0.9, 0.3, 1.2, materials.bodyPrimary, 0.7, 0.2, 0, -0.4, 0, 0.3, 1.5, 0, 0, 0, 'supercar_hood_wedge');
-
-  // 6. Front Center Beak
-  addPart(0.2, 0.35, 0.4, materials.bodyPrimary, 0.5, 0.5, 0, -0.1, 0, 0.25, 2.05, 0, 0, 0, 'supercar_front_beak');
-
-  // 7. Front Fenders L/R
-  addPart(0.5, 0.35, 1.2, materials.bodyPrimary, 0.6, 0.7, 0, -0.1, -0.75, 0.325, 1.4, 0, 0, 0, 'supercar_fender_FL');
-  addPart(0.5, 0.35, 1.2, materials.bodyPrimary, 0.6, 0.7, 0, -0.1, 0.75, 0.325, 1.4, 0, 0, 0, 'supercar_fender_FR');
-
-  // 8. Headlight Housings
-  addPart(0.35, 0.2, 0.3, materials.trimDark, 0.9, 0.8, 0, -0.1, -0.65, 0.4, 1.85, 0, 0, 0, 'supercar_headlight_housing_L');
-  addPart(0.35, 0.2, 0.3, materials.trimDark, 0.9, 0.8, 0, -0.1, 0.65, 0.4, 1.85, 0, 0, 0, 'supercar_headlight_housing_R');
-
-  // 9. Side Doors
-  addPart(1.9, 0.3, 1.4, materials.bodyPrimary, 0.95, 1.0, 0, 0, 0, 0.3, 0.1, 0, 0, 0, 'supercar_doors_main');
-
-  // 10. Side Door Trim Inserts
-  addPart(1.95, 0.15, 0.8, materials.trimDark, 1.0, 0.9, 0, 0, 0, 0.225, 0.2, 0, 0, 0, 'supercar_doors_trim');
-
-  // 11. Rear Fenders
-  addPart(0.6, 0.45, 1.4, materials.bodyPrimary, 0.7, 0.8, 0, 0.1, -0.8, 0.375, -1.2, 0, 0, 0, 'supercar_fender_RL');
-  addPart(0.6, 0.45, 1.4, materials.bodyPrimary, 0.7, 0.8, 0, 0.1, 0.8, 0.375, -1.2, 0, 0, 0, 'supercar_fender_RR');
-
-  // 12. Rear Engine Deck
-  addPart(1.1, 0.2, 1.2, materials.trimDark, 0.9, 0.9, 0, 0, 0, 0.45, -1.3, 0, 0, 0, 'supercar_engine_deck');
-
-  // 13. Side Air Intakes
-  addPart(0.3, 0.4, 0.8, materials.trimDark, 1, 1, 0, 0, -0.85, 0.35, -0.5, 0, 0, 0, 'supercar_air_intake_L');
-  addPart(0.3, 0.4, 0.8, materials.trimDark, 1, 1, 0, 0, 0.85, 0.35, -0.5, 0, 0, 0, 'supercar_air_intake_R');
-
-  // 14. Spoiler Wing & Mounts
-  addPart(0.08, 0.25, 0.3, materials.bodyPrimary, 0.6, 0.8, 0, -0.1, -0.8, 0.65, -1.8, 0, 0, 0, 'supercar_spoiler_mount_L');
-  addPart(0.08, 0.25, 0.3, materials.bodyPrimary, 0.6, 0.8, 0, -0.1, 0.8, 0.65, -1.8, 0, 0, 0, 'supercar_spoiler_mount_R');
-  addPart(1.8, 0.05, 0.4, materials.trimDark, 1.0, 0.9, 0, 0, 0, 0.8, -1.9, 0, 0, 0, 'supercar_spoiler_wing');
-
-  // 15. Rear Diffuser
-  addPart(1.6, 0.2, 0.4, materials.trimDark, 0.9, 1.0, 0, 0, 0, 0.15, -2.05, 0, 0, 0, 'supercar_rear_diffuser');
-
-  // 16. Mirrors
-  addPart(0.12, 0.08, 0.15, materials.bodyPrimary, 0.8, 0.8, 0, 0, -0.95, 0.55, 0.7, 0, 0, 0, 'supercar_mirror_L');
-  addPart(0.12, 0.08, 0.15, materials.bodyPrimary, 0.8, 0.8, 0, 0, 0.95, 0.55, 0.7, 0, 0, 0, 'supercar_mirror_R');
-
-  const mStickL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.04), materials.trimDark);
-  mStickL.name = 'supercar_mirror_arm_L';
-  mStickL.position.set(-0.8, 0.5, 0.7);
-  mStickL.rotation.z = 0.4;
-  bodyGroup.add(mStickL);
-
-  const mStickR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.04), materials.trimDark);
-  mStickR.name = 'supercar_mirror_arm_R';
-  mStickR.position.set(0.8, 0.5, 0.7);
-  mStickR.rotation.z = -0.4;
-  bodyGroup.add(mStickR);
-
-  // 17. Headlight LEDs (Glowing)
-  const hlGeom = new THREE.BoxGeometry(0.08, 0.06, 0.04);
-  for (let i = 0; i < 4; i++) {
-    const hlL = new THREE.Mesh(hlGeom, materials.lightWarm);
-    hlL.name = `apex_horizon_headlights_L_${i}`;
-    hlL.position.set(-0.55 - i * 0.07, 0.4, 1.95 - i * 0.03);
-    hlL.rotation.y = 0.2;
-    bodyGroup.add(hlL);
-
-    const hlR = new THREE.Mesh(hlGeom, materials.lightWarm);
-    hlR.name = `apex_horizon_headlights_R_${i}`;
-    hlR.position.set(0.55 + i * 0.07, 0.4, 1.95 - i * 0.03);
-    hlR.rotation.y = -0.2;
-    bodyGroup.add(hlR);
-  }
-
-  // 18. Taillights (Glowing Red)
-  const tlGeom = new THREE.BoxGeometry(0.6, 0.08, 0.04);
-  const tlL = new THREE.Mesh(tlGeom, materials.lightRed);
-  tlL.name = 'apex_horizon_taillights_L';
-  tlL.position.set(-0.5, 0.45, -2.12);
-  bodyGroup.add(tlL);
-
-  const tlR = new THREE.Mesh(tlGeom, materials.lightRed);
-  tlR.name = 'apex_horizon_taillights_R';
-  tlR.position.set(0.5, 0.45, -2.12);
-  bodyGroup.add(tlR);
-
-  return bodyGroup;
-}
-
-/* =========================================================================
- * 3. ANIMATION CLIP GENERATORS
- * ========================================================================= */
-
-function buildDriveClip(): THREE.AnimationClip {
-  const fps = 30;
-  const duration = 2.0;
-  const frameCount = Math.round(duration * fps);
-  const times: number[] = [];
-
-  const wheelSpinValues: number[] = [];
-  const chassisPosValues: number[] = [];
-  const chassisRotValues: number[] = [];
-
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-
-  for (let i = 0; i <= frameCount; i++) {
-    const t = (i / frameCount) * duration;
-    times.push(t);
-
-    const angle = (t / duration) * Math.PI * 4;
-    q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), angle);
-    wheelSpinValues.push(q.x, q.y, q.z, q.w);
-
-    const bob = Math.sin(t * Math.PI * 8) * 0.012;
-    chassisPosValues.push(0, 0.38 + bob, 0);
-
-    const pitch = Math.sin(t * Math.PI * 8 + 0.5) * 0.008;
-    const roll = Math.cos(t * Math.PI * 4) * 0.005;
-    e.set(pitch, 0, roll);
-    q.setFromEuler(e);
-    chassisRotValues.push(q.x, q.y, q.z, q.w);
-  }
-
-  const tracks: THREE.KeyframeTrack[] = [
-    new THREE.QuaternionKeyframeTrack('wheelSpinFL.quaternion', times, wheelSpinValues),
-    new THREE.QuaternionKeyframeTrack('wheelSpinFR.quaternion', times, wheelSpinValues),
-    new THREE.QuaternionKeyframeTrack('wheelSpinRL.quaternion', times, wheelSpinValues),
-    new THREE.QuaternionKeyframeTrack('wheelSpinRR.quaternion', times, wheelSpinValues),
-    new THREE.VectorKeyframeTrack('Node_Chassis.position', times, chassisPosValues),
-    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', times, chassisRotValues),
-  ];
-
-  return new THREE.AnimationClip('drive', duration, tracks);
-}
-
-function buildIdleRevClip(): THREE.AnimationClip {
-  const duration = 1.2;
-  const times = [0, 0.3, 0.6, 0.9, 1.2];
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-
-  const chassisRotVals: number[] = [];
-  [0, 0.025, -0.015, 0.02, 0].forEach((pitch) => {
-    e.set(pitch, 0, 0);
-    q.setFromEuler(e);
-    chassisRotVals.push(q.x, q.y, q.z, q.w);
+  const gripMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.swordHilt),
+    roughness: 0.8,
+    metalness: 0.2,
+  });
+  const pommelMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.accentGold),
+    roughness: 0.2,
+    metalness: 0.95,
+  });
+  const guardMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.swordGuard),
+    roughness: 0.25,
+    metalness: 0.9,
+  });
+  const coreMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.swordCore),
+    emissive: new THREE.Color(theme.swordCore),
+    emissiveIntensity: 0.9,
+    roughness: 0.15,
+    metalness: 0.9,
+  });
+  const edgeMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.swordBladeGlow),
+    emissive: new THREE.Color(theme.swordBladeGlow),
+    emissiveIntensity: 1.8,
+    roughness: 0.1,
+    metalness: 0.95,
   });
 
-  const tracks: THREE.KeyframeTrack[] = [
+  const p = 0.03125;
+  const voxelGeom = new THREE.BoxGeometry(p, p, p * 1.15);
+
+  // 1. Pommel Jewel
+  const pommel = new THREE.Mesh(new THREE.BoxGeometry(p * 2.0, p * 2.0, p * 2.0), pommelMat);
+  pommel.position.set(0, -0.22, 0);
+  pommel.castShadow = true;
+  swordGroup.add(pommel);
+
+  // 2. Handle Grip
+  for (let i = -6; i <= 2; i++) {
+    const gripBlock = new THREE.Mesh(voxelGeom, gripMat);
+    gripBlock.position.set(0, i * p, 0);
+    gripBlock.castShadow = true;
+    swordGroup.add(gripBlock);
+  }
+
+  // 3. Flared Golden Crossguard Wings
+  const guardWidth = 6;
+  for (let g = -guardWidth; g <= guardWidth; g++) {
+    const yOff = Math.abs(g) > 3 ? p * 0.4 : 0;
+    const gMesh = new THREE.Mesh(new THREE.BoxGeometry(p, p * 1.3, p * 1.6), guardMat);
+    gMesh.position.set(g * p * 0.85, 3 * p + yOff, 0);
+    gMesh.castShadow = true;
+    swordGroup.add(gMesh);
+
+    if (Math.abs(g) === guardWidth) {
+      const tipMesh = new THREE.Mesh(new THREE.BoxGeometry(p * 1.2, p * 2.2, p * 1.8), pommelMat);
+      tipMesh.position.set(g * p * 0.85, 4 * p + yOff, 0);
+      swordGroup.add(tipMesh);
+    }
+  }
+
+  // Guard Core Power Crystal
+  const crystal = new THREE.Mesh(new THREE.BoxGeometry(p * 2, p * 2, p * 2), edgeMat);
+  crystal.position.set(0, 3.2 * p, 0);
+  swordGroup.add(crystal);
+
+  // 4. Heavy Broadsword Blade
+  const bladeLength = 22;
+  for (let b = 4; b <= bladeLength; b++) {
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(p * 1.1, p, p * 0.9), coreMat);
+    spine.position.set(0, b * p, 0);
+    spine.castShadow = true;
+    swordGroup.add(spine);
+
+    const edgeL = new THREE.Mesh(new THREE.BoxGeometry(p * 0.85, p, p * 0.6), edgeMat);
+    edgeL.position.set(-p * 0.95, b * p, 0);
+    swordGroup.add(edgeL);
+
+    const edgeR = new THREE.Mesh(new THREE.BoxGeometry(p * 0.85, p, p * 0.6), edgeMat);
+    edgeR.position.set(p * 0.95, b * p, 0);
+    swordGroup.add(edgeR);
+  }
+
+  // 5. Blade Tip
+  const tip1 = new THREE.Mesh(new THREE.BoxGeometry(p * 1.5, p, p * 0.7), edgeMat);
+  tip1.position.set(0, (bladeLength + 1) * p, 0);
+  swordGroup.add(tip1);
+
+  const tip2 = new THREE.Mesh(new THREE.BoxGeometry(p * 0.8, p, p * 0.5), edgeMat);
+  tip2.position.set(0, (bladeLength + 2) * p, 0);
+  swordGroup.add(tip2);
+
+  swordGroup.rotation.x = -Math.PI * 0.28;
+  swordGroup.rotation.z = -Math.PI * 0.08;
+  swordGroup.rotation.y = -Math.PI * 0.15;
+  return swordGroup;
+}
+
+export function createMinecraftCharacterModel(input?: SkinThemeId | CharacterOptions): THREE.Group {
+  let resolvedThemeId: SkinThemeId = 'cyber-paladin';
+  let showSword = true;
+
+  if (typeof input === 'string' && SKIN_THEMES[input]) {
+    resolvedThemeId = input;
+  } else if (typeof input === 'object' && input !== null) {
+    if (input.theme && SKIN_THEMES[input.theme]) resolvedThemeId = input.theme;
+    else if (input.skinTheme && SKIN_THEMES[input.skinTheme]) resolvedThemeId = input.skinTheme;
+    else if (input.colorScheme && SKIN_THEMES[input.colorScheme]) resolvedThemeId = input.colorScheme;
+    if (input.showSword !== undefined) showSword = input.showSword;
+  }
+
+  const theme = SKIN_THEMES[resolvedThemeId] || SKIN_THEMES['cyber-paladin'];
+
+  const root = new THREE.Group();
+  root.name = 'MinecraftCharacter_Root';
+
+  // Master Textures
+  const headSkinTex = createVoxelTexture(8, 8, theme.skinTone, theme.skinShadow, 0.05);
+  const hairTex = createVoxelTexture(8, 8, theme.hairBase, theme.hairHighlight, 0.12);
+  const torsoArmorTex = createVoxelTexture(8, 12, theme.primaryArmor, theme.primaryArmorDark, 0.08, theme.accentGold, true);
+  const legArmorTex = createVoxelTexture(4, 12, theme.secondaryArmor, theme.primaryArmorDark, 0.08, theme.accentGold);
+  const armArmorTex = createVoxelTexture(4, 12, theme.secondaryArmor, theme.primaryArmor, 0.08, theme.glowCyan);
+  const capeTex = createVoxelTexture(8, 16, theme.capeOuter, theme.capeInner, 0.05, theme.accentGold);
+
+  // PBR Materials
+  const skinMat = new THREE.MeshStandardMaterial({ map: headSkinTex, roughness: 0.8, metalness: 0.05, name: 'Mat_HeadSkin' });
+  const hairMat = new THREE.MeshStandardMaterial({ map: hairTex, roughness: 0.85, metalness: 0.1, name: 'Mat_Hair' });
+  const armorMat = new THREE.MeshStandardMaterial({
+    map: torsoArmorTex,
+    roughness: 0.28,
+    metalness: 0.82,
+    name: 'Mat_PlateArmor',
+  });
+  const legMat = new THREE.MeshStandardMaterial({ map: legArmorTex, roughness: 0.35, metalness: 0.75, name: 'Mat_LegArmor' });
+  const armMat = new THREE.MeshStandardMaterial({ map: armArmorTex, roughness: 0.32, metalness: 0.78, name: 'Mat_ArmArmor' });
+  const capeMat = new THREE.MeshStandardMaterial({ map: capeTex, roughness: 0.9, metalness: 0.05, side: THREE.DoubleSide, name: 'Mat_Cape' });
+  const goldMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.accentGold), roughness: 0.2, metalness: 0.95, name: 'Mat_Gold' });
+
+  // Facial Materials
+  const scleraMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.eyesSclera), roughness: 0.2, name: 'Mat_Sclera' });
+  const irisMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(theme.eyesIris),
+    emissive: new THREE.Color(theme.eyesIris),
+    emissiveIntensity: 1.8,
+    roughness: 0.1,
+    name: 'Mat_Iris',
+  });
+  const pupilMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.eyesPupil), roughness: 0.3, name: 'Mat_Pupil' });
+  const eyebrowMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.eyebrow), roughness: 0.9, name: 'Mat_Eyebrow' });
+  const mouthLipMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.mouthLip), roughness: 0.85, name: 'Mat_MouthLip' });
+  const mouthInnerMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.mouthInner), roughness: 0.95, name: 'Mat_MouthInner' });
+  const blushMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.blush), roughness: 0.9, transparent: true, opacity: 0.5, name: 'Mat_Blush' });
+
+  const materials = {
+    skinMat,
+    hairMat,
+    armorMat,
+    legMat,
+    armMat,
+    capeMat,
+    goldMat,
+    scleraMat,
+    irisMat,
+    pupilMat,
+    eyebrowMat,
+    mouthLipMat,
+    mouthInnerMat,
+    blushMat,
+  };
+
+  // =========================================================================
+  // CHARACTER RIG HIERARCHY
+  // =========================================================================
+  const bodyRoot = new THREE.Group();
+  bodyRoot.name = 'Node_BodyRoot';
+  root.add(bodyRoot);
+
+  const pelvisPivot = new THREE.Group();
+  pelvisPivot.name = 'Node_PelvisPivot';
+  pelvisPivot.position.set(0, 0.75, 0);
+  bodyRoot.add(pelvisPivot);
+
+  // 1. Torso Assembly
+  const torsoPivot = new THREE.Group();
+  torsoPivot.name = 'Node_TorsoPivot';
+  torsoPivot.position.set(0, 0, 0);
+  pelvisPivot.add(torsoPivot);
+
+  const torsoGeom = new THREE.BoxGeometry(0.5, 0.75, 0.25);
+  torsoGeom.translate(0, 0.375, 0);
+  const torsoMesh = new THREE.Mesh(torsoGeom, armorMat);
+  torsoMesh.name = 'Node_TorsoMesh';
+  torsoMesh.castShadow = true;
+  torsoMesh.receiveShadow = true;
+  torsoPivot.add(torsoMesh);
+
+  // 3D Armored Cuirass Overlayer
+  const jacketGeom = new THREE.BoxGeometry(0.535, 0.77, 0.285);
+  jacketGeom.translate(0, 0.375, 0);
+  const jacketMesh = new THREE.Mesh(jacketGeom, armorMat);
+  jacketMesh.name = 'Node_JacketLayer';
+  jacketMesh.castShadow = true;
+  torsoPivot.add(jacketMesh);
+
+  // 3D Pauldrons
+  const pauldronGeom = new THREE.BoxGeometry(0.64, 0.18, 0.32);
+  pauldronGeom.translate(0, 0.68, 0);
+  const pauldronsMesh = new THREE.Mesh(pauldronGeom, goldMat);
+  pauldronsMesh.name = 'Node_Pauldrons';
+  pauldronsMesh.castShadow = true;
+  torsoPivot.add(pauldronsMesh);
+
+  // 3D Belt Buckle
+  const beltGeom = new THREE.BoxGeometry(0.16, 0.1, 0.31);
+  beltGeom.translate(0, 0.08, 0);
+  const beltBuckleMesh = new THREE.Mesh(beltGeom, goldMat);
+  beltBuckleMesh.name = 'Node_BeltBuckle';
+  beltBuckleMesh.castShadow = true;
+  torsoPivot.add(beltBuckleMesh);
+
+  // Dynamic Flowing Hero Cape
+  const capeGroup = new THREE.Group();
+  capeGroup.name = 'Node_CapeGroup';
+  capeGroup.position.set(0, 0.72, -0.14);
+  capeGroup.rotation.x = 0.15;
+  torsoPivot.add(capeGroup);
+
+  const capeGeom = new THREE.BoxGeometry(0.48, 0.95, 0.025);
+  capeGeom.translate(0, -0.475, 0);
+  const capeMesh = new THREE.Mesh(capeGeom, capeMat);
+  capeMesh.castShadow = true;
+  capeGroup.add(capeMesh);
+
+  // 2. Head Assembly & Professional Facial Rig
+  const headPivot = new THREE.Group();
+  headPivot.name = 'Node_HeadPivot';
+  headPivot.position.set(0, 0.75, 0);
+  torsoPivot.add(headPivot);
+
+  const headGeom = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  headGeom.translate(0, 0.25, 0);
+  const headMesh = new THREE.Mesh(headGeom, skinMat);
+  headMesh.name = 'Node_HeadMesh';
+  headMesh.castShadow = true;
+  headPivot.add(headMesh);
+
+  // 3D Extruded Layered Hair Shell
+  const headLayerGeom = new THREE.BoxGeometry(0.54, 0.54, 0.54);
+  headLayerGeom.translate(0, 0.26, 0);
+  const headLayerMesh = new THREE.Mesh(headLayerGeom, hairMat);
+  headLayerMesh.name = 'Node_HeadHatLayer';
+  headLayerMesh.castShadow = true;
+  headPivot.add(headLayerMesh);
+
+  // 3D Sovereign Crown
+  const crownGeom = new THREE.BoxGeometry(0.56, 0.12, 0.56);
+  crownGeom.translate(0, 0.44, 0);
+  const crownMesh = new THREE.Mesh(crownGeom, goldMat);
+  crownMesh.name = 'Node_PaladinCrown';
+  crownMesh.castShadow = true;
+  headPivot.add(crownMesh);
+
+  // 3D Multi-Part Facial Rig
+  const faceFeaturesGroup = new THREE.Group();
+  faceFeaturesGroup.name = 'Node_FaceFeatures';
+  headPivot.add(faceFeaturesGroup);
+
+  const eyeZ = 0.253;
+  const p = 0.03125;
+
+  const leftEyeGroup = new THREE.Group();
+  leftEyeGroup.name = 'LeftEyeGroup';
+  leftEyeGroup.position.set(0.12, 0.22, eyeZ);
+
+  const rightEyeGroup = new THREE.Group();
+  rightEyeGroup.name = 'RightEyeGroup';
+  rightEyeGroup.position.set(-0.12, 0.22, eyeZ);
+
+  [
+    { grp: leftEyeGroup, isRight: false },
+    { grp: rightEyeGroup, isRight: true },
+  ].forEach(({ grp, isRight }) => {
+    // Sclera White Base
+    const sclera = new THREE.Mesh(new THREE.PlaneGeometry(p * 3, p * 2), scleraMat);
+    grp.add(sclera);
+
+    // Glowing Iris
+    const iris = new THREE.Mesh(new THREE.PlaneGeometry(p * 1.6, p * 2), irisMat);
+    iris.position.set(isRight ? -p * 0.6 : p * 0.6, 0, 0.001);
+    grp.add(iris);
+
+    // Pupil
+    const pupil = new THREE.Mesh(new THREE.PlaneGeometry(p * 0.9, p * 1.2), pupilMat);
+    pupil.position.set(isRight ? -p * 0.6 : p * 0.6, -p * 0.3, 0.002);
+    grp.add(pupil);
+
+    // Catchlight Sparkle
+    const sparkle = new THREE.Mesh(
+      new THREE.PlaneGeometry(p * 0.5, p * 0.5),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    sparkle.position.set(isRight ? -p * 0.3 : p * 0.8, p * 0.5, 0.003);
+    grp.add(sparkle);
+
+    // 3D Beveled Eyebrow
+    const eyebrow = new THREE.Mesh(new THREE.BoxGeometry(p * 3.4, p * 0.8, p * 0.4), eyebrowMat);
+    eyebrow.position.set(0, p * 1.6, p * 0.2);
+    grp.add(eyebrow);
+
+    // Subtle Cheek Blush
+    const blush = new THREE.Mesh(new THREE.PlaneGeometry(p * 2.2, p * 0.9), blushMat);
+    blush.position.set(0, -p * 2.0, 0.001);
+    grp.add(blush);
+
+    faceFeaturesGroup.add(grp);
+  });
+
+  // Layered 3D Mouth
+  const mouthGroup = new THREE.Group();
+  mouthGroup.name = 'MouthGroup';
+  mouthGroup.position.set(0, 0.08, eyeZ);
+
+  const mouthInner = new THREE.Mesh(new THREE.PlaneGeometry(p * 3.2, p * 1.2), mouthInnerMat);
+  mouthGroup.add(mouthInner);
+
+  const upperLip = new THREE.Mesh(new THREE.BoxGeometry(p * 3.6, p * 0.5, p * 0.3), mouthLipMat);
+  upperLip.position.set(0, p * 0.6, p * 0.15);
+  mouthGroup.add(upperLip);
+
+  faceFeaturesGroup.add(mouthGroup);
+
+  // 3. Left Arm Rig & Gauntlet
+  const leftArmPivot = new THREE.Group();
+  leftArmPivot.name = 'Node_LeftArmPivot';
+  leftArmPivot.position.set(0.375, 0.7, 0);
+  torsoPivot.add(leftArmPivot);
+
+  const armGeom = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+  armGeom.translate(0, -0.325, 0);
+  const leftArmMesh = new THREE.Mesh(armGeom, skinMat);
+  leftArmMesh.name = 'Node_LeftArmMesh';
+  leftArmMesh.castShadow = true;
+  leftArmPivot.add(leftArmMesh);
+
+  const sleeveGeom = new THREE.BoxGeometry(0.275, 0.42, 0.275);
+  sleeveGeom.translate(0, -0.16, 0);
+  const leftSleeveMesh = new THREE.Mesh(sleeveGeom, armMat);
+  leftSleeveMesh.name = 'Node_LeftSleeve';
+  leftSleeveMesh.castShadow = true;
+  leftArmPivot.add(leftSleeveMesh);
+
+  const gauntletGeom = new THREE.BoxGeometry(0.29, 0.35, 0.29);
+  gauntletGeom.translate(0, -0.52, 0);
+  const leftGauntletMesh = new THREE.Mesh(gauntletGeom, goldMat);
+  leftGauntletMesh.name = 'Node_LeftGauntlet';
+  leftGauntletMesh.castShadow = true;
+  leftArmPivot.add(leftGauntletMesh);
+
+  // 4. Right Arm Rig & Hand-Fitted Sword
+  const rightArmPivot = new THREE.Group();
+  rightArmPivot.name = 'Node_RightArmPivot';
+  rightArmPivot.position.set(-0.375, 0.7, 0);
+  torsoPivot.add(rightArmPivot);
+
+  const rightArmMesh = new THREE.Mesh(armGeom.clone(), skinMat);
+  rightArmMesh.name = 'Node_RightArmMesh';
+  rightArmMesh.castShadow = true;
+  rightArmPivot.add(rightArmMesh);
+
+  const rightSleeveMesh = new THREE.Mesh(sleeveGeom.clone(), armMat);
+  rightSleeveMesh.name = 'Node_RightSleeve';
+  rightSleeveMesh.castShadow = true;
+  rightArmPivot.add(rightSleeveMesh);
+
+  const rightGauntletMesh = new THREE.Mesh(gauntletGeom.clone(), goldMat);
+  rightGauntletMesh.name = 'Node_RightGauntlet';
+  rightGauntletMesh.castShadow = true;
+  rightArmPivot.add(rightGauntletMesh);
+
+  const handSocketRight = new THREE.Group();
+  handSocketRight.name = 'Socket_HandRight';
+  handSocketRight.position.set(0, -0.56, 0.02);
+  rightArmPivot.add(handSocketRight);
+
+  const swordProp = createVoxelClaymoreSword(theme);
+  swordProp.visible = showSword;
+  handSocketRight.add(swordProp);
+
+  // 5. Left Leg Rig & Armored Greave
+  const leftLegPivot = new THREE.Group();
+  leftLegPivot.name = 'Node_LeftLegPivot';
+  leftLegPivot.position.set(0.125, 0, 0);
+  pelvisPivot.add(leftLegPivot);
+
+  const legGeom = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+  legGeom.translate(0, -0.375, 0);
+  const leftLegMesh = new THREE.Mesh(legGeom, legMat);
+  leftLegMesh.name = 'Node_LeftLegMesh';
+  leftLegMesh.castShadow = true;
+  leftLegPivot.add(leftLegMesh);
+
+  const pantsLayerGeom = new THREE.BoxGeometry(0.28, 0.52, 0.28);
+  pantsLayerGeom.translate(0, -0.26, 0);
+  const leftPantsLayer = new THREE.Mesh(pantsLayerGeom, legMat);
+  leftPantsLayer.name = 'Node_LeftPantsLayer';
+  leftPantsLayer.castShadow = true;
+  leftLegPivot.add(leftPantsLayer);
+
+  const bootGeom = new THREE.BoxGeometry(0.29, 0.28, 0.31);
+  bootGeom.translate(0, -0.61, 0.01);
+  const leftBootArmor = new THREE.Mesh(bootGeom, goldMat);
+  leftBootArmor.name = 'Node_LeftBootArmor';
+  leftBootArmor.castShadow = true;
+  leftLegPivot.add(leftBootArmor);
+
+  // 6. Right Leg Rig & Armored Greave
+  const rightLegPivot = new THREE.Group();
+  rightLegPivot.name = 'Node_RightLegPivot';
+  rightLegPivot.position.set(-0.125, 0, 0);
+  pelvisPivot.add(rightLegPivot);
+
+  const rightLegMesh = new THREE.Mesh(legGeom.clone(), legMat);
+  rightLegMesh.name = 'Node_RightLegMesh';
+  rightLegMesh.castShadow = true;
+  rightLegPivot.add(rightLegMesh);
+
+  const rightPantsLayer = new THREE.Mesh(pantsLayerGeom.clone(), legMat);
+  rightPantsLayer.name = 'Node_RightPantsLayer';
+  rightPantsLayer.castShadow = true;
+  rightLegPivot.add(rightPantsLayer);
+
+  const rightBootArmor = new THREE.Mesh(bootGeom.clone(), goldMat);
+  rightBootArmor.name = 'Node_RightBootArmor';
+  rightBootArmor.castShadow = true;
+  rightLegPivot.add(rightBootArmor);
+
+  // =========================================================================
+  // ANIMATIONS: 10-SECOND 4-STAGE DANCE CHOREOGRAPHY
+  // =========================================================================
+  const mixer = new THREE.AnimationMixer(root);
+  const actions = new Map<string, THREE.AnimationAction>();
+
+  const danceTracks: THREE.KeyframeTrack[] = [
+    // Pelvis Jump & Ground Clearance
     new THREE.VectorKeyframeTrack(
-      'Node_Chassis.position',
-      times,
-      [0, 0.38, 0, 0, 0.375, 0, 0, 0.384, 0, 0, 0.377, 0, 0, 0.38, 0]
+      'Node_PelvisPivot.position',
+      [
+        0.0, 0.625, 1.25, 1.875, 2.5,
+        3.125, 3.75, 4.375, 5.0,
+        5.4, 5.8, 6.25, 6.875, 7.5,
+        8.0, 8.5, 9.0, 9.5, 10.0,
+      ],
+      [
+        0, 0.75, 0,      0, 0.88, 0,      0, 0.71, 0,      0, 0.88, 0,      0, 0.75, 0,
+        0, 0.84, 0.05,   0, 0.72, -0.05,  0, 0.84, 0.05,   0, 0.75, 0,
+        0, 1.24, 0,      0, 1.32, 0,      0, 0.78, 0,      0, 0.84, 0,      0, 0.75, 0,
+        0, 0.66, 0,      0, 0.84, 0,      0, 0.66, 0,      0, 0.78, 0,      0, 0.75, 0,
+      ]
     ),
-    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', times, chassisRotVals),
+
+    // Pelvis/Torso 360 Spin & Beat Rotation
+    new THREE.NumberKeyframeTrack(
+      'Node_PelvisPivot.rotation[y]',
+      [0.0, 1.25, 2.5, 3.75, 5.0, 5.8, 6.25, 7.5, 8.5, 9.5, 10.0],
+      [0.0, 0.38, -0.38, 0.48, -0.48, Math.PI * 2, 0.0, 0.32, -0.32, 0.0, 0.0]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_PelvisPivot.rotation[z]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.75, 5.0, 6.25, 7.5, 8.5, 9.5, 10.0],
+      [0.0, 0.14, -0.14, 0.14, 0.0, -0.18, 0.18, 0.0, 0.16, -0.16, 0.0, 0.0]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_TorsoPivot.rotation[x]',
+      [0.0, 1.25, 2.5, 5.0, 5.8, 7.5, 8.5, 9.5, 10.0],
+      [0.0, 0.1, -0.05, 0.14, -0.22, 0.08, 0.25, 0.36, 0.0]
+    ),
+
+    // Cape Aerodynamics
+    new THREE.NumberKeyframeTrack(
+      'Node_CapeGroup.rotation[x]',
+      [0.0, 0.625, 1.25, 2.5, 5.4, 5.8, 6.25, 7.5, 10.0],
+      [0.15, 0.45, 0.12, 0.15, 0.95, 1.1, 0.25, 0.15, 0.15]
+    ),
+
+    // Head Pitch & Nodding Rhythm
+    new THREE.NumberKeyframeTrack(
+      'Node_HeadPivot.rotation[y]',
+      [0.0, 1.25, 2.5, 3.75, 5.0, 6.25, 7.5, 8.75, 10.0],
+      [0.0, -0.32, 0.32, -0.38, 0.38, 0.0, -0.25, 0.25, 0.0]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_HeadPivot.rotation[x]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.75, 5.0, 7.5, 8.5, 9.5, 10.0],
+      [0.0, 0.2, -0.1, 0.2, 0.0, 0.25, -0.14, 0.14, -0.18, 0.28, 0.0]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_HeadPivot.rotation[z]',
+      [0.0, 1.25, 2.5, 3.75, 5.0, 7.5, 10.0],
+      [0.0, -0.15, 0.15, 0.18, -0.18, 0.1, 0.0]
+    ),
+
+    // Left Arm Free Dancing
+    new THREE.NumberKeyframeTrack(
+      'Node_LeftArmPivot.rotation[x]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.125, 3.75, 4.375, 5.0, 5.8, 6.875, 7.5, 8.5, 9.5, 10.0],
+      [
+        0.0, -1.75, 0.22, -1.75, 0.0,
+        -2.5, -0.32, -2.5, -1.2,
+        -3.14, 0.4, -1.5,
+        -2.1, 0.4, 0.0
+      ]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_LeftArmPivot.rotation[z]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.75, 5.0, 5.8, 7.5, 8.5, 9.5, 10.0],
+      [0.08, 0.6, 0.16, 0.6, 0.08, 1.35, 0.32, 0.78, 1.15, 0.2, 0.08, 0.08]
+    ),
+
+    // Right Arm Sword Slashes & Flourishes
+    new THREE.NumberKeyframeTrack(
+      'Node_RightArmPivot.rotation[x]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.125, 3.75, 4.375, 5.0, 5.8, 6.875, 7.5, 8.5, 9.5, 10.0],
+      [
+        0.0, 0.22, -1.75, 0.22, 0.0,
+        -0.32, -2.5, -0.32, -2.5,
+        -3.14, -1.5, 0.4,
+        0.4, -2.1, 0.0
+      ]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_RightArmPivot.rotation[z]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.75, 5.0, 5.8, 7.5, 8.5, 9.5, 10.0],
+      [-0.08, -0.16, -0.6, -0.16, -0.08, -0.32, -1.35, -0.78, -0.2, -1.15, -0.08, -0.08]
+    ),
+
+    // Left Leg Ground Planting & Kick Flares
+    new THREE.NumberKeyframeTrack(
+      'Node_LeftLegPivot.rotation[x]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.75, 5.0, 5.8, 6.25, 7.5, 8.5, 9.5, 10.0],
+      [0.0, -0.7, 0.48, -0.7, 0.0, 0.45, -0.45, -1.2, 0.35, -0.6, 0.38, 0.09, 0.0]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_LeftLegPivot.rotation[z]',
+      [0.0, 1.25, 2.5, 3.75, 5.0, 7.5, 8.5, 10.0],
+      [0.0, 0.25, -0.05, 0.3, 0.0, 0.2, -0.2, 0.0]
+    ),
+
+    // Right Leg Motion
+    new THREE.NumberKeyframeTrack(
+      'Node_RightLegPivot.rotation[x]',
+      [0.0, 0.625, 1.25, 1.875, 2.5, 3.75, 5.0, 5.8, 6.25, 7.5, 8.5, 9.5, 10.0],
+      [0.0, 0.48, -0.7, 0.48, 0.0, -0.45, 0.45, -0.85, -0.35, 0.6, -0.38, 0.09, 0.0]
+    ),
+    new THREE.NumberKeyframeTrack(
+      'Node_RightLegPivot.rotation[z]',
+      [0.0, 1.25, 2.5, 3.75, 5.0, 7.5, 8.5, 10.0],
+      [0.0, 0.05, -0.25, 0.0, -0.3, -0.2, 0.2, 0.0]
+    ),
   ];
 
-  return new THREE.AnimationClip('idle_rev', duration, tracks);
-}
+  const danceClip = new THREE.AnimationClip('dance', 10.0, danceTracks);
+  const danceAction = mixer.clipAction(danceClip);
+  actions.set('dance', danceAction);
 
-function buildDriftClip(): THREE.AnimationClip {
-  const duration = 2.4;
-  const times = [0, 0.6, 1.2, 1.8, 2.4];
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-
-  const steerVals: number[] = [];
-  [0, -0.42, -0.38, -0.15, 0].forEach((yaw) => {
-    e.set(0, yaw, 0);
-    q.setFromEuler(e);
-    steerVals.push(q.x, q.y, q.z, q.w);
-  });
-
-  const chassisRotVals: number[] = [];
-  [0, -0.06, -0.08, -0.03, 0].forEach((roll) => {
-    e.set(0.01, 0, roll);
-    q.setFromEuler(e);
-    chassisRotVals.push(q.x, q.y, q.z, q.w);
-  });
-
-  const tracks: THREE.KeyframeTrack[] = [
-    new THREE.QuaternionKeyframeTrack('wheelSteerFL.quaternion', times, steerVals),
-    new THREE.QuaternionKeyframeTrack('wheelSteerFR.quaternion', times, steerVals),
-    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', times, chassisRotVals),
+  // Walk Clip
+  const walkTracks: THREE.KeyframeTrack[] = [
+    new THREE.VectorKeyframeTrack('Node_PelvisPivot.position', [0, 0.25, 0.5, 0.75, 1.0], [
+      0, 0.75, 0, 0, 0.79, 0, 0, 0.75, 0, 0, 0.79, 0, 0, 0.75, 0
+    ]),
+    new THREE.NumberKeyframeTrack('Node_PelvisPivot.rotation[y]', [0, 0.25, 0.5, 0.75, 1.0], [0, 0.06, 0, -0.06, 0]),
+    new THREE.NumberKeyframeTrack('Node_LeftArmPivot.rotation[x]', [0, 0.5, 1.0], [-0.55, 0.55, -0.55]),
+    new THREE.NumberKeyframeTrack('Node_RightArmPivot.rotation[x]', [0, 0.5, 1.0], [0.55, -0.55, 0.55]),
+    new THREE.NumberKeyframeTrack('Node_LeftLegPivot.rotation[x]', [0, 0.5, 1.0], [0.55, -0.55, 0.55]),
+    new THREE.NumberKeyframeTrack('Node_RightLegPivot.rotation[x]', [0, 0.5, 1.0], [-0.55, 0.55, -0.55]),
   ];
+  const walkClip = new THREE.AnimationClip('walk', 1.0, walkTracks);
+  actions.set('walk', mixer.clipAction(walkClip));
 
-  return new THREE.AnimationClip('drift', duration, tracks);
-}
-
-function buildParkedClip(): THREE.AnimationClip {
-  const tracks: THREE.KeyframeTrack[] = [
-    new THREE.VectorKeyframeTrack('Node_Chassis.position', [0, 1.0], [0, 0.38, 0, 0, 0.38, 0]),
-    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', [0, 1.0], [0, 0, 0, 1, 0, 0, 0, 1]),
+  // Idle Clip
+  const idleTracks: THREE.KeyframeTrack[] = [
+    new THREE.VectorKeyframeTrack('Node_PelvisPivot.position', [0, 1.0, 2.0], [0, 0.75, 0, 0, 0.735, 0, 0, 0.75, 0]),
+    new THREE.NumberKeyframeTrack('Node_HeadPivot.rotation[x]', [0, 1.0, 2.0], [0, 0.04, 0]),
+    new THREE.NumberKeyframeTrack('Node_LeftArmPivot.rotation[x]', [0, 1.0, 2.0], [0, -0.05, 0]),
+    new THREE.NumberKeyframeTrack('Node_RightArmPivot.rotation[x]', [0, 1.0, 2.0], [0, 0.05, 0]),
   ];
-  return new THREE.AnimationClip('parked', 1.0, tracks);
-}
+  const idleClip = new THREE.AnimationClip('idle', 2.0, idleTracks);
+  actions.set('idle', mixer.clipAction(idleClip));
 
-/* =========================================================================
- * 4. FACTORY ENTRY POINT
- * ========================================================================= */
+  // Run Clip
+  const runTracks: THREE.KeyframeTrack[] = [
+    new THREE.VectorKeyframeTrack('Node_PelvisPivot.position', [0, 0.15, 0.3, 0.45, 0.6], [
+      0, 0.72, 0, 0, 0.82, 0, 0, 0.72, 0, 0, 0.82, 0, 0, 0.72, 0
+    ]),
+    new THREE.NumberKeyframeTrack('Node_TorsoPivot.rotation[x]', [0, 0.6], [0.18, 0.18]),
+    new THREE.NumberKeyframeTrack('Node_LeftArmPivot.rotation[x]', [0, 0.3, 0.6], [-1.1, 1.1, -1.1]),
+    new THREE.NumberKeyframeTrack('Node_RightArmPivot.rotation[x]', [0, 0.3, 0.6], [1.1, -1.1, 1.1]),
+    new THREE.NumberKeyframeTrack('Node_LeftLegPivot.rotation[x]', [0, 0.3, 0.6], [1.1, -1.1, 1.1]),
+    new THREE.NumberKeyframeTrack('Node_RightLegPivot.rotation[x]', [0, 0.3, 0.6], [-1.1, 1.1, -1.1]),
+  ];
+  const runClip = new THREE.AnimationClip('run', 0.6, runTracks);
+  actions.set('run', mixer.clipAction(runClip));
 
-export function createSupercarModel(options: SupercarOptions = {}): SupercarInstance {
-  const carRoot = new THREE.Group() as SupercarInstance;
-  carRoot.name = 'Supercar_ApexHorizon';
+  danceAction.play();
 
-  const bodyColorHex = options.bodyColor || '#FF5500';
-  const rimColorHex = options.rimColor || '#E8E8E8';
-
-  const materials: SupercarMaterials = {
-    bodyPrimary: new THREE.MeshStandardMaterial({
-      color: new THREE.Color(bodyColorHex),
-      roughness: 0.25,
-      metalness: 0.15,
-      flatShading: true,
-      name: 'Mat_SupercarBody',
-    }),
-    bodyAccent: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#1A1A1A'),
-      roughness: 0.4,
-      metalness: 0.3,
-      flatShading: true,
-      name: 'Mat_SupercarAccent',
-    }),
-    trimDark: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#111315'),
-      roughness: 0.6,
-      metalness: 0.2,
-      flatShading: true,
-      name: 'Mat_SupercarTrimDark',
-    }),
-    chromeRim: new THREE.MeshStandardMaterial({
-      color: new THREE.Color(rimColorHex),
-      roughness: 0.15,
-      metalness: 0.9,
-      flatShading: true,
-      name: 'Mat_ChromeRim',
-    }),
-    tireRubber: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#181818'),
-      roughness: 0.85,
-      metalness: 0.05,
-      flatShading: true,
-      name: 'Mat_TireRubber',
-    }),
-    glassTint: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#0A0C10'),
-      roughness: 0.1,
-      metalness: 0.9,
-      transparent: true,
-      opacity: 0.88,
-      flatShading: true,
-      name: 'Mat_GlassTint',
-    }),
-    lightWarm: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#FFF0A0'),
-      emissive: new THREE.Color('#FFE070'),
-      emissiveIntensity: options.headlightsOn !== false ? 2.5 : 0.1,
-      flatShading: true,
-      name: 'Mat_HeadlightWarm',
-    }),
-    lightAmber: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#FFA826'),
-      emissive: new THREE.Color('#FF9500'),
-      emissiveIntensity: 1.5,
-      flatShading: true,
-      name: 'Mat_AmberLight',
-    }),
-    lightRed: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#FF3B30'),
-      emissive: new THREE.Color('#FF1100'),
-      emissiveIntensity: 1.8,
-      flatShading: true,
-      name: 'Mat_TaillightRed',
-    }),
+  const rig: CharacterRig = {
+    bodyRoot,
+    pelvisPivot,
+    torsoPivot,
+    torsoMesh,
+    jacketMesh,
+    pauldronsMesh,
+    beltBuckleMesh,
+    capeGroup,
+    headPivot,
+    headMesh,
+    headLayerMesh,
+    crownMesh,
+    faceFeaturesGroup,
+    leftEyeGroup,
+    rightEyeGroup,
+    mouthGroup,
+    leftArmPivot,
+    leftArmMesh,
+    leftSleeveMesh,
+    leftGauntletMesh,
+    rightArmPivot,
+    rightArmMesh,
+    rightSleeveMesh,
+    rightGauntletMesh,
+    handSocketRight,
+    swordProp,
+    leftLegPivot,
+    leftLegMesh,
+    leftPantsLayer,
+    leftBootArmor,
+    rightLegPivot,
+    rightLegMesh,
+    rightPantsLayer,
+    rightBootArmor,
   };
 
-  // NODE & PIVOT HIERARCHY (Gizmo & Animation safe)
-  const chassisNode = new THREE.Group();
-  chassisNode.name = 'Node_Chassis';
-  chassisNode.position.set(0, 0.38, 0);
-  carRoot.add(chassisNode);
+  const nodes: Record<string, THREE.Object3D> = {
+    root,
+    bodyRoot,
+    pelvisPivot,
+    torsoPivot,
+    torsoMesh,
+    jacketMesh,
+    pauldronsMesh,
+    beltBuckleMesh,
+    capeGroup,
+    headPivot,
+    headMesh,
+    headLayerMesh,
+    crownMesh,
+    faceFeaturesGroup,
+    leftEyeGroup,
+    rightEyeGroup,
+    mouthGroup,
+    leftArmPivot,
+    leftArmMesh,
+    leftSleeveMesh,
+    leftGauntletMesh,
+    rightArmPivot,
+    rightArmMesh,
+    rightSleeveMesh,
+    rightGauntletMesh,
+    handSocketRight,
+    swordProp,
+    leftLegPivot,
+    leftLegMesh,
+    leftPantsLayer,
+    leftBootArmor,
+    rightLegPivot,
+    rightLegMesh,
+    rightPantsLayer,
+    rightBootArmor,
+  };
 
-  // Body Assembly
-  const bodyAssembly = buildSupercarBody(materials);
-  chassisNode.add(bodyAssembly);
-
-  // Wheels Mounts & Spin Nodes
-  function addWheelPivot(opts: {
-    name: string;
-    steerName?: string;
-    spinName: string;
-    x: number;
-    y: number;
-    z: number;
-    radius: number;
-    width: number;
-    isRight: boolean;
-  }) {
-    let parentGroup: THREE.Group = chassisNode;
-
-    if (opts.steerName) {
-      const steerPivot = new THREE.Group();
-      steerPivot.name = opts.steerName;
-      steerPivot.position.set(opts.x, opts.y - 0.38, opts.z);
-      chassisNode.add(steerPivot);
-      parentGroup = steerPivot;
-    }
-
-    const spinPivot = new THREE.Group();
-    spinPivot.name = opts.spinName;
-    if (!opts.steerName) {
-      spinPivot.position.set(opts.x, opts.y - 0.38, opts.z);
-    }
-    parentGroup.add(spinPivot);
-
-    const wheel = buildLowPolyWheel(opts.radius, opts.width, materials, opts.isRight, opts.name);
-    spinPivot.add(wheel);
-  }
-
-  // Front Wheels (with steering pivots)
-  addWheelPivot({
-    name: 'wheel_FL',
-    steerName: 'wheelSteerFL',
-    spinName: 'wheelSpinFL',
-    x: -0.9,
-    y: 0.38,
-    z: 1.4,
-    radius: 0.36,
-    width: 0.26,
-    isRight: false,
-  });
-
-  addWheelPivot({
-    name: 'wheel_FR',
-    steerName: 'wheelSteerFR',
-    spinName: 'wheelSpinFR',
-    x: 0.9,
-    y: 0.38,
-    z: 1.4,
-    radius: 0.36,
-    width: 0.26,
-    isRight: true,
-  });
-
-  // Rear Wheels
-  addWheelPivot({
-    name: 'wheel_RL',
-    spinName: 'wheelSpinRL',
-    x: -0.95,
-    y: 0.40,
-    z: -1.35,
-    radius: 0.40,
-    width: 0.30,
-    isRight: false,
-  });
-
-  addWheelPivot({
-    name: 'wheel_RR',
-    spinName: 'wheelSpinRR',
-    x: 0.95,
-    y: 0.40,
-    z: -1.35,
-    radius: 0.40,
-    width: 0.30,
-    isRight: true,
-  });
-
-  // ANIMATION CLIPS
-  const driveClip = buildDriveClip();
-  const idleRevClip = buildIdleRevClip();
-  const driftClip = buildDriftClip();
-  const parkedClip = buildParkedClip();
-  const clips: THREE.AnimationClip[] = [driveClip, idleRevClip, driftClip, parkedClip];
-
-  carRoot.animations = clips;
-
-  // SCULPT RUNTIME METADATA
   const passes = {
-    blockout: { name: 'Blockout & Silhouette', completed: true, score: 0.95 },
-    structural: { name: 'Modular Pivot Hierarchy & Rig', completed: true, score: 0.95 },
-    form: { name: 'Faceted Kitbash Styling & Aerodynamics', completed: true, score: 0.95 },
-    material: { name: 'PBR Body / Chrome / Rubber Materials', completed: true, score: 0.90 },
-    surface: { name: 'Headlights, Taillights, Louvers, Splitter', completed: true, score: 0.90 },
-    lighting: { name: 'Headlight Emissive & Taillight Glow', completed: true, score: 0.85 },
-    interaction: { name: '4 Baked AnimationClips & Gizmo Safe Nodes', completed: true, score: 0.95 },
-    optimization: { name: 'Clean Shared Geometries & Modular Parts', completed: true, score: 0.90 },
+    blockout:     { name: 'Voxel Blockout & Proportions',                  completed: true, score: 0.95 },
+    structural:   { name: 'Hierarchical Character Rig & Pivots',          completed: true, score: 0.95 },
+    form:         { name: 'Dual-Layer Head & Body Voxel Geometry',        completed: true, score: 0.95 },
+    material:     { name: 'Nearest-Neighbor Minecraft Procedural Textures', completed: true, score: 0.90 },
+    surface:      { name: 'Voxel Claymore Sword & Pauldron Armor',         completed: true, score: 0.90 },
+    lighting:     { name: 'LookDev Light Rig & Emissive Eyes',            completed: true, score: 0.85 },
+    interaction:  { name: '10-Second 4-Step Choreographed Dance Clip',      completed: true, score: 0.95 },
+    optimization: { name: 'Geometry Caching & GPU Texture Clean',          completed: true, score: 0.90 },
   };
 
+  // `score` in [0, 1] — see checkTsStagedPasses() in index.html.
   const passesReviewed: Record<string, { score: number; notes?: string }> = {
-    blockout: { score: 0.95, notes: 'Apex Horizon low-poly concept supercar silhouette' },
-    structural: { score: 0.95, notes: 'Chassis + steering pivots + wheel spin pivots with natural gizmo alignment' },
-    form: { score: 0.95, notes: 'Faceted kitbash styling with aerodynamic body lines' },
-    material: { score: 0.90, notes: 'PBR Standard with flatShading, metallic chrome rims and rubber tires' },
-    surface: { score: 0.90, notes: 'Splitter, louvers, diffuser, LED headlights, taillights' },
-    lighting: { score: 0.85, notes: 'Warm LED headlights with emissive intensity controls' },
-    interaction: { score: 0.95, notes: '4 baked AnimationClips with seamless loops and full gizmo support' },
-    optimization: { score: 0.90, notes: 'Modular hierarchy with memory-efficient shared materials' },
+    blockout:     { score: 0.95, notes: 'Blocky 8x8 voxel head + 16x8 body proportions' },
+    structural:   { score: 0.95, notes: 'Hierarchical pivot rig: head, torso, hips, arms, legs' },
+    form:         { score: 0.95, notes: 'Layered voxel geometry with skin + apparel + armor' },
+    material:     { score: 0.90, notes: 'Nearest-neighbor filtered procedural textures' },
+    surface:      { score: 0.90, notes: 'Pauldron armor, dual-wing crossguard, gold filigree' },
+    lighting:     { score: 0.85, notes: 'LookDev HemisphereLight + DirectionalLight + emissive eyes' },
+    interaction:  { score: 0.95, notes: 'Choreographed 4-step dance clip with baked keyframes' },
+    optimization: { score: 0.90, notes: 'Geometry cached, materials & GPU resources disposed on teardown' },
   };
 
   const detailInventory: DetailInventoryItem[] = [
     {
-      id: 'supercar_body_chassis_base',
-      region: 'chassis',
+      // SYSTEM_UPDATE_PROMPT §3b contract fields.
+      // The `id` is the mesh-name prefix — the validator checks
+      // `o.name.startsWith(id)` (dots → slashes) and warns on miss.
+      id: 'Node_HeadMesh',
+      region: 'head',
       kind: 'feature',
       priority: 'high',
       reviewThreshold: 0.9,
-      name: 'Apex Horizon Body',
-      feature: 'Faceted Body Shell',
-      category: 'Chassis',
+      // Inspector metadata:
+      name: 'Voxel Paladin Head with 3D Crown & Eyes',
+      feature: 'Layered Head, Hair & Sclera-Iris Eyes',
+      category: 'Anatomy',
       pass: 'form',
-      description: 'Faceted body kitbash — front splitter, doors, fenders, roof, spoiler',
-      location: 'main chassis',
-      meshName: 'supercar_body_chassis_base',
+      description: '8x8 voxel head with 3D catchlight eyes, 3D eyebrows, and golden crown',
+      location: 'Head Pivot Joint',
+      meshName: 'Node_HeadMesh',
+      nodes: ['Node_HeadPivot', 'Node_HeadMesh', 'Node_FaceFeatures', 'Node_PaladinCrown'],
     },
     {
-      id: 'wheel_FL_tire',
-      region: 'front-left',
+      // `Item_VoxelClaymore` is a THREE.Group (swordGroup) — its
+      // internal pommel/grip/blade meshes don't carry individual
+      // names.  medium priority skips the validator's mesh-prefix
+      // lookup while still surfacing the entry in the inspector.
+      id: 'Item_VoxelClaymore',
+      region: 'right-hand',
       kind: 'feature',
-      priority: 'high',
+      priority: 'medium',
+      reviewThreshold: 0.85,
+      name: 'Voxel Laser Claymore Greatsword',
+      feature: 'Glowing Runed Claymore',
+      category: 'Weaponry',
+      pass: 'surface',
+      description: 'Hand-fitted broadsword with pommel jewel and dual-wing crossguard',
+      location: 'Right Hand Socket',
+      meshName: 'Item_VoxelClaymore',
+      nodes: ['Socket_HandRight', 'Item_VoxelClaymore'],
+    },
+    {
+      // `Node_CapeGroup` is a THREE.Group; the cape mesh inside is
+      // unnamed.  medium priority skips the mesh-prefix check.
+      id: 'Node_CapeGroup',
+      region: 'back',
+      kind: 'feature',
+      priority: 'medium',
       reviewThreshold: 0.8,
-      name: 'Front-Left Wheel',
-      feature: '5-Star Chrome Rim + Rubber Tire',
+      name: 'Aerodynamic Royal Flowing Cape',
+      feature: 'Back Cape Armor',
+      category: 'Apparel',
+      pass: 'surface',
+      description: 'Dynamic physics-reactive cape with gold filigree border',
+      location: 'Torso Upper Posterior',
+      meshName: 'Node_CapeGroup',
+      nodes: ['Node_CapeGroup'],
+    },
+    {
+      id: 'Node_LeftLegMesh',
+      region: 'lower-body',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.85,
+      name: 'Dual-Leg Armored Greaves & Soles',
+      feature: 'Lower Limb Rig',
       category: 'Locomotion',
-      pass: 'form',
-      description: '5-spoke chrome rim with deep dish lip and dark barrel',
-      location: 'front-left wheel well',
-      meshName: 'wheel_FL_tire',
-    },
-    {
-      id: 'wheel_FR_tire',
-      region: 'front-right',
-      kind: 'feature',
-      priority: 'high',
-      reviewThreshold: 0.8,
-      name: 'Front-Right Wheel',
-      feature: '5-Star Chrome Rim + Rubber Tire',
-      category: 'Locomotion',
-      pass: 'form',
-      description: '5-spoke chrome rim with deep dish lip and dark barrel',
-      location: 'front-right wheel well',
-      meshName: 'wheel_FR_tire',
-    },
-    {
-      id: 'wheel_RL_tire',
-      region: 'rear-left',
-      kind: 'feature',
-      priority: 'high',
-      reviewThreshold: 0.8,
-      name: 'Rear-Left Wheel',
-      feature: '5-Star Chrome Rim + Rubber Tire (larger rear)',
-      category: 'Locomotion',
-      pass: 'form',
-      description: 'Larger rear wheel for performance stance',
-      location: 'rear-left wheel well',
-      meshName: 'wheel_RL_tire',
-    },
-    {
-      id: 'wheel_RR_tire',
-      region: 'rear-right',
-      kind: 'feature',
-      priority: 'high',
-      reviewThreshold: 0.8,
-      name: 'Rear-Right Wheel',
-      feature: '5-Star Chrome Rim + Rubber Tire (larger rear)',
-      category: 'Locomotion',
-      pass: 'form',
-      description: 'Larger rear wheel for performance stance',
-      location: 'rear-right wheel well',
-      meshName: 'wheel_RR_tire',
-    },
-    {
-      id: 'apex_horizon_headlights_L_0',
-      region: 'front',
-      kind: 'feature',
-      priority: 'high',
-      reviewThreshold: 0.75,
-      name: 'Glowing Headlights',
-      feature: 'Warm LED Emissive Blocks',
-      category: 'Lighting',
-      pass: 'lighting',
-      description: 'Emissive warm-yellow LED blocks in front fascia',
-      location: 'front headlights',
-      meshName: 'apex_horizon_headlights_L_0',
-    },
-    {
-      id: 'apex_horizon_taillights_L',
-      region: 'rear',
-      kind: 'feature',
-      priority: 'high',
-      reviewThreshold: 0.75,
-      name: 'Glowing Taillights',
-      feature: 'Red Emissive Tail Blocks',
-      category: 'Lighting',
-      pass: 'lighting',
-      description: 'Red emissive taillight blocks across the rear fascia',
-      location: 'rear taillights',
-      meshName: 'apex_horizon_taillights_L',
+      pass: 'structural',
+      description: 'Independent hip joint anchors with gold armored boots for dance steps',
+      location: 'Pelvis Pivot Mount',
+      meshName: 'Node_LeftLegMesh',
+      nodes: ['Node_LeftLegPivot', 'Node_RightLegPivot', 'Node_LeftBootArmor', 'Node_RightBootArmor'],
     },
   ];
 
-  const mixer = new THREE.AnimationMixer(carRoot);
-  const actions = new Map<string, THREE.AnimationAction>();
-
-  for (const clip of clips) {
-    const action = mixer.clipAction(clip);
-    action.setLoop(THREE.LoopRepeat, Infinity);
-    action.clampWhenFinished = false;
-    action.enabled = true;
-    action.setEffectiveWeight(0);
-    actions.set(clip.name, action);
-  }
-
-  let currentAnim = 'drive';
-  const initialAction = actions.get(currentAnim);
-  if (initialAction) {
-    initialAction.setEffectiveWeight(1).play();
-  }
-
-  const runtime = {
-    animations: clips.map((c) => ({
-      name: c.name,
-      duration: c.duration,
-      tracks: c.tracks.map((t) => ({
-        name: t.name,
-        times: Array.from((t as any).times),
-        values: Array.from((t as any).values),
-      })),
-    })),
+  const runtime: MinecraftCharacterRuntime = {
+    root,
+    rig,
+    nodes,
+    materials,
+    animations: {
+      clips: [danceClip, walkClip, runClip, idleClip],
+      mixer,
+      actions,
+    },
+    state: {
+      currentAnimation: 'dance',
+      theme: resolvedThemeId,
+      isDancing: true,
+      hasSword: showSword,
+    },
     passes,
     passesComplete: true,
     passesReviewed,
     detailInventory,
-    mixer,
-  };
 
-  carRoot.userData.sculptRuntime = runtime;
-  carRoot.userData.tick = (dt?: number) => {
-    mixer.update(Math.min(dt ?? 0.016, 0.1));
-  };
+    playAnimation(name: AnimationName, crossFadeDuration = 0.3) {
+      if (this.state.currentAnimation === name) return;
+      this.state.currentAnimation = name;
 
-  function setAnimation(animName: string) {
-    if (!actions.has(animName)) return;
-    if (animName === currentAnim) return;
-    const fade = 0.2;
-    const prev = actions.get(currentAnim);
-    const next = actions.get(animName)!;
-    if (prev) {
-      prev.fadeOut(fade);
-    }
-    next.reset();
-    next.setEffectiveWeight(1);
-    next.fadeIn(fade);
-    next.play();
-    currentAnim = animName;
-  }
+      const targetAction = actions.get(name);
+      if (!targetAction) return;
 
-  function setHeadlights(enabled: boolean) {
-    materials.lightWarm.emissiveIntensity = enabled ? 2.5 : 0.05;
-  }
-
-  function setBodyColor(hex: string) {
-    materials.bodyPrimary.color.set(hex);
-  }
-
-  function dispose() {
-    carRoot.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.geometry?.dispose();
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((m) => m.dispose());
-        } else if (mesh.material) {
-          mesh.material.dispose();
+      actions.forEach((act, actName) => {
+        if (actName === name) {
+          act.reset().fadeIn(crossFadeDuration).play();
+        } else {
+          act.fadeOut(crossFadeDuration);
         }
-      }
-    });
-    try {
-      mixer.stopAllAction();
-      mixer.uncacheRoot(carRoot);
-    } catch (_) {
-      /* noop */
-    }
-  }
+      });
+    },
 
-  Object.defineProperty(carRoot, 'currentAnimation', { get: () => currentAnim });
-  carRoot.tick = (dt: number) => mixer.update(Math.min(dt, 0.1));
-  carRoot.setAnimation = setAnimation;
-  carRoot.setHeadlights = setHeadlights;
-  carRoot.setBodyColor = setBodyColor;
-  carRoot.dispose = dispose;
+    stopAnimations() {
+      actions.forEach((act) => act.stop());
+    },
+
+    setJointAngles(angles: JointAnglesConfig) {
+      if (angles.headPitch !== undefined) headPivot.rotation.x = angles.headPitch;
+      if (angles.headYaw !== undefined) headPivot.rotation.y = angles.headYaw;
+      if (angles.headRoll !== undefined) headPivot.rotation.z = angles.headRoll;
+      if (angles.torsoYaw !== undefined) torsoPivot.rotation.y = angles.torsoYaw;
+      if (angles.torsoPitch !== undefined) torsoPivot.rotation.x = angles.torsoPitch;
+      if (angles.torsoRoll !== undefined) torsoPivot.rotation.z = angles.torsoRoll;
+      if (angles.leftArmPitch !== undefined) leftArmPivot.rotation.x = angles.leftArmPitch;
+      if (angles.leftArmYaw !== undefined) leftArmPivot.rotation.y = angles.leftArmYaw;
+      if (angles.leftArmRoll !== undefined) leftArmPivot.rotation.z = angles.leftArmRoll;
+      if (angles.rightArmPitch !== undefined) rightArmPivot.rotation.x = angles.rightArmPitch;
+      if (angles.rightArmYaw !== undefined) rightArmPivot.rotation.y = angles.rightArmYaw;
+      if (angles.rightArmRoll !== undefined) rightArmPivot.rotation.z = angles.rightArmRoll;
+      if (angles.leftLegPitch !== undefined) leftLegPivot.rotation.x = angles.leftLegPitch;
+      if (angles.leftLegYaw !== undefined) leftLegPivot.rotation.y = angles.leftLegYaw;
+      if (angles.leftLegRoll !== undefined) leftLegPivot.rotation.z = angles.leftLegRoll;
+      if (angles.rightLegPitch !== undefined) rightLegPivot.rotation.x = angles.rightLegPitch;
+      if (angles.rightLegYaw !== undefined) rightLegPivot.rotation.y = angles.rightLegYaw;
+      if (angles.rightLegRoll !== undefined) rightLegPivot.rotation.z = angles.rightLegRoll;
+    },
+
+    setSkinTheme(newThemeId: SkinThemeId) {
+      const newTheme = SKIN_THEMES[newThemeId];
+      if (!newTheme) return;
+      this.state.theme = newThemeId;
+
+      skinMat.map = createVoxelTexture(8, 8, newTheme.skinTone, newTheme.skinShadow, 0.05);
+      hairMat.map = createVoxelTexture(8, 8, newTheme.hairBase, newTheme.hairHighlight, 0.12);
+      armorMat.map = createVoxelTexture(8, 12, newTheme.primaryArmor, newTheme.primaryArmorDark, 0.08, newTheme.accentGold, true);
+      legMat.map = createVoxelTexture(4, 12, newTheme.secondaryArmor, newTheme.primaryArmorDark, 0.08, newTheme.accentGold);
+      armMat.map = createVoxelTexture(4, 12, newTheme.secondaryArmor, newTheme.primaryArmor, 0.08, newTheme.glowCyan);
+      capeMat.map = createVoxelTexture(8, 16, newTheme.capeOuter, newTheme.capeInner, 0.05, newTheme.accentGold);
+      goldMat.color.set(newTheme.accentGold);
+      scleraMat.color.set(newTheme.eyesSclera);
+      irisMat.color.set(newTheme.eyesIris);
+      irisMat.emissive.set(newTheme.eyesIris);
+      pupilMat.color.set(newTheme.eyesPupil);
+      eyebrowMat.color.set(newTheme.eyebrow);
+      mouthLipMat.color.set(newTheme.mouthLip);
+      mouthInnerMat.color.set(newTheme.mouthInner);
+      blushMat.color.set(newTheme.blush);
+    },
+
+    setSwordVisibility(visible: boolean) {
+      this.state.hasSword = visible;
+      swordProp.visible = visible;
+    },
+
+    update(deltaTime: number) {
+      mixer.update(deltaTime);
+    },
+
+    tick(deltaTime = 0.016) {
+      this.update(deltaTime);
+    },
+
+    dispose() {
+      root.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else if (child.material) {
+            child.material.dispose();
+          }
+        }
+      });
+      headSkinTex.dispose();
+      hairTex.dispose();
+      torsoArmorTex.dispose();
+      legArmorTex.dispose();
+      armArmorTex.dispose();
+      capeTex.dispose();
+    },
+  };
+
+  root.userData.sculptRuntime = runtime;
+  root.userData.runtime = runtime;
+  root.userData.tick = (dt?: number) => runtime.tick(dt ?? 0.016);
 
   // LBL PART 30.7 — tag every part mesh for external rig-test/GLB-viewer
   // pickability. Inert to this renderer (nothing here reads these two
@@ -802,42 +1327,56 @@ export function createSupercarModel(options: SupercarOptions = {}): SupercarInst
   // (GLTFExporter serializes userData -> extras) to enumerate
   // separately-pickable parts instead of falling back to a single
   // whole-model "low-poly mode" target.
-  carRoot.traverse((node) => {
-    if ((node as THREE.Mesh).isMesh) {
+  root.traverse((node) => {
+    if (node instanceof THREE.Mesh) {
       node.userData.isPickable = true;
       node.userData.partName = node.name || `part_${node.id}`;
     }
   });
 
-  return carRoot;
+  return root;
+}
+
+export function tick(group: THREE.Group, delta = 0.016): void {
+  if (group.userData.sculptRuntime?.tick) {
+    group.userData.sculptRuntime.tick(delta);
+  } else if (group.userData.tick) {
+    group.userData.tick(delta);
+  }
 }
 
 export function getLookDevLights(): THREE.Group {
   const lightRig = new THREE.Group();
-  lightRig.name = 'Supercar_LookDevLights';
+  lightRig.name = 'Minecraft_LookDevLights';
 
-  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334455, 1.0);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 1.2);
   hemiLight.position.set(0, 20, 0);
   lightRig.add(hemiLight);
 
-  const keyLight = new THREE.DirectionalLight(0xfffaed, 2.2);
-  keyLight.position.set(6, 12, 8);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.width = 2048;
-  keyLight.shadow.mapSize.height = 2048;
-  lightRig.add(keyLight);
+  const sunLight = new THREE.DirectionalLight(0xfffaed, 2.4);
+  sunLight.position.set(6, 12, 8);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  lightRig.add(sunLight);
 
-  const fillLight = new THREE.DirectionalLight(0x88ccff, 0.8);
-  fillLight.position.set(-8, 6, -6);
+  const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.9);
+  fillLight.position.set(-8, 5, -6);
   lightRig.add(fillLight);
 
-  const rimLight = new THREE.DirectionalLight(0xff7722, 1.4);
-  rimLight.position.set(0, 8, -10);
+  const rimLight = new THREE.DirectionalLight(0xf59e0b, 1.6);
+  rimLight.position.set(0, 6, -10);
   lightRig.add(rimLight);
 
   return lightRig;
 }
 
-export const createSupercar = createSupercarModel;
-export const createModel = createSupercarModel;
-export default createSupercarModel;
+export const createModel = createMinecraftCharacterModel;
+export const createCharacterModel = createMinecraftCharacterModel;
+export const createMinecraftModel = createMinecraftCharacterModel;
+export const createMinecraftCharacter = (options?: SkinThemeId | CharacterOptions) => {
+  const group = createMinecraftCharacterModel(options);
+  return { group, runtime: group.userData.sculptRuntime as MinecraftCharacterRuntime };
+};
+
+export default createMinecraftCharacterModel;

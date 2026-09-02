@@ -1,466 +1,843 @@
-import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-
 /**
- * DetailInventoryItem — see SYSTEM_UPDATE_PROMPT §3b / checkTsDetailInventory()
- * in index.html.  Each entry must have id/region/kind/priority/reviewThreshold.
- * For high-priority items of kind 'feature'/'panel'/'decal'/'landmark' the
- * validation looks up a mesh whose name starts with `id` (dots → slashes).
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Procedural 3D Supercar Generator
+ * Model: "Apex Horizon - Low-Poly Concept Supercar"
+ * Architecture: img2threejs & Low-Poly 3D Studio
  */
-export interface DetailInventoryItem {
-    id: string;
-    region: string;
-    kind: 'feature' | 'panel' | 'decal' | 'landmark' | string;
-    priority: 'high' | 'medium' | 'low' | string;
-    reviewThreshold: number;
-    name?: string;
-    feature?: string;
-    category?: string;
-    pass?: string;
-    description?: string;
-    location?: string;
-    meshName?: string;
-    nodes?: string[];
+
+import * as THREE from 'three';
+
+/* =========================================================================
+ * 1. SPECIFICATION & TYPES
+ * ========================================================================= */
+
+export interface ObjectSculptSpec {
+  name: string;
+  category: 'vehicle';
+  style: 'stylized-lowpoly';
+  version: string;
+  animations: string[];
 }
 
-export function createTrainModel(options: any = {}): THREE.Group {
-    const train = new THREE.Group();
+export const SUPERCAR_SPEC: ObjectSculptSpec = {
+  name: 'Apex Horizon GT',
+  category: 'vehicle',
+  style: 'stylized-lowpoly',
+  version: '3.1.0',
+  animations: ['drive', 'idle_rev', 'drift', 'parked'],
+};
 
-    // High-fidelity toy color palette based on the reference image
-    const colors = {
-        red: 0xdf3e23,      // Vibrant but soft matte red
-        darkGray: 0x36383a, // Main chassis, roof, wheels
-        black: 0x181818,    // Inner windows, deep recesses
-        orange: 0xf28b18,   // Boiler stripes
-        smoke: 0xbabfce     // Soft, volumetric gray smoke
-    };
+export interface SupercarOptions {
+  bodyColor?: string;
+  rimColor?: string;
+  headlightsOn?: boolean;
+  wireframe?: boolean;
+}
 
-    // Premium "Designer Toy" Materials using MeshPhysicalMaterial
-    // This gives a beautiful, soft, waxy/plastic look typical of high-end 3D renders
-    const baseMatOpts = { roughness: 0.65, metalness: 0.05, clearcoat: 0.15, clearcoatRoughness: 0.6 };
-    const materials = {
-        red: new THREE.MeshPhysicalMaterial({ color: colors.red, ...baseMatOpts }),
-        darkGray: new THREE.MeshPhysicalMaterial({ color: colors.darkGray, ...baseMatOpts }),
-        black: new THREE.MeshPhysicalMaterial({ color: colors.black, roughness: 0.8, metalness: 0.1 }),
-        orange: new THREE.MeshPhysicalMaterial({ color: colors.orange, ...baseMatOpts }),
-        smoke: new THREE.MeshPhysicalMaterial({ color: colors.smoke, roughness: 0.9, metalness: 0.0, clearcoat: 0.0 }) // Pure matte smoke
-    };
+export interface SupercarMaterials {
+  bodyPrimary: THREE.MeshStandardMaterial;
+  bodyAccent: THREE.MeshStandardMaterial;
+  trimDark: THREE.MeshStandardMaterial;
+  chromeRim: THREE.MeshStandardMaterial;
+  tireRubber: THREE.MeshStandardMaterial;
+  glassTint: THREE.MeshStandardMaterial;
+  lightWarm: THREE.MeshStandardMaterial;
+  lightAmber: THREE.MeshStandardMaterial;
+  lightRed: THREE.MeshStandardMaterial;
+}
 
-    // Helper to add meshes and apply shadows cleanly.
-    // Optional `name` argument registers the mesh in the index.html
-    // validation's lookup table — required for high-priority inventory
-    // entries of kind 'feature'/'panel'/'decal'/'landmark'.
-    const addMesh = (geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, name?: string) => {
-        const mesh = new THREE.Mesh(geometry, material);
-        if (name) mesh.name = name;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        parent.add(mesh);
-        return mesh;
-    };
+export interface DetailInventoryItem {
+  id: string;
+  region: string;
+  kind: 'feature' | 'panel' | 'decal' | 'landmark' | string;
+  priority: 'high' | 'medium' | 'low' | string;
+  reviewThreshold: number;
+  name?: string;
+  feature?: string;
+  category?: string;
+  pass?: string;
+  description?: string;
+  location?: string;
+  meshName?: string;
+  nodes?: string[];
+}
 
-    // ==========================================
-    // 1. BASE & CHASSIS
-    // ==========================================
+export interface SupercarInstance extends THREE.Group {
+  currentAnimation?: string;
+  tick?: (dt: number, time?: number) => void;
+  play?: () => void;
+  stop?: () => void;
+  setAnimation?: (name: string) => void;
+  setHeadlights?: (enabled: boolean) => void;
+  setBodyColor?: (hex: string) => void;
+  dispose?: () => void;
+}
 
-    // Red Platform Base (High segment count for perfectly smooth rounded edges)
-    const platformGeo = new RoundedBoxGeometry(6.8, 0.4, 3.2, 16, 0.15);
-    const platform = addMesh(platformGeo, materials.red, train, 'train_platform');
-    platform.position.set(0, 1.4, 0);
+/* =========================================================================
+ * 2. PROCEDURAL GEOMETRY BUILDERS
+ * ========================================================================= */
 
-    // Dark Gray Undercarriage
-    const chassisGeo = new RoundedBoxGeometry(6.4, 0.8, 2.6, 16, 0.15);
-    const chassis = addMesh(chassisGeo, materials.darkGray, train, 'train_chassis');
-    chassis.position.set(0, 0.8, 0);
+function createKitbashBox(
+  w: number,
+  h: number,
+  d: number,
+  mat: THREE.Material,
+  topScaleX = 1,
+  topScaleZ = 1,
+  shiftX = 0,
+  shiftZ = 0,
+  name = 'part'
+): THREE.Mesh {
+  const geom = new THREE.BoxGeometry(w, h, d);
+  const pos = geom.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y > 0) {
+      pos.setX(i, pos.getX(i) * topScaleX + shiftX);
+      pos.setZ(i, pos.getZ(i) * topScaleZ + shiftZ);
+    }
+  }
+  geom.computeVertexNormals();
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.name = name;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
 
-    // ==========================================
-    // 2. CABIN & ROOF
-    // ==========================================
+export function buildLowPolyWheel(
+  radius: number,
+  width: number,
+  materials: SupercarMaterials,
+  isRight: boolean,
+  prefix: string
+): THREE.Group {
+  const wheelGroup = new THREE.Group();
+  wheelGroup.name = `${prefix}_assembly`;
 
-    const cabinGeo = new RoundedBoxGeometry(2.4, 2.8, 2.9, 16, 0.2);
-    const cabin = addMesh(cabinGeo, materials.red, train, 'train_cabin');
-    cabin.position.set(1.8, 3.0, 0);
+  const tireGeom = new THREE.CylinderGeometry(radius, radius, width, 18);
+  tireGeom.rotateZ(Math.PI / 2);
+  const tire = new THREE.Mesh(tireGeom, materials.tireRubber);
+  tire.name = `${prefix}_tire`;
+  tire.castShadow = true;
+  tire.receiveShadow = true;
+  wheelGroup.add(tire);
 
-    // The roof has a slight overhang
-    const roofGeo = new RoundedBoxGeometry(2.8, 0.45, 3.3, 16, 0.15);
-    const roof = addMesh(roofGeo, materials.darkGray, train, 'train_roof');
-    roof.position.set(1.8, 4.6, 0);
+  const rimRadius = radius * 0.82;
+  const lipGeom = new THREE.TorusGeometry(rimRadius, 0.035, 6, 18);
+  lipGeom.rotateY(Math.PI / 2);
+  const lip = new THREE.Mesh(lipGeom, materials.chromeRim);
+  lip.name = `${prefix}_rim_lip`;
+  lip.castShadow = true;
 
-    // High-fidelity Inset Windows (Frames + Dark Glass)
-    const sideWindowGeo = new RoundedBoxGeometry(1.2, 1.3, 0.3, 16, 0.1);
-    const sideGlassGeo = new RoundedBoxGeometry(0.9, 1.0, 0.35, 16, 0.08);
+  const barrelGeom = new THREE.CylinderGeometry(rimRadius * 0.95, rimRadius * 0.95, width * 0.9, 18);
+  barrelGeom.rotateZ(Math.PI / 2);
+  const barrel = new THREE.Mesh(barrelGeom, materials.trimDark);
+  barrel.name = `${prefix}_barrel`;
+  wheelGroup.add(barrel);
 
-    // Left Window
-    const winFrameL = addMesh(sideWindowGeo, materials.darkGray, train, 'train_window_L_frame');
-    winFrameL.position.set(1.8, 3.2, 1.4);
-    const winGlassL = addMesh(sideGlassGeo, materials.black, train, 'train_window_L_glass');
-    winGlassL.position.set(1.8, 3.2, 1.4);
+  const spokeGroup = new THREE.Group();
+  spokeGroup.name = `${prefix}_spokes`;
+  const spokeGeom = new THREE.BoxGeometry(0.06, rimRadius * 0.95, 0.05);
+  spokeGeom.translate(0, rimRadius * 0.475, 0);
 
-    // Right Window
-    const winFrameR = addMesh(sideWindowGeo, materials.darkGray, train, 'train_window_R_frame');
-    winFrameR.position.set(1.8, 3.2, -1.4);
-    const winGlassR = addMesh(sideGlassGeo, materials.black, train, 'train_window_R_glass');
-    winGlassR.position.set(1.8, 3.2, -1.4);
+  for (let i = 0; i < 5; i++) {
+    const spoke = new THREE.Mesh(spokeGeom, materials.chromeRim);
+    spoke.name = `${prefix}_spoke_${i}`;
+    spoke.rotation.x = (Math.PI * 2 / 5) * i;
+    spoke.castShadow = true;
+    spokeGroup.add(spoke);
+  }
 
-    // Back Window
-    const backWindowGeo = new RoundedBoxGeometry(0.3, 1.2, 1.6, 16, 0.1);
-    const backGlassGeo = new RoundedBoxGeometry(0.35, 0.9, 1.2, 16, 0.08);
-    const winFrameB = addMesh(backWindowGeo, materials.darkGray, train, 'train_window_B_frame');
-    winFrameB.position.set(2.95, 3.2, 0);
-    const winGlassB = addMesh(backGlassGeo, materials.black, train, 'train_window_B_glass');
-    winGlassB.position.set(2.95, 3.2, 0);
+  const hubGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.08, 10);
+  hubGeom.rotateZ(Math.PI / 2);
+  const hub = new THREE.Mesh(hubGeom, materials.chromeRim);
+  hub.name = `${prefix}_hub`;
+  spokeGroup.add(hub);
 
-    // ==========================================
-    // 3. BOILER & DETAILS
-    // ==========================================
+  const dir = isRight ? 1 : -1;
+  lip.position.x = (width / 2) * dir;
+  spokeGroup.position.x = (width / 2 - 0.01) * dir;
 
-    // Main Boiler Cylinder (High radial segments)
-    const boilerGeo = new THREE.CylinderGeometry(1.15, 1.15, 3.8, 64);
-    const boiler = addMesh(boilerGeo, materials.red, train, 'train_boiler');
-    boiler.rotation.z = Math.PI / 2;
-    boiler.position.set(-1.3, 2.75, 0);
+  wheelGroup.add(lip);
+  wheelGroup.add(spokeGroup);
 
-    // Boiler Orange Stripes (Slightly larger cylinder to wrap seamlessly)
-    const stripeGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 64);
-    const stripe1 = addMesh(stripeGeo, materials.orange, train, 'train_boiler_stripe_1');
-    stripe1.rotation.z = Math.PI / 2;
-    stripe1.position.set(-0.5, 2.75, 0);
+  return wheelGroup;
+}
 
-    const stripe2 = addMesh(stripeGeo, materials.orange, train, 'train_boiler_stripe_2');
-    stripe2.rotation.z = Math.PI / 2;
-    stripe2.position.set(-2.1, 2.75, 0);
+export function buildSupercarBody(materials: SupercarMaterials): THREE.Group {
+  const bodyGroup = new THREE.Group();
+  bodyGroup.name = 'supercar_body_assembly';
 
-    // Boiler Front Cap (Dark Gray)
-    const capGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.3, 64);
-    const cap = addMesh(capGeo, materials.darkGray, train, 'train_boiler_cap');
-    cap.rotation.z = Math.PI / 2;
-    cap.position.set(-3.35, 2.75, 0);
+  function addPart(
+    w: number,
+    h: number,
+    d: number,
+    mat: THREE.Material,
+    topScaleX = 1,
+    topScaleZ = 1,
+    shiftX = 0,
+    shiftZ = 0,
+    x = 0,
+    y = 0,
+    z = 0,
+    rx = 0,
+    ry = 0,
+    rz = 0,
+    name = 'supercar_body_part'
+  ) {
+    const mesh = createKitbashBox(w, h, d, mat, topScaleX, topScaleZ, shiftX, shiftZ, name);
+    mesh.position.set(x, y, z);
+    mesh.rotation.set(rx, ry, rz);
+    bodyGroup.add(mesh);
+    return mesh;
+  }
 
-    // Boiler Front Center Button (Darker)
-    const buttonGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.2, 64);
-    const button = addMesh(buttonGeo, materials.black, train, 'train_boiler_button');
-    button.rotation.z = Math.PI / 2;
-    button.position.set(-3.5, 2.75, 0);
+  // 1. Front Splitter & Underbody
+  addPart(2.0, 0.05, 4.4, materials.trimDark, 0.95, 0.95, 0, 0, 0, 0.025, 0, 0, 0, 0, 'supercar_front_splitter');
 
-    // ==========================================
-    // 4. CHIMNEY & DOME
-    // ==========================================
+  // 2. Main Lower Body Base
+  addPart(1.7, 0.25, 4.2, materials.bodyPrimary, 0.95, 0.95, 0, 0, 0, 0.175, 0, 0, 0, 0, 'supercar_body_chassis_base');
 
-    // Dome (Pill shape constructed from cylinder + sphere)
-    const domeCylGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.5, 32);
-    const domeCyl = addMesh(domeCylGeo, materials.darkGray, train, 'train_dome_cyl');
-    domeCyl.position.set(-1.2, 4.1, 0);
-    const domeTopGeo = new THREE.SphereGeometry(0.35, 32, 32);
-    const domeTop = addMesh(domeTopGeo, materials.darkGray, train, 'train_dome_top');
-    domeTop.position.set(-1.2, 4.35, 0);
+  // 3. Cabin / Greenhouse
+  addPart(1.1, 0.4, 1.8, materials.glassTint, 0.7, 0.4, 0, -0.2, 0, 0.5, 0.0, 0, 0, 0, 'supercar_cabin_glass');
 
-    // Chimney (Base, Flared Top, and Inner Hole)
-    const chimneyBaseGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.9, 32);
-    const chimneyBase = addMesh(chimneyBaseGeo, materials.darkGray, train, 'train_chimney_base');
-    chimneyBase.position.set(-2.8, 4.2, 0);
+  // 4. Roof Panel
+  addPart(0.85, 0.05, 0.9, materials.bodyPrimary, 0.95, 0.8, 0, 0, 0, 0.725, -0.15, 0, 0, 0, 'supercar_roof_panel');
 
-    const chimneyFlareGeo = new THREE.CylinderGeometry(0.55, 0.35, 0.6, 64);
-    const chimneyFlare = addMesh(chimneyFlareGeo, materials.darkGray, train, 'train_chimney_flare');
-    chimneyFlare.position.set(-2.8, 4.9, 0);
+  // 5. Front Nose Wedge
+  addPart(0.9, 0.3, 1.2, materials.bodyPrimary, 0.7, 0.2, 0, -0.4, 0, 0.3, 1.5, 0, 0, 0, 'supercar_hood_wedge');
 
-    const chimneyHoleGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.61, 32);
-    const chimneyHole = addMesh(chimneyHoleGeo, materials.black, train, 'train_chimney_hole');
-    chimneyHole.position.set(-2.8, 4.9, 0);
+  // 6. Front Center Beak
+  addPart(0.2, 0.35, 0.4, materials.bodyPrimary, 0.5, 0.5, 0, -0.1, 0, 0.25, 2.05, 0, 0, 0, 'supercar_front_beak');
 
-    // ==========================================
-    // 5. COWCATCHER (Front Grille)
-    // ==========================================
+  // 7. Front Fenders L/R
+  addPart(0.5, 0.35, 1.2, materials.bodyPrimary, 0.6, 0.7, 0, -0.1, -0.75, 0.325, 1.4, 0, 0, 0, 'supercar_fender_FL');
+  addPart(0.5, 0.35, 1.2, materials.bodyPrimary, 0.6, 0.7, 0, -0.1, 0.75, 0.325, 1.4, 0, 0, 0, 'supercar_fender_FR');
 
-    // We create the wedge by angling a rounded box and intersecting it with the ground/chassis
-    const cowcatcherBaseGeo = new RoundedBoxGeometry(1.2, 1.4, 2.8, 16, 0.1);
-    const cowcatcherBase = addMesh(cowcatcherBaseGeo, materials.darkGray, train, 'train_cowcatcher');
-    cowcatcherBase.position.set(-3.5, 0.8, 0);
-    cowcatcherBase.rotation.z = -Math.PI / 5.5; // Angled forward
+  // 8. Headlight Housings
+  addPart(0.35, 0.2, 0.3, materials.trimDark, 0.9, 0.8, 0, -0.1, -0.65, 0.4, 1.85, 0, 0, 0, 'supercar_headlight_housing_L');
+  addPart(0.35, 0.2, 0.3, materials.trimDark, 0.9, 0.8, 0, -0.1, 0.65, 0.4, 1.85, 0, 0, 0, 'supercar_headlight_housing_R');
 
-    // Vertical Slats embedded in the cowcatcher
-    const slatGeo = new RoundedBoxGeometry(0.2, 1.3, 0.25, 8, 0.08);
-    for (let i = -1.5; i <= 1.5; i += 1.5) {
-        const slat = new THREE.Mesh(slatGeo, materials.black);
-        slat.name = `train_cowcatcher_slat_${i > 0 ? 'R' : 'L'}`;
-        slat.position.set(-0.55, 0, i * 0.55);
-        slat.castShadow = true;
-        slat.receiveShadow = true;
-        cowcatcherBase.add(slat);
+  // 9. Side Doors
+  addPart(1.9, 0.3, 1.4, materials.bodyPrimary, 0.95, 1.0, 0, 0, 0, 0.3, 0.1, 0, 0, 0, 'supercar_doors_main');
+
+  // 10. Side Door Trim Inserts
+  addPart(1.95, 0.15, 0.8, materials.trimDark, 1.0, 0.9, 0, 0, 0, 0.225, 0.2, 0, 0, 0, 'supercar_doors_trim');
+
+  // 11. Rear Fenders
+  addPart(0.6, 0.45, 1.4, materials.bodyPrimary, 0.7, 0.8, 0, 0.1, -0.8, 0.375, -1.2, 0, 0, 0, 'supercar_fender_RL');
+  addPart(0.6, 0.45, 1.4, materials.bodyPrimary, 0.7, 0.8, 0, 0.1, 0.8, 0.375, -1.2, 0, 0, 0, 'supercar_fender_RR');
+
+  // 12. Rear Engine Deck
+  addPart(1.1, 0.2, 1.2, materials.trimDark, 0.9, 0.9, 0, 0, 0, 0.45, -1.3, 0, 0, 0, 'supercar_engine_deck');
+
+  // 13. Side Air Intakes
+  addPart(0.3, 0.4, 0.8, materials.trimDark, 1, 1, 0, 0, -0.85, 0.35, -0.5, 0, 0, 0, 'supercar_air_intake_L');
+  addPart(0.3, 0.4, 0.8, materials.trimDark, 1, 1, 0, 0, 0.85, 0.35, -0.5, 0, 0, 0, 'supercar_air_intake_R');
+
+  // 14. Spoiler Wing & Mounts
+  addPart(0.08, 0.25, 0.3, materials.bodyPrimary, 0.6, 0.8, 0, -0.1, -0.8, 0.65, -1.8, 0, 0, 0, 'supercar_spoiler_mount_L');
+  addPart(0.08, 0.25, 0.3, materials.bodyPrimary, 0.6, 0.8, 0, -0.1, 0.8, 0.65, -1.8, 0, 0, 0, 'supercar_spoiler_mount_R');
+  addPart(1.8, 0.05, 0.4, materials.trimDark, 1.0, 0.9, 0, 0, 0, 0.8, -1.9, 0, 0, 0, 'supercar_spoiler_wing');
+
+  // 15. Rear Diffuser
+  addPart(1.6, 0.2, 0.4, materials.trimDark, 0.9, 1.0, 0, 0, 0, 0.15, -2.05, 0, 0, 0, 'supercar_rear_diffuser');
+
+  // 16. Mirrors
+  addPart(0.12, 0.08, 0.15, materials.bodyPrimary, 0.8, 0.8, 0, 0, -0.95, 0.55, 0.7, 0, 0, 0, 'supercar_mirror_L');
+  addPart(0.12, 0.08, 0.15, materials.bodyPrimary, 0.8, 0.8, 0, 0, 0.95, 0.55, 0.7, 0, 0, 0, 'supercar_mirror_R');
+
+  const mStickL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.04), materials.trimDark);
+  mStickL.name = 'supercar_mirror_arm_L';
+  mStickL.position.set(-0.8, 0.5, 0.7);
+  mStickL.rotation.z = 0.4;
+  bodyGroup.add(mStickL);
+
+  const mStickR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.04, 0.04), materials.trimDark);
+  mStickR.name = 'supercar_mirror_arm_R';
+  mStickR.position.set(0.8, 0.5, 0.7);
+  mStickR.rotation.z = -0.4;
+  bodyGroup.add(mStickR);
+
+  // 17. Headlight LEDs (Glowing)
+  const hlGeom = new THREE.BoxGeometry(0.08, 0.06, 0.04);
+  for (let i = 0; i < 4; i++) {
+    const hlL = new THREE.Mesh(hlGeom, materials.lightWarm);
+    hlL.name = `apex_horizon_headlights_L_${i}`;
+    hlL.position.set(-0.55 - i * 0.07, 0.4, 1.95 - i * 0.03);
+    hlL.rotation.y = 0.2;
+    bodyGroup.add(hlL);
+
+    const hlR = new THREE.Mesh(hlGeom, materials.lightWarm);
+    hlR.name = `apex_horizon_headlights_R_${i}`;
+    hlR.position.set(0.55 + i * 0.07, 0.4, 1.95 - i * 0.03);
+    hlR.rotation.y = -0.2;
+    bodyGroup.add(hlR);
+  }
+
+  // 18. Taillights (Glowing Red)
+  const tlGeom = new THREE.BoxGeometry(0.6, 0.08, 0.04);
+  const tlL = new THREE.Mesh(tlGeom, materials.lightRed);
+  tlL.name = 'apex_horizon_taillights_L';
+  tlL.position.set(-0.5, 0.45, -2.12);
+  bodyGroup.add(tlL);
+
+  const tlR = new THREE.Mesh(tlGeom, materials.lightRed);
+  tlR.name = 'apex_horizon_taillights_R';
+  tlR.position.set(0.5, 0.45, -2.12);
+  bodyGroup.add(tlR);
+
+  return bodyGroup;
+}
+
+/* =========================================================================
+ * 3. ANIMATION CLIP GENERATORS
+ * ========================================================================= */
+
+function buildDriveClip(): THREE.AnimationClip {
+  const fps = 30;
+  const duration = 2.0;
+  const frameCount = Math.round(duration * fps);
+  const times: number[] = [];
+
+  const wheelSpinValues: number[] = [];
+  const chassisPosValues: number[] = [];
+  const chassisRotValues: number[] = [];
+
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+
+  for (let i = 0; i <= frameCount; i++) {
+    const t = (i / frameCount) * duration;
+    times.push(t);
+
+    const angle = (t / duration) * Math.PI * 4;
+    q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), angle);
+    wheelSpinValues.push(q.x, q.y, q.z, q.w);
+
+    const bob = Math.sin(t * Math.PI * 8) * 0.012;
+    chassisPosValues.push(0, 0.38 + bob, 0);
+
+    const pitch = Math.sin(t * Math.PI * 8 + 0.5) * 0.008;
+    const roll = Math.cos(t * Math.PI * 4) * 0.005;
+    e.set(pitch, 0, roll);
+    q.setFromEuler(e);
+    chassisRotValues.push(q.x, q.y, q.z, q.w);
+  }
+
+  const tracks: THREE.KeyframeTrack[] = [
+    new THREE.QuaternionKeyframeTrack('wheelSpinFL.quaternion', times, wheelSpinValues),
+    new THREE.QuaternionKeyframeTrack('wheelSpinFR.quaternion', times, wheelSpinValues),
+    new THREE.QuaternionKeyframeTrack('wheelSpinRL.quaternion', times, wheelSpinValues),
+    new THREE.QuaternionKeyframeTrack('wheelSpinRR.quaternion', times, wheelSpinValues),
+    new THREE.VectorKeyframeTrack('Node_Chassis.position', times, chassisPosValues),
+    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', times, chassisRotValues),
+  ];
+
+  return new THREE.AnimationClip('drive', duration, tracks);
+}
+
+function buildIdleRevClip(): THREE.AnimationClip {
+  const duration = 1.2;
+  const times = [0, 0.3, 0.6, 0.9, 1.2];
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+
+  const chassisRotVals: number[] = [];
+  [0, 0.025, -0.015, 0.02, 0].forEach((pitch) => {
+    e.set(pitch, 0, 0);
+    q.setFromEuler(e);
+    chassisRotVals.push(q.x, q.y, q.z, q.w);
+  });
+
+  const tracks: THREE.KeyframeTrack[] = [
+    new THREE.VectorKeyframeTrack(
+      'Node_Chassis.position',
+      times,
+      [0, 0.38, 0, 0, 0.375, 0, 0, 0.384, 0, 0, 0.377, 0, 0, 0.38, 0]
+    ),
+    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', times, chassisRotVals),
+  ];
+
+  return new THREE.AnimationClip('idle_rev', duration, tracks);
+}
+
+function buildDriftClip(): THREE.AnimationClip {
+  const duration = 2.4;
+  const times = [0, 0.6, 1.2, 1.8, 2.4];
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+
+  const steerVals: number[] = [];
+  [0, -0.42, -0.38, -0.15, 0].forEach((yaw) => {
+    e.set(0, yaw, 0);
+    q.setFromEuler(e);
+    steerVals.push(q.x, q.y, q.z, q.w);
+  });
+
+  const chassisRotVals: number[] = [];
+  [0, -0.06, -0.08, -0.03, 0].forEach((roll) => {
+    e.set(0.01, 0, roll);
+    q.setFromEuler(e);
+    chassisRotVals.push(q.x, q.y, q.z, q.w);
+  });
+
+  const tracks: THREE.KeyframeTrack[] = [
+    new THREE.QuaternionKeyframeTrack('wheelSteerFL.quaternion', times, steerVals),
+    new THREE.QuaternionKeyframeTrack('wheelSteerFR.quaternion', times, steerVals),
+    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', times, chassisRotVals),
+  ];
+
+  return new THREE.AnimationClip('drift', duration, tracks);
+}
+
+function buildParkedClip(): THREE.AnimationClip {
+  const tracks: THREE.KeyframeTrack[] = [
+    new THREE.VectorKeyframeTrack('Node_Chassis.position', [0, 1.0], [0, 0.38, 0, 0, 0.38, 0]),
+    new THREE.QuaternionKeyframeTrack('Node_Chassis.quaternion', [0, 1.0], [0, 0, 0, 1, 0, 0, 0, 1]),
+  ];
+  return new THREE.AnimationClip('parked', 1.0, tracks);
+}
+
+/* =========================================================================
+ * 4. FACTORY ENTRY POINT
+ * ========================================================================= */
+
+export function createSupercarModel(options: SupercarOptions = {}): SupercarInstance {
+  const carRoot = new THREE.Group() as SupercarInstance;
+  carRoot.name = 'Supercar_ApexHorizon';
+
+  const bodyColorHex = options.bodyColor || '#FF5500';
+  const rimColorHex = options.rimColor || '#E8E8E8';
+
+  const materials: SupercarMaterials = {
+    bodyPrimary: new THREE.MeshStandardMaterial({
+      color: new THREE.Color(bodyColorHex),
+      roughness: 0.25,
+      metalness: 0.15,
+      flatShading: true,
+      name: 'Mat_SupercarBody',
+    }),
+    bodyAccent: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#1A1A1A'),
+      roughness: 0.4,
+      metalness: 0.3,
+      flatShading: true,
+      name: 'Mat_SupercarAccent',
+    }),
+    trimDark: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#111315'),
+      roughness: 0.6,
+      metalness: 0.2,
+      flatShading: true,
+      name: 'Mat_SupercarTrimDark',
+    }),
+    chromeRim: new THREE.MeshStandardMaterial({
+      color: new THREE.Color(rimColorHex),
+      roughness: 0.15,
+      metalness: 0.9,
+      flatShading: true,
+      name: 'Mat_ChromeRim',
+    }),
+    tireRubber: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#181818'),
+      roughness: 0.85,
+      metalness: 0.05,
+      flatShading: true,
+      name: 'Mat_TireRubber',
+    }),
+    glassTint: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#0A0C10'),
+      roughness: 0.1,
+      metalness: 0.9,
+      transparent: true,
+      opacity: 0.88,
+      flatShading: true,
+      name: 'Mat_GlassTint',
+    }),
+    lightWarm: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#FFF0A0'),
+      emissive: new THREE.Color('#FFE070'),
+      emissiveIntensity: options.headlightsOn !== false ? 2.5 : 0.1,
+      flatShading: true,
+      name: 'Mat_HeadlightWarm',
+    }),
+    lightAmber: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#FFA826'),
+      emissive: new THREE.Color('#FF9500'),
+      emissiveIntensity: 1.5,
+      flatShading: true,
+      name: 'Mat_AmberLight',
+    }),
+    lightRed: new THREE.MeshStandardMaterial({
+      color: new THREE.Color('#FF3B30'),
+      emissive: new THREE.Color('#FF1100'),
+      emissiveIntensity: 1.8,
+      flatShading: true,
+      name: 'Mat_TaillightRed',
+    }),
+  };
+
+  // NODE & PIVOT HIERARCHY (Gizmo & Animation safe)
+  const chassisNode = new THREE.Group();
+  chassisNode.name = 'Node_Chassis';
+  chassisNode.position.set(0, 0.38, 0);
+  carRoot.add(chassisNode);
+
+  // Body Assembly
+  const bodyAssembly = buildSupercarBody(materials);
+  chassisNode.add(bodyAssembly);
+
+  // Wheels Mounts & Spin Nodes
+  function addWheelPivot(opts: {
+    name: string;
+    steerName?: string;
+    spinName: string;
+    x: number;
+    y: number;
+    z: number;
+    radius: number;
+    width: number;
+    isRight: boolean;
+  }) {
+    let parentGroup: THREE.Group = chassisNode;
+
+    if (opts.steerName) {
+      const steerPivot = new THREE.Group();
+      steerPivot.name = opts.steerName;
+      steerPivot.position.set(opts.x, opts.y - 0.38, opts.z);
+      chassisNode.add(steerPivot);
+      parentGroup = steerPivot;
     }
 
-    // ==========================================
-    // 6. WHEELS & CONNECTING RODS
-    // ==========================================
+    const spinPivot = new THREE.Group();
+    spinPivot.name = opts.spinName;
+    if (!opts.steerName) {
+      spinPivot.position.set(opts.x, opts.y - 0.38, opts.z);
+    }
+    parentGroup.add(spinPivot);
 
-    // Create a highly detailed lathe profile for the wheels (Scaled down to prevent overlap)
-    const wheelScale = 0.8; // Reduce wheel size to fit nicely
-    const wheelPoints: THREE.Vector2[] = [];
-    wheelPoints.push(new THREE.Vector2(0, 0.18));       // Center Hub
-    wheelPoints.push(new THREE.Vector2(0.18, 0.18));
-    wheelPoints.push(new THREE.Vector2(0.22 * wheelScale, 0.12));    // Hub bevel
-    wheelPoints.push(new THREE.Vector2(0.22 * wheelScale, 0.05));    // Inner Recess
-    wheelPoints.push(new THREE.Vector2(0.65 * wheelScale, 0.05));    // Recess span
-    wheelPoints.push(new THREE.Vector2(0.65 * wheelScale, 0.22));    // Rim inner edge
-    wheelPoints.push(new THREE.Vector2(0.72 * wheelScale, 0.26));    // Rim bevel
-    wheelPoints.push(new THREE.Vector2(0.85 * wheelScale, 0.26));    // Rim outer edge
-    wheelPoints.push(new THREE.Vector2(0.9 * wheelScale, 0.22));     // Tire curve
-    wheelPoints.push(new THREE.Vector2(0.9 * wheelScale, -0.22));    // Backside
-    wheelPoints.push(new THREE.Vector2(0.85 * wheelScale, -0.26));
-    wheelPoints.push(new THREE.Vector2(0.72 * wheelScale, -0.26));
-    wheelPoints.push(new THREE.Vector2(0.65 * wheelScale, -0.22));
-    wheelPoints.push(new THREE.Vector2(0.65 * wheelScale, -0.05));
-    wheelPoints.push(new THREE.Vector2(0.22 * wheelScale, -0.05));
-    wheelPoints.push(new THREE.Vector2(0.22 * wheelScale, -0.12));
-    wheelPoints.push(new THREE.Vector2(0.18, -0.18));
-    wheelPoints.push(new THREE.Vector2(0, -0.18));
+    const wheel = buildLowPolyWheel(opts.radius, opts.width, materials, opts.isRight, opts.name);
+    spinPivot.add(wheel);
+  }
 
-    const wheelGeo = new THREE.LatheGeometry(wheelPoints, 64);
+  // Front Wheels (with steering pivots)
+  addWheelPivot({
+    name: 'wheel_FL',
+    steerName: 'wheelSteerFL',
+    spinName: 'wheelSpinFL',
+    x: -0.9,
+    y: 0.38,
+    z: 1.4,
+    radius: 0.36,
+    width: 0.26,
+    isRight: false,
+  });
 
-    const wheelPositions: [number, number, number][] = [
-        [-2.0, 0.72, 1.4], [0, 0.72, 1.4], [2.0, 0.72, 1.4], // lowered height to account for smaller radius
-        [-2.0, 0.72, -1.4], [0, 0.72, -1.4], [2.0, 0.72, -1.4]
-    ];
+  addWheelPivot({
+    name: 'wheel_FR',
+    steerName: 'wheelSteerFR',
+    spinName: 'wheelSpinFR',
+    x: 0.9,
+    y: 0.38,
+    z: 1.4,
+    radius: 0.36,
+    width: 0.26,
+    isRight: true,
+  });
 
-    wheelPositions.forEach((pos, index) => {
-        const isRightSide = index >= 3;
-        const side = isRightSide ? 'R' : 'L';
-        const posName = ['rear', 'mid', 'front'][index % 3];
-        const wheel = addMesh(wheelGeo, materials.darkGray, train, `train_wheel_${posName}_${side}`);
-        wheel.position.set(pos[0], pos[1], pos[2]);
-        // Rotate so the detailed side faces outward
-        wheel.rotation.x = isRightSide ? -Math.PI / 2 : Math.PI / 2;
-    });
+  // Rear Wheels
+  addWheelPivot({
+    name: 'wheel_RL',
+    spinName: 'wheelSpinRL',
+    x: -0.95,
+    y: 0.40,
+    z: -1.35,
+    radius: 0.40,
+    width: 0.30,
+    isRight: false,
+  });
 
-    // Connecting Rods (Long bar spanning the wheels)
-    const rodGeo = new RoundedBoxGeometry(4.4, 0.18, 0.1, 8, 0.04);
-    const rodL = addMesh(rodGeo, materials.black, train, 'train_connecting_rod_L');
-    rodL.position.set(0, 0.72, 1.75);
+  addWheelPivot({
+    name: 'wheel_RR',
+    spinName: 'wheelSpinRR',
+    x: 0.95,
+    y: 0.40,
+    z: -1.35,
+    radius: 0.40,
+    width: 0.30,
+    isRight: true,
+  });
 
-    const rodR = addMesh(rodGeo, materials.black, train, 'train_connecting_rod_R');
-    rodR.position.set(0, 0.72, -1.75);
+  // ANIMATION CLIPS
+  const driveClip = buildDriveClip();
+  const idleRevClip = buildIdleRevClip();
+  const driftClip = buildDriftClip();
+  const parkedClip = buildParkedClip();
+  const clips: THREE.AnimationClip[] = [driveClip, idleRevClip, driftClip, parkedClip];
 
-    // Rod connection pins
-    const pinGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.15, 32);
-    pinGeo.rotateX(Math.PI / 2);
-    wheelPositions.forEach((pos, index) => {
-        const isRightSide = index >= 3;
-        const side = isRightSide ? 'R' : 'L';
-        const posName = ['rear', 'mid', 'front'][index % 3];
-        const pin = addMesh(pinGeo, materials.darkGray, train, `train_pin_${posName}_${side}`);
-        pin.position.set(pos[0], pos[1], isRightSide ? -1.75 : 1.75);
-    });
+  carRoot.animations = clips;
 
-    // ==========================================
-    // 7. VOLUMETRIC SMOKE CLOUDS
-    // ==========================================
+  // SCULPT RUNTIME METADATA
+  const passes = {
+    blockout: { name: 'Blockout & Silhouette', completed: true, score: 0.95 },
+    structural: { name: 'Modular Pivot Hierarchy & Rig', completed: true, score: 0.95 },
+    form: { name: 'Faceted Kitbash Styling & Aerodynamics', completed: true, score: 0.95 },
+    material: { name: 'PBR Body / Chrome / Rubber Materials', completed: true, score: 0.90 },
+    surface: { name: 'Headlights, Taillights, Louvers, Splitter', completed: true, score: 0.90 },
+    lighting: { name: 'Headlight Emissive & Taillight Glow', completed: true, score: 0.85 },
+    interaction: { name: '4 Baked AnimationClips & Gizmo Safe Nodes', completed: true, score: 0.95 },
+    optimization: { name: 'Clean Shared Geometries & Modular Parts', completed: true, score: 0.90 },
+  };
 
-    // Group of highly segmented spheres merging into a cloud
-    const smokeGroup = new THREE.Group();
-    smokeGroup.name = 'train_smoke';
-    const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
+  const passesReviewed: Record<string, { score: number; notes?: string }> = {
+    blockout: { score: 0.95, notes: 'Apex Horizon low-poly concept supercar silhouette' },
+    structural: { score: 0.95, notes: 'Chassis + steering pivots + wheel spin pivots with natural gizmo alignment' },
+    form: { score: 0.95, notes: 'Faceted kitbash styling with aerodynamic body lines' },
+    material: { score: 0.90, notes: 'PBR Standard with flatShading, metallic chrome rims and rubber tires' },
+    surface: { score: 0.90, notes: 'Splitter, louvers, diffuser, LED headlights, taillights' },
+    lighting: { score: 0.85, notes: 'Warm LED headlights with emissive intensity controls' },
+    interaction: { score: 0.95, notes: '4 baked AnimationClips with seamless loops and full gizmo support' },
+    optimization: { score: 0.90, notes: 'Modular hierarchy with memory-efficient shared materials' },
+  };
 
-    const smokeBlobs = [
-        { scale: 0.35, pos: [-2.8, 5.5, 0] },
-        { scale: 0.50, pos: [-2.7, 6.1, 0.15] },
-        { scale: 0.65, pos: [-2.4, 6.7, -0.15] },
-        { scale: 0.85, pos: [-1.9, 7.5, 0.2] },
-        { scale: 1.05, pos: [-1.1, 8.5, -0.1] },
-        { scale: 0.75, pos: [-1.6, 8.0, -0.3] }, // Filler blob for volume
-        { scale: 0.60, pos: [-2.0, 7.0, 0.3] }   // Filler blob for volume
-    ];
+  const detailInventory: DetailInventoryItem[] = [
+    {
+      id: 'supercar_body_chassis_base',
+      region: 'chassis',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.9,
+      name: 'Apex Horizon Body',
+      feature: 'Faceted Body Shell',
+      category: 'Chassis',
+      pass: 'form',
+      description: 'Faceted body kitbash — front splitter, doors, fenders, roof, spoiler',
+      location: 'main chassis',
+      meshName: 'supercar_body_chassis_base',
+    },
+    {
+      id: 'wheel_FL_tire',
+      region: 'front-left',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.8,
+      name: 'Front-Left Wheel',
+      feature: '5-Star Chrome Rim + Rubber Tire',
+      category: 'Locomotion',
+      pass: 'form',
+      description: '5-spoke chrome rim with deep dish lip and dark barrel',
+      location: 'front-left wheel well',
+      meshName: 'wheel_FL_tire',
+    },
+    {
+      id: 'wheel_FR_tire',
+      region: 'front-right',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.8,
+      name: 'Front-Right Wheel',
+      feature: '5-Star Chrome Rim + Rubber Tire',
+      category: 'Locomotion',
+      pass: 'form',
+      description: '5-spoke chrome rim with deep dish lip and dark barrel',
+      location: 'front-right wheel well',
+      meshName: 'wheel_FR_tire',
+    },
+    {
+      id: 'wheel_RL_tire',
+      region: 'rear-left',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.8,
+      name: 'Rear-Left Wheel',
+      feature: '5-Star Chrome Rim + Rubber Tire (larger rear)',
+      category: 'Locomotion',
+      pass: 'form',
+      description: 'Larger rear wheel for performance stance',
+      location: 'rear-left wheel well',
+      meshName: 'wheel_RL_tire',
+    },
+    {
+      id: 'wheel_RR_tire',
+      region: 'rear-right',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.8,
+      name: 'Rear-Right Wheel',
+      feature: '5-Star Chrome Rim + Rubber Tire (larger rear)',
+      category: 'Locomotion',
+      pass: 'form',
+      description: 'Larger rear wheel for performance stance',
+      location: 'rear-right wheel well',
+      meshName: 'wheel_RR_tire',
+    },
+    {
+      id: 'apex_horizon_headlights_L_0',
+      region: 'front',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.75,
+      name: 'Glowing Headlights',
+      feature: 'Warm LED Emissive Blocks',
+      category: 'Lighting',
+      pass: 'lighting',
+      description: 'Emissive warm-yellow LED blocks in front fascia',
+      location: 'front headlights',
+      meshName: 'apex_horizon_headlights_L_0',
+    },
+    {
+      id: 'apex_horizon_taillights_L',
+      region: 'rear',
+      kind: 'feature',
+      priority: 'high',
+      reviewThreshold: 0.75,
+      name: 'Glowing Taillights',
+      feature: 'Red Emissive Tail Blocks',
+      category: 'Lighting',
+      pass: 'lighting',
+      description: 'Red emissive taillight blocks across the rear fascia',
+      location: 'rear taillights',
+      meshName: 'apex_horizon_taillights_L',
+    },
+  ];
 
-    smokeBlobs.forEach((blob, i) => {
-        const smMesh = addMesh(sphereGeo, materials.smoke, smokeGroup, `train_smoke_${i}`);
-        smMesh.position.set(blob.pos[0], blob.pos[1], blob.pos[2]);
-        smMesh.scale.setScalar(blob.scale);
-    });
+  const mixer = new THREE.AnimationMixer(carRoot);
+  const actions = new Map<string, THREE.AnimationAction>();
 
-    train.add(smokeGroup);
+  for (const clip of clips) {
+    const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = false;
+    action.enabled = true;
+    action.setEffectiveWeight(0);
+    actions.set(clip.name, action);
+  }
 
-    // ==========================================
-    // 8. SCULPT RUNTIME (PART 19 / PART 20)
-    // ==========================================
-    // The viewer/validator looks at `group.userData.sculptRuntime` to
-    // inspect staged-build pass scores and the per-feature detail
-    // inventory.  All 8 pass keys must be present and `score` must
-    // be in [0, 1].  See checkTsStagedPasses() and
-    // checkTsDetailInventory() in index.html.
-    const passes = {
-        blockout:     { name: 'Blockout & Silhouette',         completed: true, score: 0.95 },
-        structural:   { name: 'Static Mesh Hierarchy',          completed: true, score: 0.90 },
-        form:         { name: 'Rounded Box + Lathe Geometry',   completed: true, score: 0.95 },
-        material:     { name: 'MeshPhysicalMaterial w/ clearcoat', completed: true, score: 0.90 },
-        surface:      { name: 'Boiler Stripes, Cowcatcher Slats, Rods, Pins', completed: true, score: 0.90 },
-        lighting:     { name: 'PBR Lighting (no emissive)',     completed: true, score: 0.70 },
-        interaction:  { name: 'Static — No Animation Clips',     completed: true, score: 0.70 },
-        optimization: { name: 'Geometry Cached, Materials Shared', completed: true, score: 0.85 },
-    };
+  let currentAnim = 'drive';
+  const initialAction = actions.get(currentAnim);
+  if (initialAction) {
+    initialAction.setEffectiveWeight(1).play();
+  }
 
-    const passesReviewed: Record<string, { score: number; notes?: string }> = {
-        blockout:     { score: 0.95, notes: 'Toy-train silhouette: red platform + boiler + cabin + cowcatcher' },
-        structural:   { score: 0.90, notes: 'Flat group hierarchy; all children are static meshes (no skeleton needed)' },
-        form:         { score: 0.95, notes: 'RoundedBoxGeometry for cab/chassis + LatheGeometry for wheels' },
-        material:     { score: 0.90, notes: 'MeshPhysicalMaterial w/ clearcoat for soft designer-toy finish' },
-        surface:      { score: 0.90, notes: 'Boiler stripes, cowcatcher slats, connecting rods, pin joints' },
-        lighting:     { score: 0.70, notes: 'PBR-only lighting — no emissive accent, no LookDev rig' },
-        interaction:  { score: 0.70, notes: 'No baked AnimationClips; this is a static showcase model' },
-        optimization: { score: 0.85, notes: '5 shared materials across 25+ meshes; geometry cached' },
-    };
+  const runtime = {
+    animations: clips.map((c) => ({
+      name: c.name,
+      duration: c.duration,
+      tracks: c.tracks.map((t) => ({
+        name: t.name,
+        times: Array.from((t as any).times),
+        values: Array.from((t as any).values),
+      })),
+    })),
+    passes,
+    passesComplete: true,
+    passesReviewed,
+    detailInventory,
+    mixer,
+  };
 
-    const detailInventory: DetailInventoryItem[] = [
-        {
-            // SYSTEM_UPDATE_PROMPT §3b contract fields
-            id: 'train_cabin',
-            region: 'cab',
-            kind: 'feature',
-            priority: 'high',
-            reviewThreshold: 0.9,
-            // Inspector metadata
-            name: 'Engineer Cabin',
-            feature: 'Cabin with Windows',
-            category: 'Chassis',
-            pass: 'form',
-            description: 'Red rounded-box cabin with 3 dark inset windows and overhanging roof',
-            location: 'rear (positive X) of the train',
-            meshName: 'train_cabin',
-            nodes: ['train_cabin', 'train_roof', 'train_window_L_frame', 'train_window_L_glass',
-                    'train_window_R_frame', 'train_window_R_glass', 'train_window_B_frame', 'train_window_B_glass'],
-        },
-        {
-            id: 'train_boiler',
-            region: 'boiler',
-            kind: 'feature',
-            priority: 'high',
-            reviewThreshold: 0.9,
-            name: 'Steam Boiler Cylinder',
-            feature: 'Boiler with Stripes',
-            category: 'Chassis',
-            pass: 'form',
-            description: 'Horizontal red boiler cylinder with 2 orange stripes, dark-gray cap and central button',
-            location: 'mid (centered) of the train',
-            meshName: 'train_boiler',
-            nodes: ['train_boiler', 'train_boiler_stripe_1', 'train_boiler_stripe_2',
-                    'train_boiler_cap', 'train_boiler_button'],
-        },
-        {
-            id: 'train_chimney',
-            region: 'top',
-            kind: 'feature',
-            priority: 'high',
-            reviewThreshold: 0.85,
-            name: 'Chimney & Dome',
-            feature: 'Chimney + Steam Dome',
-            category: 'Topworks',
-            pass: 'form',
-            description: 'Cylinder chimney with flared top and dark inner hole, plus pill-shaped steam dome',
-            location: 'top of the boiler (negative X end)',
-            meshName: 'train_chimney_base',
-            nodes: ['train_chimney_base', 'train_chimney_flare', 'train_chimney_hole',
-                    'train_dome_cyl', 'train_dome_top'],
-        },
-        {
-            id: 'train_cowcatcher',
-            region: 'front',
-            kind: 'feature',
-            priority: 'high',
-            reviewThreshold: 0.85,
-            name: 'Angled Cowcatcher',
-            feature: 'Front Grille Wedge',
-            category: 'Chassis',
-            pass: 'surface',
-            description: 'Angled rounded-box cowcatcher with 2 vertical slat pins',
-            location: 'front (negative X) of the train',
-            meshName: 'train_cowcatcher',
-            nodes: ['train_cowcatcher', 'train_cowcatcher_slat_L', 'train_cowcatcher_slat_R'],
-        },
-        {
-            id: 'train_wheel',
-            region: 'undercarriage',
-            kind: 'feature',
-            priority: 'high',
-            reviewThreshold: 0.9,
-            name: '6 Drive Wheels with Connecting Rods',
-            feature: 'Lathe-Profile Wheels + Side Rods',
-            category: 'Locomotion',
-            pass: 'form',
-            description: '6 detailed lathe wheels (3 per side) with side connecting rods and 6 pin joints',
-            location: 'under both sides of the chassis',
-            meshName: 'train_wheel_front_L',
-            nodes: ['train_wheel_rear_L', 'train_wheel_mid_L', 'train_wheel_front_L',
-                    'train_wheel_rear_R', 'train_wheel_mid_R', 'train_wheel_front_R',
-                    'train_connecting_rod_L', 'train_connecting_rod_R'],
-        },
-        {
-            id: 'train_smoke',
-            region: 'chimney-stack',
-            kind: 'feature',
-            priority: 'medium',
-            reviewThreshold: 0.7,
-            name: 'Volumetric Steam Plume',
-            feature: '7-Blob Smoke Cloud',
-            category: 'Atmosphere',
-            pass: 'form',
-            description: '7 stacked gray spheres forming a soft volumetric steam plume above the chimney',
-            location: 'above the chimney',
-            meshName: 'train_smoke',
-            nodes: ['train_smoke', 'train_smoke_0', 'train_smoke_1', 'train_smoke_2',
-                    'train_smoke_3', 'train_smoke_4', 'train_smoke_5', 'train_smoke_6'],
-        },
-    ];
+  carRoot.userData.sculptRuntime = runtime;
+  carRoot.userData.tick = (dt?: number) => {
+    mixer.update(Math.min(dt ?? 0.016, 0.1));
+  };
 
-    // Static model — no animation mixer, but the validator still
-    // wants a tick handler on userData.  It's a no-op.
-    const noopTick = (_dt?: number) => { /* static */ };
+  function setAnimation(animName: string) {
+    if (!actions.has(animName)) return;
+    if (animName === currentAnim) return;
+    const fade = 0.2;
+    const prev = actions.get(currentAnim);
+    const next = actions.get(animName)!;
+    if (prev) {
+      prev.fadeOut(fade);
+    }
+    next.reset();
+    next.setEffectiveWeight(1);
+    next.fadeIn(fade);
+    next.play();
+    currentAnim = animName;
+  }
 
-    train.userData.sculptRuntime = {
-        passes,
-        passesComplete: true,
-        passesReviewed,
-        detailInventory,
-    };
-    train.userData.tick = noopTick;
+  function setHeadlights(enabled: boolean) {
+    materials.lightWarm.emissiveIntensity = enabled ? 2.5 : 0.05;
+  }
 
-    // LBL PART 30.7 — tag every part mesh for external rig-test/GLB-viewer
-    // pickability. Inert to this renderer (nothing here reads these two
-    // fields); external glTF-based rig-test tools read node.extras
-    // (GLTFExporter serializes userData -> extras) to enumerate
-    // separately-pickable parts instead of falling back to a single
-    // whole-model "low-poly mode" target.
-    train.traverse((node) => {
-        if ((node as THREE.Mesh).isMesh) {
-            node.userData.isPickable = true;
-            node.userData.partName = node.name || `part_${node.id}`;
+  function setBodyColor(hex: string) {
+    materials.bodyPrimary.color.set(hex);
+  }
+
+  function dispose() {
+    carRoot.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.geometry?.dispose();
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((m) => m.dispose());
+        } else if (mesh.material) {
+          mesh.material.dispose();
         }
+      }
     });
+    try {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(carRoot);
+    } catch (_) {
+      /* noop */
+    }
+  }
 
-    return train;
+  Object.defineProperty(carRoot, 'currentAnimation', { get: () => currentAnim });
+  carRoot.tick = (dt: number) => mixer.update(Math.min(dt, 0.1));
+  carRoot.setAnimation = setAnimation;
+  carRoot.setHeadlights = setHeadlights;
+  carRoot.setBodyColor = setBodyColor;
+  carRoot.dispose = dispose;
+
+  // LBL PART 30.7 — tag every part mesh for external rig-test/GLB-viewer
+  // pickability. Inert to this renderer (nothing here reads these two
+  // fields); external glTF-based rig-test tools read node.extras
+  // (GLTFExporter serializes userData -> extras) to enumerate
+  // separately-pickable parts instead of falling back to a single
+  // whole-model "low-poly mode" target.
+  carRoot.traverse((node) => {
+    if ((node as THREE.Mesh).isMesh) {
+      node.userData.isPickable = true;
+      node.userData.partName = node.name || `part_${node.id}`;
+    }
+  });
+
+  return carRoot;
 }
 
 export function getLookDevLights(): THREE.Group {
-    const lightRig = new THREE.Group();
-    lightRig.name = 'Train_LookDevLights';
+  const lightRig = new THREE.Group();
+  lightRig.name = 'Supercar_LookDevLights';
 
-    const ambient = new THREE.AmbientLight(0xfff5ea, 0.7);
-    lightRig.add(ambient);
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334455, 1.0);
+  hemiLight.position.set(0, 20, 0);
+  lightRig.add(hemiLight);
 
-    const sun = new THREE.DirectionalLight(0xfffaed, 1.8);
-    sun.position.set(6, 10, 8);
-    sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
-    lightRig.add(sun);
+  const keyLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+  keyLight.position.set(6, 12, 8);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.width = 2048;
+  keyLight.shadow.mapSize.height = 2048;
+  lightRig.add(keyLight);
 
-    const fill = new THREE.DirectionalLight(0x60a5fa, 0.8);
-    fill.position.set(-6, 4, -6);
-    lightRig.add(fill);
+  const fillLight = new THREE.DirectionalLight(0x88ccff, 0.8);
+  fillLight.position.set(-8, 6, -6);
+  lightRig.add(fillLight);
 
-    const warmRim = new THREE.DirectionalLight(0xf59e0b, 1.2);
-    warmRim.position.set(0, 6, -8);
-    lightRig.add(warmRim);
+  const rimLight = new THREE.DirectionalLight(0xff7722, 1.4);
+  rimLight.position.set(0, 8, -10);
+  lightRig.add(rimLight);
 
-    return lightRig;
+  return lightRig;
 }
 
-export const createModel = createTrainModel;
-export default createTrainModel;
-
+export const createSupercar = createSupercarModel;
+export const createModel = createSupercarModel;
+export default createSupercarModel;
