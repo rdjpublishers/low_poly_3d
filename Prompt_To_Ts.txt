@@ -3,6 +3,22 @@ LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.7 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.8 (2026-09-02) — CHARACTER / MASCOT SCULPT ENRICHMENT (source:
+    Character_Sculpt_Enrichment_v1.txt). New PART 31 appends the
+    macro/meso/micro hierarchy, attachment contract, actionProfile,
+    recessed-eye rules, build-pass discipline, and anti-shallow quality
+    gates for character subjects on the TS factory path. The hierarchy
+    is expressed as nested named THREE.Group nodes (root → pelvis →
+    abdomen → chest → neck → head, plus 14 MESO limbs and the MICRO
+    face); attachment lives on userData.attachment and actionProfile on
+    userData.actionProfile on every child Group/Mesh. ALL NEW FIELDS
+    are OPTIONAL — the current renderer ignores unknown userData keys
+    safely, the AI is forced to author a proper component hierarchy
+    instead of a flat 1-2-Group character, and future rig/animation
+    layers can consume them. Applies ONLY when the subject is a
+    character, mascot, creature, or humanoid — NOT to props, vehicles,
+    architecture, food, or abstract shapes. No renderer code change
+    required.
   v1.7 (2026-09-01) — CORRECTION to v1.6's diagnosis, plus the real fix.
     v1.6 (below) fixed a genuine problem (whole-model single-mesh
     fusion) but a second field-test round against the same external
@@ -3954,3 +3970,629 @@ the JSON/JS path. Instead:
 No new field, helper, or renderer behavior is introduced by this PART; it
 is a documentation-only cross-reference, same as PART 62 on the sibling
 path.
+
+================================================================================
+PART 31 — v1.8 ADDITIONS: CHARACTER / MASCOT SCULPT ENRICHMENT
+================================================================================
+Source: Character_Sculpt_Enrichment_v1.txt (compiled from object-sculpt
+schema 2.1, character-v1.5 track). Compatible with the TS factory path
+on top of LBL v1.7 (Prompt_To_Ts.txt / Image_To_Ts.txt).
+
+--------------------------------------------------------------------------------
+PURPOSE & SCOPE
+--------------------------------------------------------------------------------
+This PART is an ADD-ON to the TS output contract in PART 1. It applies
+ONLY when the subject is a stylized character, mascot, creature,
+humanoid, or anthropomorphic figure. It does NOT replace any of the
+core rules in PARTs 1-30 — it adds hierarchy depth, attachment
+contracts, action-ready pivots, material frequency bands, recessed-eye
+rules, build-pass discipline, and anti-shallow quality gates so the AI
+stops emitting flat under-detailed characters in TypeScript.
+
+The TS path already has PART 30 (Rigging & Animation Authoring Standard)
+which is the closest existing parallel — this PART 31 is the
+character-must-have hierarchy + attachment contract layer that
+PART 30's action-ready rig rides on top of.
+
+APPLY automatically when:
+  - Subject is character / mascot / creature / humanoid / anthropomorphic
+  - Reference image shows a posed or standing figure with limbs, head, face
+  - User says "stylized", "mascot", "electric mouse", "chibi", "cartoon
+    character", "anthropomorphic", "person", "man", "woman", "kid", etc.
+  - Pipeline routing or meta.category is "character"
+
+DO NOT force this structure on pure props, vehicles, architecture, food,
+or abstract shapes. A pet rock with eyes is NOT a character; an animal
+with bilateral limbs, head, and facial features IS.
+
+For the image-input fork (Image_To_Ts.txt) this PART applies IN
+ADDITION to the image analysis protocol in PART 17. The image analysis
+protocol determines the proportions and pose; this PART determines the
+component hierarchy and attachment contract.
+
+--------------------------------------------------------------------------------
+31.1 — MANDATORY COMPONENT HIERARCHY (MACRO → MESO → MICRO)
+--------------------------------------------------------------------------------
+Every character factory MUST build at least these named Group nodes
+under root (use these exact .name strings or clearly scoped
+equivalents). Missing any macro/meso part is a quality failure.
+
+MACRO (required — these are the 6 root-level body masses):
+  root            — the returned THREE.Group (set root.name = '')
+  pelvis          — child Group .name = 'pelvis'
+  abdomen         — child Group .name = 'abdomen'
+  chest           — child Group .name = 'chest'
+  neck            — child Group .name = 'neck'
+  head            — child Group .name = 'head'
+
+MESO (required for full-body characters):
+  hair            — child Group .name = 'hair' (may be omitted only if bald)
+  clavicle-l / clavicle-r
+  upper-arm-l / upper-arm-r
+  forearm-l / forearm-r
+  hand-l / hand-r
+  thigh-l / thigh-r
+  shin-l / shin-r
+  foot-l / foot-r
+
+MICRO (required for face readability):
+  brow-l / brow-r
+  ear-l / ear-r
+  nose
+  mouth
+  eye-l / eye-r
+  eye-cavity-l / eye-cavity-r   (recessed sockets — see 31.5, never flat decals)
+
+Optional but recommended when visible:
+  fingers (thumb/index/middle/ring/little × 2-3 phalanges per hand)
+  tail, ears (animal character), horns, accessories, clothing layers,
+  held props
+
+RULE: Never collapse independently movable parts into one mesh. Each
+limb segment is its own Group with its own named pivot, and the chain
+generator from PART 3 / PART 30 is the preferred single-mesh
+implementation when the limb needs per-segment continuity — the limb
+STILL rides on its own named Group ("arm_l", not folded into "chest").
+
+SKELETON PATTERN (real TypeScript — use this as the factory's spine):
+
+  export function createCharacterModel(opts?: CharacterModelOptions): THREE.Group {
+    const root = new THREE.Group();
+    root.name = ''; // root intentionally unnamed; see PART 1.2
+
+    // MACRO
+    const pelvis  = pivot('pelvis',  [ 0.00, 0.95, 0.00]);
+    const abdomen = pivot('abdomen', [ 0.00, 1.20, 0.00]);
+    const chest   = pivot('chest',   [ 0.00, 1.45, 0.00]);
+    const neck    = pivot('neck',    [ 0.00, 1.70, 0.00]);
+    const head    = pivot('head',    [ 0.00, 1.85, 0.00]);
+
+    root.add(pelvis);
+    pelvis.add(abdomen);
+    abdomen.add(chest);
+    chest.add(neck);
+    neck.add(head);
+
+    // MESO (left arm — right arm mirrors the same pattern)
+    const clavicleL = pivot('clavicle-l', [-0.22, 1.55, 0.00]);
+    const armL      = buildArm('l');
+    const handL     = buildHand('l');
+    chest.add(clavicleL);
+    clavicleL.add(armL);
+    armL.add(handL); // chain generator already builds pivot geometry
+
+    // MESO (legs)
+    const thighL = pivot('thigh-l', [-0.12, 0.85, 0.00]);
+    const shinL  = pivot('shin-l',  [-0.12, 0.50, 0.00]);
+    const footL  = pivot('foot-l',  [-0.12, 0.05, 0.08]);
+    pelvis.add(thighL); thighL.add(shinL); shinL.add(footL);
+    // mirror for right side ...
+
+    // MICRO face
+    const eyeCavityL = buildEyeCavity('l');
+    const eyeL       = buildEye('l');
+    head.add(eyeCavityL); eyeCavityL.add(eyeL);
+    // ear-l, ear-r, nose, mouth, brow-l, brow-r, hair ...
+
+    // Expose named nodes so the host rig can drive them
+    root.userData.sculptRuntime = {
+      nodes: {
+        root, pelvis, abdomen, chest, neck, head,
+        arm_l: armL, hand_l: handL, /* ... */
+      },
+      sockets: {
+        'chest-clavicle-l': clavicleL,
+        'chest-clavicle-r': clavicleR,
+        'pelvis-thigh-l':   thighL,
+        'pelvis-thigh-r':   thighR,
+        'head-eye-l':       eyeCavityL,
+        'head-eye-r':       eyeCavityR
+      },
+      materials: { /* see 31.4 */ }
+    };
+
+    applyOptions(root, opts);
+    return root;
+  }
+
+  // Local helper — a named pivot Group at a world position:
+  function pivot(name: string, pos: [number, number, number]): THREE.Group {
+    const g = new THREE.Group();
+    g.name = name;
+    g.position.set(pos[0], pos[1], pos[2]);
+    return g;
+  }
+
+--------------------------------------------------------------------------------
+31.2 — ATTACHMENT CONTRACT (userData.attachment on every child mesh)
+--------------------------------------------------------------------------------
+Every child Mesh (or Group that contains a mesh) MUST carry a
+`userData.attachment` object describing the seam to its parent. The
+TS path's runtime already populates `userData` (PART 6) so this rides
+along to the inspector / future rig layer without any renderer change.
+
+PREFERRED SHAPE (TypeScript):
+
+  interface Attachment {
+    parentSocket: string;         // semantic socket name on parent
+    localStart:   [number, number, number]; // attach point in parent local space
+    localEnd:     [number, number, number]; // far end of this segment
+    contactType:  'rigid-weld' | 'socket-joint' | 'hinge-joint';
+    baseRadius:   number;         // thickness at root
+    endRadius:    number;         // thickness at tip
+    embedDepth:   number;         // 0.02-0.05
+    gapTolerance: number;         // 0.01
+  }
+
+CONTACT TYPE GUIDANCE (semantic, not enforced by the renderer):
+  rigid-weld    — torso segments, neck, hair, clothing panels
+  socket-joint  — shoulder, hip
+  hinge-joint   — elbow, knee, finger joints, jaw
+
+Minimum overlap at seams: 0.02 world units (do not leave floating
+parts). The existing parent-child Group structure (31.1) is what the
+scene graph USES to position the child — the userData.attachment object
+is the contract that the rest of the model needs to satisfy.
+
+EXAMPLE — arm_l with a full attachment contract (real TypeScript):
+
+  function buildArm(side: 'l' | 'r'): THREE.Group {
+    const sign = side === 'l' ? 1 : -1;
+    const arm = new THREE.Group();
+    arm.name = `arm_${side}`;
+    // chain generator (PART 3) — or compose two capsule segments per
+    // PART 40. Pivot is implicit in the segment aim direction.
+    const mesh = chainMesh({
+      baseRadius: 0.07,
+      segs: 6,
+      segments: [
+        { length: 0.32, tipRatio: 0.85, aim: [ 0.06 * sign, -1, 0.05] },
+        { length: 0.30, tipRatio: 0.65, aim: [ 0.08 * sign, -1, 0.20] }
+      ]
+    }, M.skin);
+    arm.add(mesh);
+    arm.userData.attachment = {
+      parentSocket: 'chest-clavicle-' + side,
+      localStart:   [ 0.22 * sign, -0.05,  0.00],
+      localEnd:     [ 0.26 * sign, -0.65,  0.05],
+      contactType:  'socket-joint',
+      baseRadius:   0.085,
+      endRadius:    0.055,
+      embedDepth:   0.04,
+      gapTolerance: 0.01
+    };
+    return arm;
+  }
+
+  // Quick helper for a "weld" attachment (clothing panels, hair):
+  function weldAttachment(
+    localStart: [number, number, number],
+    localEnd:   [number, number, number],
+    baseR: number, endR: number
+  ): Attachment {
+    return {
+      parentSocket: 'auto',
+      localStart, localEnd,
+      contactType: 'rigid-weld',
+      baseRadius: baseR, endRadius: endR,
+      embedDepth: 0.03, gapTolerance: 0.01
+    };
+  }
+
+--------------------------------------------------------------------------------
+31.3 — ACTION PROFILE & PIVOTS (userData.actionProfile on every macro/meso)
+--------------------------------------------------------------------------------
+Every macro and meso Group/Mesh should carry a
+`userData.actionProfile` object. This is the same shape PART 30's rig
+code reads — keep it in sync so a host rig can drive the character
+without re-deriving it.
+
+PREFERRED SHAPE (TypeScript):
+
+  type AnimationRole = 'root' | 'static' | 'limb' | 'digit' | 'face';
+  interface ActionProfile {
+    animationRole: AnimationRole;
+    pivot: {
+      mode: 'center' | 'root' | 'custom';
+      localPosition: [number, number, number];
+      axis:           [number, number, number];
+    };
+    transformChannels: {
+      translate:     boolean;
+      rotate:        boolean;
+      scale:         boolean;
+      bend:          boolean;
+      twist:         boolean;
+      detach:        boolean;
+      visibility:    boolean;
+      materialState: boolean;
+    };
+    collider: {
+      type:   'box' | 'sphere' | 'capsule';
+      offset: [number, number, number];
+      scale:  [number, number, number];
+    };
+    destruction: {
+      breakable:     boolean;
+      fractureGroup: string;
+    };
+  }
+
+PIVOT PLACEMENT RULES (read these BEFORE setting pivot.localPosition):
+  root        — at the model's logical center (usually 0,0,0)
+  pelvis      — at the hip center
+  abdomen     — at the lower torso center
+  chest       — at the upper torso center
+  neck        — at the base of the neck (jaw line)
+  head        — at the head center (NOT at the chin)
+  hair        — at the scalp root
+  upper-arm   — at the shoulder (pivot at the join, not the segment middle)
+  forearm     — at the elbow
+  hand        — at the wrist
+  thigh       — at the hip
+  shin        — at the knee
+  foot        — at the ankle
+  eye         — at the eye center
+  jaw/mouth   — at the lower-lip center
+
+EXAMPLE — head with actionProfile (real TypeScript):
+
+  function buildHead(): THREE.Group {
+    const head = new THREE.Group();
+    head.name = 'head';
+    head.position.set(0, 1.85, 0);
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 18, 14),
+      M.skin
+    );
+    sphere.name = 'head-mesh';
+    head.add(sphere);
+    head.userData.actionProfile = {
+      animationRole: 'face',
+      pivot: { mode: 'center', localPosition: [0, 0, 0], axis: [0, 1, 0] },
+      transformChannels: {
+        translate: true, rotate: true, scale: false,
+        bend: false, twist: false, detach: false,
+        visibility: true, materialState: false
+      },
+      collider: { type: 'sphere', offset: [0, 0, 0], scale: [1, 1, 1] },
+      destruction: { breakable: false, fractureGroup: 'head' }
+    };
+    return head;
+  }
+
+  // Helper for the common "limb joint" case:
+  function jointActionProfile(
+    role: AnimationRole,
+    axis: [number, number, number] = [0, 1, 0]
+  ): ActionProfile {
+    return {
+      animationRole: role,
+      pivot: { mode: 'root', localPosition: [0, 0, 0], axis },
+      transformChannels: {
+        translate: true, rotate: true, scale: false,
+        bend: true, twist: false, detach: false,
+        visibility: true, materialState: false
+      },
+      collider: { type: 'capsule', offset: [0, -0.15, 0], scale: [1, 1, 1] },
+      destruction: { breakable: false, fractureGroup: role }
+    };
+  }
+
+For chain-generator limbs the pivot is implicit in the segment aim
+direction; you can still fill in actionProfile with the joint pivot
+position (the elbow) for the forearm segment specifically.
+
+--------------------------------------------------------------------------------
+31.4 — MATERIALS (character palette + frequency bands)
+--------------------------------------------------------------------------------
+Minimum material set for a clothed character:
+  skin, hair, shirt (or torso cloth), pants, shoes, eye, lips
+
+A creature/mascot may substitute "fur"/"feathers"/"scales" for skin +
+hair, but keep the eye + a "mouth interior" material distinct.
+
+The TS path's MeshStandardMaterial already supports color / roughness /
+metalness / emissive / normalMap. The "surface frequency bands" from
+the enrichment file are extra OPTIONAL fields the runtime ignores today
+— they're documented here for future rig/timing layers:
+
+  - albedo.dominant        — MeshStandardMaterial.color (already set)
+  - albedo.secondary       — optional "secondary color" for hand-painted
+                              trim panels (renderer-ignored; document intent)
+  - roughness.base         — MeshStandardMaterial.roughness (already set)
+  - roughness.variation    — optional 0.0-0.1 jitter amount
+  - surfaceFrequencyBands: — object with three optional sub-fields
+      macro  — broad color/height breakup (sampled region span)
+      meso   — pores, fabric weave, fur clumps
+      micro  — highlight breakup under grazing light
+
+DO NOT use a single flat color for the whole character. DO NOT paint
+lighting into albedo. If you want a lit-vs-shadow region, use one of:
+  - A second MeshStandardMaterial with slightly darker color on the
+    specific panel/sub-mesh that's genuinely recessed
+  - A duplicated, slightly inset mesh under a "shadow" Group
+  - A custom onBeforeCompile hook (PART 28) for vertex-driven shading
+
+ROUGHNESS GUIDANCE (when you set it explicitly on
+MeshStandardMaterial.roughness):
+  skin   0.45 - 0.60
+  cloth  0.70 - 0.90
+  hair   0.55 - 0.75
+  eye    0.15 - 0.25
+  lips   0.30 - 0.50
+  shoe   0.50 - 0.80
+
+EXAMPLE — character materials in the M object (drop into buildMaterials()
+from PART 7):
+
+  const M = {
+    skin: new THREE.MeshStandardMaterial({ color: 0xe8b87c, roughness: 0.55, metalness: 0.0 }),
+    skin_d: new THREE.MeshStandardMaterial({ color: 0xb5773a, roughness: 0.65, metalness: 0.0 }),
+    hair: new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 0.65, metalness: 0.0 }),
+    shirt: new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.80, metalness: 0.0 }),
+    pants: new THREE.MeshStandardMaterial({ color: 0x1a3a8a, roughness: 0.85, metalness: 0.0 }),
+    shoe: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.70, metalness: 0.0 }),
+    eye: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.20, metalness: 0.05 }),
+    lip: new THREE.MeshStandardMaterial({ color: 0xcc6644, roughness: 0.40, metalness: 0.0 })
+  };
+
+  // For meshes that need per-vertex tint jitter, add colorVariation
+  // as a custom onBeforeCompile hook (PART 28.1) or a baked CanvasTexture
+  // (PART 8) — don't try to add an LBL "colorVariation" field on a
+  // MeshStandardMaterial directly.
+
+--------------------------------------------------------------------------------
+31.5 — FACE LANDMARKS & RECESSED EYES (critical)
+--------------------------------------------------------------------------------
+Eyes MUST read as recessed cavities, not flat stickers. PREFERRED
+techniques, in order of preference:
+
+  1. Smaller sphere for the cavity, then a slightly smaller eye sphere
+     inset into it (most reliable across every renderer version).
+  2. Inset sphere with a slight negative Z offset (chibi style).
+  3. booleanSubtract a small sphere from the head, then place a smaller
+     eye sphere inside the resulting hole. (Use the three-bvh-csg
+     library for true boolean ops, or use ExtrudeGeometry with a
+     pierced Shape from PART 3.7.)
+
+LANDMARK PLACEMENT (relative to head height, where head height = 1.0):
+  eye line          — at   0.55 of head height from the chin
+  eye spacing       — 0.30-0.35 of head width apart (center to center)
+  nose base         — at   0.40 of head height from the chin
+  mouth line        — at   0.25 of head height from the chin
+  brow line         — at   0.68 of head height (above the eye line)
+  ear line          — at   0.55 of head height (≈ on the eye line)
+
+EXAMPLE — recessed eye cluster (chibi, head height 0.42, real TS):
+
+  function buildEyeCavity(side: 'l' | 'r'): THREE.Group {
+    const sign = side === 'l' ? -1 : 1;
+    const g = new THREE.Group();
+    g.name = `eye-cavity-${side}`;
+    g.position.set(0.06 * sign, 0.04, 0.18);
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 12, 10),
+      M.skin_d
+    );
+    m.name = `eye-cavity-${side}-mesh`;
+    g.add(m);
+    g.userData.actionProfile = {
+      animationRole: 'face',
+      pivot: { mode: 'center', localPosition: [0, 0, 0], axis: [0, 1, 0] },
+      transformChannels: {
+        translate: false, rotate: false, scale: false,
+        bend: false, twist: false, detach: false,
+        visibility: true, materialState: false
+      },
+      collider: { type: 'sphere', offset: [0, 0, 0], scale: [1, 1, 1] },
+      destruction: { breakable: false, fractureGroup: 'head' }
+    };
+    return g;
+  }
+
+  function buildEye(side: 'l' | 'r'): THREE.Group {
+    const g = new THREE.Group();
+    g.name = `eye-${side}`;
+    g.position.set(0, 0, 0.005);
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(0.034, 12, 10),
+      M.eye
+    );
+    m.name = `eye-${side}-mesh`;
+    g.add(m);
+    return g;
+  }
+
+  // In the head builder:
+  head.add(buildEyeCavity('l'));
+  head.children.find(c => c.name === 'eye-cavity-l')!.add(buildEye('l'));
+  // ... mirror for right side ...
+
+--------------------------------------------------------------------------------
+31.6 — BUILD PASSES (ordered, do not skip)
+--------------------------------------------------------------------------------
+When generating a character factory, mentally (or actually) follow this
+order. Emit the full factory only after the last required pass.
+
+  1. blockout
+     - root + pelvis + abdomen + chest + neck + head + major limb capsules
+     - Correct head-unit proportions and overall silhouette
+     - Acceptance: humanoid proportions readable with zero materials
+
+  2. proportion-lock
+     - Lock head/torso/limb ratios to measured reference (or style table)
+     - Fix pose angles (elbow/knee bend, weight shift)
+
+  3. feature-placement
+     - hair, brows, ears, nose, mouth, eyes + cavities
+     - fingers if visible
+     - All attachment contracts filled (31.2)
+
+  4. material-pass
+     - Assign skin/hair/cloth/shoe/eye/lips materials
+     - Sample real mid-tone colors from reference if image is present
+     - Add roughness variation and basic frequency bands (31.4)
+
+  5. lighting-pass
+     - Optional in the factory, required in the post-render review
+     - Note key / fill / rim intent (which way does the main light come
+       from on the reference?)
+
+  6. interaction-pass
+     - Confirm every limb has a named pivot in userData.actionProfile (31.3)
+     - Confirm every held prop is parented to a hand Group, not floating
+     - Populate root.userData.sculptRuntime with nodes + sockets (31.1)
+
+  7. optimization-pass
+     - Stay inside the performance budget (prefer < 80-120k tris for
+       full characters)
+     - Share material instances across sibling meshes (one M.skin,
+       not 14 copies)
+
+--------------------------------------------------------------------------------
+31.7 — QUALITY CONTRACT (anti-shallow rules — REJECT/REWRITE if any fire)
+--------------------------------------------------------------------------------
+REJECT the factory and rewrite if ANY of these are true:
+
+  - Only a root + 1-2 child Groups for a full character (PART 31.1 lists
+    the minimum set; a 3-Group character is NEVER acceptable)
+  - Limbs are single CapsuleGeometry meshes with no elbow/knee break
+    (use the chain generator from PART 3, or two stacked capsule
+    segments per limb)
+  - Eyes are flat PlaneGeometry / decal-style quads with no cavity (31.5)
+  - Hands are undifferentiated BoxGeometry with no fingers (when
+    fingers are visible at the reference's zoom level)
+  - Materials are one generic MeshStandardMaterial with uniform
+    roughness (31.4)
+  - Child Groups float with no parent chain back to root (31.1)
+  - Adjacent parts have seam gap > 0.02 (PART 30 rule)
+  - Face landmarks ignore measured eye-line / mouth-line (31.5)
+  - Pose is forced to perfect T-pose when the reference shows a
+    different pose (PART 30 / PART 42)
+  - root.userData.sculptRuntime.nodes does not name every macro +
+    meso Group by its standard id (31.1 / 31.8)
+
+DEFINITION OF DONE (character):
+  Silhouette matches the reference, primary proportions are correct,
+  component hierarchy depth ≥ 3 levels (macro + meso + micro from 31.1),
+  most recognizable local features are present, materials respond to
+  light (not flat plastic), root.userData.sculptRuntime exposes
+  named nodes and sockets.
+
+Append these to PART 12's validation checklist (character-only items):
+
+  [ ] [v1.8] Character has all 6 MACRO Groups (root, pelvis, abdomen,
+      chest, neck, head) under root — 31.1.
+  [ ] [v1.8] Full-body character has all 14 MESO Groups (hair, 2× clavicle,
+      2× upper-arm, 2× forearm, 2× hand, 2× thigh, 2× shin, 2× foot) —
+      omit only the parts genuinely not visible — 31.1.
+  [ ] [v1.8] Face has eye-cavity-l, eye-l, eye-cavity-r, eye-r as 4
+      separate Groups (NOT one merged "eyes" object) — 31.5.
+  [ ] [v1.8] Every child limb/appendage has either a userData.attachment
+      object (31.2) OR a parent Group with the right world-space
+      overlap to its child.
+  [ ] [v1.8] Every macro and meso Group has a userData.actionProfile
+      with at least animationRole + pivot (31.3) — even if the host
+      rig doesn't drive it today.
+  [ ] [v1.8] Minimum material set is present (skin, hair, torso cloth,
+      pants/legs, shoes, eye) — 31.4. A mascot/creature may substitute
+      fur/feathers/scales for skin + hair but still needs eye +
+      mouth-interior distinct.
+  [ ] [v1.8] The eye MeshStandardMaterial has roughness < 0.3 and
+      metalness < 0.1 — not a generic PBR preset — 31.4 / 31.5.
+  [ ] [v1.8] root.userData.sculptRuntime.nodes names every macro +
+      meso Group by its standard id (pelvis, chest, arm_l, etc.) — 31.1.
+
+--------------------------------------------------------------------------------
+31.8 — OUTPUT RULES (still pure TS)
+--------------------------------------------------------------------------------
+  - File is a real ES module (PART 1.1): `import * as THREE from 'three'`
+    at the top, an `export function createXxxModel(...)` factory, an
+    optional `export function createXxxModelLookDevLights(...)`.
+  - The factory returns a THREE.Group with root.name = '' and the
+    6 MACRO Groups added under it (31.1).
+  - root.userData.sculptRuntime (PART 6) is REQUIRED and must include
+    at minimum: nodes (every macro + meso Group by standard id) and
+    sockets (the named attach points a host rig / animation system
+    can target).
+  - userData.attachment + userData.actionProfile are EXTRA fields on
+    individual Group/Mesh nodes. The current renderer ignores unknown
+    userData keys safely; future rig/animation layers consume them.
+  - When an image is supplied, MEASURE proportions and SAMPLE colors
+    from the image before writing any numbers (see Image_To_Ts.txt
+    PART 17 for the full protocol).
+  - Every limb segment is its own Group with its own id and pivot —
+    the chain generator (PART 3) is the preferred single-mesh
+    implementation but the limb Group still exists.
+  - Keep all existing TS path constraints: no top-level DOM access
+    outside the factory, no network fetches, no `eval`, no CommonJS
+    `module.exports` (PART 1.5).
+
+--------------------------------------------------------------------------------
+31.9 — QUICK CHARACTER SCAFFOLD (copy-paste starting point)
+--------------------------------------------------------------------------------
+Use this mental skeleton, then fill real scales/positions from the
+reference (or from PART 20's style table for a prompt-only build):
+
+  root
+  ├── pelvis
+  │   ├── thigh-l → shin-l → foot-l
+  │   └── thigh-r → shin-r → foot-r
+  ├── abdomen
+  │   └── chest
+  │       ├── neck → head
+  │       │         ├── hair
+  │       │         ├── brow-l / brow-r
+  │       │         ├── ear-l / ear-r
+  │       │         ├── nose
+  │       │         ├── mouth
+  │       │         ├── eye-cavity-l → eye-l
+  │       │         └── eye-cavity-r → eye-r
+  │       ├── clavicle-l → upper-arm-l → forearm-l → hand-l (+ fingers)
+  │       └── clavicle-r → upper-arm-r → forearm-r → hand-r (+ fingers)
+
+For a chibi mascot, fold thighs and shins into one stubby cylinder per
+leg, omit fingers, exaggerate the head, and keep all 6 MACRO Groups
+(31.1 — never fold chest+abdomen+pelvis into one "body" even on a
+chibi).
+
+For a quadruped (dog, cat, horse, dragon), replace thigh-r/l + shin-r/l
+with front-leg-r/l + back-leg-r/l, add a tail Group attached to
+pelvis, and keep the same eye/brow/ear/nose/mouth micro face structure
+(move ears forward to the eye line per 31.5).
+
+For a creature with no arms (slime, octopus with a humanoid face), drop
+clavicle/upper-arm/forearm/hand per side but keep the rest of the
+hierarchy intact.
+
+================================================================================
+END OF PART 31 — CHARACTER / MASCOT SCULPT ENRICHMENT
+Output remains valid TS factory module. Unknown extra fields (userData.
+attachment, userData.actionProfile, userData.surfaceFrequencyBands,
+etc.) are kept as optional and ignored by the current renderer; they
+exist so future rig/animation layers can consume them, and so the AI
+is forced to author a proper component hierarchy instead of a flat
+1-2-Group character. The rules in this PART apply ONLY when the
+subject is a character, mascot, creature, or humanoid.
+================================================================================

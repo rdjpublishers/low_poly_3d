@@ -62,7 +62,18 @@ the two source documents disagreed with the code, the CODE wins, and the
 discrepancy is logged in PART 23 (CHANGELOG / CORRECTIONS) at the end of
 this file. Anywhere a documented feature could not be found in the code at
 all, it is explicitly marked "ASPIRATIONAL / NOT IMPLEMENTED" rather than
-silently dropped or silently kept.
+silently dropped or silently kept. PART 64's v8.2 character / mascot /
+creature / humanoid sculpt enrichment (source: Character_Sculpt_Enrichment_v1.txt)
+appended 2026-09-02 — adds the macro/meso/micro hierarchy, attachment
+contract, actionProfile, recessed-eye rules, build-pass discipline, and
+anti-shallow quality gates for character subjects. ALL NEW FIELDS
+(attachment, actionProfile, surfaceFrequencyBands, collider, destruction,
+transformChannels) are OPTIONAL — the current renderer ignores unknown
+keys safely, the AI is forced to author a proper component hierarchy
+instead of a flat 1-2-part character, and future renderer versions +
+the TS factory path can consume them. Applies ONLY when the subject is a
+character, mascot, creature, or humanoid — NOT to props, vehicles,
+architecture, food, or abstract shapes.
 
 >>> v7.0 CHANGE — READ PART 32 FIRST. The renderer's INPUT FORMAT changed
 from a JSON text file to a JAVASCRIPT (.js) script. Every "objects" field,
@@ -8162,3 +8173,597 @@ guarantees.
   [ ] [v8.1] A character-scale model has roughly 10-15 separate exportable
       mesh parts (fewer is fine for a genuinely simple prop) — not 1
       (PART 63.1).
+
+================================================================================
+PART 64 — v8.2 ADDITIONS: CHARACTER / MASCOT SCULPT ENRICHMENT
+================================================================================
+Source: Character_Sculpt_Enrichment_v1.txt (compiled from object-sculpt
+schema 2.1, character-v1.5 track). Compatible with LBL v8.0+ (JS path).
+
+--------------------------------------------------------------------------------
+PURPOSE & SCOPE
+--------------------------------------------------------------------------------
+This PART is an ADD-ON. It applies ONLY when the subject is a stylized
+character, mascot, creature, humanoid, or anthropomorphic figure. It does
+NOT replace any of the core LBL rules in PARTs 1-63 — it adds hierarchy
+depth, attachment contracts, action-ready pivots, material frequency
+bands, recessed-eye rules, build-pass discipline, and anti-shallow
+quality gates so the AI stops emitting flat under-detailed characters.
+
+APPLY automatically when:
+  - Subject is character / mascot / creature / humanoid / anthropomorphic
+  - Reference image shows a posed or standing figure with limbs, head, face
+  - User says "stylized", "mascot", "electric mouse", "chibi", "cartoon
+    character", "anthropomorphic", "person", "man", "woman", "kid", etc.
+  - Pipeline routing or meta.category is "character"
+
+DO NOT force this structure on pure props, vehicles, architecture, food,
+or abstract shapes. A pet rock with eyes is NOT a character; an animal
+with bilateral limbs, head, and facial features IS.
+
+For the image-input fork (Image_To_Js.txt) this PART applies IN ADDITION
+to the image analysis protocol in PART 27. The image analysis protocol
+determines the proportions and pose; this PART determines the component
+hierarchy and attachment contract.
+
+--------------------------------------------------------------------------------
+64.1 — MANDATORY COMPONENT HIERARCHY (MACRO → MESO → MICRO)
+--------------------------------------------------------------------------------
+Every character blueprint MUST contain at least these named parts (use
+these exact ids or clearly scoped equivalents). Missing any macro/meso
+part is a quality failure.
+
+MACRO (required — these are the 6 root-level body masses):
+  root            — overall character container / origin
+  pelvis          — hip / lower torso mass
+  abdomen         — mid torso
+  chest           — upper torso / ribcage mass
+  neck            — neck cylinder/capsule
+  head            — head volume
+
+MESO (required for full-body characters):
+  hair            — hair volume (may be omitted only if the character is bald)
+  clavicle-l / clavicle-r
+  upper-arm-l / upper-arm-r
+  forearm-l / forearm-r
+  hand-l / hand-r
+  thigh-l / thigh-r
+  shin-l / shin-r
+  foot-l / foot-r
+
+MICRO (required for face readability):
+  brow-l / brow-r
+  ear-l / ear-r
+  nose
+  mouth
+  eye-l / eye-r
+  eye-cavity-l / eye-cavity-r   (recessed sockets — see 64.6, never flat decals)
+
+Optional but recommended when visible:
+  fingers (thumb/index/middle/ring/little × 2-3 phalanges per hand)
+  tail, ears (animal character), horns, accessories, clothing layers,
+  held props
+
+RULE: Never collapse independently movable parts into one mesh. Each
+limb segment is its own object with its own pivot. The PART 40 "chain"
+generator is the preferred single-mesh implementation when the limb
+needs per-segment continuity, but the limb must STILL ride on its own
+named id ("arm_l", not folded into "chest").
+
+EXAMPLE — minimal character hierarchy in JS (flat format, real JS that
+builds the blueprint object, skeleton only — see 64.5 for materials):
+
+  const characterObjects = [
+    { id: "root", type: "group" }, // pure organizer, holds everything
+
+    // === MACRO ===
+    { id: "pelvis",  type: "ellipsoid", material: "cloth", baseColor: "#1a3a8a" },
+    { id: "abdomen", type: "ellipsoid", attachTo: "pelvis",  placement: "above",
+      material: "cloth", baseColor: "#1a3a8a" },
+    { id: "chest",   type: "ellipsoid", attachTo: "abdomen", placement: "above",
+      material: "cloth", baseColor: "#cc2222" },
+    { id: "neck",    type: "cylinder",  attachTo: "chest",   placement: "above",
+      scale: [0.18, 0.18, 0.18], material: "skin", baseColor: "#e8b87c" },
+    { id: "head",    type: "sphere",    attachTo: "neck",    placement: "above",
+      material: "skin", baseColor: "#e8b87c" },
+
+    // === FACE MICRO (mirror the _r side the same way) ===
+    { id: "hair", type: "blob", attachTo: "head", placement: "above",
+      offset: [0, 0.18, -0.05], material: "fur", baseColor: "#3a2418" },
+    { id: "eye-cavity-l", type: "sphere", attachTo: "head", placement: "front",
+      offset: [-0.10, 0.05, 0.18], scale: [0.06, 0.06, 0.04],
+      material: "skin", baseColor: "#7a4a2a" },
+    { id: "eye-l", type: "sphere", attachTo: "eye-cavity-l", placement: "front",
+      offset: [0, 0, 0.01], scale: [0.045, 0.045, 0.03],
+      material: "eye", baseColor: "#1a1a1a" },
+    // ... eye-cavity-r / eye-r, ear-l / ear-r, nose, mouth, brow-l / brow-r ...
+
+    // === ARMS (left full, right mirrored by name) ===
+    { id: "clavicle-l", type: "sphere", attachTo: "chest", placement: "left",
+      material: "cloth", baseColor: "#cc2222" },
+    { id: "arm_l", type: "generated", generator: "chain",
+      attachTo: "clavicle-l", placement: "below",
+      params: {
+        baseRadius: 0.07, segs: 6,
+        segments: [
+          { length: 0.32, tipRatio: 0.85, aim: [ 0.06, -1, 0.05] },
+          { length: 0.30, tipRatio: 0.65, aim: [ 0.08, -1, 0.20] }
+        ]
+      },
+      material: "skin", baseColor: "#e8b87c" },
+    { id: "hand_l", type: "generated", generator: "capsule",
+      attachTo: "arm_l", placement: "below",
+      params: { radius: 0.07, length: 0.02 },
+      material: "skin", baseColor: "#e8b87c" }
+    // ... arm_r, hand_r, thigh-l/r, shin-l/r, foot-l/r ...
+  ];
+
+  // Use a helper to build the mirrored right-side parts from a left-side
+  // template — keeps the JS readable and prevents copy-paste drift:
+  function mirrorX(obj) {
+    const m = { ...obj };
+    if (Array.isArray(m.position))      m.position      = m.position.map((v, i) => i === 0 ? -v : v);
+    if (Array.isArray(m.offset))        m.offset        = m.offset.map((v, i) => i === 0 ? -v : v);
+    if (Array.isArray(m.attachment?.localStart)) m.attachment.localStart = m.attachment.localStart.map((v, i) => i === 0 ? -v : v);
+    if (Array.isArray(m.attachment?.localEnd))   m.attachment.localEnd   = m.attachment.localEnd.map((v, i) => i === 0 ? -v : v);
+    m.id = m.id.endsWith("_l") ? m.id.slice(0, -2) + "_r" : m.id;
+    m.attachTo = m.attachTo?.endsWith("_l") ? m.attachTo.slice(0, -2) + "_r" : m.attachTo;
+    return m;
+  }
+
+--------------------------------------------------------------------------------
+64.2 — ATTACHMENT CONTRACT (required for every child limb/appendage)
+--------------------------------------------------------------------------------
+Every child part that is not the root MUST declare an "attachment"
+object (the LBL equivalent of "attachTo" with extra structural detail
+about the seam). The renderer's current buildScene() ignores this field
+(it only reads attachTo/placement) — it exists so the AI is forced to
+think about the joint instead of guessing floating positions, and so
+future renderer versions + the TS factory path can consume it.
+
+PREFERRED SHAPE (all fields optional but strongly recommended):
+
+  "attachment": {
+    "parentSocket": "chest-clavicle-l",   // semantic socket name on parent
+    "localStart":   [x, y, z],            // attach point in parent local space
+    "localEnd":     [x, y, z],            // far end of this segment
+    "contactType":  "rigid-weld" | "socket-joint" | "hinge-joint",
+    "baseRadius":   number,               // thickness at root
+    "endRadius":    number,               // thickness at tip
+    "embedDepth":   0.02-0.05,            // how far it sinks into parent
+    "gapTolerance": 0.01                  // max allowed air gap
+  }
+
+CONTACT TYPE GUIDANCE (semantic, not enforced by the renderer):
+  rigid-weld    — torso segments, neck, hair, clothing panels
+  socket-joint  — shoulder, hip
+  hinge-joint   — elbow, knee, finger joints, jaw
+
+Minimum overlap at seams: 0.02 world units (do not leave floating
+parts). The existing PART 41 attachTo + placement system is what the
+renderer actually USES to position the child — the attachment object
+above is the contract that the rest of the model needs to satisfy.
+
+EXAMPLE — arm_l with a full attachment contract (chain mesh, see 64.1
+for the rest):
+
+  const armL = {
+    id: "arm_l",
+    type: "generated",
+    generator: "chain",
+    params: { baseRadius: 0.07, segs: 6, segments: [
+      { length: 0.32, tipRatio: 0.85, aim: [ 0.06, -1, 0.05] },
+      { length: 0.30, tipRatio: 0.65, aim: [ 0.08, -1, 0.20] }
+    ] },
+    attachTo: "clavicle-l",
+    placement: "below",
+    attachment: {
+      parentSocket: "chest-clavicle-l",
+      localStart:   [ 0.18, -0.05,  0.00],
+      localEnd:     [ 0.22, -0.65,  0.05],
+      contactType:  "socket-joint",
+      baseRadius:   0.085,
+      endRadius:    0.055,
+      embedDepth:   0.04,
+      gapTolerance: 0.01
+    },
+    material: "skin",
+    baseColor: "#e8b87c"
+  };
+
+  // Quick helper for a "weld" attachment (clothing panels, hair, etc.):
+  function weldAttachment(localStart, localEnd, baseR, endR) {
+    return {
+      parentSocket: "auto",
+      localStart, localEnd,
+      contactType: "rigid-weld",
+      baseRadius: baseR, endRadius: endR,
+      embedDepth: 0.03, gapTolerance: 0.01
+    };
+  }
+
+--------------------------------------------------------------------------------
+64.3 — ACTION PROFILE & PIVOTS (action-ready static rig)
+--------------------------------------------------------------------------------
+Every macro and meso part should carry an "actionProfile" object. The
+renderer ignores this field today; it exists so a future rig/anim layer
+(the TS factory path's userData.sculptRuntime already uses the same
+shape — see Prompt_To_Ts.txt PART 6 / PART 30) can drive the part
+without re-deriving it.
+
+PREFERRED SHAPE:
+
+  "actionProfile": {
+    "animationRole": "root" | "static" | "limb" | "digit" | "face",
+    "pivot": {
+      "mode": "center" | "root" | "custom",
+      "localPosition": [0, 0, 0],
+      "axis":           [0, 1, 0]
+    },
+    "transformChannels": {
+      "translate":     true,
+      "rotate":        true,
+      "scale":         true,
+      "bend":          false,
+      "twist":         false,
+      "detach":        false,
+      "visibility":    true,
+      "materialState": false
+    },
+    "collider": {
+      "type":   "box" | "sphere" | "capsule",
+      "offset": [0, 0, 0],
+      "scale":  [1, 1, 1]
+    },
+    "destruction": {
+      "breakable":     false,
+      "fractureGroup": "<id>"
+    }
+  }
+
+PIVOT PLACEMENT RULES (read these BEFORE writing pivot.localPosition):
+  root        — at the model's logical center (usually 0,0,0)
+  pelvis      — at the hip center
+  abdomen     — at the lower torso center
+  chest       — at the upper torso center
+  neck        — at the base of the neck (jaw line)
+  head        — at the head center (NOT at the chin)
+  hair        — at the scalp root
+  upper-arm   — at the shoulder (pivot at the join, not the segment middle)
+  forearm     — at the elbow
+  hand        — at the wrist
+  thigh       — at the hip
+  shin        — at the knee
+  foot        — at the ankle
+  eye         — at the eye center
+  jaw/mouth   — at the lower-lip center
+
+Place the pivot at the semantic joint, then build geometry outward from
+localStart (root end) to localEnd (tip). The renderer's existing
+"position" + "attachTo + placement" system does the world placement;
+the "actionProfile.pivot" is the LOCAL-FRAME hint that future rig code
+needs.
+
+EXAMPLE — head with actionProfile (real JS):
+
+  const head = {
+    id: "head",
+    type: "sphere",
+    attachTo: "neck",
+    placement: "above",
+    material: "skin",
+    baseColor: "#e8b87c",
+    actionProfile: {
+      animationRole: "face",
+      pivot: {
+        mode: "center",
+        localPosition: [0, 0, 0],
+        axis: [0, 1, 0]
+      },
+      transformChannels: {
+        translate: true, rotate: true, scale: false,
+        bend: false, twist: false, detach: false,
+        visibility: true, materialState: false
+      },
+      collider: { type: "sphere", offset: [0, 0, 0], scale: [1, 1, 1] },
+      destruction: { breakable: false, fractureGroup: "head" }
+    }
+  };
+
+  // Helper for the common "limb joint" case — pivot at the parent end:
+  function jointActionProfile(role, axis) {
+    return {
+      animationRole: role,
+      pivot: { mode: "root", localPosition: [0, 0, 0], axis: axis || [0, 1, 0] },
+      transformChannels: {
+        translate: true, rotate: true, scale: false,
+        bend: true, twist: false, detach: false,
+        visibility: true, materialState: false
+      },
+      collider: { type: "capsule", offset: [0, -0.15, 0], scale: [1, 1, 1] },
+      destruction: { breakable: false, fractureGroup: role }
+    };
+  }
+
+For chain-generator limbs the pivot is implicit in the segment aim
+direction; you can still fill in actionProfile with the joint pivot
+position (the elbow) for the forearm segment specifically.
+
+--------------------------------------------------------------------------------
+64.4 — MATERIALS (character palette + frequency bands)
+--------------------------------------------------------------------------------
+Minimum material set for a clothed character:
+  skin, hair, shirt (or torso cloth), pants, shoes, eye, lips
+
+A creature/mascot may substitute "fur"/"feathers"/"scales" for skin +
+hair, but keep the eye + a "mouth interior" material distinct.
+
+Each material should declare (LBL already supports baseColor / roughness
+/ metalness; the rest below are OPTIONAL extension fields the renderer
+ignores, mirroring the surface-frequency-band concept from the
+enrichment file):
+
+  - albedo.dominant        — baseColor (already supported)
+  - albedo.secondary       — optional "secondary baseColor" for hand-painted
+                              trim panels (renderer-ignored; document intent)
+  - roughness.base         — already supported (top-level roughness)
+  - roughness.variation    — optional 0.0-0.1 jitter amount
+  - surfaceFrequencyBands: — object with three optional sub-fields
+      macro  — broad color/height breakup (sampled region span)
+      meso   — pores, fabric weave, fur clumps
+      micro  — highlight breakup under grazing light
+
+DO NOT use a single flat color for the whole character. DO NOT paint
+lighting into albedo. If you want a lit-vs-shadow region, use one of:
+  - "toneVariant": "dark" | "light" (PART 26.7) on a separate sub-mesh
+  - "colorVariation": 0.04 (PART 26.4) for a painted-shading look
+  - A second material with darker color on a genuinely recessed panel
+
+ROUGHNESS GUIDANCE (when you set it explicitly):
+  skin   0.45 - 0.60
+  cloth  0.70 - 0.90
+  hair   0.55 - 0.75
+  eye    0.15 - 0.25
+  lips   0.30 - 0.50
+  shoe   0.50 - 0.80
+
+EXAMPLE — character palette (drop into the blueprint-level "palette" map):
+
+  const characterPalette = {
+    skin:   "#e8b87c",
+    skin_d: "#b5773a",   // darker recess / shadow panel
+    hair:   "#3a2418",
+    shirt:  "#cc2222",
+    pants:  "#1a3a8a",
+    shoe:   "#1a1a1a",
+    eye:    "#1a1a1a",
+    lip:    "#cc6644"
+  };
+
+  // Helper to look up a palette color and produce a baseColor string:
+  function p(key) { return characterPalette[key]; }
+
+  // In objects:
+  { id: "chest",         material: "cloth", baseColor: p("shirt") },
+  { id: "shirt_shadow",  attachTo: "chest", placement: "below",
+    offset: [0, -0.02, 0.001], material: "cloth", baseColor: p("skin_d"),
+    toneVariant: "dark" }
+
+--------------------------------------------------------------------------------
+64.5 — FACE LANDMARKS & RECESSED EYES (critical)
+--------------------------------------------------------------------------------
+Eyes MUST read as recessed cavities, not flat stickers. PREFERRED
+techniques, in order of preference (all are optional — the renderer
+just renders whatever geometry you give it, so the choice is on the
+author):
+
+  1. Smaller sphere for the cavity, then a slightly smaller eye sphere
+     inset into it (most reliable across every renderer version).
+  2. Inset sphere with a slight negative Z offset (chibi style).
+  3. booleanSubtract a small sphere from the head, then place a smaller
+     eye sphere inside the resulting hole. (Use booleanSubtract from
+     PART 10; remember CSG timing caveat from PART 38 — boolean the
+     cavity BEFORE the head is attached to anything else.)
+
+LANDMARK PLACEMENT (relative to head height, where head height = 1.0):
+  eye line          — at   0.55 of head height from the chin
+  eye spacing       — 0.30-0.35 of head width apart (center to center)
+  nose base         — at   0.40 of head height from the chin
+  mouth line        — at   0.25 of head height from the chin
+  brow line         — at   0.68 of head height (above the eye line)
+  ear line          — at   0.55 of head height (≈ on the eye line)
+
+EXAMPLE — recessed eye cluster (chibi, head height 0.42, real JS):
+
+  const faceObjects = [
+    { id: "head", type: "sphere", scale: [0.22, 0.21, 0.22],
+      material: "skin", baseColor: "#e8b87c",
+      attachTo: "neck", placement: "above" },
+    { id: "eye-cavity-l", type: "sphere", scale: [0.045, 0.045, 0.025],
+      attachTo: "head", placement: "front", offset: [-0.06, 0.04, 0.18],
+      material: "skin", baseColor: "#7a4a2a" },
+    { id: "eye-l", type: "sphere", scale: [0.034, 0.034, 0.020],
+      attachTo: "eye-cavity-l", placement: "front", offset: [0, 0, 0.005],
+      material: "eye", baseColor: "#1a1a1a" },
+    { id: "eye-cavity-r", type: "sphere", scale: [0.045, 0.045, 0.025],
+      attachTo: "head", placement: "front", offset: [ 0.06, 0.04, 0.18],
+      material: "skin", baseColor: "#7a4a2a" },
+    { id: "eye-r", type: "sphere", scale: [0.034, 0.034, 0.020],
+      attachTo: "eye-cavity-r", placement: "front", offset: [0, 0, 0.005],
+      material: "eye", baseColor: "#1a1a1a" }
+  ];
+
+  // A small helper to generate the left+right eye cluster in one call:
+  function eyeCluster(parentId, side, y, z, cavityR, eyeR, color) {
+    const s = side === "l" ? -1 : 1;
+    return [
+      { id: `eye-cavity-${side}`, type: "sphere", scale: [cavityR, cavityR, cavityR * 0.55],
+        attachTo: parentId, placement: "front", offset: [s * 0.06, y, z],
+        material: "skin", baseColor: color.cavity },
+      { id: `eye-${side}`, type: "sphere", scale: [eyeR, eyeR, eyeR * 0.6],
+        attachTo: `eye-cavity-${side}`, placement: "front", offset: [0, 0, 0.005],
+        material: "eye", baseColor: color.iris }
+    ];
+  }
+
+--------------------------------------------------------------------------------
+64.6 — BUILD PASSES (ordered, do not skip)
+--------------------------------------------------------------------------------
+When generating a character, mentally (or actually) follow this order.
+Emit the full blueprint only after the last required pass.
+
+  1. blockout
+     - root + pelvis + abdomen + chest + neck + head + major limb capsules
+     - Correct head-unit proportions and overall silhouette
+     - Acceptance: humanoid proportions readable with zero materials
+
+  2. proportion-lock
+     - Lock head/torso/limb ratios to measured reference (or style table)
+     - Fix pose angles (elbow/knee bend, weight shift)
+
+  3. feature-placement
+     - hair, brows, ears, nose, mouth, eyes + cavities
+     - fingers if visible
+     - All attachment contracts filled (64.2)
+
+  4. material-pass
+     - Assign skin/hair/cloth/shoe/eye/lips materials
+     - Sample real mid-tone colors from reference if image is present
+     - Add roughness variation and basic frequency bands (64.4)
+
+  5. lighting-pass
+     - Optional in the blueprint, required in the post-render review
+     - Note key / fill / rim intent (which way does the main light come
+       from on the reference?)
+
+  6. interaction-pass
+     - Confirm every limb has a named pivot in actionProfile (64.3)
+     - Confirm every held prop is attachTo:"hand_l" or "hand_r"
+       (PART 43), not floating
+
+  7. optimization-pass
+     - Stay inside the performance budget (prefer < 80-120k tris for
+       full characters)
+     - Fold per-frame colorVariation / smoothing into "autoEnhance":true
+       (PART 46) where possible
+
+--------------------------------------------------------------------------------
+64.7 — QUALITY CONTRACT (anti-shallow rules — REJECT/REWRITE if any fire)
+--------------------------------------------------------------------------------
+REJECT the blueprint and rewrite if ANY of these are true:
+
+  - Only a root + 1-2 body parts for a full character (PART 64.1 lists
+    the minimum set; a 3-part character is NEVER acceptable)
+  - Limbs are single capsules with no elbow/knee break (use the chain
+    generator, PART 40, or two stacked capsule segments per limb)
+  - Eyes are flat disks or decals with no cavity (64.5)
+  - Hands are undifferentiated boxes with no fingers (when fingers
+    are visible at the reference's zoom level)
+  - Materials are one generic color with uniform roughness (64.4)
+  - Child parts float with no attachment / embedDepth (64.2)
+  - Adjacent parts have seam gap > 0.02 (PART 45 rule)
+  - Face landmarks ignore measured eye-line / mouth-line (64.5)
+  - Pose is forced to perfect T-pose when the reference shows a
+    different pose (PART 42)
+
+DEFINITION OF DONE (character):
+  Silhouette matches the reference, primary proportions are correct,
+  component hierarchy depth ≥ 3 levels (macro + meso + micro from 64.1),
+  most recognizable local features are present, materials respond to
+  light (not flat plastic).
+
+Append these to PART 21's validation checklist (character-only items):
+
+  [ ] [v8.2] Character has all 6 MACRO parts (root, pelvis, abdomen,
+      chest, neck, head) — 64.1.
+  [ ] [v8.2] Full-body character has all 14 MESO parts (hair, 2× clavicle,
+      2× upper-arm, 2× forearm, 2× hand, 2× thigh, 2× shin, 2× foot) —
+      omit only the parts genuinely not visible — 64.1.
+  [ ] [v8.2] Face has eye-cavity-l, eye-l, eye-cavity-r, eye-r as 4
+      separate objects (NOT one merged "eyes" object) — 64.5.
+  [ ] [v8.2] Every child limb/appendage has either an "attachment"
+      object (64.2) OR a complete "attachTo" + "placement" pair with
+      "overlap": 0.02+ (PART 26.5).
+  [ ] [v8.2] Every macro and meso part has an "actionProfile" object
+      with at least animationRole + pivot (64.3) — even if the renderer
+      ignores it today.
+  [ ] [v8.2] Minimum material set is present (skin, hair, torso cloth,
+      pants/legs, shoes, eye) — 64.4. A mascot/creature may substitute
+      fur/feathers/scales for skin + hair but still needs eye +
+      mouth-interior distinct.
+  [ ] [v8.2] Eye material is set to "eye" (or a metalness < 0.1,
+      roughness < 0.3 MeshStandardMaterial equivalent) — not a generic
+      "default" preset.
+
+--------------------------------------------------------------------------------
+64.8 — OUTPUT RULES (still pure LBL)
+--------------------------------------------------------------------------------
+  - Build the blueprint object as real JS (PART 32); the returned
+    value is the same shape the JSON spec produces. The renderer
+    doesn't care whether the object came from JSON or JS.
+  - Prefer the flat "objects" array (PART 1, FORMAT A). The nested
+    FORMAT B also works — child ids are scoped by the converter
+    automatically (PART 19).
+  - Use string material names that exist in LBL presets (PART 3), or
+    omit "material" and set baseColor + roughness directly.
+  - The new fields (attachment, actionProfile, surfaceFrequencyBands,
+    collider, destruction, transformChannels, etc.) are EXTRA keys on
+    the object. The current renderer ignores unknown keys safely.
+    Future renderer versions and the TS factory path consume them.
+  - Keep all existing LBL constraints (no trailing commas in the
+    BUILT object, valid primitives, sdf_blob must have "balls",
+    extrude/lathe must have "profile", booleanX "with" must reference
+    an existing id, etc.). Trailing commas in the JS source itself
+    are fine — only the final object's JSON-validity matters.
+  - When an image is supplied, MEASURE proportions and SAMPLE colors
+    from the image before writing any numbers (see Image_To_Js.txt
+    PART 27 for the full protocol).
+  - Every limb segment is its own object with its own id and pivot —
+    the chain generator (PART 40) is the preferred single-mesh
+    implementation but the limb id still exists.
+
+--------------------------------------------------------------------------------
+64.9 — QUICK CHARACTER SCAFFOLD (copy-paste starting point)
+--------------------------------------------------------------------------------
+Use this mental skeleton, then fill real scales/positions from the
+reference (or from the style table in PART 20 for a prompt-only build):
+
+  root (type: group)
+  ├── pelvis
+  │   ├── thigh-l → shin-l → foot-l
+  │   └── thigh-r → shin-r → foot-r
+  ├── abdomen
+  │   └── chest
+  │       ├── neck → head
+  │       │         ├── hair
+  │       │         ├── brow-l / brow-r
+  │       │         ├── ear-l / ear-r
+  │       │         ├── nose
+  │       │         ├── mouth
+  │       │         ├── eye-cavity-l → eye-l
+  │       │         └── eye-cavity-r → eye-r
+  │       ├── clavicle-l → upper-arm-l → forearm-l → hand-l (+ fingers)
+  │       └── clavicle-r → upper-arm-r → forearm-r → hand-r (+ fingers)
+
+For a chibi mascot, fold thighs and shins into one stubby cylinder per
+leg, omit fingers, exaggerate the head, and keep all 6 MACRO parts
+(64.1 — never fold chest+abdomen+pelvis into one "body" even on a chibi).
+
+For a quadruped (dog, cat, horse, dragon), replace thigh-r/l + shin-r/l
+with front-leg-r/l + back-leg-r/l, add a tail attached to pelvis, and
+keep the same eye/brow/ear/nose/mouth micro face structure (move ears
+forward to the eye line per 64.5).
+
+For a creature with no arms (slime, octopus with a humanoid face), drop
+clavicle/upper-arm/forearm/hand per side but keep the rest of the
+hierarchy intact.
+
+================================================================================
+END OF PART 64 — CHARACTER / MASCOT SCULPT ENRICHMENT
+Output remains valid LBL JS. Unknown extra fields are kept as optional
+and ignored by the current renderer; they exist so future renderer
+versions and the TS factory path can consume them, and so the AI is
+forced to author a proper component hierarchy instead of a flat 1-2-part
+character. The rules in this PART apply ONLY when the subject is a
+character, mascot, creature, or humanoid.
+================================================================================
