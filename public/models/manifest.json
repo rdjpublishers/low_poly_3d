@@ -4,6 +4,7 @@
     { "id": "Model_1", "file": "Model_1.ts" },
     { "id": "Model_2", "file": "Model_2.ts" },
     { "id": "Model_3", "file": "Model_3.ts" },
-    { "id": "Model_4", "file": "Model_4.ts" }
+    { "id": "Model_4", "file": "Model_4.ts" },
+    { "id": "Model_5", "file": "Model_5.ts" }
   ]
 }
