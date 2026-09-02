@@ -1000,6 +1000,83 @@ This way the factory has ONE tick entry point and the renderer never
 double-ticks.
 
 --------------------------------------------------------------------------
+5.6(a) — BAKING FROM A .glb/.gltf REFERENCE: PROPERTY-NAME TRANSLATION (CRITICAL)
+--------------------------------------------------------------------------
+When clips are built from keyframe data extracted out of a reference
+.glb/.gltf file (not hand-authored), the raw glTF JSON uses glTF's own
+channel target names:
+
+    translation | rotation | scale
+
+These are NOT the three.js Object3D property names. THREE.PropertyBinding
+resolves KeyframeTrack names against the actual object properties, and
+Object3D has no `.translation` property at all, and `.rotation` is an
+Euler — a different value type/size than the Quaternion a glTF 'rotation'
+channel is baked as. Using the glTF path name verbatim as the track name
+does NOT throw, does NOT log a warning, and the AnimationClip / mixer /
+action all construct and play "successfully" — the track simply never
+finds anything to write to, so the model sits frozen while every symptom
+you'd check (clips present, actions playing, mixer.update() being called
+every frame) looks correct. This is the single most common way a baked
+clip silently fails to play.
+
+The required translation table when building track names from glTF data:
+
+    glTF channel target      three.js KeyframeTrack target      Track type
+    --------------------      -----------------------------      ----------
+    translation           →   <node>.position                    VectorKeyframeTrack
+    rotation               →   <node>.quaternion                  QuaternionKeyframeTrack
+    scale                   →   <node>.scale                       VectorKeyframeTrack
+
+    // NEVER build a track name as `${node}.${gltfPath}` directly.
+    // ALWAYS pass gltfPath through an explicit lookup table first:
+    const GLTF_PATH_TO_THREE_PROPERTY = {
+      translation: 'position',
+      rotation: 'quaternion',
+      scale: 'scale',
+    };
+    const trackName = `${nodeName}.${GLTF_PATH_TO_THREE_PROPERTY[gltfPath]}`;
+
+A `rotation` channel MUST be constructed with `QuaternionKeyframeTrack`
+(4 floats/key, XYZW) targeting `.quaternion` — never `NumberKeyframeTrack`
+per-Euler-component targeting `.rotation[x/y/z]` when the source data is
+already baked as quaternions. (Per-axis Euler NumberKeyframeTracks
+targeting `.rotation[x]` etc. remain valid ONLY for hand-authored
+procedural tracks where you chose Euler angles yourself — never mix the
+two conventions on data pulled from a .glb sampler.)
+
+--------------------------------------------------------------------------
+5.6(b) — MANDATORY: HEADLESS PLAYBACK VERIFICATION BEFORE DELIVERY
+--------------------------------------------------------------------------
+"The clip constructs without a compile/type error" is NOT evidence the
+animation plays. TypeScript cannot catch a track name that resolves to
+a nonexistent runtime property — this is a runtime binding failure, not
+a type error, and `tsc --strict` will pass on the broken version just as
+cleanly as the fixed one.
+
+Before treating any baked-animation file as done, run an actual headless
+playback check — not just a compile check:
+
+  1. Stub `document.createElement` to return a no-op object (most factory
+     files early-return out of their canvas-texture helpers when
+     `getContext()` returns null, so this is usually enough to construct
+     the model headless).
+  2. Import the compiled factory, call it, grab a node that a track
+     targets via `root.getObjectByName('<NodeName>')`.
+  3. Record that node's `.position` / `.quaternion` BEFORE ticking.
+  4. Call `root.userData.tick(dt, elapsed)` (or drive the mixer directly)
+     for ~30-90 simulated frames.
+  5. Record the same node's `.position` / `.quaternion` AFTER, and assert
+     it actually changed.
+
+If the AFTER values equal the BEFORE values, the clip is NOT playing —
+even though the clip, action, and mixer all "exist" — and the file is
+not done. Do this check for at least one rotation-path node and one
+translation-path node per clip family before delivery. A passes/
+passesReviewed note claiming a clip count or animation description is
+documentation, not verification — it does not substitute for this check.
+
+--------------------------------------------------------------------------
 5.7 — Custom-runtime `update(elapsed)` (no tick, no mixer)
 --------------------------------------------------------------------------
 Some models (the pikachu ref is the canonical example) keep their
@@ -1143,6 +1220,14 @@ v1.2 files that only set nodes/meshes/sockets/colliders/
 destructionGroups keep working — all the new fields are pure additions.
 
 
+
+NOTE — if `animations.mixer` here is the SAME mixer instance a
+`root.userData.tick` also calls `.update()` on (PART 5.6), that is a
+double-drive bug (the clip plays at 2x speed, not "doesn't play" — a
+different symptom from 5.6(a), but the same root cause: two update
+paths touching one mixer). The factory's tick owns `mixer.update()`;
+`sculptRuntime.animations.mixer` is for the renderer's UI/inspector to
+read from, not a second place to drive it from.
 
 --------------------------------------------------------------------------
 6.2 — NAMING
