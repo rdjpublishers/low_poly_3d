@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.5 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.6 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -10606,4 +10606,271 @@ the renderer state — no new contract, no new validator, no new
 mandatory field. Layers on top of PART 1, PART 2, PART 4, PART 30,
 PART 32 / PART 65, PART 34, PART 35. Nothing in this PART removes or
 weakens any rule from PARTs 1-35.
+================================================================================
+
+================================================================================
+PART 37 — v1.14 / v8.6 ADDITIONS: ZIP BUNDLE SUPPORT
+The renderer accepts a `.zip` file (single file, drop, drag, or
+served from the demo / model-store URL) as a "bundle" of model +
+rig + any other files, and extracts it in-memory before routing
+each entry through the same multi-file drop pipeline from PART 36.
+The user can ship one zip per model (e.g. `Model_1.zip`) instead
+of juggling separate files. This PART layers on top of PART 1
+(single-file factory output contract), PART 2 (types), PART 4
+(imports), PART 30 (rigging), PART 32 / PART 65 (canonical
+helpers + validators), PART 34 (pre-bundled rig helpers), PART 35
+(triangle-first geometry), and PART 36 (multi-file drop + model +
+rig pairing). The renderer gains:
+  - `fflate` in the import map (10 KB minified, no deps, MIT)
+  - `multiple` attribute on the 4 file inputs extended with `.zip`
+  - a new "zip" file-type bucket in the dispatcher
+  - `__lblExtractZip(file)` that turns a zip into a list of File
+    objects ready for the existing routing pipeline
+  - `__lblLooksLikeZip(bytes)` magic-byte check (`PK\x03\x04`)
+  - `__lblFetchBytes(url)` for the demo / model-store path
+  - `.zip` accepted in the demo manifest + the legacy probe
+  - the model-store "Download Model Code" button re-serves the
+    original zip bytes verbatim (no inner-model extraction)
+================================================================================
+
+--------------------------------------------------------------------------
+37.1 — EXECUTIVE OVERVIEW: WHAT A BUNDLE LOOKS LIKE
+--------------------------------------------------------------------------
+A bundle is just a regular `.zip` archive. The renderer does not
+impose a particular layout, but the conventional / recommended shape
+matches the demo / model-store naming and the PART 36 model + rig
+pairing contract:
+
+  Model_1.zip                  (or any *.zip — the file's basename is
+                                irrelevant, only the contents matter)
+  ├── model.ts                 (REQUIRED — the main model factory.
+                                Can also be named model.js / model.json
+                                if you prefer the JSON/JS blueprint
+                                path. Whichever file the parser
+                                accepts as a model goes first.)
+  ├── rig.ts                   (OPTIONAL — PART 36's 4 export shapes.
+                                Auto-attaches to the just-loaded
+                                model exactly as if you'd dropped
+                                it standalone.)
+  ├── extra.glb                (OPTIONAL — appended in a row the
+                                same way a multi-file GLB drop would.)
+  ├── texture.png              (OPTIONAL — applied as a texture to
+                                the selection, same as a regular
+                                image drop.)
+  ├── README.md                (OPTIONAL — informational only; the
+                                renderer doesn't try to render it
+                                but lists it in the extraction toast
+                                so the user knows it's there.)
+  └── <any other asset>        (OPTIONAL — anything the import map
+                                can route is processed; unknown
+                                extensions are passed through as
+                                blueprint text last-resort, same
+                                as a regular drop.)
+
+The renderer filters out macOS resource-fork junk (`__MACOSX/.*`),
+hidden dotfiles (`.DS_Store`, `._*`), and directory markers. Every
+other entry becomes a File object and goes through `lblRouteFiles`.
+
+--------------------------------------------------------------------------
+37.2 — DROP, FILE-PICKER, AND DRAG-AND-DROP BEHAVIOR
+--------------------------------------------------------------------------
+A `.zip` is now a first-class file type in the dropper. All 4 file
+inputs (`file-input`, `file3d-input`, `dz-input`, `mob-dz-input`)
+include `.zip` in their `accept` attribute, and the dropzone
+sub-text reads "drop a .zip with model.ts + rig.ts" so the user
+knows the feature exists. Drop / pick / drag behavior:
+
+  1. Single .zip dropped   → `__lblExtractZip` runs, the extracted
+                              files re-enter `lblRouteFiles`, which
+                              fans them out as if they'd been dropped
+                              individually. The user sees:
+                              "✓ Extracted N files from Model_1.zip"
+  2. .zip + other files     → Zips are processed FIRST (so the
+                              extraction completes before the other
+                              files start), then the non-zip files
+                              go through the existing bucket dispatch.
+  3. Multiple .zips         → Extracted sequentially (the second zip
+                              waits for the first to finish) so a
+                              model.ts in zip A + a rig.ts in zip B
+                              still wire up via `__lblPendingRigs`.
+
+The full extraction → routing path is:
+
+  ┌─ drop / pick zip
+  │
+  ├─ __lblClassifyFile → 'zip' bucket
+  │
+  ├─ async __lblExtractZip(file):
+  │     unzip() via fflate
+  │     filter out __MACOSX, .DS_Store, dotfiles
+  │     text files → File(text); binary files → File(uint8)
+  │     return { files, entries, skipped, zipName }
+  │
+  ├─ toast "Extracted N files from <zipName>"
+  │
+  └─ lblRouteFiles(extracted) — recurse with the FileList
+        ├─ model.ts   → validateAndBuild →  CURRENT_TS_MODEL set
+        ├─ rig.ts     → __lblReadBlueprintOrRig → rig attaches
+        ├─ extra.glb  → load3DFile (append if scene non-empty)
+        ├─ texture    → lblApplyImageFileToSelected
+        └─ README.md  → classified 'blueprint' last-resort;
+                        try-compile fails with a parse error that
+                        shows up as a non-blocking toast (the
+                        model + rig still load — README.md is the
+                        user's documentation, not source code)
+
+If `__lblExtractZip` itself throws (corrupt zip, password-protected,
+unsupported compression method), the user sees a clear error toast
+with the underlying message and the rest of the batch is unaffected.
+
+--------------------------------------------------------------------------
+37.3 — DEMO / MODEL-STORE BEHAVIOR
+--------------------------------------------------------------------------
+The demo system (Demo / Model Store) is also zip-aware. A demo
+author can ship a single `public/models/Model_1.zip` and the
+renderer will:
+
+  1. Discover it via the manifest:
+     { "id": "Model_1", "file": "Model_1.zip" }
+     (the loader accepts .zip alongside .ts / .js / .json)
+
+  2. Or discover it via the legacy probe (which now tries
+     `Model_1.zip` after `Model_1.ts` / `.js` / `.json`).
+
+  3. On click, fetch the zip, check the `PK\x03\x04` magic bytes
+     (so a stale 404 HTML page isn't mistaken for a zip), then
+     extract + route through the same multi-file dispatch.
+
+  4. The "Download Model Code" button re-serves the **original
+     zip bytes verbatim** — what you download is what you
+     uploaded, not a reconstructed model.ts. This is important
+     for a demo workflow: if the user finds a bug in a model
+     bundle, they can fix the source files in the zip, re-upload
+     to the repo, and the next demo load serves back exactly
+     the same archive. The download goes through the existing
+     `lblLastDemoSource.bytes` path, no new button needed.
+
+The legacy probe prefers .ts over .zip when both exist for the
+same Model_N, so a repo with `Model_1.ts` keeps using the source
+editor flow and a repo with only `Model_1.zip` (no source) still
+loads. To FORCE zip mode, list the .zip in the manifest.
+
+--------------------------------------------------------------------------
+37.4 — WHAT A BUNDLE FILE MUST NOT DO
+--------------------------------------------------------------------------
+The PART 4 single-file / no-relative-imports rules apply to every
+.ts / .js / .json file inside a bundle, exactly as if they'd been
+dropped individually:
+
+  - No relative imports to OTHER FILES IN THE SAME BUNDLE. The
+    extraction produces flat File objects, and the TS pipeline
+    rewrites imports through the import map — `./rig` inside a
+    bundle does NOT resolve to the bundle's rig.ts.
+  - Imports of `'three'`, `'three/addons/...'`, `'three-bvh-csg'`,
+    `'three-rig-helpers'`, `'fflate'` (and any future import-map
+    entries) are allowed.
+
+If you need to share helpers between model.ts and rig.ts inside
+a bundle, the supported workaround is:
+
+  1. Inline the helper functions into each file (the spec already
+     encourages this — the LBL spec is a self-contained-output
+     format, see PART 4.1 "no relative imports").
+  2. OR factor the helper into a third file, write a tiny build
+     step that concatenates everything into one model.ts at
+     deploy time, and ship the .ts in the demo store instead
+     of the .zip.
+
+The renderer does NOT enforce this with a separate linter — the
+existing PART 4 validators handle it on the model side, and the
+dynamic-import failure surfaces naturally on the rig side.
+
+--------------------------------------------------------------------------
+37.5 — BACKWARDS COMPATIBILITY
+--------------------------------------------------------------------------
+A bundle is purely additive. Every existing workflow is preserved:
+
+  - Single .ts / .js / .json / .glb / .obj / .stl / .fbx / .dae /
+    image drop → unchanged.
+  - Multi-file drop with model + rig → unchanged (PART 36 still
+    works exactly as before, zips are just one more file type
+    that the bucket dispatch recognizes).
+  - Demo / model-store with .ts / .js / .json → unchanged.
+  - Editor paste path → unchanged (still single-file at a time).
+  - "Download Model Code" button → serves .ts / .js / .json as
+    text (unchanged) AND zip as `application/zip` (new — only
+    when the source was a zip).
+
+The `accept` attribute change on the 4 file inputs (added `.zip`)
+is a no-op for users who don't have zips — the browser's file
+picker shows zip files alongside the other supported extensions
+but the user can still pick a non-zip file and the existing flow
+takes over.
+
+The `__lblClassifyFile` change (added the 'zip' bucket) is also
+a no-op for non-zip files. The bucket only triggers when the file
+extension is `.zip`, and the extracted File objects are re-classified
+in the recursive `lblRouteFiles` call with their original
+extensions.
+
+--------------------------------------------------------------------------
+37.6 — PRE-EMISSION CHECKLIST (extends the 36.6 / 35.6 / 34.6 lists)
+--------------------------------------------------------------------------
+The 6-item pre-emission checklist in 35.6, the 6-item PART 34
+checklist, and the 2-item PART 36 voluntary checklist are all
+unchanged. If you ship a bundle (PART 37), add these 2 voluntary
+items to your personal mental checklist (not enforced by any
+validator — the renderer doesn't introspect zip layouts):
+
+  [PART-37.1] The bundle contains at least one .ts / .js / .json
+              file that defines a renderable scene. An empty zip
+              gets a "contained no renderable files" error.
+  [PART-37.2] The bundle's .ts / .js / .json files do NOT use
+              relative imports to other files in the same zip.
+              The import map doesn't know about zip-internal
+              paths. (See 37.4 for the supported workarounds.)
+
+PART 37 does NOT introduce a new mandatory field, a new export
+path, a new validator, or a new API surface. The new behavior is
+purely a new input format on the dropper + a new recognized
+extension in the demo / model-store. No .ts factory is required
+to know about zips — the renderer handles extraction transparently.
+
+PART 37 layers on top of, never replaces:
+  - PART 1 (TS output contract) — every bundle's model still has a factory
+  - PART 2 (type safety) — same TypeScript rules
+  - PART 4 (no relative imports) — applies to zip contents
+  - PART 30 (rigging) — auto-promotion still happens for blueprints
+  - PART 32 / PART 65 (canonical helpers) — extended, not replaced
+  - PART 34 (rig helpers) — bundles can include rig.ts that uses
+    'three-rig-helpers' exactly like a standalone rig file
+  - PART 35 (tris inspector) — bundle-loaded models still report
+    their triangle budget via the 🔺 Tris button
+  - PART 36 (multi-file drop) — the zip extraction feeds into the
+    same `lblRouteFiles` dispatcher
+
+PART 37 does NOT introduce:
+  - A new mandatory field on any existing userData namespace
+  - A new top-level API surface (no global `lblLoadZipFromUrl` —
+    the demo flow uses the existing `lblModelStoreLoadByNumber`)
+  - A change to the GLB / OBJ / STL / FBX / DAE loader
+  - A change to the editor paste path
+  - A change to the file-picker UI (just an `accept` attr extension)
+  - A change to the scene tree or the Rig button
+  - A dependency on a non-import-mapped module (fflate IS in
+    the import map, same access pattern as the other deps)
+
+================================================================================
+END OF PART 37 — v1.14 / v8.6 ADDITIONS: ZIP BUNDLE SUPPORT
+The renderer now accepts a .zip anywhere a file can enter the
+system: drop, file-picker, drag, or the demo / model-store URL.
+The bundle is extracted in-memory (no disk write), filtered for
+junk files, and every entry is routed through the same multi-
+file dispatcher from PART 36 — model.ts loads, rig.ts attaches,
+extra GLBs append, images texture, READMEs surface as non-blocking
+toast. The raw zip bytes are preserved so "Download Model Code"
+re-serves the exact same archive the user loaded. Single-file
+workflows are unchanged. Layers on top of PART 1, PART 2, PART
+4, PART 30, PART 32 / PART 65, PART 34, PART 35, PART 36. Nothing
+in this PART removes or weakens any rule from PARTs 1-36.
 ================================================================================

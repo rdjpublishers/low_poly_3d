@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI Low-Poly Scene Builder | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.13 (TS path) and v8.5 (JSON/JS path) with 10 opt-in architectural features, 10 hard anti-pattern guards, and a triangle-first geometry inspector. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.13, LBL v8.5"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.14 (TS path) and v8.6 (JSON/JS path) with 10 opt-in architectural features, 10 hard anti-pattern guards, and a triangle-first geometry inspector. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.14, LBL v8.6, zip bundle, model rig"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1438,7 +1438,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <!-- RJS UPDATE 3 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
        TS factories target v1.10 (PART 33 architectural features), JSON/JS blueprints target v8.2 (PART 66 feature bridge).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 10 anti-patterns from PART 32/65. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.13 / v8.5</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.14 / v8.6</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -1460,8 +1460,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="usdz-btn" title="Export USDZ — Apple AR Quick Look format. Degrades gracefully if the loaded Three.js build doesn't ship USDZExporter.">USDZ</button>
   <button class="tbtn primary" id="glb-btn">Export GLB</button>
 </div>
-<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts" multiple style="display:none"/>
-<input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz" multiple style="display:none"/>
+<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts,.zip" multiple style="display:none"/>
+<input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz,.zip" multiple style="display:none"/>
 <!-- 3D-model uploads intentionally keep their own format list — .ts/.mts/.cts
      are source code for the LBL TS factory pipeline (#file-input above), not
      importable 3D model formats, so they don't belong on this input. -->
@@ -1550,10 +1550,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="dropzone">
-        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" multiple/>
+        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,.zip,image/*" multiple/>
         <div class="dz-icon">📄</div>
-        <div class="dz-title">Drop JSON / JS / TS here</div>
-        <div class="dz-sub">or click to browse · drop several files at once · drop an image onto a selected part to texture it</div>
+        <div class="dz-title">Drop JSON / JS / TS / ZIP here</div>
+        <div class="dz-sub">or click to browse · drop several files at once · drop a .zip with model.ts + rig.ts · drop an image onto a selected part to texture it</div>
       </div>
     </div>
     <div class="panel-section">
@@ -1885,7 +1885,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="mob-dropzone" class="dropzone-box">
-        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" class="dropzone-input" multiple/>
+        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,.zip,image/*" class="dropzone-input" multiple/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Tap to browse JSON</div>
       </div>
@@ -1994,7 +1994,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
     "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.3/build/index.module.js",
     "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.16/build/index.module.js",
-    "three-rig-helpers": "./public/rig/three-rig-helpers.js"
+    "three-rig-helpers": "./public/rig/three-rig-helpers.js",
+    "fflate": "https://unpkg.com/fflate@0.8.2/esm/browser.js"
   }
 }
 </script>
@@ -13845,7 +13846,13 @@ function lblModelStorePopulateFromManifest(manifest, base){
     const n = parseInt(String(m.id).replace(/^Model_/i, ''), 10);
     if(!Number.isFinite(n) || n < 1) continue;
     const ext = String(m.file).split('.').pop().toLowerCase();
-    if(!/^(ts|js|json)$/.test(ext)) continue;
+    // LBL ZIP BUNDLE (PART 37) — accept .zip in the manifest as a fully
+    // valid alternative to .ts / .js / .json. The loader detects a zip
+    // response (PK\x03\x04 magic bytes) and extracts it client-side
+    // before handing the inner model.ts to the regular parser. The
+    // "Download Model Code" button serves back the original zip bytes
+    // verbatim, so what you download is what you uploaded.
+    if(!/^(ts|js|json|zip)$/.test(ext)) continue;
     lblModelStoreUrlCache.set(n, { n, id: m.id, file: m.file, ext, url: base + m.file });
     if(n === highestContiguous + 1) highestContiguous = n;
   }
@@ -13903,7 +13910,12 @@ async function lblModelStoreFindExisting(n, signal){
 // in normal operation.
 // ═══════════════════════════════════════════════════════════════════
 const LBL_MODEL_STORE_BATCH = 20;
-const LBL_MODEL_STORE_EXTS  = ['js','json','ts'];
+// LBL ZIP BUNDLE (PART 37) — .zip is now a fully-recognized model-store
+// extension. The legacy probe tries .zip AFTER .ts/.js/.json (so a
+// repo with a .ts source still loads the source for the inline editor
+// + Download Model Code button), but a zip bundle is the easiest way
+// to ship a model + rig as a single asset.
+const LBL_MODEL_STORE_EXTS  = ['ts','js','json','zip'];
 let LBL_MODEL_STORE_BASES_RUNTIME = null;
 function lblModelStoreComputeBases(){
   if(LBL_MODEL_STORE_BASES_RUNTIME) return LBL_MODEL_STORE_BASES_RUNTIME;
@@ -14026,10 +14038,9 @@ async function lblModelStoreLoadByNumber(n){
   updateAllValLogs(`<span class="ok">✓ Found ${lblModelStoreLoadedFilename || ('Model_'+n+'.'+found.ext)} at ${found.url}${cached?' (cache hit)':''}</span><br><span class="info">→ downloading…</span>`);
   setStatus('downloading…', true);
   lblLoadingUpdate({ title: 'Downloading model', message: `Model_${n}.${found.ext}`, sub: found.url, progress: 0.35 });
-  let text;
+  let bytes;
   try{
-    const r = await fetch(found.url, {cache:'no-store'});
-    text = await r.text();
+    bytes = await __lblFetchBytes(found.url);
   }catch(err){
     updateAllValLogs(`<span class="err">✗ Failed to fetch ${found.url}: ${err.message}</span>`);
     setStatus('fetch error', false);
@@ -14039,6 +14050,49 @@ async function lblModelStoreLoadByNumber(n){
   }
   lblModelStoreIndex = n;
   lblModelStoreLoadedFilename = 'Model_' + n + '.' + found.ext;
+
+  // LBL ZIP BUNDLE (PART 37) — if the response is a zip (PK\x03\x04
+  // magic at byte 0), extract it client-side, then feed the inner
+  // model.ts / model.js / model.json to the regular parser. Rig files
+  // (rig.ts) and any 3D-model / image / extra-blueprint files in the
+  // zip are routed through the same multi-file dispatch the dropper
+  // uses, so they apply in the same way as if the user had dropped
+  // them individually. The raw zip bytes are stashed in
+  // lblLastDemoSource.bytes so the "Download Model Code" button
+  // re-serves the exact same zip the user loaded.
+  if(__lblLooksLikeZip(bytes) || found.ext === 'zip'){
+    try{
+      const zipFile = new File([bytes], lblModelStoreLoadedFilename, { type: 'application/zip' });
+      const { files: extracted, skipped } = await __lblExtractZip(zipFile);
+      if(skipped.length){
+        console.log('[model-store]', lblModelStoreLoadedFilename, 'skipped', skipped.length, 'hidden/system entries');
+      }
+      if(!extracted.length){
+        updateAllValLogs(`<span class="err">✗ ${lblModelStoreLoadedFilename} contained no renderable files (${skipped.length} skipped).</span>`);
+        setStatus('empty zip', false);
+        lblLoadingErr(`Empty zip — add at least a model.ts`);
+        toast(`${lblModelStoreLoadedFilename} contains no renderable files`, 'err');
+        return false;
+      }
+      lblSetDemoSource(null, lblModelStoreLoadedFilename, 'zip', bytes);
+      updateAllValLogs(`<span class="ok">✓ Downloaded ${lblModelStoreLoadedFilename} (${bytes.length.toLocaleString()} bytes) — extracted ${extracted.length} file${extracted.length===1?'':'s'}</span><br><span class="info">→ routing ${extracted.map(f=>f.name).join(', ')}…</span>`);
+      lblLoadingUpdate({ title: 'Extracting zip', message: `${extracted.length} file${extracted.length===1?'':'s'}`, sub: lblModelStoreLoadedFilename, progress: 0.55 });
+      // Route the extracted files through the same multi-file dispatcher
+      // the dropper uses. The model.ts inside gets the regular TS path,
+      // rig.ts gets the rig fallback, extra 3D models append, etc.
+      lblRouteFiles(extracted);
+      return true;
+    }catch(e){
+      updateAllValLogs(`<span class="err">✗ Failed to extract ${lblModelStoreLoadedFilename}: ${e.message}</span>`);
+      setStatus('zip error', false);
+      lblLoadingErr(`Zip extract failed: ${e.message}`);
+      toast(`Failed to extract ${lblModelStoreLoadedFilename}: ${e.message}`, 'err');
+      return false;
+    }
+  }
+
+  // Plain text file (.ts / .js / .json) — decode and dispatch.
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
   // LBL UPDATE F8 — remember the just-fetched source so the
   // "Download Model Code" button can serve the exact file the user
   // is currently previewing, without re-hitting the network.
@@ -14102,25 +14156,38 @@ async function lblModelStoreLoadByNumber(n){
 // alongside the rest of the nav when the store is empty.
 const lblLastDemoSource = { text: '', filename: '', ext: '' };
 
-function lblSetDemoSource(text, filename, ext){
+function lblSetDemoSource(text, filename, ext, bytes){
   lblLastDemoSource.text     = text     || '';
   lblLastDemoSource.filename = filename || '';
   lblLastDemoSource.ext      = ext      || '';
+  // LBL ZIP BUNDLE (PART 37) — when the source is a .zip we keep the
+  // raw bytes around too so "Download Model Code" re-serves the exact
+  // same zip the user originally loaded (rather than reconstructing
+  // it from a now-extracted model.ts). The text field stays empty for
+  // zips — there's no single "the source" to display in the editor.
+  lblLastDemoSource.bytes    = bytes    || null;
   const btn = document.getElementById('demo-dl-code');
-  if(btn) btn.disabled = !text;
+  if(btn) btn.disabled = !text && !bytes;
 }
 
 function lblDownloadDemoSource(){
-  if(!lblLastDemoSource.text){
+  if(!lblLastDemoSource.text && !lblLastDemoSource.bytes){
     toast('No demo model source available — load a model first', 'err');
     return;
   }
-  const mime = ({
-    json: 'application/json',
-    ts:   'text/x-typescript',
-    js:   'text/javascript',
-  })[lblLastDemoSource.ext] || 'text/plain';
-  const blob = new Blob([lblLastDemoSource.text], { type: mime + ';charset=utf-8' });
+  let blob, mime;
+  if(lblLastDemoSource.bytes){
+    // Zip bundle — re-serve the raw bytes verbatim.
+    blob = new Blob([lblLastDemoSource.bytes], { type: 'application/zip' });
+    mime = 'application/zip';
+  } else {
+    mime = ({
+      json: 'application/json',
+      ts:   'text/x-typescript',
+      js:   'text/javascript',
+    })[lblLastDemoSource.ext] || 'text/plain';
+    blob = new Blob([lblLastDemoSource.text], { type: mime + ';charset=utf-8' });
+  }
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
@@ -16850,13 +16917,83 @@ async function __lblReadBlueprintOrRig(file){
 //                 blueprint is dropped, we load the first and warn the user
 //                 that merging multiple blueprints is not supported in a
 //                 single drop — the others are queued via the file picker.
+//   • zip       → __lblExtractZip → recurse with the extracted FileList
+//                 (PART 37 — bundles model.ts + rig.ts + any other assets)
 const __LBL_MODEL_EXTS  = new Set(['glb','gltf','fbx','obj','stl','dae','usdz']);
 const __LBL_BLUEPRT_EXTS= new Set(['json','js','ts','mts','cts']);
 const __LBL_IMAGE_EXTS  = new Set(['png','jpg','jpeg','gif','webp','bmp','svg','avif','heic','heif']);
+const __LBL_ZIP_EXTS    = new Set(['zip']);
+
+// LBL ZIP BUNDLE (PART 37) — extract a .zip in memory and convert every
+// entry into a File object so the existing routing / drop / model-store
+// pipeline can treat them exactly like user-dropped files. Uses the
+// fflate ESM module (pinned in the import map above) — ~10KB minified,
+// no external deps, no native bridge. The expected shape of a bundle is
+//   model.ts       (the main model — required, the only file in the zip
+//                    that becomes the THREE.Group that gets rendered)
+//   rig.ts         (optional — Part 36's 4 export shapes; auto-attaches
+//                    to the just-loaded model)
+//   <any 3D>       (optional — appended in a row the same way a multi-
+//                    file GLB drop would)
+//   <any image>    (optional — applied as a texture to the selection)
+//   <any json/js>  (optional — treated as a blueprint)
+//   README.md / *  (informational only — the renderer ignores unknown
+//                    extensions but the user can see them in the validator
+//                    log after extraction)
+async function __lblExtractZip(file){
+  const { unzip, strFromU8 } = await import('fflate');
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const entries = await new Promise((resolve, reject) => {
+    unzip(buf, (err, data) => {
+      if(err) reject(err);
+      else resolve(data || {});
+    });
+  });
+  // Decide which entries to keep. We drop directory markers, macOS
+  // resource-fork junk, and dotfiles; everything else becomes a File.
+  const kept = [];
+  const skipped = [];
+  const TEXT_EXTS = /^(ts|mts|cts|js|mjs|json|svg|html|htm|md|txt|glsl|vs|fs|vert|frag|xml|yaml|yml|css|map)$/i;
+  for(const [name, data] of Object.entries(entries)){
+    if(!(data instanceof Uint8Array)) continue; // directory marker
+    const basename = name.split('/').pop();
+    if(name.endsWith('/') || !basename) continue;
+    if(basename.startsWith('.') || name.includes('__MACOSX/')){
+      skipped.push(name);
+      continue;
+    }
+    const isText = TEXT_EXTS.test(basename.split('.').pop() || '');
+    const fileObj = isText
+      ? new File([strFromU8(data)], basename, { type: 'text/plain' })
+      : new File([data], basename);
+    kept.push({ file: fileObj, originalPath: name });
+  }
+  return { files: kept.map(k => k.file), entries: kept, skipped, zipName: file.name };
+}
+
+// Detect a buffer or Response as a ZIP file (PK\x03\x04 magic at byte 0).
+// Used by the demo / model-store side to decide whether a fetched URL
+// is a zip bundle that needs extracting vs a raw .ts / .json / .glb.
+function __lblLooksLikeZip(bytes){
+  return bytes && bytes.length >= 4
+    && bytes[0] === 0x50 && bytes[1] === 0x4B
+    && bytes[2] === 0x03 && bytes[3] === 0x04;
+}
+
+// Fetch a URL and return its bytes. Tries `fetch().arrayBuffer()` first
+// (the standard path), falls back to a manual XHR for the rare cases
+// where a server returns a non-2xx with a useful error body.
+async function __lblFetchBytes(url, opts){
+  const r = await fetch(url, Object.assign({ cache: 'no-store' }, opts || {}));
+  if(!r.ok) throw new Error(`HTTP ${r.status} fetching ${url}`);
+  return new Uint8Array(await r.arrayBuffer());
+}
+
 function __lblClassifyFile(file){
   const name = (file && file.name) || '';
   const ext  = (name.split('.').pop() || '').toLowerCase();
   if(file && /^image\//.test(file.type)) return 'image';
+  if(__LBL_ZIP_EXTS.has(ext)) return 'zip';
   if(__LBL_MODEL_EXTS.has(ext)) return 'model';
   if(__LBL_BLUEPRT_EXTS.has(ext)) return 'blueprint';
   if(__LBL_IMAGE_EXTS.has(ext)) return 'image'; // tolerate missing MIME type on mobile captures
@@ -16871,8 +17008,41 @@ function lblRouteFiles(fileList){
     return;
   }
   // Multi-file path — bucket then dispatch.
-  const buckets = { image:[], model:[], blueprint:[] };
+  const buckets = { image:[], model:[], blueprint:[], zip:[] };
   files.forEach(f=>{ buckets[__lblClassifyFile(f)].push(f); });
+
+  // LBL ZIP BUNDLE (PART 37) — process any .zip files FIRST, since the
+  // extracted files replace the zip in the routing pipeline. We do
+  // this asynchronously and re-enter lblRouteFiles with the extracted
+  // FileList once the unzip is done — the same routing logic then
+  // handles images / 3D models / blueprints / rig pairs as if the user
+  // had dropped them individually. (Sequential processing: if a batch
+  // contains multiple zips, the second one is unzipped after the first
+  // finishes, so a model.ts in zip A + a rig.ts in zip B still wire
+  // up via the standard __lblPendingRigs queue.)
+  if(buckets.zip.length){
+    (async () => {
+      const allExtracted = [];
+      for(const z of buckets.zip){
+        try{
+          const { files: extracted, skipped, zipName } = await __lblExtractZip(z);
+          if(skipped.length){
+            console.log('[zip]', zipName, 'skipped', skipped.length, 'hidden/system entries');
+          }
+          toast(`✓ Extracted ${extracted.length} file${extracted.length===1?'':'s'} from ${zipName}`);
+          allExtracted.push(...extracted);
+        }catch(e){
+          toast(`Failed to extract ${z.name}: ${e.message}`, 'err');
+          console.error('[zip] extract failed for', z.name, e);
+        }
+      }
+      if(allExtracted.length){
+        // Re-enter the routing pipeline with the extracted files.
+        lblRouteFiles(allExtracted);
+      }
+    })();
+    return;
+  }
 
   // Images first — each one textures the currently selected part (or
   // spawns a new textured plane if nothing is selected), exactly as the
@@ -16939,11 +17109,29 @@ function lblRouteDroppedFile(file){
     window.lblApplyImageFileToSelected(file);
     return;
   }
+  const ext = (file && file.name ? file.name.split('.').pop() : '').toLowerCase();
+  // LBL ZIP BUNDLE (PART 37) — a single .zip goes through the same
+  // extraction path as a multi-file batch (just without the bucket step).
+  if(__LBL_ZIP_EXTS.has(ext)){
+    (async () => {
+      try{
+        const { files: extracted, skipped, zipName } = await __lblExtractZip(file);
+        if(skipped.length){
+          console.log('[zip]', zipName, 'skipped', skipped.length, 'hidden/system entries');
+        }
+        toast(`✓ Extracted ${extracted.length} file${extracted.length===1?'':'s'} from ${zipName}`);
+        lblRouteFiles(extracted);
+      }catch(e){
+        toast(`Failed to extract ${file.name}: ${e.message}`, 'err');
+        console.error('[zip] extract failed for', file.name, e);
+      }
+    })();
+    return;
+  }
   // LBL MODEL + RIG MULTI-FILE — for blueprint-ish files (JSON/JS/TS),
   // route through the new reader which tries the model pipeline first
   // and falls back to a rig attach when the TS file has no factory.
   // (Image drops are handled by the branch above.)
-  const ext = (file && file.name ? file.name.split('.').pop() : '').toLowerCase();
   if(__LBL_BLUEPRT_EXTS.has(ext)){
     (async () => {
       try{
@@ -21327,34 +21515,40 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 / 4 / 5 — LBL SPEC v1.13 / v8.5 RUNTIME SUPPORT
+// RJS UPDATE 3 / 4 / 5 / 6 — LBL SPEC v1.14 / v8.6 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
 // guards), PART 33/66 (10 architectural features), PART 34 (pre-bundled
 // rig helpers escape hatch from PART 4's single-file rule), PART 35
 // (triangle-first geometry inspector + 5 renderer-side helpers + the new
-// `🔺 Tris` topbar button + E12 validator), and PART 36 (multi-file drop
+// `🔺 Tris` topbar button + E12 validator), PART 36 (multi-file drop
 // + model + rig pairing — adds the `lblRouteFiles(fileList)` dispatcher,
 // the `__lblLoaded3DModels[]` array, the `__lblExtractRigGraph` /
-// `__lblApplyRigToModel` helpers, the `__lblPendingRigs` queue, and the
-// `multiple` attribute on the 4 file inputs). Lives at the end of the
-// main module so it can reference every helper defined above. The block
-// is intentionally self-contained — no global state is added that other
+// `__lblApplyRigToModel` helpers, the `__lblPendingRigs` queue, and
+// the `multiple` attribute on the 4 file inputs), and PART 37 (zip
+// bundle support — adds the `fflate` import-map entry, the
+// `__lblExtractZip` / `__lblLooksLikeZip` / `__lblFetchBytes` helpers,
+// the `'zip'` bucket in the classifier, the `.zip` accept on the file
+// inputs, and the demo / model-store's zip-aware `lblModelStoreLoadByNumber`
+// path that extracts `Model_N.zip` and re-serves the original bytes via
+// the "Download Model Code" button). Lives at the end of the main module
+// so it can reference every helper defined above. The block is
+// intentionally self-contained — no global state is added that other
 // code paths need to know about (everything is namespaced under the
 // `lblSpec` object on `window` so the inspector / console can introspect
 // it but it never collides with existing identifiers).
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.13 (PART 33 architectural features + PART 34 pre-bundled
+  // target v1.14 (PART 33 architectural features + PART 34 pre-bundled
   // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
-  // drop + model + rig pairing); JSON/JS blueprints target v8.5 (PART
-  // 66 feature bridge + PART 34 runtime contract for userData.rigGraph
-  // + PART 35 tris inspector + PART 36 same). The chip in the topbar
-  // shows both. Updating these constants is the only place to bump for
-  // a new spec release — every check below reads from this single
-  // source.
-  const VERSION = { ts: 'v1.13', json: 'v8.5' };
+  // drop + model + rig pairing + PART 37 zip bundle support); JSON/JS
+  // blueprints target v8.6 (PART 66 feature bridge + PART 34 runtime
+  // contract for userData.rigGraph + PART 35 tris inspector + PART 36
+  // same + PART 37 same). The chip in the topbar shows both. Updating
+  // these constants is the only place to bump for a new spec release —
+  // every check below reads from this single source.
+  const VERSION = { ts: 'v1.14', json: 'v8.6' };
 
   // The 10 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) one-to-one. Each check is a function that
