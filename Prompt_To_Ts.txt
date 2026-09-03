@@ -7114,6 +7114,130 @@ PART 36 layers on top of, never replaces:
   - PART 35 (tris inspector) — multi-model scenes still report their
     combined triangle budget via the 🔺 Tris button
 
+
+--------------------------------------------------------------------------
+36.7 — FILE EXTENSION ROUTING TABLE + NAMING RULES
+--------------------------------------------------------------------------
+This sub-subsection is the single source of truth for "what does
+the dropper do with a file of extension X?" — useful when a user
+asks "can I drop a .foo file?" or "does the file name matter?".
+
+COMPLETE EXTENSION ROUTING TABLE (every extension the dropper
+recognizes as of v1.13 / v8.5):
+
+  Extension(s)        Bucket        Loader
+  ──────────────────  ────────────  ──────────────────────────────────
+  .glb, .gltf         3D model      GLTFLoader — load3DFile (append
+                                   if scene non-empty)
+  .fbx                3D model      FBXLoader — load3DFile
+  .obj                3D model      OBJLoader — load3DFile
+  .stl                3D model      STLLoader — load3DFile
+  .dae                3D model      ColladaLoader — load3DFile
+  .usdz               3D model      NOT supported in browser — toast
+                                   "USDZ preview not supported in
+                                   browser — try GLB/glTF instead"
+  .png, .jpg, .jpeg,  image         lblApplyImageFileToSelected
+  .gif, .webp, .bmp,                (textures the current selection
+  .svg, .avif, .heic,               or spawns a textured plane)
+  .heif
+  .json               blueprint     validateAndBuild (JSON path)
+                                   or model+rig fallback if the
+                                   JSON happens to look like a
+                                   RigGraph (rare — use .ts for
+                                   rigs in practice)
+  .js, .mjs           blueprint     validateAndBuild (JS path)
+                                   or model+rig fallback
+  .ts, .mts, .cts     blueprint     validateAndBuildTs → tries the
+                                   create*Model factory first, falls
+                                   back to the rig path on failure
+  .zip                zip           __lblExtractZip → recurse on the
+                                   extracted FileList
+  (no extension or    blueprint     Last-resort fallback. Treated as
+   unknown extension)               text. The TS pipeline will throw
+                                   a parse error if it isn't valid
+                                   JS/TS, but JSON and JS text are
+                                   accepted too.
+
+The bucket dispatch is purely extension-based. The basename is NOT
+checked at this stage — `MyAwesomeCube.ts` and `model.ts` and
+`foo.ts` all go to the same bucket. The bucket then calls the
+loader, which is the one that decides what to do with the file's
+CONTENT.
+
+NAMING RULES — "does the file name matter?":
+
+  Rule 1: For NON-TS files (3D models, images), the basename is
+          COMPLETELY IGNORED. The file content is all that matters.
+          `Hero.glb`, `low_poly_knight.glb`, `untitled.glb` — all
+          load identically.
+
+  Rule 2: For TS files, the basename is IGNORED too. The factory
+          function NAME (not the file name) is what matters. The
+          factory must match the `create*Model` pattern (e.g.
+          `createCubeModel`, `createMinecraftCharacterModel`,
+          `createMyAwesomeThingModel`) OR be the default export
+          of a function that returns a `THREE.Object3D` with at
+          least one child. See PART 1 for the full factory
+          contract.
+
+  Rule 3: For ZIP files, the basename is the bundle name (shown
+          in the extraction toast). The contents are extracted and
+          each entry is routed by ITS OWN extension (per Rule 1-2
+          and the table above). A zip with `cube.ts` + `skeleton.ts`
+          works exactly like a zip with `model.ts` + `rig.ts`.
+
+  Rule 4: For the DEMO / MODEL STORE only (the "‹ Model N ›" buttons
+          in the topbar), file names DO matter — the legacy probe
+          and the manifest look for `Model_1`, `Model_2`, etc. in
+          `public/models/`. This is the ONE place where the
+          `Model_N.<ext>` naming convention is enforced. Direct
+          user uploads (drop / file-picker / drag) are unaffected.
+
+  Rule 5: There is NO required "primary" or "index" file inside a
+          bundle. The first file the renderer successfully builds
+          (the `create*Model` factory, in TS-extension order) becomes
+          the model. Rig files attach to it, 3D models append to it,
+          etc. The conventional `model.ts` name is just a
+          readability convention, not a requirement.
+
+EXAMPLES — every row loads identically:
+
+  Direct drop 1: cube.ts + skeleton.ts
+    → cube.ts has `create*Model` factory → loads as model
+    → skeleton.ts has no factory, has RigGraph default → loads as rig
+    → rig attaches to the cube model
+
+  Direct drop 2: MyAwesomeModel.ts + my_rig.ts
+    → identical behavior to drop 1 (basenames are ignored)
+
+  Zip bundle 1: Bundle.zip / [model.ts + rig.ts + extra.glb]
+    → extracted, then routed: model.ts → model, rig.ts → rig,
+      extra.glb → 3D model appended in a row
+
+  Zip bundle 2: Bundle.zip / [cube.ts + skeleton.ts + hero.glb]
+    → identical behavior to bundle 1
+
+  Direct drop 3: cube.ts + skeleton.ts + hero.glb
+    → identical to dropping a zip containing the same three files
+
+  Demo / Model Store: public/models/Model_1.zip
+    → the "Model_1" in the file name is what the demo system
+      looks for; once found, the .zip extension triggers
+      extraction just like a direct drop
+
+PART 36 does NOT introduce:
+  - A new mandatory field on any existing userData namespace
+  - A new top-level API surface (no `lblAttachRig` global — the
+    queue + drain pattern is the only public hook)
+  - A new pre-emission gate or validator item
+  - A change to the GLB / OBJ / STL / FBX / DAE / USDZ loader
+  - A change to the editor paste path (still single-file at a time)
+  - A change to the Demo / Model Store (still one .ts per click)
+  - A required naming convention for direct user uploads (the
+    basename is always ignored; the factory function name and
+    export shape are what matter — see 36.2 and the "naming rules"
+    in 36.7)
+
 PART 36 does NOT introduce:
   - A new mandatory field on any existing userData namespace
   - A new top-level API surface (no `lblAttachRig` global — the
@@ -7379,6 +7503,160 @@ PART 37 layers on top of, never replaces:
     their triangle budget via the 🔺 Tris button
   - PART 36 (multi-file drop) — the zip extraction feeds into the
     same `lblRouteFiles` dispatcher
+
+
+--------------------------------------------------------------------------
+37.7 — BUNDLE CONTENT NAMING RULES + PER-ENTRY ROUTING TABLE
+--------------------------------------------------------------------------
+This sub-subsection is the zip-specific companion to PART 36.7.
+It documents "what does the renderer do with a file named
+`foo.bar` inside a zip bundle?" — useful when a user asks "can I
+name my model file anything inside the zip?" or "what if I have
+two `.ts` files in the same bundle, which is the model?".
+
+PER-ENTRY ROUTING TABLE (every extension a zip entry can have
+and what the renderer does with it):
+
+  Entry extension     What the renderer does
+  ──────────────────  ──────────────────────────────────────────
+  .ts / .mts / .cts   Run the regular model pipeline (try
+                      create*Model factory). If that fails,
+                      retry as a rig (see PART 36.2 for the 4
+                      export shapes). The first entry to
+                      successfully build a model becomes THE
+                      model of the bundle; subsequent .ts
+                      entries are either rigs (if they expose
+                      a RigGraph) or extra blueprints (rare,
+                      shows up as a parse error toast).
+
+  .js / .mjs          Run the regular JS blueprint pipeline. No
+                      rig fallback for plain .js (only TS gets
+                      the rig fallback — see 36.2 for why).
+
+  .json               Run the regular JSON blueprint pipeline.
+                      No rig fallback (rare in practice; a rig
+                      is almost always a .ts file).
+
+  .glb / .gltf /      Append in a row to the right of the model
+  .fbx / .obj /       (3D models use the same `load3DFile`
+  .stl / .dae         append path as a direct multi-file drop).
+                      If the bundle has no model.ts (only 3D
+                      models + maybe a rig), the first 3D
+                      model becomes the "anchor" at origin
+                      and the rest append to it.
+
+  .png / .jpg /       Apply as a texture to the current
+  .jpeg / .gif /      selection. If nothing is selected, the
+  .webp / .bmp /      renderer spawns a new textured plane
+  .svg / .avif /      (same as a direct image drop).
+  .heic / .heif
+
+  .zip                NESTED ZIPS are not supported. The first
+                      .zip inside a .zip is treated as blueprint
+                      text and will fail to parse. Users who
+                      need a multi-bundle workflow should drop
+                      multiple .zip files in one drop instead
+                      (the dispatcher processes them
+                      sequentially per PART 37.2).
+
+  .md / .txt /        Treated as blueprint text last-resort
+  .html / .css /      (per PART 36.7). JSON-shaped .json5/.yaml
+  .xml / .yaml /      / .toml files fall through the same
+  .yml / .map         path. Unknown extensions also fall
+                      through — the parser tries, fails with a
+                      parse error, the rest of the bundle is
+                      unaffected.
+
+  __MACOSX/.*         FILTERED OUT (macOS resource-fork junk).
+                      The user sees them in console.log only,
+                      not in the extraction toast.
+  .DS_Store,          FILTERED OUT (hidden dotfiles).
+  ._* (dotfiles)
+
+NAMING RULES — "what should I name the files inside my bundle?":
+
+  Rule 1: ANY NAME WORKS for a direct user upload (drop / file-
+          picker / drag). `cube.ts` + `skeleton.ts` is exactly
+          the same as `model.ts` + `rig.ts`. The basenames are
+          ignored — the renderer classifies by EXTENSION and
+          builds by CONTENT.
+
+  Rule 2: For DEMO / MODEL STORE files (public/models/Model_N.*),
+          the name `Model_N.<ext>` IS required (the legacy probe
+          and the manifest lookup use this convention). This
+          rule applies regardless of whether the demo file is
+          a single .ts, a single .json, a single .glb, or a
+          full .zip bundle.
+
+  Rule 3: There is no "primary" or "index" file requirement
+          inside a bundle. The renderer doesn't look for a
+          file named `model.ts` or `index.ts`. Instead:
+          - The first .ts that successfully builds via the
+            model pipeline becomes the model
+          - Any other .ts that fails as a model is retried as
+            a rig and attaches to the just-loaded model
+          - If the bundle has no .ts at all but does have 3D
+            models, the first 3D model becomes the anchor and
+            the rest append to it
+
+  Rule 4: The CONVENTIONAL layout (recommended for readability
+          + tooling) is:
+
+            Model_1.zip (or any name for direct drops)
+            ├── model.ts          (the factory)
+            ├── rig.ts            (optional — auto-attaches)
+            ├── extra.glb         (optional — 3D model)
+            ├── texture.png       (optional — texture)
+            └── README.md         (optional — documentation)
+
+          But the renderer will happily load a bundle with any
+          other layout, as long as the contents have the right
+          extensions and the right export shapes.
+
+EXAMPLES — every row extracts + routes identically:
+
+  Bundle 1: Bundle.zip / [model.ts + rig.ts + hero.glb + grass.png]
+    → 4 files extracted, 0 junk
+    → model.ts loads as the cube
+    → rig.ts attaches to the cube
+    → hero.glb appends in a row
+    → grass.png textures the selection (or spawns a plane)
+
+  Bundle 2: Bundle.zip / [cube.ts + skeleton.ts + extra.obj + note.md]
+    → identical behavior (basenames don't matter)
+
+  Bundle 3: Bundle.zip / [hero.glb + decoration.glb + notes.md]
+    → no model.ts, so the first .glb (hero.glb) anchors at origin
+    → decoration.glb appends in a row
+    → notes.md fails to parse as blueprint, toast warns
+
+  Bundle 4: Bundle.zip / [model.ts + model2.ts + rig.ts]
+    → model.ts loads first (factory succeeds)
+    → model2.ts — if it has a factory, it REPLACES the scene
+      (current behavior — last-load-wins); if it has no
+      factory, it's tried as a rig and attaches to model.ts
+    → rig.ts attaches to whichever model is currently in the
+      scene after model2.ts is processed
+
+  Bundle 5: Bundle.zip / [rig.ts]  (model dropped second, separately)
+    → rig.ts has no model to attach to → queued in
+      __lblPendingRigs
+    → User drops model.ts (or another zip with model.ts) →
+      rig drains and attaches
+    → See PART 36.2 for the queue/drain protocol
+
+PART 37 does NOT introduce:
+  - A new mandatory field on any existing userData namespace
+  - A new top-level API surface (no global `lblLoadZipFromUrl` —
+    the demo flow uses the existing `lblModelStoreLoadByNumber`)
+  - A change to the GLB / OBJ / STL / FBX / DAE loader
+  - A change to the editor paste path
+  - A change to the file-picker UI (just an `accept` attr extension)
+  - A change to the scene tree or the Rig button
+  - A dependency on a non-import-mapped module (fflate IS in
+    the import map, same access pattern as the other deps)
+  - A required "primary" file name inside a bundle (Rule 3
+    above — there's no `model.ts` requirement)
 
 PART 37 does NOT introduce:
   - A new mandatory field on any existing userData namespace
