@@ -1,8 +1,38 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.10 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.11 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.11 (2026-09-03) — PRE-BUNDLED RIG HELPERS (OPT-IN ESCAPE
+    HATCH FROM PART 4's SINGLE-FILE RULE) (source: weights.ts
+    + skeleton.ts attached by the maintainer). New PART 34
+    documents the three-rig-helpers pre-bundled library as the
+    ONE sanctioned exception to PART 4.1 / 4.2 (the only
+    `import ... from 'three-rig-helpers'` line allowed in any
+    .ts factory), declares the 5 public functions
+    (buildSkeleton, buildSemanticWeights,
+    buildRigidSemanticWeights, validateRigGraph, validateWeights)
+    and the 3 data shapes (RigJoint, RigGraph, Vec3 — re-
+    declared in the spec, not as a reference, so the spec is
+    self-contained for the AI to read), includes a complete
+    worked example (the smooth-skinned robot from the
+    maintainer's conversation: validate → build skeleton →
+    build geometry → build weights → validate weights →
+    assemble SkinnedMesh → expose userData.rigGraph), adds a
+    decision table (rig helpers = mesh deforms with bones /
+    smooth skin / > 255 bones; pivot hierarchy = joint rotates
+    but mesh doesn't deform / low-poly / static pose), a 6-
+    item pre-emission checklist, and a runtime contract
+    describing the renderer's E11 validator + Rig button. The
+    pre-bundled library is shipped at /public/rig/three-rig-
+    helpers.js (3.9 KB minified, ES2020, single import spec
+    `'three-rig-helpers'` resolved through the page's import
+    map, with `'three'` left as a bare specifier). PART 34
+    reinforces — never replaces — PARTs 1, 4, 30, 32, 33. The
+    pivot-hierarchy approach (PART 30) remains the default;
+    PART 34 is opt-in only and only applies when the model
+    genuinely needs true SkinnedMesh with vertex skin weights.
+    Bumped from v1.10 to v1.11.
   v1.10 (2026-09-03) — COMPREHENSIVE ARCHITECTURAL IMPROVEMENTS (source:
     RDJ_PUBLISHERS_LOW_POLY_3D_SYSTEM_COMPREHENSIVE_ARCHITECTURAL_
     IMPROVEMENTS.txt). New PART 33 documents the 10 opt-in feature
@@ -5726,4 +5756,450 @@ the master prompt template in 33.2, the opt-in table in 33.3, the
 exercises the corresponding feature. The structural checklist in
 33.4 is MANDATORY only for the features a model has enabled. Nothing
 in this PART removes or weakens any rule from PARTs 1-32.
+================================================================================
+
+================================================================================
+PART 34 — v1.11 ADDITIONS: PRE-BUNDLED RIG HELPERS (OPT-IN)
+(Sanctioned escape hatch from PART 4's single-file rule, for true SkinnedMesh)
+================================================================================
+Source: weights.ts + skeleton.ts attached by the maintainer. This PART
+documents the 5 public functions and 3 data shapes, declares the exact
+import path the AI must use, codifies the WHEN / WHEN-NOT decision, and
+ships a complete worked example. It is the ONLY sanctioned exception to
+PART 4.1 / PART 4.2's single-file / no-relative-import rule — and ONLY
+applies when the model genuinely needs a THREE.SkinnedMesh with vertex
+skin weights. For every other case, the pivot-hierarchy approach in
+PART 30 is still the default and you do not touch this PART.
+
+--------------------------------------------------------------------------
+34.1 — THE ESCAPE HATCH (the one and only)
+--------------------------------------------------------------------------
+PART 4.1 / 4.2 say: every .ts factory is a single self-contained file.
+The only allowed imports are 'three' and 'three/examples/jsm/...' (or
+the 'three/addons/...' alias). Zero relative imports, zero npm packages,
+zero local helpers, no fetch — the entire build must live in one file.
+
+v1.11 sanctions a single, narrow exception:
+
+    import {
+      buildSkeleton,                 // compile a RigGraph → THREE.Skeleton
+      buildSemanticWeights,          // smooth vertex-skin weights (4 influences)
+      buildRigidSemanticWeights,     // compact uint8 vertex-skin weights (≤ 255 bones)
+      validateRigGraph,              // check a RigGraph before compiling
+      validateWeights,               // check a geometry's skinIndex/skinWeight
+    } from 'three-rig-helpers';
+
+The bare specifier 'three-rig-helpers' resolves through the renderer's
+import map (the only entry added in v1.11, the third line in the
+`imports` object — see PART 4.1's import-map convention) to a
+pre-bundled, minified ES module at /public/rig/three-rig-helpers.js
+(3.9 KB, single file, ES2020 target, ZERO deps beyond the page's own
+'three' build — the bundle's `import * as THREE from 'three'` is left
+as a bare specifier so the page's import map resolves it).
+
+That is the entire exception. Everything else in PART 4 still applies:
+no other relative imports, no other local helpers, no other npm
+packages, no fetch, no dynamic specifier hacks, no private registry,
+no bundling your own three, no `import.meta`. The 'three-rig-helpers'
+import is the single permitted local helper — period.
+
+Why this exception exists: the v8.3 / v1.10-era auto Bone-promotion +
+single-bone-per-part rigid skin at GLB export time (PART 30.7) is
+sufficient for the 99% case where each mesh deforms as a rigid unit
+bound to a single bone. The remaining 1% — smooth-skinned characters,
+faces with proper blendshape-style vertex weighting, rig graphs with
+> 255 bones that need a real multi-bone-per-vertex bind — needs the AI
+to author a real THREE.SkinnedMesh with `skinIndex` + `skinWeight`
+attributes, which is more code than belongs inline. The pre-bundled
+helpers exist to make that 1% tractable while preserving every other
+PART 4 guarantee.
+
+--------------------------------------------------------------------------
+34.2 — THE 5 PUBLIC FUNCTIONS
+--------------------------------------------------------------------------
+All 5 are pure / deterministic / have no DOM dependencies. All 5 throw
+explicit Error messages (or push to a string[] for the validators) so
+failures are diagnosable from the console, not silent.
+
+  // 1. Compile a RigGraph into a THREE.Skeleton + bone map.
+  //    Validates exactly one root joint, parent-before-child ordering,
+  //    and updates matrixWorld BEFORE calculateInverses() (otherwise
+  //    every inverse is identity and vertices stretch from the origin
+  //    when SkinnedMesh applies the bind pose — see upstream comment).
+  function buildSkeleton(graph: RigGraph): SkeletonBuildResult;
+
+  // 2. Build smooth skin weights (4-influence per vertex, nearest joints
+  //    by squared-distance falloff). Returns a Uint16BufferAttribute for
+  //    skinIndex and a Float32BufferAttribute for skinWeight, plus
+  //    maxWeightError (the worst |1 - sum| across the geometry — the
+  //    AI should surface this in its pre-emission checklist).
+  function buildSemanticWeights(
+    geometry: THREE.BufferGeometry,
+    skeleton: SkeletonBuildResult,
+    joints: RigJoint[],
+    maxInfluences?: number,        // default 4
+  ): WeightBuildResult;
+
+  // 3. Build COMPACT skin weights (uint8 indices + uint8 normalized
+  //    weights, 1 influence per vertex, weight = 255). For
+  //    reconstructed multipart surfaces where smoothing across an
+  //    unknown source seam would be less truthful than a rigid semantic
+  //    region. Throws if the skeleton has > 255 bones (uint8 index cap).
+  function buildRigidSemanticWeights(
+    geometry: THREE.BufferGeometry,
+    skeleton: SkeletonBuildResult,
+    resolveJoint: (x: number, y: number, z: number, vertex: number) => string,
+  ): CompactWeightBuildResult;
+
+  // 4. Validate a RigGraph BEFORE compiling it. Returns string[] of
+  //    human-readable errors (empty array = clean). Checks for:
+  //    duplicate joint ids, self-parenting, NaN / Infinity rest
+  //    positions, missing parent joints, and root count != 1.
+  function validateRigGraph(graph: RigGraph): string[];
+
+  // 5. Validate a geometry's skinIndex + skinWeight attributes. Returns
+  //    string[] of human-readable errors. Checks for: skinWeight vec4
+  //    presence, skinIndex vec4 presence, and per-vertex |sum - 1|
+  //    within the supplied tolerance (default 0.001). An empty return
+  //    value is the 6th item in the pre-emission checklist below.
+  function validateWeights(geometry: THREE.BufferGeometry, tolerance?: number): string[];
+
+  // Bonus, not part of the "5 public" but documented for completeness
+  // (also exported by the bundle, free, no extra cost):
+  //   resetSkeleton(result):       re-pose a built skeleton to bind
+  //   jointWorldPosition(result, id): query a joint's world position
+  //   asVector([x,y,z]):           convert a Vec3 literal to THREE.Vector3
+
+--------------------------------------------------------------------------
+34.3 — THE 3 DATA SHAPES (re-declared for spec self-containment)
+--------------------------------------------------------------------------
+The bundle ships the source-of-truth types INLINE — no external type
+imports. The spec must be self-contained, so the canonical shapes are
+re-declared here verbatim. If the upstream character-ir.ts source is
+attached in a future round, the types in this section are what to expect.
+
+  // [number, number, number] — XYZ literal. THREE.Vector3-compatible.
+  type Vec3 = [number, number, number];
+
+  // [x, y, z, w] — quaternion in XYZW order. The bundle's
+  // bone.quaternion.set(...restRotation) consumes this order directly.
+  type Quat4 = [number, number, number, number];
+
+  // One joint in the rig graph. parentId is OMITTED for the root.
+  // restPosition is WORLD-space (the build pass subtracts the parent's
+  // rest position to derive a local offset — see buildSkeleton above).
+  // restRotation is WORLD-space quaternion in XYZW order. Bone NAMES
+  // are the same .name strings, so they must follow PART 32 error [2]'s
+  // alphanumeric-with-underscores rule and (for any humanoid / biped /
+  // mech) reuse STANDARD_BONES from PART 33.1[10].
+  interface RigJoint {
+    id: string;                    // unique, alphanumeric + underscore
+    parentId?: string;             // OMITTED on the single root
+    restPosition: Vec3;            // [x, y, z] world-space
+    restRotation: Quat4;           // [x, y, z, w] world-space, unit length
+  }
+
+  // The full rig graph. joints[] does NOT need to be topologically
+  // sorted — buildSkeleton re-orders via a pending-queue walk that
+  // defers a joint until its parent has been added. But sorting it
+  // parent-before-child is fine and helps the AI's own debugging.
+  interface RigGraph {
+    joints: RigJoint[];
+  }
+
+The bundle ALSO exports two return-type shapes (free, not part of the
+"3 data shapes" but useful for editor / .d.ts consumers):
+
+  interface SkeletonBuildResult {
+    root: THREE.Bone;
+    bones: Map<string, THREE.Bone>;
+    skeleton: THREE.Skeleton;
+    restWorldPositions: Map<string, THREE.Vector3>;
+  }
+  interface WeightBuildResult {
+    indices: THREE.Uint16BufferAttribute;
+    weights: THREE.Float32BufferAttribute;
+    maxWeightError: number;
+  }
+  interface CompactWeightBuildResult {
+    indices: THREE.Uint8BufferAttribute;
+    weights: THREE.Uint8BufferAttribute;
+  }
+
+--------------------------------------------------------------------------
+34.4 — WHEN TO USE RIG HELPERS VS. THE PLAIN PIVOT HIERARCHY (PART 30)
+--------------------------------------------------------------------------
+PART 30 (pivot hierarchy + auto-promotion + single-bone-per-part rigid
+skin at export) is still the DEFAULT. PART 34 is the explicit escape
+hatch for the cases PART 30 cannot cover. Use the decision table below:
+
+  ┌────────────────────────────────┬──────────────────────┬───────────────────┐
+  │ If the model needs...          │ Use PART 30          │ Use PART 34       │
+  │                                │ (pivot hierarchy,    │ (three-rig-helpers│
+  │                                │  default)            │  escape hatch)    │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ Mesh deforms with bones        │ NO (mesh is rigidly │ YES               │
+  │ (vertex skin weights)          │ bound, 1 bone/part)  │                   │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ Joint rotates but mesh doesn't │ YES (default)        │ NO (overkill)     │
+  │ deform (low-poly, static pose) │                      │                   │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ Smooth skin (4-influence per   │ NO                   │ YES               │
+  │ vertex, distance falloff)      │                      │ (buildSemantic    │
+  │                                │                      │  Weights)         │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ Multi-bone-per-vertex (> 1     │ NO                   │ YES               │
+  │ influence per vertex)          │                      │                   │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ > 255 bones in the rig graph   │ NO                   │ YES (but only     │
+  │                                │                      │ with the float    │
+  │                                │                      │ path —            │
+  │                                │                      │ buildRigid-       │
+  │                                │                      │ SemanticWeights   │
+  │                                │                      │ caps at 255)      │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ Simple human / biped / mech    │ YES (use STANDARD_   │ NO                │
+  │ (< 64 bones, rigid per-part)   │ BONES, no helpers)   │                   │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ Style-locked cel-toon /        │ YES                  │ NO                │
+  │ retro-psx / hologram mode      │                      │                   │
+  │ (PART 33.1[4])                 │                      │                   │
+  ├────────────────────────────────┼──────────────────────┼───────────────────┤
+  │ External GLB-viewer rig-test   │ YES (PART 30.7's     │ YES (already      │
+  │ mode wants a `skins` section   │ auto-promotion       │  has a real       │
+  │                                │  covers it)          │  SkinnedMesh —    │
+  │                                │                      │  export is a      │
+  │                                │                      │  no-op identity   │
+  │                                │                      │  in this case)    │
+  └────────────────────────────────┴──────────────────────┴───────────────────┘
+
+Quick rule of thumb: if the model has fewer than 64 bones, no vertex
+skin weights, and each part is a rigid mesh that follows its parent
+Group's transform, you DO NOT need this PART — use PART 30 and forget
+34 exists. Reach for 34 only when the table above says YES.
+
+--------------------------------------------------------------------------
+34.5 — WORKED EXAMPLE: SMOOTH-SKINNED ROBOT (validate → build skeleton
+        → build mesh → validate weights → expose userData.rigGraph)
+--------------------------------------------------------------------------
+The end-to-end pattern for a model that genuinely needs vertex skin
+weights. Adapted from the maintainer's own robot-rigging build session
+to fit this renderer's single-file factory contract. Drop this skeleton
+into a real createXxxModel() factory — DO NOT paste it as a standalone
+file with no factory wrapper (PART 30.0's load-time rejection applies).
+
+  import * as THREE from 'three';
+  import {
+    buildSkeleton,
+    buildSemanticWeights,
+    validateRigGraph,
+    validateWeights,
+  } from 'three-rig-helpers';
+
+  export function createSmoothSkinnedRobotModel(options?: { color?: number }): THREE.Group {
+    const root = new THREE.Group();
+    root.name = 'RobotRoot';
+
+    // 1. Declare the rig graph (world-space rest positions, parent links).
+    //    Note: parentId omitted on the single root; restRotation is a unit
+    //    quaternion (0,0,0,1) for a default-pose robot.
+    const rig: RigGraph = {
+      joints: [
+        { id: 'Bone_Pelvis', restPosition: [0, 1.0, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Spine',  parentId: 'Bone_Pelvis', restPosition: [0, 1.25, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Chest',  parentId: 'Bone_Spine',  restPosition: [0, 1.55, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Head',   parentId: 'Bone_Chest',  restPosition: [0, 1.85, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Shoulder_L', parentId: 'Bone_Chest', restPosition: [ 0.25, 1.65, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Arm_L',      parentId: 'Bone_Shoulder_L', restPosition: [ 0.50, 1.55, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Shoulder_R', parentId: 'Bone_Chest', restPosition: [-0.25, 1.65, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'Bone_Arm_R',      parentId: 'Bone_Shoulder_R', restPosition: [-0.50, 1.55, 0], restRotation: [0, 0, 0, 1] },
+      ],
+    };
+
+    // 2. Validate BEFORE building — fail fast, surface every error.
+    const rigErrors = validateRigGraph(rig);
+    if (rigErrors.length > 0) {
+      throw new Error('rig graph validation failed:\n  - ' + rigErrors.join('\n  - '));
+    }
+
+    // 3. Compile the rig → THREE.Skeleton + bone map.
+    const built = buildSkeleton(rig);
+
+    // 4. Build the geometry (procedural torso + head, no PART 30 auto-
+    //    promotion needed because we're authoring the SkinnedMesh
+    //    ourselves; the auto-promotion path is a no-op for true
+    //    SkinnedMeshes).
+    const torsoGeo = new THREE.CylinderGeometry(0.20, 0.22, 0.55, 8, 4, true);
+    torsoGeo.translate(0, 0.275, 0);   // base at y=0 (parent local)
+
+    // 5. Build smooth skin weights (4-influence, distance falloff).
+    const w = buildSemanticWeights(torsoGeo, built, rig.joints);
+    if (w.maxWeightError > 0.01) {
+      console.warn('[rig] torso weights max error =', w.maxWeightError,
+                  '(> 0.01 — geometry may show seams at joint boundaries)');
+    }
+
+    // 6. Validate the weights BEFORE assembling the SkinnedMesh.
+    const weightErrors = validateWeights(torsoGeo);
+    if (weightErrors.length > 0) {
+      throw new Error('skin weight validation failed:\n  - ' + weightErrors.join('\n  - '));
+    }
+
+    // 7. Assemble the SkinnedMesh and wire it to the root bone.
+    const torsoMat = new THREE.MeshStandardMaterial({
+      color: options?.color ?? 0x8aa0b8,
+      roughness: 0.55, metalness: 0.35,
+    });
+    const torsoMesh = new THREE.SkinnedMesh(torsoGeo, torsoMat);
+    built.root.add(torsoMesh);
+    // CRITICAL: bind the SkinnedMesh to the compiled skeleton explicitly.
+    // (Auto-bind via mesh.skeleton = built.skeleton is the conventional
+    //  shape; the renderer's GLB-export path picks it up either way.)
+    torsoMesh.bind(built.skeleton, built.root.matrixWorld);
+
+    // 8. Expose the runtime contract on userData so the renderer can
+    //    surface a "Rig" button + the joint hierarchy panel.
+    root.userData.rigGraph = rig;                                    // PART 34 contract
+    root.userData.skeletonSource = 'three-rig-helpers';              // PART 34 marker
+    root.userData.skeleton = built.skeleton;                         // optional: live THREE.Skeleton
+    root.userData.bones = built.bones;                               // optional: id → THREE.Bone map
+    root.userData.restWorldPositions = built.restWorldPositions;     // optional: id → world pos
+
+    return root;
+  }
+
+That is the whole pattern: validate → build skeleton → build geometry →
+build weights → validate weights → assemble SkinnedMesh → expose
+userData.rigGraph. Every other line in the file is normal PART 1-33
+factory body code (materials, head sphere, optional PART 33.1[5]
+animationFsm, etc.).
+
+--------------------------------------------------------------------------
+34.6 — PRE-EMISSION CHECKLIST (the 6 items — MANDATORY for any model
+        that imports 'three-rig-helpers'; a no-op for every other
+        model that does not)
+--------------------------------------------------------------------------
+Append these to PART 32.4's 16-item structural reference checklist.
+Any unchecked item is a load-time or first-render failure that the
+renderer will surface as a red spec chip.
+
+  [ ] 1. [PART 34.1] The file contains exactly ONE `import ... from
+         'three-rig-helpers'` line, at the top, and zero other local /
+         relative / npm / fetch imports. PART 4.1 / 4.2 still apply to
+         everything else in the file.
+  [ ] 2. [PART 34.3] The rig graph has been validated with
+         `validateRigGraph()` and the returned string[] is empty.
+  [ ] 3. [PART 34.3] The graph declares exactly one root joint (the
+         one with parentId omitted). buildSkeleton throws on != 1, but
+         validate first so the error message is yours, not its.
+  [ ] 4. [PART 32 error [2]] Every joint's `id` is alphanumeric +
+         underscore, non-empty, and (for any humanoid / biped / mech)
+         matches the STANDARD_BONES catalog from PART 33.1[10]. No
+         hard-coded alternates like `Bone_Thigh_Left` or
+         `bone-thigh-l` — the case and the underscore matter because
+         external rig-test viewers and the renderer's Rig panel both
+         match by exact string.
+  [ ] 5. [PART 34.5] The geometry's `skinIndex` + `skinWeight` have
+         been validated with `validateWeights()` and the returned
+         string[] is empty (the 6th item in this checklist, surfaced
+         loudly so the AI doesn't ship a model with seams that
+         stretch from the origin).
+  [ ] 6. [PART 34.5] The returned root Group has
+         `root.userData.rigGraph` (the RigGraph itself) AND
+         `root.userData.skeletonSource === 'three-rig-helpers'` set.
+         The renderer uses these two keys to enable the Rig button +
+         run the E11 validator check at load time.
+
+If a model does not import 'three-rig-helpers' at all, this checklist
+is a no-op — don't add fake entries to satisfy the form. Models that
+don't need it (i.e. most low-poly cases) skip 34 entirely.
+
+--------------------------------------------------------------------------
+34.7 — RUNTIME CONTRACT (what the renderer does when it sees
+        userData.rigGraph)
+--------------------------------------------------------------------------
+The renderer's `window.lblSpec.refreshOnLoad()` (in index.html, the
+RJS UPDATE 3 block) now performs three rig-aware behaviors on every
+load — these are observable by any model that exports PART 34's
+contract, and inert for every other model:
+
+  (a) VALIDATOR E11 (rig helpers marker check)
+      If `root.userData.rigGraph` is present but
+      `root.userData.skeletonSource !== 'three-rig-helpers'`, the
+      renderer surfaces a non-blocking warning via the spec chip —
+      "Rig graph declared but skeletonSource is missing or not
+      'three-rig-helpers'". This is a STRICT check: the only
+      sanctioned source is the pre-bundled helpers. A model with a
+      custom-built SkinnedMesh is allowed (PART 30.7's auto-promotion
+      + per-part skin handles it) but should NOT also declare
+      userData.rigGraph — pick one path or the other.
+
+  (b) RIG BUTTON (topbar, next to the Sockets button)
+      If `root.userData.rigGraph` is present AND
+      `root.userData.skeletonSource === 'three-rig-helpers'`, the
+      renderer enables a new Rig button in the topbar (right after
+      the Sockets button, before Recipes). Clicking it opens a panel
+      listing every joint: id, parent id, and the rest position
+      (read from the rigGraph on every open). The panel re-validates
+      the graph with `validateRigGraph()` on every open and surfaces
+      any errors as a red banner above the joint list. The validator
+      runs CLIENT-SIDE — it does not require the bundle to be
+      imported dynamically; the bundle is loaded once at page load via
+      the import map and the helpers are available globally.
+
+  (c) GLB EXPORT OPTIMIZATION (optional, buildSkinnedHierarchyForExport)
+      The existing `buildSkinnedHierarchyForExport` (index.html line
+      ~14069, see PART 30.7) is the renderer's auto Bone-promotion +
+      per-part skin pass. If the loaded model ALREADY has a real
+      SkinnedMesh with skinIndex + skinWeight from PART 34, the
+      export pass detects that and is a no-op for those meshes (no
+      need to re-bind what the factory already bound correctly). The
+      optimization is internal — the export button is unchanged, no
+      new button, no new workflow.
+
+--------------------------------------------------------------------------
+34.8 — CROSS-REFERENCES
+--------------------------------------------------------------------------
+PART 34 layers on top of, never replaces:
+
+  - PART 4.1 / 4.2 — the single-file / no-relative-import rule. PART 34
+    is the one explicit exception; the rest of PART 4 still applies.
+  - PART 30 (rigging & animation authoring standard) — the default
+    pivot-hierarchy approach is still the right answer for ~99% of
+    cases. Reach for 34 only when 30's auto-promotion + single-bone-
+    per-part rigid skin is insufficient.
+  - PART 30.2 — bone naming rule. Every joint id must be alphanumeric
+    + underscore and (for humanoids / bipeds / mechs) reuse
+    STANDARD_BONES from PART 33.1[10].
+  - PART 30.7 — the auto-promotion + per-part skin pass is the
+    renderer's existing skeleton export path. PART 34 is a strictly
+    more powerful alternative for the 1% of cases that need it.
+  - PART 32 error [2] — track binding. Every animated bone still needs
+    an explicit, alphanumeric .name. The Rig panel's joint list reads
+    the same .name strings.
+  - PART 32.4 (16-item structural reference checklist) — the 6 items
+    in 34.6 are an APPEND to that list, not a replacement.
+  - PART 33.1[10] / 33.5 — the universal rigging standard + the
+    STANDARD_BONES catalog. Reuse the canonical names; don't invent
+    alternates.
+  - PART 33.4 (10-item architectural checklist) — orthogonal. None of
+    33.4's items change. A model that imports 'three-rig-helpers'
+    still benefits from any of 33.1[1-9] that apply to the subject.
+
+PART 34 does NOT introduce:
+  - Any new field that PART 30 / 33 doesn't already accept
+  - Any new renderer behavior beyond (a) the E11 validator, (b) the Rig
+    button, and (c) the export-path no-op described in 34.7
+  - Any new dependency in the model file beyond the single
+    'three-rig-helpers' import
+  - Any change to the GLB export's user-visible behavior
+
+================================================================================
+END OF PART 34 — v1.11 ADDITIONS: PRE-BUNDLED RIG HELPERS (OPT-IN)
+The escape hatch is opt-in and narrow: use PART 30 (pivot hierarchy +
+auto-promotion) for every model that doesn't need true SkinnedMesh
+vertex skin weights; reach for PART 34 only when the decision table in
+34.4 says YES. The 6-item checklist in 34.6 is MANDATORY for any model
+that imports 'three-rig-helpers' (no-op for every other model). Nothing
+in this PART removes or weakens any rule from PARTs 1-33.
 ================================================================================

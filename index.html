@@ -1364,6 +1364,15 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
        When the loaded model exposes `root.userData.sockets` with canonical Socket_HeadTop / Socket_Arm_Left / Socket_Arm_Right / Socket_Backpack names,
        this button is enabled and clicking it opens a panel listing every socket + the part library, so accessories snap to the right anchor. -->
   <button class="tbtn hide-xs" id="sockets-btn" title="PART 33.1[7] — modular socket kitbash. Snap accessories from the part library onto canonical Socket_HeadTop / Socket_Arm_Left / Socket_Arm_Right / Socket_Backpack anchors." disabled>🔌 Sockets</button>
+  <!-- RJS UPDATE 3 — PART 34 pre-bundled rig helpers: when the loaded
+       model exposes `root.userData.rigGraph` AND
+       `root.userData.skeletonSource === 'three-rig-helpers'`, this
+       button is enabled and clicking it opens a panel listing every
+       joint (id, parent, rest position) with a red banner if
+       validateRigGraph() reports errors. The validator runs on every
+       open. The bundle is loaded once at page load via the import
+       map (the third entry added in v1.11). -->
+  <button class="tbtn hide-xs" id="rig-btn" title="PART 34 — pre-bundled rig helpers. List the joint hierarchy when the model exports userData.rigGraph + skeletonSource === 'three-rig-helpers'." disabled>🦴 Rig</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
   <div class="vdiv"></div>
   <!-- LBL update F4 — animation controls moved out of the topbar into a
@@ -1978,7 +1987,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
     "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.3/build/index.module.js",
-    "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.16/build/index.module.js"
+    "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.16/build/index.module.js",
+    "three-rig-helpers": "/public/rig/three-rig-helpers.js"
   }
 }
 </script>
@@ -2027,6 +2037,17 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
+// v1.11 / v8.3 (PART 34) — pre-bundled rig helpers. The only sanctioned
+// local-helper import in the LBL spec; the same package is also the one
+// any .ts model factory may import via the bare specifier
+// 'three-rig-helpers'. Imported here (3.9 KB, ES2020, minified) so the
+// renderer can call validateRigGraph() / listRigGraph() on every model
+// load and run the Rig panel without an extra network round-trip. The
+// bundle's own `import * as THREE from 'three'` is left as a bare
+// specifier (the import map's first entry resolves it) so the page
+// stays on the same THREE instance as the rest of the renderer.
+import * as __threeRigHelpers from 'three-rig-helpers';
+window.__threeRigHelpers = __threeRigHelpers;
 
 // CSG (boolean union/subtract/intersect) is loaded lazily via dynamic import
 // the FIRST time a model actually uses a boolean operation — this keeps the
@@ -20668,23 +20689,26 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 — LBL SPEC v1.10 / v8.2 RUNTIME SUPPORT
+// RJS UPDATE 3 — LBL SPEC v1.11 / v8.3 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
-// guards) and PART 33/66 (10 architectural features). Lives at the end of
-// the main module so it can reference every helper defined above. The
-// block is intentionally self-contained — no global state is added that
+// guards), PART 33/66 (10 architectural features), and PART 34 (pre-bundled
+// rig helpers escape hatch from PART 4's single-file rule). Lives at the
+// end of the main module so it can reference every helper defined above.
+// The block is intentionally self-contained — no global state is added that
 // other code paths need to know about (everything is namespaced under the
 // `lblSpec` object on `window` so the inspector / console can introspect
 // it but it never collides with existing identifiers).
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.10 (PART 33 architectural features); JSON/JS blueprints
-  // target v8.2 (PART 66 feature bridge). The chip in the topbar shows
-  // both. Updating these constants is the only place to bump for a new
-  // spec release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.10', json: 'v8.2' };
+  // target v1.11 (PART 33 architectural features + PART 34 pre-bundled
+  // rig helpers); JSON/JS blueprints target v8.3 (PART 66 feature bridge
+  // + PART 34 runtime contract for userData.rigGraph). The chip in the
+  // topbar shows both. Updating these constants is the only place to
+  // bump for a new spec release — every check below reads from this
+  // single source.
+  const VERSION = { ts: 'v1.11', json: 'v8.3' };
 
   // The 10 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) one-to-one. Each check is a function that
@@ -20877,6 +20901,29 @@ window.lblSpec = (function(){
         const unknown = Object.keys(s).filter(k => !canon.includes(k));
         if(unknown.length === 0) return null;
         return 'Sockets present but use non-canonical names: ' + unknown.join(', ') + '. Inspector Sockets button will be disabled.';
+      }
+    },
+    {
+      id: 'E11', label: 'Rig helpers marker (PART 34)',
+      check: (root) => {
+        // PART 34 (v1.11 / v8.3) — the three-rig-helpers escape hatch
+        // from PART 4's single-file rule. If a model declares a rig
+        // graph on root.userData.rigGraph, the ONLY sanctioned
+        // skeleton source is the pre-bundled 'three-rig-helpers'
+        // import (resolved through the import map's third entry, see
+        // <head>). A model with a custom-built SkinnedMesh is allowed
+        // (PART 30.7's auto-promotion + per-part skin handles it) but
+        // should NOT also declare userData.rigGraph — pick one path or
+        // the other. The check is a STRICT marker test: presence of
+        // rigGraph without the right skeletonSource is a warning.
+        if(!root || !root.userData) return null;
+        const ud = root.userData;
+        if(ud.rigGraph && ud.skeletonSource !== 'three-rig-helpers'){
+          return 'root.userData.rigGraph is declared but userData.skeletonSource is "' +
+            (ud.skeletonSource || '<missing>') +
+            '" (must be exactly "three-rig-helpers" to use the pre-bundled helpers, or omit rigGraph entirely and rely on PART 30.7).';
+        }
+        return null;
       }
     }
   ];
@@ -21101,6 +21148,61 @@ window.lblSpec = (function(){
     }
   }
 
+  // ── PART 34 — pre-bundled rig helpers: joint hierarchy panel ──────
+  // When the loaded model exposes `root.userData.rigGraph` AND
+  // `root.userData.skeletonSource === 'three-rig-helpers'`, the Rig
+  // button in the topbar is enabled. Clicking it opens a panel that
+  // lists every joint (id, parent id, rest position). The panel
+  // re-validates against `validateRigGraph()` (imported from the
+  // pre-bundled helpers via the import map) on every open and
+  // surfaces any errors as a red banner above the joint list.
+  // The bundle is loaded once at page load — no dynamic import is
+  // needed here; the helpers are available globally as
+  // window.__threeRigHelpers (set by the side-effecting import the
+  // page does at load time). If the bundle failed to load, listRigGraph
+  // returns null and the button stays disabled.
+  function getRigHelpers(){
+    return (typeof window !== 'undefined' && window.__threeRigHelpers) || null;
+  }
+  function listRigGraph(){
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+    if(!root || !root.userData || !root.userData.rigGraph) return null;
+    if(root.userData.skeletonSource !== 'three-rig-helpers') return null;
+    const graph = root.userData.rigGraph;
+    if(!graph || !Array.isArray(graph.joints)) return null;
+    return graph;
+  }
+  function openRigPanel(){
+    const graph = listRigGraph();
+    if(!graph){
+      if(typeof toast === 'function') toast('This model has no PART 34 rig helpers (no userData.rigGraph + skeletonSource === "three-rig-helpers").', 'warn');
+      return;
+    }
+    const helpers = getRigHelpers();
+    let errs = [];
+    if(helpers && typeof helpers.validateRigGraph === 'function'){
+      try { errs = helpers.validateRigGraph(graph) || []; }
+      catch(e){ errs = ['validateRigGraph threw: ' + (e && e.message || e)]; }
+    } else {
+      errs = ['three-rig-helpers bundle not loaded (window.__threeRigHelpers is missing)'];
+    }
+    const header = errs.length > 0
+      ? ('⚠ Rig graph validation FAILED (' + errs.length + ' error(s)):\n  - ' + errs.join('\n  - ') + '\n\nJoints:\n')
+      : ('Rig graph valid ✓ (' + graph.joints.length + ' joints)\n\nJoints:\n');
+    const lines = graph.joints.map((j, i) => {
+      const p = (j.restPosition || [0,0,0]).map(v => v.toFixed(2)).join(', ');
+      return '  ' + (i+1) + '. ' + (j.id || '<unnamed>') +
+             (j.parentId ? '  (parent: ' + j.parentId + ')' : '  (ROOT)') +
+             '  @ (' + p + ')';
+    });
+    if(typeof toast === 'function'){
+      toast(header + lines.join('\n'), errs.length > 0 ? 'err' : 'ok', 7000);
+    } else {
+      console.log('[lblSpec] Rig panel:\n' + header + lines.join('\n'));
+    }
+  }
+
   // ── PART 33.1[9] — USDZ export ────────────────────────────────────
   // Apple AR Quick Look format. Only shipped in Three.js builds that
   // include the USDZExporter addon; on builds that don't, the function
@@ -21168,6 +21270,12 @@ window.lblSpec = (function(){
       sbtn.__lblSpecWired = true;
       sbtn.addEventListener('click', openSocketKitbashPanel);
     }
+    // Rig button (PART 34) — opens the joint hierarchy panel.
+    const rbtn = document.getElementById('rig-btn');
+    if(rbtn && !rbtn.__lblSpecWired){
+      rbtn.__lblSpecWired = true;
+      rbtn.addEventListener('click', openRigPanel);
+    }
     // USDZ export
     const ubtn = document.getElementById('usdz-btn');
     if(ubtn && !ubtn.__lblSpecWired){
@@ -21186,6 +21294,13 @@ window.lblSpec = (function(){
     if(sbtn){
       const hasSockets = listSockets().length > 0;
       sbtn.disabled = !hasSockets;
+    }
+    // Enable the Rig button (PART 34) if the model exposes a rig graph
+    // with the three-rig-helpers source marker. No-op for every other
+    // model — button stays disabled.
+    const rbtn = document.getElementById('rig-btn');
+    if(rbtn){
+      rbtn.disabled = !listRigGraph();
     }
     // Lock the shading dropdown to whatever the model declared.
     const sel = document.getElementById('shading-mode-select');
@@ -21219,6 +21334,8 @@ window.lblSpec = (function(){
     triggerFsmState,
     listSockets,
     openSocketKitbashPanel,
+    listRigGraph,
+    openRigPanel,
     exportUSDZ
   };
 })();
