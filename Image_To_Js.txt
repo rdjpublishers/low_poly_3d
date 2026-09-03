@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.1 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.2 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -105,7 +105,19 @@ material instance mutation, with canonical blueprint-side compliant
 shapes and a 10-item pre-emission reference checklist. PART 65
 reinforces — never replaces — PARTs 3, 7, 8, 15, and 63. The remaining
 6 of 10 errors do not apply on the JSON/JS path — see PART 65.3 for
-the cross-reference table. Bumped from v8.0 to v8.1.
+the cross-reference table. Bumped from v8.0 to v8.1. PART 66's v8.2
+architectural feature bridge (source: RDJ_PUBLISHERS_LOW_POLY_3D_
+SYSTEM_COMPREHENSIVE_ARCHITECTURAL_IMPROVEMENTS.txt) appended
+2026-09-03 — reproduces Prompt_To_Js.txt's PART 66 unchanged on the
+image-input fork (the 4 of 10 features with explicit blueprint-side
+hooks are output-side, identical regardless of how the subject was
+sourced). Documents the multi-style shading `shadingMode` field,
+audio-reactive animation `animationFsm.states` shape, modular
+socket attachment with the four canonical Socket_* names, and the
+universal rigging standard with the twelve canonical Bone_* part
+ids, plus the 6 renderer-side behaviors the AI doesn't have to
+author. PART 66 reinforces — never replaces — PARTs 5, 28, 30, 64,
+65. Bumped from v8.1 to v8.2.
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  AI SYSTEM PROMPT — PASTE THIS WHOLE FILE, OR JUST THIS BOX, AS CONTEXT  ║
@@ -9043,4 +9055,297 @@ fixes in 65.1 and the 10-item checklist in 65.2 are MANDATORY before
 every emission. The cross-reference table in 65.3 documents why the
 remaining 6 of 10 TS-path errors do not apply here. Nothing in this
 PART removes or weakens any rule from PARTs 1-64.
+================================================================================
+
+================================================================================
+PART 66 — v8.2 ADDITIONS: ARCHITECTURAL FEATURE BRIDGE
+(JSON/JS blueprint → opt-in field mapping for the 10 RDJ features)
+================================================================================
+Source: RDJ_PUBLISHERS_LOW_POLY_3D_SYSTEM_COMPREHENSIVE_ARCHITECTURAL_
+IMPROVEMENTS.txt. PART 33 documents the 10 features for the TS factory
+path. For the JSON/JS blueprint path, the AI does not emit raw Three.js
+code, so 8 of the 10 features (AO [1], IK [2], canvas decals [3],
+audio FSM [5], particle VFX [6], spring dynamics [8], multi-format
+export [9], inverted-hull outline [4 partial]) are renderer-side
+behaviors that the renderer already implements for blueprints matching
+the right shape — the AI's only job on the JSON/JS path is to author
+blueprints that the renderer can recognize as wanting each feature.
+
+The 4 features where the JSON/JS path has explicit blueprint-side
+hooks (features 4 [shading mode], 5 [animation FSM states], 7 [socket
+attachment], 10 [standard bone naming]) are documented below. The
+remaining 6 are addressed by the existing renderer behavior — the AI
+emits the same blueprint it would today and the renderer handles the
+rest. See 66.3 for the cross-reference table.
+
+--------------------------------------------------------------------------------
+66.1 — BLUEPRINT-SIDE FEATURE HOOKS (the 4 that apply)
+--------------------------------------------------------------------------------
+
+[4] MULTI-STYLE SHADING (blueprint-side hook)
+    The renderer recognizes a top-level blueprint field
+    `shadingMode: 'flat-pbr' | 'cel-toon' | 'hologram' | 'retro-psx'`
+    and switches the rendering pipeline accordingly. Defaults to
+    'flat-pbr' when omitted.
+
+    ❌ // wrong casing or unsupported value
+       { "shadingmode": "CelToon" }                 // ❌ lowercase key
+       { "shadingMode": "wireframe" }               // ❌ not in enum
+
+    ✅ { "shadingMode": "cel-toon" }                // exact kebab-case
+       { "shadingMode": "flat-pbr" }                // default
+       // or, when not declared at all, the renderer uses 'flat-pbr'
+
+    RULE: `shadingMode` is a top-level (root) blueprint field
+    only. Allowed values are exactly the four strings above. Any
+    unknown value falls back to 'flat-pbr' and the inspector shows
+    a non-blocking warning. Reinforces PART 3 (primitive + material
+    catalog) and PART 28 (advanced shading).
+
+[5] ANIMATION FSM STATES (blueprint-side hook)
+    The renderer reads an optional `animationFsm: { states: [...] }`
+    object on the root group and surfaces each state name as a
+    clickable button in the inspector's "Animation" panel. Clips are
+    referenced by id (not embedded) — the blueprint's `animations`
+    array (existing field) holds the actual THREE.AnimationClip
+    objects; the FSM maps human-readable state names to clip ids.
+
+    ❌ // wrong shape (array of strings instead of objects)
+       { "animationFsm": ["Idle", "Walk", "Run"] }
+       // or: clip embedded in the FSM object instead of by id
+       { "animationFsm": {
+           "states": [{ "name": "Idle",
+                        "clip": { /* inline AnimationClip */ } }]
+         } }
+
+    ✅ { "animations": [
+           { "id": "clip_idle",  "duration": 2.0 },
+           { "id": "clip_walk",  "duration": 1.2 },
+           { "id": "clip_run",   "duration": 0.8 },
+           { "id": "clip_jump",  "duration": 0.6 }
+         ],
+         "animationFsm": {
+           "states": [
+             { "name": "Idle",  "clipId": "clip_idle",  "fadeIn": 0.25 },
+             { "name": "Walk",  "clipId": "clip_walk",  "fadeIn": 0.20 },
+             { "name": "Run",   "clipId": "clip_run",   "fadeIn": 0.15 },
+             { "name": "Jump",  "clipId": "clip_jump",  "fadeIn": 0.10 }
+           ]
+         } }
+
+    RULE: `animationFsm.states` is an array of {name, clipId, fadeIn?}
+    objects. Every `clipId` MUST match an existing `animations[].id`
+    in the same blueprint. At minimum, supply Idle + Walk + Run +
+    Jump (matches the master prompt line 6 in PART 33.2). The
+    renderer instantiates the FSM lazily — when no FSM is declared,
+    the inspector shows the raw clip list instead.
+
+[7] MODULAR SOCKET ATTACHMENT (blueprint-side hook)
+    The renderer recognizes a `sockets` object on the root group
+    AND on individual parts (via `userData.sockets`) and exposes
+    each socket in the inspector's "Kitbash" panel. The AI's job
+    is to declare sockets with the canonical names so accessories
+    snap to the right place.
+
+    ❌ // wrong socket name (no exact match)
+       { "sockets": {
+           "head_top":    { "id": "..." },   // ❌ not canonical
+           "arm-left":    { "id": "..." },   // ❌ case mismatch
+           "weapon-hand": { "id": "..." }    // ❌ not in catalog
+         } }
+
+    ✅ { "sockets": {
+           "Socket_HeadTop":   { "attachTo": "head",    "offset": [0, 0.18, 0] },
+           "Socket_Arm_Left":  { "attachTo": "arm_l",   "offset": [0,  0,    0.15] },
+           "Socket_Arm_Right": { "attachTo": "arm_r",   "offset": [0,  0,    0.15] },
+           "Socket_Backpack":  { "attachTo": "chest",   "offset": [0, -0.05, -0.18] }
+         } }
+
+    SOCKET NAME CATALOG (the renderer uses these EXACT strings to
+    index its kitbash library — never rename, never lowercase):
+
+       Socket_HeadTop       (head top — beacons, antennae, hats)
+       Socket_Arm_Left      (left hand — cannons, shields, tools)
+       Socket_Arm_Right     (right hand — cannons, shields, tools)
+       Socket_Backpack      (back — jetpacks, radar, battery packs)
+
+    Per-socket `attachTo` is a string id of an existing part id in
+    the same blueprint; `offset` is a local [x, y, z] triple.
+    Reinforces PART 30.7 (TS-side mirror).
+
+[10] UNIVERSAL RIGGING & BONE HIERARCHY STANDARD (blueprint-side hook)
+    The renderer matches the TS-path STANDARD_BONES catalog
+    (PART 33.1[10]) on the JSON/JS side via the `actionProfile.
+    animationRole` field (existing field, see PART 30 / 64) AND via
+    standard part id strings. The AI's job is to name every joint-
+    relevant part with the canonical id so animations and accessories
+    are cross-compatible.
+
+    ❌ // non-canonical part ids
+       { "id": "leftThigh",  "type": "capsule" }   // ❌ camelCase
+       { "id": "right-calf", "type": "capsule" }   // ❌ kebab-case
+       { "id": "BoneFootL",  "type": "box" }       // ❌ mixed
+
+    ✅ { "id": "Bone_Thigh_L", "type": "capsule",
+         "userData": {
+           "actionProfile": { "animationRole": "limb" }
+         } }
+       { "id": "Bone_Calf_L",  "type": "capsule",
+         "userData": {
+           "actionProfile": { "animationRole": "limb" }
+         } }
+       { "id": "Bone_Foot_L",  "type": "box",
+         "userData": {
+           "actionProfile": { "animationRole": "limb" }
+         } }
+       // ... mirror for Bone_Thigh_R / Bone_Calf_R / Bone_Foot_R ...
+
+    CANONICAL BONE / JOINT ID CATALOG (the renderer expects these
+    EXACTLY when the model is a humanoid / biped / mech):
+
+       Bone_Root       Bone_Pelvis       Bone_Spine       Bone_Chest
+       Bone_Head       Bone_Thigh_L      Bone_Calf_L      Bone_Foot_L
+       Bone_Toe_L      Bone_Thigh_R      Bone_Calf_R      Bone_Foot_R
+       Bone_Toe_R
+
+    RULE: every joint-relevant part id is one of the strings above,
+    exactly (case + underscores matter). The renderer's animation
+    library uses these ids to map shared clips to the right bones
+    across all humanoid / biped / mech blueprints. Reinforces
+    PART 30.2 (TS-side) and PART 64 (character enrichment).
+
+--------------------------------------------------------------------------------
+66.2 — RENDERER-SIDE FEATURES (the 6 the AI doesn't have to author)
+--------------------------------------------------------------------------------
+The remaining 6 features are pure renderer behavior. The AI emits
+the same blueprint it does today and the renderer implements the
+feature when it recognizes the right shape:
+
+  [1] Procedural vertex AO    → renderer applies per-vertex cavity
+                                shading automatically when
+                                `material.vertexColors` is true
+                                (the renderer sets it on by default
+                                for PBR materials). AI just uses
+                                PBR materials as PART 7 says.
+  [2] Analytical 2-bone IK    → renderer exposes a global
+                                `ikSolver` on the inspector that
+                                drives any 2-segment limb pair
+                                automatically. No AI authoring needed.
+  [3] Canvas decal synthesizer → renderer's existing PART 8 procedural
+                                texture system handles every pattern
+                                the AI could want; AI just references
+                                the existing `texturePattern` field
+                                (or the companion `textureImage`
+                                field per PART 65 error [5]).
+  [6] Procedural particle VFX → renderer auto-emits exhaust / spark /
+                                steam particles for any part marked
+                                `userData.isEmitter: true`. AI just
+                                declares the field and the renderer
+                                handles the rest.
+  [8] Spring dynamics         → renderer applies spring-damper
+                                physics to any bone whose userData
+                                declares `spring: { stiffness, damping,
+                                axis }`. AI just provides the values.
+  [9] Multi-format export     → renderer's inspector offers GLB / OBJ
+                                / STL / USDZ export buttons for every
+                                loaded model. AI doesn't author export
+                                code on the JSON/JS path.
+
+If the AI declares any of the above via `userData` (e.g. `isEmitter:
+true`, `spring: { ... }`), the renderer picks it up automatically.
+If the AI doesn't declare them, the model simply doesn't have that
+feature — no penalty, no broken-state failure.
+
+--------------------------------------------------------------------------------
+66.3 — WHY ONLY 4 OF 10 FEATURES APPLY HERE (cross-reference table)
+--------------------------------------------------------------------------------
+The full architectural catalog has 10 features. For the JSON/JS
+blueprint path, the AI authors structured data, not Three.js code,
+so 6 of the 10 features are pure renderer behavior (66.2) and 4 have
+explicit blueprint-side hooks (66.1):
+
+  [1] procedural vertex AO       → renderer-side (66.2)
+  [2] analytical 2-bone IK       → renderer-side (66.2)
+  [3] canvas decal synthesizer   → renderer-side (66.2)
+  [4] multi-style shading        → BLUEPRINT FIELD  (66.1)
+  [5] audio-reactive FSM         → BLUEPRINT FIELD  (66.1)
+  [6] procedural particle VFX    → renderer-side (66.2)
+  [7] modular socket attachment  → BLUEPRINT FIELD  (66.1)
+  [8] secondary spring dynamics  → renderer-side (66.2)
+  [9] multi-format export        → renderer-side (66.2)
+  [10] universal rigging standard → BLUEPRINT FIELD  (66.1)
+
+The TS-path full feature catalog is in PART 33 (Prompt_To_Ts.txt /
+Image_To_Ts.txt). The JSON/JS-path feature bridge is in this PART 66.
+
+--------------------------------------------------------------------------------
+66.4 — STRUCTURAL REFERENCE CHECKLIST (JSON/JS pre-emission additions)
+--------------------------------------------------------------------------------
+Append these to PART 65's 10-item checklist. Any unchecked item is
+either a missing feature hook or a feature hook with a wrong shape.
+
+  [ ] 11. [PART 66.1] If the model needs a non-default shading style,
+         `shadingMode` is declared at the root with one of the four
+         exact kebab-case enum values.
+  [ ] 12. [PART 66.1] If the model has multiple animations, an
+         `animationFsm.states` array is declared with at least the
+         Idle + Walk + Run + Jump states, every `clipId` matches a
+         real `animations[].id`.
+  [ ] 13. [PART 66.1] If the model needs kitbash sockets, a `sockets`
+         object is declared with the EXACT canonical socket names
+         (Socket_HeadTop, Socket_Arm_Left, Socket_Arm_Right,
+         Socket_Backpack) and every `attachTo` matches a real part
+         id in the same blueprint.
+  [ ] 14. [PART 66.1] Every joint-relevant part id is one of the
+         canonical bone strings (Bone_Root, Bone_Pelvis, Bone_Spine,
+         Bone_Chest, Bone_Head, Bone_Thigh_L/R, Bone_Calf_L/R,
+         Bone_Foot_L/R, Bone_Toe_L/R) — exact case + underscores.
+  [ ] 15. [PART 66.2] If the model needs procedural particles, every
+         emitter part declares `userData.isEmitter: true` and the
+         expected `userData.particlePattern` field; the renderer
+         auto-creates the THREE.Points / InstancedMesh on load.
+  [ ] 16. [PART 66.2] If the model needs spring dynamics on any
+         bone, the part's `userData.spring` is an object with
+         non-zero `stiffness` AND `damping` AND a valid `axis`
+         string ('x' | 'y' | 'z').
+  [ ] 17. [PART 65.5] Every socket and bone id mentioned in
+         `sockets[].attachTo` and `animationFsm.states[].clipId` is
+         actually present in the blueprint (no dangling references).
+  [ ] 18. [PART 65.5] Every `sockets` and `animationFsm` declaration
+         sits at the ROOT of the blueprint (or inside a part's
+         `userData`), never as a sibling of the part list at the
+         wrong depth.
+
+--------------------------------------------------------------------------------
+66.5 — INTERSECTION WITH EXISTING PARTS
+--------------------------------------------------------------------------------
+This PART does NOT replace any existing rule — it adds OPT-IN feature
+hooks on top of the JSON/JS bug-fix foundation laid by PART 65 and
+the character / mascot / creature enrichment laid by PART 64. The 4
+blueprint-side hooks (66.1) and the 4 renderer-side behaviors
+(66.2) are independent of every other PART — they layer cleanly on
+top, the renderer never throws on missing fields, and the AI is free
+to omit any feature a model doesn't need.
+
+Cross-reference map:
+  [4] shadingMode         → PART 3 (presets), PART 28 (advanced)
+  [5] animationFsm        → PART 5 (animation fields), PART 30
+  [7] sockets             → PART 30.7, PART 64 (character enrichment)
+  [10] STANDARD_BONES ids → PART 30.2, PART 64 (actionProfile)
+
+PART 66 is the JSON/JS-path feature bridge. If the AI remembers ONLY
+one thing from this PART, remember the four canonical name catalogs
+in 66.1: `shadingMode` enum, `animationFsm.states[]` shape, the four
+canonical `Socket_*` names, and the twelve canonical `Bone_*` ids.
+
+================================================================================
+END OF PART 66 — ARCHITECTURAL FEATURE BRIDGE (JSON/JS PATH)
+Output remains a valid LBL JSON/JS blueprint. The 4 blueprint-side
+hooks in 66.1, the 6 renderer-side behaviors in 66.2, the cross-
+reference table in 66.3, the 8-item checklist addition in 66.4, and
+the cross-reference map in 66.5 are all OPT-IN — drop them in if and
+only if the model actually exercises the corresponding feature. The
+structural checklist in 66.4 is MANDATORY only for the features a
+model has enabled. Nothing in this PART removes or weakens any rule
+from PARTs 1-65.
 ================================================================================

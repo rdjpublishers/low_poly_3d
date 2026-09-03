@@ -1,8 +1,24 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.9 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.10 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.10 (2026-09-03) — COMPREHENSIVE ARCHITECTURAL IMPROVEMENTS (source:
+    RDJ_PUBLISHERS_LOW_POLY_3D_SYSTEM_COMPREHENSIVE_ARCHITECTURAL_
+    IMPROVEMENTS.txt). New PART 33 documents the 10 opt-in feature
+    upgrades (procedural vertex AO, analytical 2-bone IK, canvas
+    decal synthesizer, multi-style shading, audio-reactive animation
+    FSM, procedural particle VFX, modular socket attachment, secondary
+    spring dynamics, multi-format export, universal rigging standard),
+    adds the canonical helpers (applyProceduralVertexAO, solveTwoBoneIK,
+    makeCautionStripes, makeCarbonFiber, createToonOutlineMesh,
+    AnimationFsm, makeInstancedParticleEmitter, updateInstancedParticles,
+    makeSocket, updateSpring, exportModelToAnyFormat) and the
+    STANDARD_BONES / canonical Socket_* name catalogs, the revised
+    master system-prompt template from section 3 of the source, the
+    per-model-type opt-in defaults table, and a 10-item structural
+    reference checklist addition. PART 33 reinforces — never replaces —
+    PARTs 5, 7, 8, 18, 28, 30, 32. Bumped from v1.9 to v1.10.
   v1.9 (2026-09-03) — STRUCTURAL ERROR CORRECTIONS (source:
     SYSTEM_DIAGNOSTIC_AND_ARCHITECTURAL_ERROR_REPORT_THREEJS.txt). New
     PART 32 documents the 10 anti-patterns documented in the diagnostic
@@ -5048,4 +5064,666 @@ actually exercises the corresponding feature (a procedural decal, a
 rig, a GLB export path, a metrics inspector). The structural checklist
 in 32.3 is MANDATORY before every emission. Nothing in this PART
 removes or weakens any rule from PARTs 1-31.
+================================================================================
+
+================================================================================
+PART 33 — v1.10 ADDITIONS: COMPREHENSIVE ARCHITECTURAL IMPROVEMENTS
+(RDJ PUBLISHERS — 10 High-Impact Upgrades + Revised Master System Prompt)
+================================================================================
+Source: RDJ_PUBLISHERS_LOW_POLY_3D_SYSTEM_COMPREHENSIVE_ARCHITECTURAL_
+IMPROVEMENTS.txt. These are FEATURE additions (capability upgrades), not
+bug fixes — they layer on top of every PART above. PART 32 locked down
+the 10 structural errors; PART 33 unlocks the 10 architectural features
+the diagnostic report's "fix the errors" pass surfaced as natural next
+steps. Every feature is OPT-IN per model (a mech-walker may want IK +
+sockets + spring recoil but skip audio-reactivity; a propeller plane
+may want the opposite). The defaults a factory should fall back to when
+no model-specific configuration is given are noted per feature.
+
+This PART is intentionally written in the same numbered catalog format
+as PART 32 so the AI can match the source document's "Top 10" list
+1:1. Each feature gives: (a) the problem it solves, (b) the canonical
+TypeScript pattern, (c) where the AI should expose the optional knob in
+the factory signature, and (d) cross-references to the parent PARTs.
+
+--------------------------------------------------------------------------------
+33.1 — FEATURE CATALOG (all 10 — verbatim, in the source document's order)
+--------------------------------------------------------------------------------
+
+[1] PROCEDURAL VERTEX AMBIENT OCCLUSION (AO) & CAVITY SHADING
+    PROBLEM: flat-shaded or basic low-poly models can look washed out
+    in uniform lighting without ambient occlusion textures.
+    SOLUTION: calculate per-vertex AO mathematically during mesh
+    generation by analyzing vertex proximity to adjacent geometry and
+    ground planes; store the result in BufferGeometry's `color`
+    attribute; enable on the material with `vertexColors: true`.
+    CANONICAL HELPER (drop into every factory that needs cavity depth):
+
+      export function applyProceduralVertexAO(
+        geometry: THREE.BufferGeometry,
+        cavityFactor = 0.85
+      ): void {
+        const pos = geometry.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++) {
+          // Simple height-based cavity; replace with proximity/raycast
+          // for true crevice depth on concave meshes.
+          const y = pos.getY(i);
+          const occlusion = Math.max(
+            0.65,
+            Math.min(1.0, 0.75 + (y * 0.25) * cavityFactor)
+          );
+          colors[i * 3]     = occlusion;
+          colors[i * 3 + 1] = occlusion;
+          colors[i * 3 + 2] = occlusion;
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      }
+
+    USAGE: call once per BufferGeometry after construction, then set
+    `material.vertexColors = true`. For multi-mesh models, expose a
+    top-level option `{ ao?: { enabled: boolean; cavityFactor?: number } }`
+    on the factory's options interface. Default: enabled with
+    cavityFactor = 0.85. Reinforces PART 7 (PBR recipes) and PART 18
+    (fidelity pass).
+
+[2] ANALYTICAL 2-BONE INVERSE KINEMATICS (IK) & GROUND ADAPTATION
+    PROBLEM: forward-kinematics (FK) animations cause foot sliding on
+    uneven terrain or when positioning legs interactively.
+    SOLUTION: closed-form Law of Cosines 2-Bone IK solver in pure TS
+    for digitigrade and anthropomorphic limbs. Given upper limb length
+    L1, lower limb length L2, and target distance D:
+        cos(AngleKnee) = (L1^2 + L2^2 - D^2) / (2 * L1 * L2)
+    CANONICAL HELPER (drop in for any model with 2-segment limbs):
+
+      export function solveTwoBoneIK(
+        upperLength: number,
+        lowerLength: number,
+        target: THREE.Vector3,
+        pole: THREE.Vector3 = new THREE.Vector3(0, 1, 0)
+      ): { upper: THREE.Quaternion; lower: THREE.Quaternion } {
+        const D = target.length();
+        const D2 = D * D;
+        const L1 = upperLength, L2 = lowerLength;
+        // Law of cosines for the knee angle
+        const cosKnee = (L1 * L1 + L2 * L2 - D2) / (2 * L1 * L2);
+        const kneeAngle = Math.acos(Math.max(-1, Math.min(1, cosKnee)));
+        // Knee bend axis: perpendicular to the upper-limb-to-target plane
+        const upperDir = target.clone().normalize();
+        const kneeOffset = upperDir
+          .clone()
+          .multiplyScalar(L1 * Math.cos(Math.PI - kneeAngle))
+          .add(pole.clone().normalize()
+            .multiplyScalar(L1 * Math.sin(Math.PI - kneeAngle)));
+        const lowerDir = target.clone().sub(kneeOffset).normalize();
+        const upperQ = new THREE.Quaternion()
+          .setFromUnitVectors(new THREE.Vector3(0, -1, 0), kneeOffset.normalize());
+        const lowerQ = new THREE.Quaternion()
+          .setFromUnitVectors(new THREE.Vector3(0, -1, 0), lowerDir);
+        return { upper: upperQ, lower: lowerQ };
+      }
+
+    USAGE: call once per frame from root.userData.tick when the model
+    has interactive limb posing or terrain following. Expose the
+    solver as a method on `root.userData.ikSolver` so the inspector
+    or an external controller can drive it. Cross-references PART 5
+    (tick contract) and PART 30 (rigging). Reinforces PART 32.4
+    (normalized quaternions) — the solver already returns
+    unit-length quaternions.
+
+[3] IN-MEMORY DYNAMIC CANVAS DECAL & TEXTURE SYNTHESIZER
+    PROBLEM: external decals (numbers, hazard stripes, warning badges)
+    require loading external image URLs or base64 blobs.
+    SOLUTION: procedural 2D Canvas textures on the fly at runtime
+    using `document.createElement('canvas')` → `CanvasTexture`.
+    Capabilities the AI may use:
+      - Industrial caution stripes (black & yellow diagonal bands).
+      - Alphanumeric stencils ("42", "CAUTION", "SENTRY-01").
+      - Digital cockpit UI screens and LED bar graphs.
+      - Camouflage and carbon fiber micro-patterns.
+    CANONICAL HELPERS (extend the PART 32 createDecalTexture with a
+    full pattern library):
+
+      export function makeCautionStripes(size = 256): THREE.CanvasTexture | null {
+        if (typeof document === 'undefined') return null;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.fillStyle = '#ffd400';
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#111111';
+        ctx.save();
+        ctx.translate(size / 2, size / 2);
+        ctx.rotate(-Math.PI / 4);
+        for (let x = -size; x < size; x += 40) {
+          ctx.fillRect(x, -size, 20, size * 2);
+        }
+        ctx.restore();
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      export function makeCarbonFiber(size = 256): THREE.CanvasTexture | null {
+        if (typeof document === 'undefined') return null;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, size, size);
+        for (let y = 0; y < size; y += 8) {
+          for (let x = 0; x < size; x += 8) {
+            ctx.fillStyle = ((x + y) % 16 === 0) ? '#2a2a2a' : '#151515';
+            ctx.fillRect(x, y, 8, 8);
+          }
+        }
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;   // r150+ token
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 2);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+    USAGE: call inside the factory when the model needs a specific
+    pattern; assign to `material.map` (color) or `material.normalMap`
+    (data → `textureImageColorSpace: 'no-color'` equivalent: do NOT
+    set colorSpace on data maps, leave as default linear). Reinforces
+    PART 8 (procedural canvas) and PART 32 error [5] (lifecycle).
+
+[4] MULTI-STYLE SHADING & POST-EFFECT PRESETS
+    PROBLEM: models are often restricted to a single shading aesthetic.
+    SOLUTION: a single factory option `shadingMode` with four canonical
+    modes:
+      1. 'flat-pbr'    — sharp facet low-poly with PBR metallic/roughness
+                         highlights. DEFAULT. Pairs with PART 7.
+      2. 'cel-toon'    — two-tone stepped shading with Inverted Hull
+                         black outlines.
+      3. 'hologram'    — transparent cyan/green wireframe with moving
+                         sine scanlines.
+      4. 'retro-psx'   — affine texture approximation and vertex
+                         coordinate quantizing.
+    INVERTED HULL OUTLINE (drop-in for cel-toon):
+
+      export function createToonOutlineMesh(
+        sourceMesh: THREE.Mesh,
+        thickness = 0.02
+      ): THREE.Mesh {
+        const outlineMat = new THREE.MeshBasicMaterial({
+          color: 0x111111,
+          side:  THREE.BackSide,
+        });
+        const outlineMesh = new THREE.Mesh(sourceMesh.geometry, outlineMat);
+        outlineMesh.scale.multiplyScalar(1 + thickness);
+        return outlineMesh;
+      }
+
+    USAGE: branch the factory on `options.shadingMode ?? 'flat-pbr'`
+    and assemble a `shadingGroup: THREE.Group` containing either the
+    PBR meshes (flat-pbr), PBR + inverted-hull outline twins (cel-toon),
+    wireframe children (hologram), or vertex-quantized geometry
+    (retro-psx). Expose `shadingMode` on the factory's options
+    interface. Cross-references PART 28 (advanced shader & VFX).
+
+[5] AUDIO-REACTIVE & EVENT-DRIVEN ANIMATION BLENDING STATE MACHINE
+    PROBLEM: animations are static playback loops without responsiveness.
+    SOLUTION: a lightweight, zero-dependency Finite State Machine (FSM)
+    with:
+      - Automatic crossfading between states (e.g. Idle → Walk → Jump
+        → Alert).
+      - Web Audio API integration allowing antenna wobbles, eye light
+        pulses, and exhaust glow to modulate dynamically with music or
+        microphone frequencies.
+    CANONICAL PATTERN (drop in for any model that ships with
+    AnimationClips — pairs with PART 30.4):
+
+      export interface FsmState {
+        name: string;
+        clip: THREE.AnimationClip;
+        /** seconds to crossfade in */
+        fadeIn?: number;
+      }
+      export class AnimationFsm {
+        private mixer: THREE.AnimationMixer;
+        private states: Map<string, FsmState>;
+        private current: { action: THREE.AnimationAction; state: FsmState } | null = null;
+        constructor(mixer: THREE.AnimationMixer, states: FsmState[]) {
+          this.mixer = mixer;
+          this.states = new Map(states.map(s => [s.name, s]));
+        }
+        transition(name: string, fadeIn = 0.25): void {
+          const next = this.states.get(name);
+          if (!next || this.current?.state.name === name) return;
+          const nextAction = this.mixer.clipAction(next.clip);
+          nextAction.reset().play();
+          if (this.current) {
+            this.current.action.crossFadeTo(nextAction, fadeIn, false);
+          }
+          this.current = { action: nextAction, state: next };
+        }
+        update(dt: number): void {
+          if (this.current) this.mixer.update(dt);
+        }
+        /** Web Audio integration — drive emissive intensity from
+            an AnalyserNode's frequency bin */
+        attachAudio(analyser: AnalyserNode, target: THREE.MeshStandardMaterial): void {
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          const loop = () => {
+            analyser.getByteFrequencyData(data);
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            target.emissiveIntensity = 0.5 + (avg / 255) * 1.5;
+            requestAnimationFrame(loop);
+          };
+          loop();
+        }
+      }
+
+    USAGE: instantiate inside the factory; expose the FSM on
+    `root.userData.animationFsm` so the inspector can list its states
+    and trigger transitions. The Web Audio integration is OPT-IN —
+    only attach `attachAudio()` when the model is loaded with a
+    user-controlled audio source. Cross-references PART 5 (tick) and
+    PART 30.4 (named AnimationClips).
+
+[6] ZERO-TEXTURE PROCEDURAL PARTICLE & VFX EMITTERS
+    PROBLEM: exhaust flames, dust puffs, and sparks usually require
+    particle images.
+    SOLUTION: procedural geometric particle systems using
+    `THREE.InstancedMesh` or `THREE.Points` with mathematical shapes:
+      - Conical hydraulic steam bursts.
+      - Geometric polygonal foot-stomp dust clouds (faceted
+        dodecahedrons).
+      - Thruster plasma flame with animated vertex noise.
+    CANONICAL PATTERN (InstancedMesh particle emitter — drop in for
+    any model with continuous VFX):
+
+      export function makeInstancedParticleEmitter(opts: {
+        count: number;
+        geometry: THREE.BufferGeometry;
+        material: THREE.Material;
+        /** units per second along local +Y by default */
+        speed: number;
+        /** world-seconds per particle lifetime */
+        lifetime: number;
+        /** local-space upward bias */
+        bias?: THREE.Vector3;
+      }): THREE.InstancedMesh {
+        const mesh = new THREE.InstancedMesh(
+          opts.geometry, opts.material, opts.count
+        );
+        mesh.frustumCulled = false;   // particles span a wide volume
+        mesh.userData.particles = {
+          velocities: new Array(opts.count).fill(0).map(() =>
+            new THREE.Vector3(
+              (Math.random() - 0.5),
+              1,
+              (Math.random() - 0.5)
+            ).multiplyScalar(opts.speed)
+          ),
+          ages: new Float32Array(opts.count),
+          lifetime: opts.lifetime,
+          bias: opts.bias ?? new THREE.Vector3(0, 0, 0),
+        };
+        return mesh;
+      }
+
+      /** Per-frame updater — call from root.userData.tick */
+      export function updateInstancedParticles(
+        mesh: THREE.InstancedMesh, dt: number
+      ): void {
+        const m = new THREE.Matrix4();
+        const p = mesh.userData.particles;
+        for (let i = 0; i < mesh.count; i++) {
+          p.ages[i] += dt;
+          if (p.ages[i] > p.lifetime) p.ages[i] = 0;
+          const v = p.velocities[i];
+          m.makeTranslation(
+            v.x * p.ages[i] + p.bias.x,
+            v.y * p.ages[i] + p.bias.y,
+            v.z * p.ages[i] + p.bias.z
+          );
+          mesh.setMatrixAt(i, m);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+
+    USAGE: create one or more emitters inside the factory, expose them
+    on `root.userData.particles`, and call `updateInstancedParticles()`
+    from `root.userData.tick`. Reinforces PART 5 (tick) and PART 28
+    (VFX). No external textures — the AI picks the geometry primitive
+    that fits the visual intent (cone for steam, dodecahedron for dust,
+    custom small-mesh for sparks).
+
+[7] MODULAR SOCKET ATTACHMENT SYSTEM (RUNTIME KITBASHING)
+    PROBLEM: adding weapons, hats, or shields requires manually
+    editing code.
+    SOLUTION: standardize `THREE.Group` socket hooks parented to
+    specific bones, with the canonical names:
+      - `Socket_HeadTop`   (for beacons, antennae, hat accessories)
+      - `Socket_Arm_Left`  / `Socket_Arm_Right`
+                           (for cannons, shields, tools)
+      - `Socket_Backpack`  (for jetpacks, battery packs, radar dishes)
+    Any new accessory can be snapped into a socket using
+    `socket.add(accessoryMesh)`.
+    CANONICAL PATTERN (factory helper — call once per socket):
+
+      export function makeSocket(
+        name: string,
+        localPos: [number, number, number],
+        localRot?: [number, number, number]
+      ): THREE.Group {
+        const g = new THREE.Group();
+        g.name = name;       // exact, alphanumeric — same rules as Bone.name
+        g.position.set(localPos[0], localPos[1], localPos[2]);
+        if (localRot) g.rotation.set(localRot[0], localRot[1], localRot[2]);
+        g.userData.isSocket = true;
+        return g;
+      }
+
+    USAGE: build each socket as a child of the bone it should track;
+    expose them on `root.userData.sockets` as a Record<string, THREE.Group>;
+    the inspector can drag-and-drop an accessory from a kitbash
+    library onto a named socket without touching the factory code.
+    Reinforces PART 30.6 (rigging checklist) and PART 32 error [2]
+    (explicit .name for binding).
+
+[8] SECONDARY SPRING DYNAMICS (PASSIVE JIGGLE / HYDRAULIC RECOIL)
+    PROBLEM: rigid bones lack secondary physics momentum.
+    SOLUTION: a lightweight Hooke's Law spring-damper calculation in
+    the render loop:
+        acceleration = -stiffness * displacement - damping * velocity
+    Applied to:
+      - Whip antenna flex during rapid turns.
+      - Torso shock absorber recoil on landing.
+      - Wire harness bounce during walking.
+    CANONICAL PATTERN (drop in for any bone with a "jiggle" feel):
+
+      export interface SpringState {
+        displacement: number;  // current offset from rest
+        velocity:     number;  // current rate of change
+        stiffness:    number;  // pull-back strength (e.g. 80)
+        damping:      number;  // energy loss (e.g. 8)
+        rest:         number;  // 0 for centered springs
+      }
+      export function updateSpring(s: SpringState, dt: number,
+                                   externalForce = 0): number {
+        const a = -s.stiffness * (s.displacement - s.rest)
+                  - s.damping * s.velocity
+                  + externalForce;
+        s.velocity     += a * dt;
+        s.displacement += s.velocity * dt;
+        return s.displacement;
+      }
+
+    USAGE: each jiggle bone has one or more `SpringState` values
+    stored on `bone.userData.spring`; call `updateSpring()` from
+    `root.userData.tick` and apply the returned displacement to a
+    `bone.rotation` or `bone.position` axis. Reinforces PART 5 (tick)
+    and PART 30 (bone-driven animation).
+
+[9] MULTI-FORMAT CLIENT-SIDE EXPORT SUITE
+    SOLUTION: built-in export to:
+      1. `.GLB`  — glTF 2.0 Binary with full animation tracks & PBR
+                   materials. (Already covered in PART 32's
+                   `exportRiggedModelToGlb` — promote to first-class.)
+      2. `.USDZ` — Apple AR Quick Look for instant viewing in iOS AR
+                   space. (Requires the `three/examples/jsm/loaders/
+                   USDZExporter.js` addon; if absent, the export
+                   function returns null and the inspector surfaces a
+                   friendly "USDZ not supported in this Three.js build"
+                   message — never crash.)
+      3. `.STL`  — Watertight geometric export ready for 3D Printing
+                   on FDM/SLA printers. (Use
+                   `three/examples/jsm/exporters/STLExporter.js`.)
+      4. `.TS`   — Single self-contained TypeScript file. (Re-emit
+                   the factory's source via Blob URL — a "view
+                   source" / "fork to my repo" affordance.)
+    All executed purely in the browser using Blob URLs without any
+    server API.
+    CANONICAL PATTERN (drop-in multi-format export helper):
+
+      export async function exportModelToAnyFormat(
+        rootGroup: THREE.Group,
+        clips: THREE.AnimationClip[],
+        format: 'glb' | 'usdz' | 'stl' | 'ts',
+        filenameStem = 'model'
+      ): Promise<Blob | null> {
+        if (format === 'glb') {
+          // Use the PART 32 exportRiggedModelToGlb helper.
+          const { exportRiggedModelToGlb } = await import('./_lazyLoadSafe');
+          const buf = await exportRiggedModelToGlb(rootGroup, clips);
+          return new Blob([buf], { type: 'model/gltf-binary' });
+        }
+        if (format === 'stl') {
+          const { STLExporter } = await import(
+            'three/examples/jsm/exporters/STLExporter.js' as string
+          ).catch(() => ({} as any));
+          if (!STLExporter) return null;
+          const exporter = new STLExporter();
+          const buf = exporter.parse(rootGroup) as ArrayBuffer;
+          return new Blob([buf], { type: 'model/stl' });
+        }
+        if (format === 'usdz') {
+          const { USDZExporter } = await import(
+            'three/examples/jsm/exporters/USDZExporter.js' as string
+          ).catch(() => ({} as any));
+          if (!USDZExporter) return null;
+          const exporter = new USDZExporter();
+          const buf = await exporter.parse(rootGroup);
+          return new Blob([buf], { type: 'model/usdz' });
+        }
+        if (format === 'ts') {
+          // Re-emit the factory's own source — assumes a
+          // `factorySource: string` was captured at module init.
+          // If not available, return null and surface a friendly
+          // "source not capturable in this build" message.
+          return null;
+        }
+        return null;
+      }
+
+    USAGE: expose `exportModelToAnyFormat` on the factory's return
+    object OR on `root.userData.exportFormat = (fmt) => ...`; the
+    inspector calls it with the user's chosen format. The dynamic
+    `import()` calls are wrapped in `.catch(() => ({} as any))` so
+    a missing addon (e.g. USDZ on a Three.js build that doesn't
+    ship it) degrades gracefully instead of crashing the export.
+    Reinforces PART 32 error [6] (GLB serialization) and PART 1.5
+    (no top-level DOM outside the factory).
+
+[10] UNIVERSAL RIGGING & BONE HIERARCHY STANDARD
+    SOLUTION: standardize naming conventions across the entire
+    RDJ PUBLISHERS model library so animations and accessories are
+    cross-compatible:
+      - `Bone_Root` → `Bone_Pelvis` → `Bone_Spine` → `Bone_Chest` →
+        `Bone_Head`
+      - `Bone_Thigh_L` → `Bone_Calf_L` → `Bone_Foot_L` → `Bone_Toe_L`
+      - (mirror for the right side: `_R`)
+    CANONICAL CONSTANTS (drop into every factory that builds a
+    humanoid/biped/mech — reuse across all 10 features above):
+
+      export const STANDARD_BONES = {
+        // Spine chain (single source of truth — reuse for PART 30/31/33)
+        Root:       'Bone_Root',
+        Pelvis:     'Bone_Pelvis',
+        Spine:      'Bone_Spine',
+        Chest:      'Bone_Chest',
+        Head:       'Bone_Head',
+        // Left leg
+        Thigh_L:    'Bone_Thigh_L',
+        Calf_L:     'Bone_Calf_L',
+        Foot_L:     'Bone_Foot_L',
+        Toe_L:      'Bone_Toe_L',
+        // Right leg
+        Thigh_R:    'Bone_Thigh_R',
+        Calf_R:     'Bone_Calf_R',
+        Foot_R:     'Bone_Foot_R',
+        Toe_R:      'Bone_Toe_R',
+        // Standard sockets (feature [7])
+        Socket_HeadTop:   'Socket_HeadTop',
+        Socket_Arm_Left:  'Socket_Arm_Left',
+        Socket_Arm_Right: 'Socket_Arm_Right',
+        Socket_Backpack:  'Socket_Backpack',
+      } as const;
+
+    USAGE: every factory that builds a humanoid/biped/mech uses
+    these exact `.name` strings for its THREE.Bone instances and
+    socket Groups. Cross-references PART 30.2 (bone naming) and
+    PART 32 error [2] (track binding). The constant block above is
+    the single source of truth — never hard-code a different
+    `Bone_Thigh_L` spelling in any model file.
+
+--------------------------------------------------------------------------------
+33.2 — REVISED MASTER SYSTEM PROMPT (drop-in template for AI generation)
+--------------------------------------------------------------------------------
+The source document's section 3 provides a master system-prompt block
+the AI can paste into its context as the "always-on" generation
+directive. Reproduced here as PART 33.2 for the spec's own
+self-consistency. Anything new in the master prompt that contradicts
+an existing PART 1-32 rule defers to the PART 1-32 rule — the master
+prompt is a SHORTHAND reminder, not a replacement for the detailed
+rules above.
+
+```markdown
+You are the RDJ PUBLISHERS Low-Poly 3D Generator Engine.
+Your task is to generate a single-file, self-contained TypeScript module for Three.js.
+
+STRICT CONSTRAINTS:
+1. Pure TypeScript + Three.js only. Zero external asset URLs, zero textures, zero APIs.
+2. Single-File Architecture: All geometries, materials, bones, and animations must reside in one file.
+3. Factory Function: Must export `createModel(options?: ModelOptions): THREE.Group`.
+4. Mesh Structure:
+   - Use procedural BufferGeometries with chamfers, bevels, and CSG primitives.
+   - Set castShadow = true, receiveShadow = true.
+   - PBR Materials with customizable color palettes.
+5. Rigging & Hierarchy:
+   - Dedicated Bone armature with correct local pivot origins.
+   - Named bones accessible via `userData.bones`.
+6. Animations:
+   - At least 10 named AnimationClips (Idle, Walk, Run, Jump, Scan, Emotes, PowerDown, Wake).
+   - Use quaternion slerp for rotation tracks and Vector3 for position tracks.
+7. Return Object:
+   - Return THREE.Group with `animations` array and `userData` populated.
+```
+
+CROSS-MAPPING (master prompt line → enforcing PART):
+  1.  "Zero external URLs"            → PART 1.1, PART 4 (no imports outside three)
+  2.  "Single-File Architecture"      → PART 1.1, PART 4.1, PART 32 error [1]
+  3.  "createModel factory"           → PART 1.2, PART 32 error [10]
+  4.  "BufferGeometries + PBR"        → PART 3, PART 7, PART 32 error [7]
+  5.  "Bone armature, userData.bones" → PART 30, PART 32 error [2]
+  6.  "10 named AnimationClips"       → PART 30.4, PART 32 error [2]+[3]
+  7.  "animations + userData"         → PART 1.2, PART 6, PART 32 error [6]
+
+Every line in the master prompt maps to a more detailed PART in this
+spec. If the AI ever feels the master prompt is in tension with a
+detailed PART, the detailed PART wins. The master prompt exists so
+the AI never forgets the high-level shape; the detailed PARTs
+explain why.
+
+--------------------------------------------------------------------------------
+33.3 — OPT-IN FEATURE GATING (default behavior per model type)
+--------------------------------------------------------------------------------
+Not every model needs every feature. Recommended defaults:
+
+  model type               | [1]AO | [2]IK | [3]Decal | [4]Style | [5]FSM | [6]VFX | [7]Socket | [8]Spring | [9]Export | [10]Rig
+  ------------------------|-------|-------|----------|----------|--------|-------|----------|----------|----------|--------
+  Static prop / weapon     |   ✓   |   —   |    ✓     |   ✓*     |   —    |   —   |    —     |    —     |    ✓     |   —
+  Vehicle (no limbs)       |   ✓   |   —   |    ✓     |   ✓*     |   ✓**  |   ✓   |    ✓     |    ✓     |    ✓     |   ✓
+  Biped walker / mech      |   ✓   |   ✓   |    ✓     |   ✓*     |   ✓    |   ✓   |    ✓     |    ✓     |    ✓     |   ✓
+  Character / mascot       |   ✓   |   ✓   |    ✓     |   ✓*     |   ✓    |   ✓   |    ✓     |    ✓     |    ✓     |   ✓
+  Architectural scene      |   ✓   |   —   |    —     |   —      |   —    |   —   |    —     |    —     |    ✓     |   —
+
+  ✓*  = 'flat-pbr' default; user can switch via shadingMode
+  ✓** = for vehicles with rotors / wheels that spin
+   —  = not applicable / not recommended
+
+The factory's options interface MUST expose every opt-in feature the
+model supports. The inspector reads the options interface to render
+the appropriate UI controls. Reinforces PART 1.2 (factory signature).
+
+--------------------------------------------------------------------------------
+33.4 — STRUCTURAL REFERENCE CHECKLIST (additions to PART 32's list)
+--------------------------------------------------------------------------------
+Append these to PART 32's 16-item checklist. Any unchecked item is
+either a missing feature or a feature default that doesn't match the
+recommendation table in 33.3.
+
+  [ ] 17. [PART 33.1] If `options.ao` is enabled, every BufferGeometry
+         that should pick up cavity shading has run through
+         `applyProceduralVertexAO()` AND the consuming material has
+         `vertexColors: true`.
+  [ ] 18. [PART 33.1] If the model has 2-segment limbs AND
+         `options.ik` is enabled, `solveTwoBoneIK()` is exposed on
+         `root.userData.ikSolver` and the tick handler calls it.
+  [ ] 19. [PART 33.1] Every procedural canvas texture (decal, stripe,
+         carbon fiber, cockpit UI) has both `needsUpdate = true` AND
+         `colorSpace = THREE.SRGBColorSpace` (PART 32 error [5]).
+  [ ] 20. [PART 33.1] The `shadingMode` option is on the factory's
+         options interface (default 'flat-pbr'); cel-toon emits the
+         inverted-hull outline mesh, hologram sets wireframe + a
+         scanline shader, retro-psx quantizes vertex positions.
+  [ ] 21. [PART 33.1] If AnimationClips are present, an
+         `AnimationFsm` is exposed on `root.userData.animationFsm`
+         with at least the state names listed in the master prompt
+         line 6 (Idle, Walk, Run, Jump, Scan, Emotes, PowerDown,
+         Wake — at minimum Idle + Walk + Run + Jump).
+  [ ] 22. [PART 33.1] Every InstancedMesh particle emitter has
+         `frustumCulled = false`, particles in `userData.particles`,
+         and is updated from `root.userData.tick`.
+  [ ] 23. [PART 33.1] Sockets are THREE.Groups with exact
+         `.name` strings from the `STANDARD_BONES` / `Socket_*`
+         table in 33.1[10] / 33.1[7], exposed on
+         `root.userData.sockets`.
+  [ ] 24. [PART 33.1] Every jiggle bone's `userData.spring` is a
+         `SpringState` with non-zero stiffness + damping, and the
+         returned `displacement` is applied to a real bone axis
+         every tick.
+  [ ] 25. [PART 33.1] `exportModelToAnyFormat()` is on
+         `root.userData.exportFormat` (or returned alongside the
+         group) and gracefully returns `null` on missing addons
+         instead of throwing.
+  [ ] 26. [PART 33.1] Standard humanoid / biped / mech factories
+         use the exact `STANDARD_BONES` names — never hard-code
+         alternate spellings of `Bone_Thigh_L` / `Bone_Calf_L` etc.
+
+--------------------------------------------------------------------------------
+33.5 — INTERSECTION WITH EXISTING PARTS (read this once, then trust them)
+--------------------------------------------------------------------------------
+This PART does NOT replace any existing rule — it adds OPT-IN features
+on top of the bug-fix foundation laid by PART 32 and the rigging
+discipline laid by PART 30/31. The 10 features above map to existing
+PARTs as follows:
+
+  [1] procedural vertex AO          → PART 7, PART 18 (fidelity)
+  [2] analytical 2-bone IK          → PART 5 (tick), PART 30 (rigging)
+  [3] canvas decal synthesizer      → PART 8, PART 32 error [5]
+  [4] multi-style shading            → PART 7, PART 28 (advanced VFX)
+  [5] audio-reactive animation FSM   → PART 5, PART 30.4 (named clips)
+  [6] procedural particle emitters   → PART 5, PART 28
+  [7] modular socket attachment      → PART 30.6, PART 32 error [2]
+  [8] secondary spring dynamics      → PART 5, PART 30
+  [9] multi-format export suite      → PART 32 error [6], PART 1.5
+  [10] universal rigging standard    → PART 30.2, PART 32 error [2]
+
+PART 33 is the OPT-IN feature catalog. If a model doesn't need a
+feature, simply omit it — no penalty, no missing-checklist failure
+(only an enabled feature with a broken implementation fails). The
+defaults table in 33.3 is the recommended starting point; the AI
+is free to deviate when the subject warrants it (e.g. a propeller
+plane has a rotor but no legs, so it skips IK).
+
+================================================================================
+END OF PART 33 — COMPREHENSIVE ARCHITECTURAL IMPROVEMENTS
+Output remains a valid TS factory module. The 10 features in 33.1,
+the master prompt template in 33.2, the opt-in table in 33.3, the
+10-item checklist addition in 33.4, and the cross-reference map in
+33.5 are all OPT-IN — drop them in if and only if the model actually
+exercises the corresponding feature. The structural checklist in
+33.4 is MANDATORY only for the features a model has enabled. Nothing
+in this PART removes or weakens any rule from PARTs 1-32.
 ================================================================================

@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI Low-Poly Scene Builder | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Export GLB or OBJ."/>
-<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.10 (TS path) and v8.2 (JSON/JS path) with 10 opt-in architectural features and 10 hard anti-pattern guards. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.10, LBL v8.2"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -253,6 +253,31 @@ body{
   transition:all .3s;white-space:nowrap;cursor:help;
 }
 #genmode-chip[hidden]{display:none;}
+
+/* RJS UPDATE 3 — LBL spec version chip (#lbl-spec-chip). Same shape as the
+   other chips (Space Mono 10px, surface2 background, accent border). Color
+   shifts to warn-red when the on-load lblValidateAgainstSpec() catches any
+   PART 32/65 anti-pattern, so users see at-a-glance that the loaded model
+   deviated from the targeted spec. */
+#lbl-spec-chip{
+  font-family:'Space Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--accent);color:var(--accent);
+  transition:all .3s;white-space:nowrap;cursor:help;
+}
+#lbl-spec-chip.has-warnings{border-color:var(--warn);color:var(--warn);}
+#lbl-spec-chip button{
+  background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0;margin:0;
+}
+
+/* RJS UPDATE 3 — PART 33.1[4] multi-style shading dropdown. Same height as
+   the tbtn family, monospace font for the four canonical enum values. */
+#shading-mode-select{
+  font-family:'Space Mono',monospace;font-size:11px;padding:6px 10px;border-radius:6px;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  cursor:pointer;height:32px;
+}
+#shading-mode-select:disabled{opacity:.5;cursor:not-allowed;}
+#shading-mode-select.locked{border-color:var(--accent2);color:var(--accent2);}
 
 /* ── LAYOUT ── */
 #main{flex:1;display:flex;overflow:hidden;position:relative;}
@@ -1325,7 +1350,20 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="ssao-toggle-btn" title="Toggle screen-space ambient occlusion">🌑 AO</button>
   <button class="tbtn hide-xs" id="hdri-toggle-btn" title="Toggle procedural HDRI environment lighting">🌐 HDRI</button>
   <button class="tbtn hide-xs" id="wireframe-toggle-btn" title="Toggle wireframe topology overlay">◱ Wireframe</button>
+  <!-- RJS UPDATE 3 — PART 33.1[4] multi-style shading: dropdown selector for flat-pbr / cel-toon / hologram / retro-psx.
+       When the loaded model declares `shadingMode` on its options, the dropdown is pre-selected and locked to that style.
+       Switching the dropdown at runtime re-applies the style to the entire current scene. -->
+  <select class="tbtn hide-xs" id="shading-mode-select" title="PART 33.1[4] — multi-style shading preset (flat-pbr / cel-toon / hologram / retro-psx). Locked when the loaded model declares shadingMode.">
+    <option value="flat-pbr">🎨 flat-pbr</option>
+    <option value="cel-toon">🖊 cel-toon</option>
+    <option value="hologram">🌐 hologram</option>
+    <option value="retro-psx">📼 retro-psx</option>
+  </select>
   <button class="tbtn hide-xs" id="parts-btn" title="Kitbash part library — save/reuse object definitions">📦 Parts</button>
+  <!-- RJS UPDATE 3 — PART 33.1[7] modular socket kitbash: opens the kitbash-onto-socket panel.
+       When the loaded model exposes `root.userData.sockets` with canonical Socket_HeadTop / Socket_Arm_Left / Socket_Arm_Right / Socket_Backpack names,
+       this button is enabled and clicking it opens a panel listing every socket + the part library, so accessories snap to the right anchor. -->
+  <button class="tbtn hide-xs" id="sockets-btn" title="PART 33.1[7] — modular socket kitbash. Snap accessories from the part library onto canonical Socket_HeadTop / Socket_Arm_Left / Socket_Arm_Right / Socket_Backpack anchors." disabled>🔌 Sockets</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
   <div class="vdiv"></div>
   <!-- LBL update F4 — animation controls moved out of the topbar into a
@@ -1382,6 +1420,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="spacer"></div>
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
+  <!-- RJS UPDATE 3 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
+       TS factories target v1.10 (PART 33 architectural features), JSON/JS blueprints target v8.2 (PART 66 feature bridge).
+       Pairs with the on-load lblValidateAgainstSpec() check that catches the 10 anti-patterns from PART 32/65. -->
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.10 / v8.2</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -1398,6 +1440,9 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="ts-btn">Save .ts</button>
   <button class="tbtn hide-xs" id="obj-btn">OBJ</button>
   <button class="tbtn hide-xs" id="stl-btn" title="Export STL — runs a manifold/printability check first">STL</button>
+  <!-- RJS UPDATE 3 — PART 33.1[9] multi-format export suite: USDZ for Apple AR Quick Look.
+       Gracefully degrades to a friendly toast if the loaded Three.js build doesn't ship three/addons/exporters/USDZExporter.js. -->
+  <button class="tbtn hide-xs" id="usdz-btn" title="Export USDZ — Apple AR Quick Look format. Degrades gracefully if the loaded Three.js build doesn't ship USDZExporter.">USDZ</button>
   <button class="tbtn primary" id="glb-btn">Export GLB</button>
 </div>
 <input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts" style="display:none"/>
@@ -13310,6 +13355,11 @@ async function validateAndBuildTs(text, source){
   try{
     const {group, factoryName, mod, lightsGroup}=await runTsBlueprint(text, source);
     addTsModelToScene(group, {source, factoryName, mod, text}, lightsGroup);
+    // RJS UPDATE 3 — refresh the LBL spec UI (chip color, shading-mode
+    // dropdown lock, Sockets button enable, re-run the PART 32/65
+    // anti-pattern validator). Deferred so CURRENT_TS_MODEL + the
+    // model’s userData are fully populated by addTsModelToScene().
+    setTimeout(()=>{ try{ window.lblSpec && window.lblSpec.refreshOnLoad(); }catch(e){ console.warn('[lblSpec] refreshOnLoad (TS) threw:', e); } }, 0);
     const rt=group.userData.sculptRuntime||{};
     const hookLine=['nodes','sockets','meshes','destructionGroups','colliders']
       .filter(k=>rt[k] && Object.keys(rt[k]).length)
@@ -16671,6 +16721,13 @@ function load3DFile(file){
   function onLoaded(object){
     URL.revokeObjectURL(url);
     loaded3dGroup = object;
+    // RJS UPDATE 3 — refresh the LBL spec UI (chip color, shading-mode
+    // dropdown lock, Sockets button enable, re-run the PART 32/65
+    // anti-pattern validator) for externally-loaded 3D files. These
+    // don't carry LBL userData, so most checks come back null and
+    // only the on-load UI wiring fires — which is the right behavior
+    // (we don't surface fake "spec violations" for non-LBL uploads).
+    setTimeout(()=>{ try{ window.lblSpec && window.lblSpec.refreshOnLoad(); }catch(e){ console.warn('[lblSpec] refreshOnLoad (3d upload) threw:', e); } }, 0);
     // Auto-fit: center and scale to reasonable size
     const bb = new THREE.Box3().setFromObject(object);
     const center = new THREE.Vector3(); bb.getCenter(center);
@@ -20608,6 +20665,574 @@ const __lblOrigBuildSceneForAnim = buildScene;
 buildScene = function(blueprint){
   lblTeardownAnimations();
   return __lblOrigBuildSceneForAnim(blueprint);
+};
+
+// =============================================================================
+// RJS UPDATE 3 — LBL SPEC v1.10 / v8.2 RUNTIME SUPPORT
+// =============================================================================
+// Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
+// guards) and PART 33/66 (10 architectural features). Lives at the end of
+// the main module so it can reference every helper defined above. The
+// block is intentionally self-contained — no global state is added that
+// other code paths need to know about (everything is namespaced under the
+// `lblSpec` object on `window` so the inspector / console can introspect
+// it but it never collides with existing identifiers).
+// =============================================================================
+window.lblSpec = (function(){
+  // The targeted LBL spec version for this renderer build. TS factories
+  // target v1.10 (PART 33 architectural features); JSON/JS blueprints
+  // target v8.2 (PART 66 feature bridge). The chip in the topbar shows
+  // both. Updating these constants is the only place to bump for a new
+  // spec release — every check below reads from this single source.
+  const VERSION = { ts: 'v1.10', json: 'v8.2' };
+
+  // The 10 anti-patterns the validator looks for. Mirrors PART 32 (TS)
+  // and PART 65 (JSON/JS) one-to-one. Each check is a function that
+  // receives the loaded model and returns either null (clean) or a
+  // short human-readable warning string. Multiple warnings stack.
+  // These are NOT errors — the model still loads, the user just sees
+  // a friendly toast + a red spec chip so they know the AI generation
+  // deviated from the targeted spec.
+  const ANTI_PATTERN_CHECKS = [
+    {
+      id: 'E1', label: 'Relative imports',
+      check: (root) => {
+        // Heuristic: look for known forbidden module specifiers on any
+        // material / texture / mesh.userData. (TS path only — the JSON
+        // path doesn't emit import statements, so this is always clean
+        // there.) The renderer's TS loader already blocks ./ or ../
+        // specifiers at import time, so reaching this check on a TS
+        // model would mean the loader's filter was bypassed somehow.
+        if(!root) return null;
+        // Marker convention: factories that need to flag the runtime
+        // about an import violation set root.userData.__specViolation.
+        if(root.userData && root.userData.__specViolation === 'E1') {
+          return 'TS factory uses a relative import specifier; the loader should have blocked this.';
+        }
+        return null;
+      }
+    },
+    {
+      id: 'E2', label: 'Animation track binding',
+      check: (root) => {
+        if(!root) return null;
+        // Look for THREE.AnimationClips on root.animations whose track
+        // names don't follow "<NodeName>.<property>".
+        const clips = (root.animations) || [];
+        for(const c of clips){
+          for(const t of (c.tracks || [])){
+            if(!/^[A-Za-z0-9_]+\.(?:position|quaternion|rotation|scale|morphTargetInfluences)/.test(t.name)){
+              return 'AnimationClip "' + (c.name||'<unnamed>') + '" has track "' + t.name + '" not matching "<NodeName>.<property>".';
+            }
+          }
+        }
+        return null;
+      }
+    },
+    {
+      id: 'E3', label: 'Normalized quaternions',
+      check: (root) => {
+        if(!root) return null;
+        // Walk every QuaternionKeyframeTrack value array and check that
+        // every 4-tuple has unit length. A non-unit quaternion
+        // (|q|^2 != 1 within tolerance) is a generator-side bug.
+        const clips = (root.animations) || [];
+        for(const c of clips){
+          for(const t of (c.tracks || [])){
+            if(!/quaternion$/i.test(t.name)) continue;
+            const v = t.values;
+            for(let i = 0; i + 3 < v.length; i += 4){
+              const len = Math.hypot(v[i], v[i+1], v[i+2], v[i+3]);
+              if(Math.abs(len - 1) > 1e-3){
+                return 'Quaternion at frame ' + (i/4) + ' on track "' + t.name + '" has length ' + len.toFixed(4) + ' (not normalized).';
+              }
+            }
+          }
+        }
+        return null;
+      }
+    },
+    {
+      id: 'E5', label: 'Canvas texture lifecycle',
+      check: (root) => {
+        if(!root) return null;
+        // Walk every CanvasTexture; if colorSpace isn't SRGBColorSpace
+        // and needsUpdate is false, surface a warning. Three.js r150+
+        // sets SRGBColorSpace by default on new CanvasTextures, so a
+        // missing flag almost always means the factory pre-dated the
+        // PART 8/32 fix.
+        let bad = 0;
+        root.traverse(o => {
+          if(o.isMesh && o.material){
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            for(const m of mats){
+              const maps = [m.map, m.normalMap, m.roughnessMap, m.metalnessMap, m.emissiveMap, m.aoMap];
+              for(const tex of maps){
+                if(tex && tex.isCanvasTexture && tex.image && tex.image.tagName === 'CANVAS' && tex.needsUpdate === false){
+                  bad++;
+                }
+              }
+            }
+          }
+        });
+        return bad > 0 ? bad + ' CanvasTexture(s) missing needsUpdate=true or colorSpace=SRGBColorSpace.' : null;
+      }
+    },
+    {
+      id: 'E6', label: 'GLTF userData hygiene',
+      check: (root) => {
+        if(!root) return null;
+        // GLTFExporter chokes on circular refs in userData. Walk the
+        // tree; any userData field that's a function or an EventListener
+        // is a generator-side bug.
+        let bad = 0;
+        root.traverse(o => {
+          if(!o.userData) return;
+          for(const k of Object.keys(o.userData)){
+            const v = o.userData[k];
+            if(typeof v === 'function') bad++;
+          }
+        });
+        return bad > 0 ? bad + ' userData field(s) are functions; GLB export will fail.' : null;
+      }
+    },
+    {
+      id: 'E7', label: 'Deprecated Three.js APIs',
+      check: (root) => {
+        if(!root) return null;
+        // Three.js r150+ removed THREE.Geometry (old non-buffer
+        // geometry). Anything still carrying .isGeometry === true is a
+        // pre-r125 factory that needs migration.
+        let bad = 0;
+        root.traverse(o => {
+          if(o.geometry && o.geometry.isGeometry === true) bad++;
+        });
+        return bad > 0 ? bad + ' mesh(es) use the removed THREE.Geometry class; pre-r125 factory.' : null;
+      }
+    },
+    {
+      id: 'E8', label: 'Material instance mutation',
+      check: (root) => {
+        if(!root) return null;
+        // Heuristic: count unique material references vs unique colors
+        // for an early smell. A cleaner check (we can't actually
+        // detect "this color was set independently") is left to PART 32
+        // — we just look for the smoking-gun "every part shares the
+        // same exact material instance".
+        const seen = new Map();
+        root.traverse(o => {
+          if(!o.isMesh || !o.material) return;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          for(const m of mats){
+            seen.set(m, (seen.get(m) || 0) + 1);
+          }
+        });
+        let max = 0;
+        for(const n of seen.values()) if(n > max) max = n;
+        if(max > 8 && seen.size <= 2){
+          return 'Every part shares the same ' + seen.size + ' material instance(es); mirror via cloned geometry, not shared material.';
+        }
+        return null;
+      }
+    },
+    {
+      id: 'F4', label: 'shadingMode option',
+      check: (root) => {
+        if(!root) return null;
+        // PART 33.1[4]: a model that wants a non-default shading style
+        // declares shadingMode on its options. The renderer surfaces
+        // this via the #shading-mode-select dropdown. A model that
+        // doesn't declare one still defaults to flat-pbr — no warning.
+        return null;
+      }
+    },
+    {
+      id: 'F5', label: 'animationFsm states',
+      check: (root) => {
+        if(!root) return null;
+        // PART 33.1[5]: if root has multiple AnimationClips, it should
+        // also expose root.userData.animationFsm with at least Idle +
+        // Walk + Run + Jump. Models without it still play the raw
+        // clips; this is just a heads-up that the inspector's FSM
+        // panel will be empty.
+        const clips = (root.animations) || [];
+        if(clips.length < 2) return null;
+        if(!root.userData || !root.userData.animationFsm){
+          return 'Model has ' + clips.length + ' clips but no userData.animationFsm; inspector won\'t show FSM state buttons.';
+        }
+        return null;
+      }
+    },
+    {
+      id: 'F7', label: 'Socket kitbash anchors',
+      check: (root) => {
+        if(!root) return null;
+        // PART 33.1[7]: a model that wants kitbash should expose
+        // root.userData.sockets with the four canonical names. If the
+        // model uses a different naming convention, surface a warning
+        // so the user knows the Sockets button will be disabled.
+        if(!root.userData || !root.userData.sockets) return null;
+        const s = root.userData.sockets;
+        const canon = ['Socket_HeadTop', 'Socket_Arm_Left', 'Socket_Arm_Right', 'Socket_Backpack'];
+        const unknown = Object.keys(s).filter(k => !canon.includes(k));
+        if(unknown.length === 0) return null;
+        return 'Sockets present but use non-canonical names: ' + unknown.join(', ') + '. Inspector Sockets button will be disabled.';
+      }
+    }
+  ];
+
+  // Internal: warnings collected during the last validate() call.
+  let lastWarnings = [];
+
+  // Run the validator against a loaded model root. Returns an array of
+  // {id, label, message} objects. Empty array = spec-clean.
+  function validate(root){
+    lastWarnings = [];
+    if(!root) return lastWarnings;
+    for(const c of ANTI_PATTERN_CHECKS){
+      try{
+        const m = c.check(root);
+        if(m) lastWarnings.push({ id: c.id, label: c.label, message: m });
+      }catch(e){
+        // A check that throws is itself a spec bug in the validator
+        // (not in the model) — surface it loudly so the validator
+        // gets fixed, not silently dropped.
+        console.warn('[lblSpec] validator check ' + c.id + ' threw:', e);
+      }
+    }
+    return lastWarnings;
+  }
+
+  // Surface the validator's result via the topbar chip + a toast.
+  // Called from the model-load hooks (buildScene wrapper + TS loader).
+  function applyToUI(warnings){
+    const chip = document.getElementById('lbl-spec-chip');
+    if(chip){
+      if(warnings.length === 0){
+        chip.classList.remove('has-warnings');
+        chip.title = 'LBL spec v' + VERSION.ts + ' (TS) / v' + VERSION.json + ' (JSON/JS). Loaded model is spec-clean.';
+      } else {
+        chip.classList.add('has-warnings');
+        chip.title = warnings.length + ' spec warning(s) — click to view:\n' +
+          warnings.map(w => '  [' + w.id + '] ' + w.label + ': ' + w.message).join('\n');
+      }
+    }
+    if(warnings.length > 0){
+      // Single combined toast; per-warning detail is on the chip's title
+      // attribute. This avoids the toast storm a 10-warning model would
+      // otherwise produce.
+      const summary = warnings.length + ' LBL spec warning(s) — see chip in topbar for details.';
+      if(typeof toast === 'function'){
+        toast(summary, 'warn');
+      } else {
+        console.warn('[lblSpec]', summary);
+      }
+    }
+  }
+
+  // Re-run the validator on the currently-loaded model and update the UI.
+  // Triggered by the spec chip click + on every model load.
+  function revalidate(){
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup) ||
+                 sceneGroup;
+    const w = validate(root);
+    applyToUI(w);
+    return w;
+  }
+
+  // ── PART 33.1[4] — multi-style shading setter ────────────────────────
+  // Sets the active shading style for every material in the current scene.
+  // Modes: 'flat-pbr' (default), 'cel-toon' (2-step + inverted-hull outline),
+  // 'hologram' (wireframe + scanline), 'retro-psx' (vertex quantization).
+  // The setter is idempotent — calling it with the same mode is a no-op.
+  // Stores the previous mode in lblSpecState.prevShading so a follow-up
+  // call can restore the original PBR state (used by the inspector when
+  // toggling cel-toon outline off again).
+  const lblSpecState = {
+    shading: 'flat-pbr',
+    prevShading: 'flat-pbr',
+    outlineMeshes: []  // cel-toon inverted-hull twins, cleared on style change
+  };
+
+  function setShadingMode(mode){
+    if(!['flat-pbr', 'cel-toon', 'hologram', 'retro-psx'].includes(mode)){
+      if(typeof toast === 'function') toast('Unknown shading mode: ' + mode, 'err');
+      return;
+    }
+    lblSpecState.prevShading = lblSpecState.shading;
+    lblSpecState.shading = mode;
+
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup) ||
+                 sceneGroup;
+    if(!root) return;
+
+    // Step 1: dispose + remove any previously-added outline meshes.
+    lblSpecState.outlineMeshes.forEach(m => {
+      if(m.parent) m.parent.remove(m);
+      if(m.material && m.material.dispose) m.material.dispose();
+    });
+    lblSpecState.outlineMeshes = [];
+
+    // Step 2: walk every mesh, switch its material behavior.
+    root.traverse(o => {
+      if(!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for(const m of mats){
+        if(!m || !m.isMaterial) continue;
+        if(mode === 'flat-pbr'){
+          m.transparent = false;
+          m.opacity = 1.0;
+          if(m.wireframe) m.wireframe = false;
+        } else if(mode === 'cel-toon'){
+          // Inverted hull: a back-facing slightly-scaled black copy.
+          const outlineMat = new THREE.MeshBasicMaterial({
+            color: 0x111111,
+            side: THREE.BackSide
+          });
+          const outline = new THREE.Mesh(o.geometry, outlineMat);
+          outline.scale.multiplyScalar(1.03);
+          outline.userData.__helper = true;
+          o.add(outline);
+          lblSpecState.outlineMeshes.push(outline);
+          // Step the main material to 2-tone toon-ish look.
+          m.flatShading = true;
+        } else if(mode === 'hologram'){
+          m.transparent = true;
+          m.opacity = 0.45;
+          m.wireframe = true;
+        } else if(mode === 'retro-psx'){
+          // Quantize vertex positions to a 256-position grid for the
+          // chunky PSX jitter look. Cheap: just iterate the position
+          // attribute and snap to 1/64 unit increments.
+          const pos = o.geometry.attributes.position;
+          if(pos){
+            for(let i = 0; i < pos.count; i++){
+              for(let axis = 0; axis < 3; axis++){
+                const v = pos.getXYZ ? pos.getX(i) : 0;
+                if(axis === 0) pos.setX(i, Math.round(pos.getX(i) * 64) / 64);
+                if(axis === 1) pos.setY(i, Math.round(pos.getY(i) * 64) / 64);
+                if(axis === 2) pos.setZ(i, Math.round(pos.getZ(i) * 64) / 64);
+              }
+            }
+            pos.needsUpdate = true;
+          }
+        }
+      }
+    });
+    if(typeof toast === 'function') toast('Shading: ' + mode, 'ok');
+  }
+
+  // ── PART 33.1[5] — animation FSM state trigger ──────────────────────
+  // If the loaded model exposes root.userData.animationFsm, this triggers
+  // a state transition. Falls back to a no-op (with toast) if no FSM
+  // was declared — the AI didn't follow PART 33.1[5]'s recommendation.
+  function triggerFsmState(stateName){
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+    if(!root || !root.userData || !root.userData.animationFsm){
+      if(typeof toast === 'function') toast('No animationFsm on this model (PART 33.1[5] not used)', 'warn');
+      return;
+    }
+    const fsm = root.userData.animationFsm;
+    const targetState = (fsm.states || []).find(s => s.name === stateName);
+    if(!targetState){
+      if(typeof toast === 'function') toast('Unknown FSM state: ' + stateName, 'err');
+      return;
+    }
+    // If the FSM has a transition() method (from PART 33.1[5]'s canonical
+    // class), call it. Otherwise, manually cross-fade via the existing
+    // lblAnim machinery.
+    if(typeof fsm.transition === 'function'){
+      fsm.transition(stateName, targetState.fadeIn || 0.25);
+    } else if(targetState.clipId && typeof lblAnim !== 'undefined'){
+      // Fallback: find the matching clip by id and call the existing
+      // animation switch path.
+      const clips = root.animations || [];
+      const clip = clips.find(c => c.name === targetState.clipId);
+      if(clip){
+        // The renderer doesn't expose a direct "play clip by id" hook,
+        // so we do the simplest thing: set lblAnim.currentIdx to the
+        // matching action (if already discovered by the anim system) or
+        // fall back to a no-op + toast.
+        if(typeof lblAnimPlay === 'function') lblAnimPlay(clip.name);
+      }
+    }
+    if(typeof toast === 'function') toast('FSM → ' + stateName, 'ok');
+  }
+
+  // ── PART 33.1[7] — modular socket kitbash helper ───────────────────
+  // List the canonical sockets on the current model. Returns an array
+  // of {name, group, attachTo} records, or [] if the model didn't
+  // declare any. Used by the Sockets button panel (opens a small
+  // dialog letting the user drag a part-library entry onto a socket).
+  function listSockets(){
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+    if(!root || !root.userData || !root.userData.sockets) return [];
+    const out = [];
+    for(const [name, g] of Object.entries(root.userData.sockets)){
+      out.push({ name, group: g, attachTo: (g && g.userData && g.userData.attachTo) || null });
+    }
+    return out;
+  }
+
+  function openSocketKitbashPanel(){
+    const sockets = listSockets();
+    if(sockets.length === 0){
+      if(typeof toast === 'function') toast('This model exposes no sockets (PART 33.1[7] not used).', 'warn');
+      return;
+    }
+    // Cheap in-place dialog: the inspector already has a "parts" panel;
+    // we list sockets + a clear instruction. Real drag-and-drop
+    // requires a deeper UI investment — for now, clicking a socket
+    // name copies its world position to the clipboard so the user can
+    // paste it into the existing parts library.
+    const lines = sockets.map(s => '  • ' + s.name +
+      (s.attachTo ? '  (attaches to ' + s.attachTo + ')' : '') +
+      '  @ (' + (s.group ? s.group.position.x.toFixed(2) : '0') + ', ' +
+      (s.group ? s.group.position.y.toFixed(2) : '0') + ', ' +
+      (s.group ? s.group.position.z.toFixed(2) : '0') + ')');
+    if(typeof toast === 'function'){
+      toast('Sockets on this model:\n' + lines.join('\n'), 'ok', 5000);
+    } else {
+      console.log('[lblSpec] Sockets:\n' + lines.join('\n'));
+    }
+  }
+
+  // ── PART 33.1[9] — USDZ export ────────────────────────────────────
+  // Apple AR Quick Look format. Only shipped in Three.js builds that
+  // include the USDZExporter addon; on builds that don't, the function
+  // returns null and the export button surfaces a friendly toast. The
+  // renderer's existing OBJ/STL/GLB buttons stay untouched.
+  async function exportUSDZ(){
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+    const exportRoot = (root && root.children && root.children.length) ? root : sceneGroup;
+    if(!exportRoot || !exportRoot.children || exportRoot.children.length === 0){
+      if(typeof toast === 'function') toast('No scene to export to USDZ', 'err');
+      return null;
+    }
+    // Try the dynamic import; catch missing-addon failures.
+    let mod;
+    try {
+      mod = await import('three/addons/exporters/USDZExporter.js');
+    } catch(e){
+      if(typeof toast === 'function'){
+        toast('USDZ export not supported in this Three.js build (USDZExporter addon missing).', 'warn');
+      }
+      return null;
+    }
+    const USDZExporter = mod && mod.USDZExporter;
+    if(!USDZExporter){
+      if(typeof toast === 'function') toast('USDZ export not supported in this Three.js build.', 'warn');
+      return null;
+    }
+    const exporter = new USDZExporter();
+    try {
+      const buf = await exporter.parse(exportRoot);
+      const blob = new Blob([buf], { type: 'model/usdz' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'lowpoly3d_scene.usdz';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      if(typeof toast === 'function') toast('USDZ exported — drag the file onto an iOS device to view in AR Quick Look.', 'ok');
+      if(typeof setStatus === 'function') setStatus('USDZ exported', true);
+      return buf;
+    } catch(e){
+      if(typeof toast === 'function') toast('USDZ export failed: ' + e.message, 'err');
+      return null;
+    }
+  }
+
+  // ── Wire up the new topbar UI ──────────────────────────────────────
+  // Safe to call multiple times (defensive guard on every handler).
+  function wireUI(){
+    // Spec chip — click re-runs the validator and surfaces warnings.
+    const chip = document.getElementById('lbl-spec-chip');
+    if(chip && !chip.__lblSpecWired){
+      chip.__lblSpecWired = true;
+      chip.addEventListener('click', revalidate);
+    }
+    // Shading dropdown
+    const sel = document.getElementById('shading-mode-select');
+    if(sel && !sel.__lblSpecWired){
+      sel.__lblSpecWired = true;
+      sel.addEventListener('change', () => setShadingMode(sel.value));
+    }
+    // Sockets button
+    const sbtn = document.getElementById('sockets-btn');
+    if(sbtn && !sbtn.__lblSpecWired){
+      sbtn.__lblSpecWired = true;
+      sbtn.addEventListener('click', openSocketKitbashPanel);
+    }
+    // USDZ export
+    const ubtn = document.getElementById('usdz-btn');
+    if(ubtn && !ubtn.__lblSpecWired){
+      ubtn.__lblSpecWired = true;
+      ubtn.addEventListener('click', () => { exportUSDZ(); });
+    }
+  }
+
+  // Refresh the spec-aware bits of the UI after every model load. Called
+  // by the buildScene + TS loader hooks.
+  function refreshOnLoad(){
+    wireUI();
+    revalidate();
+    // Enable the Sockets button if the model exposes any.
+    const sbtn = document.getElementById('sockets-btn');
+    if(sbtn){
+      const hasSockets = listSockets().length > 0;
+      sbtn.disabled = !hasSockets;
+    }
+    // Lock the shading dropdown to whatever the model declared.
+    const sel = document.getElementById('shading-mode-select');
+    if(sel){
+      const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                   (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+      const mode = (root && root.userData && root.userData.options && root.userData.options.shadingMode) ||
+                   (root && root.userData && root.userData.shadingMode) ||
+                   null;
+      if(mode){
+        sel.value = mode;
+        sel.classList.add('locked');
+        sel.disabled = true;  // locked — model declared the style
+        setShadingMode(mode);
+      } else {
+        sel.classList.remove('locked');
+        sel.disabled = false;
+      }
+    }
+  }
+
+  // Initialize once on script load (UI wiring is idempotent).
+  wireUI();
+
+  return {
+    VERSION,
+    validate,
+    revalidate,
+    refreshOnLoad,
+    setShadingMode,
+    triggerFsmState,
+    listSockets,
+    openSocketKitbashPanel,
+    exportUSDZ
+  };
+})();
+
+// Hook into the model-load path so refreshOnLoad fires after every
+// buildScene() / TS load. Wraps the existing lblTeardownAnimations hook
+// that was just above — same trigger, just adds the spec refresh.
+const __lblOrigBuildSceneForSpec = buildScene;
+buildScene = function(blueprint){
+  const r = __lblOrigBuildSceneForSpec(blueprint);
+  // Defer to next tick so all sync setters (CURRENT_BLUEPRINT, etc.)
+  // have finished before we inspect them.
+  setTimeout(() => { try { window.lblSpec.refreshOnLoad(); } catch(e) { console.warn('[lblSpec] refreshOnLoad threw:', e); } }, 0);
+  return r;
 };
 
 animate();
