@@ -1460,8 +1460,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="usdz-btn" title="Export USDZ — Apple AR Quick Look format. Degrades gracefully if the loaded Three.js build doesn't ship USDZExporter.">USDZ</button>
   <button class="tbtn primary" id="glb-btn">Export GLB</button>
 </div>
-<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts" style="display:none"/>
-<input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz" style="display:none"/>
+<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts" multiple style="display:none"/>
+<input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz" multiple style="display:none"/>
 <!-- 3D-model uploads intentionally keep their own format list — .ts/.mts/.cts
      are source code for the LBL TS factory pipeline (#file-input above), not
      importable 3D model formats, so they don't belong on this input. -->
@@ -1550,10 +1550,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="dropzone">
-        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,image/*"/>
+        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" multiple/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Drop JSON / JS / TS here</div>
-        <div class="dz-sub">or click to browse · drop an image onto a selected part to texture it</div>
+        <div class="dz-sub">or click to browse · drop several files at once · drop an image onto a selected part to texture it</div>
       </div>
     </div>
     <div class="panel-section">
@@ -1885,7 +1885,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="mob-dropzone" class="dropzone-box">
-        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" class="dropzone-input"/>
+        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,image/*" class="dropzone-input" multiple/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Tap to browse JSON</div>
       </div>
@@ -7892,7 +7892,32 @@ let LBL_RNG = Math.random;
 function setGlobalSeed(seed){
   LBL_RNG = (seed===undefined || seed===null) ? Math.random : makeSeededRandom(Number(seed) || 1);
 }
-let loaded3dGroup=null; // holds any externally-loaded 3D file (GLB/FBX/OBJ/STL/DAE)
+let loaded3dGroup=null; // holds the MOST RECENT externally-loaded 3D file (GLB/FBX/OBJ/STL/DAE). Kept as a single
+                         // value so the existing single-model selection / gizmo / inspector code keeps working
+                         // unchanged. See __lblLoaded3DModels below for the full list of all loaded 3D models.
+let __lblLoaded3DModels=[]; // LBL MULTI-FILE UPDATE — every 3D model loaded in the current session, in load
+                            // order. New models are appended in a row to the right; clearing the scene wipes
+                            // all of them. `loaded3dGroup` is maintained as a back-compat alias for the last
+                            // entry of this array.
+window.__lblSelectedModelIndex = null; // index into __lblLoaded3DModels for the row currently selected in
+                                       // the scene tree, or null for "the whole collection" (LBL_EXTERNAL_ID).
+// Helper: prefer the explicit `loaded3dGroup` single-value (which is set
+// every time load3DFile finishes) and only fall back to the first entry
+// of __lblLoaded3DModels so a multi-model scene still has a "current
+// root" for code that only needs one (revalidators, USDZ export, FSM
+// triggers, etc.). Returns null when neither is set.
+function __lblGetActiveExternalRoot(){
+  if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) return loaded3dGroup;
+  if(typeof __lblLoaded3DModels !== 'undefined' && __lblLoaded3DModels && __lblLoaded3DModels.length){
+    if(typeof window.__lblSelectedModelIndex === 'number'
+       && window.__lblSelectedModelIndex >= 0
+       && window.__lblSelectedModelIndex < __lblLoaded3DModels.length){
+      return __lblLoaded3DModels[window.__lblSelectedModelIndex];
+    }
+    return __lblLoaded3DModels[__lblLoaded3DModels.length - 1];
+  }
+  return null;
+}
 
 // ── v6.3: Advanced Model Quality System — shared session state ─────────
 let CURRENT_BLUEPRINT=null;            // last successfully-built blueprint object. sceneObjects entries are the
@@ -8279,6 +8304,16 @@ function computeFidelityLogStats(category, limit=50){
 
 function clearScene(){
   sceneGroup.clear(); meshMap.clear(); sceneObjects=[]; selectedId=null;
+  // LBL MULTI-FILE UPDATE — wipe EVERY loaded 3D model, not just the
+  // most recent one. The single-variable `loaded3dGroup` is left null
+  // for back-compat. Also reset the per-model selection index so a
+  // subsequent "Uploaded 3D model" pick doesn't think the user still
+  // has a specific model selected.
+  window.__lblSelectedModelIndex = null;
+  if(__lblLoaded3DModels && __lblLoaded3DModels.length){
+    __lblLoaded3DModels.forEach(g=>{ if(g && g.parent) g.parent.remove(g); });
+    __lblLoaded3DModels = [];
+  }
   if(loaded3dGroup){ scene.remove(loaded3dGroup); loaded3dGroup=null; }
   if(contactShadowMesh){ scene.remove(contactShadowMesh); contactShadowMesh.geometry.dispose(); contactShadowMesh.material.dispose(); contactShadowMesh=null; }
   if(convexHullMesh){ scene.remove(convexHullMesh); convexHullMesh.geometry.dispose(); convexHullMesh.material.dispose(); convexHullMesh=null; }
@@ -8703,6 +8738,15 @@ function buildScene(blueprint){
     }
   });
   sceneGroup.clear(); meshMap.clear(); sceneObjects=[];
+  // LBL MULTI-FILE UPDATE — clearScene() in buildScene() (called whenever
+  // a blueprint is rebuilt) needs to also wipe every previously loaded
+  // 3D model, otherwise a blueprint load would leave stale GLB models
+  // sitting on top of the freshly built scene.
+  window.__lblSelectedModelIndex = null;
+  if(__lblLoaded3DModels && __lblLoaded3DModels.length){
+    __lblLoaded3DModels.forEach(g=>{ if(g && g.parent) g.parent.remove(g); });
+    __lblLoaded3DModels = [];
+  }
   if(loaded3dGroup){ scene.remove(loaded3dGroup); loaded3dGroup=null; }
   // v6.3: drop any contact-shadow disc from a previous model — it lives
   // directly under `scene` (not sceneGroup), so sceneGroup.clear() above
@@ -9942,12 +9986,62 @@ function updateTree(){
       // No blueprint parts — but if a whole model was imported (Upload 3D
       // or a .ts factory), still surface it as a selectable row instead of
       // just showing "No objects." with no way to select it from the tree.
-      const wholeLabel = loaded3dGroup ? '📦 Uploaded model' : (CURRENT_TS_MODEL ? '🧩 TS model' : null);
-      const wholeId = loaded3dGroup ? LBL_EXTERNAL_ID : (CURRENT_TS_MODEL ? LBL_TSMODEL_ID : null);
-      if(wholeLabel){
-        el.innerHTML = `<div class="tree-item${selectedId===wholeId?' selected':''}" data-id="${wholeId}">
+      // LBL MULTI-FILE UPDATE — when several 3D files have been loaded,
+      // list EACH one as its own tree row (so the user can click any one
+      // to select it, drag the gizmo, etc.) instead of collapsing them
+      // all into a single "📦 Uploaded model" row.
+      const extModels = (__lblLoaded3DModels && __lblLoaded3DModels.length)
+        ? __lblLoaded3DModels
+        : (loaded3dGroup ? [loaded3dGroup] : []);
+      if(extModels.length){
+        if(extModels.length === 1){
+          const wholeLabel = '📦 Uploaded model';
+          const wholeId = LBL_EXTERNAL_ID;
+          el.innerHTML = `<div class="tree-item${selectedId===wholeId?' selected':''}" data-id="${wholeId}">
+            <div class="tree-dot" style="background:var(--accent)"></div>
+            <div class="tree-name">${wholeLabel}</div>
+            <div class="tree-type">whole object</div>
+          </div>`;
+        } else {
+          // Multi-model scene — show a header row that selects the whole
+          // collection (LBL_EXTERNAL_ID, same back-compat sentinel as before)
+          // plus one row per model for finer-grained selection.
+          const headerRow = `<div class="tree-item${selectedId===LBL_EXTERNAL_ID?' selected':''}" data-id="${LBL_EXTERNAL_ID}">
+            <div class="tree-dot" style="background:var(--accent)"></div>
+            <div class="tree-name">📦 Uploaded models (${extModels.length})</div>
+            <div class="tree-type">all</div>
+          </div>`;
+          const modelRows = extModels.map((g, i)=>{
+            const name = (g && g.userData && g.userData.__lblFileName) || ('Model ' + (i+1));
+            const id = LBL_EXTERNAL_ID + '_' + i;
+            return `<div class="tree-item child${selectedId===id?' selected':''}" data-id="${id}">
+              <div class="tree-dot" style="background:var(--accent)"></div>
+              <div class="tree-name">📦 ${name}</div>
+              <div class="tree-type">3D</div>
+            </div>`;
+          }).join('');
+          el.innerHTML = headerRow + modelRows;
+        }
+        el.querySelectorAll('.tree-item').forEach(row=>row.addEventListener('click',()=>{
+          const id = row.dataset.id;
+          // Per-model row → select LBL_EXTERNAL_ID but also stash which
+          // model index the user picked, so the gizmo / inspector know
+          // which group to operate on. Falls back to LBL_EXTERNAL_ID for
+          // the single-model and header rows (back-compat behavior).
+          if(id.startsWith(LBL_EXTERNAL_ID + '_')){
+            window.__lblSelectedModelIndex = parseInt(id.split('_').pop(), 10) || 0;
+            selectObj(LBL_EXTERNAL_ID);
+          } else {
+            window.__lblSelectedModelIndex = null;
+            selectObj(id);
+          }
+        }));
+        return;
+      }
+      if(CURRENT_TS_MODEL){
+        el.innerHTML = `<div class="tree-item${selectedId===LBL_TSMODEL_ID?' selected':''}" data-id="${LBL_TSMODEL_ID}">
           <div class="tree-dot" style="background:var(--accent)"></div>
-          <div class="tree-name">${wholeLabel}</div>
+          <div class="tree-name">🧩 TS model</div>
           <div class="tree-type">whole object</div>
         </div>`;
         el.querySelectorAll('.tree-item').forEach(row=>row.addEventListener('click',()=>selectObj(row.dataset.id)));
@@ -10113,7 +10207,16 @@ function selectObj(id){
 // a single meshMap entry. Wrapped per-mesh since not every material type
 // (e.g. some glTF imports) is guaranteed to expose `emissive`.
 function lblHighlightWholeModel(id){
-  [[loaded3dGroup,LBL_EXTERNAL_ID],[CURRENT_TS_MODEL,LBL_TSMODEL_ID]].forEach(([group,sentinel])=>{
+  // LBL MULTI-FILE UPDATE — walk EVERY loaded 3D model, not just
+  // `loaded3dGroup` (which only points to the most recently loaded one).
+  // The whole-model sentinel (LBL_EXTERNAL_ID) is treated as selecting
+  // the entire imported-models collection, so all of them get the
+  // accent highlight when the user picks that row in the tree.
+  const extGroups = (__lblLoaded3DModels && __lblLoaded3DModels.length)
+    ? __lblLoaded3DModels
+    : (loaded3dGroup ? [loaded3dGroup] : []);
+  const pairs = extGroups.map(g=>[g, LBL_EXTERNAL_ID]).concat([[CURRENT_TS_MODEL, LBL_TSMODEL_ID]]);
+  pairs.forEach(([group, sentinel])=>{
     if(!group) return;
     const on = id===sentinel;
     group.traverse(n=>{
@@ -10135,8 +10238,16 @@ function lblHighlightWholeModel(id){
 // on it as a single rigid object.
 function renderWholeModelInspector(id){
   const isExternal = id===LBL_EXTERNAL_ID;
-  const label = isExternal ? 'Uploaded 3D model' : 'TS-generated model';
-  const mesh = isExternal ? loaded3dGroup : CURRENT_TS_MODEL;
+  // LBL MULTI-FILE UPDATE — when several 3D files are loaded, prefer the
+  // per-model index the user actually picked in the scene tree, falling
+  // back to the latest model. The label also gets a small "(N models)"
+  // suffix so the inspector makes it clear which object the scale
+  // readout belongs to.
+  const extCount = (__lblLoaded3DModels && __lblLoaded3DModels.length) || (loaded3dGroup ? 1 : 0);
+  const label = isExternal
+    ? (extCount > 1 ? 'Uploaded 3D model · multi (' + extCount + ')' : 'Uploaded 3D model')
+    : 'TS-generated model';
+  const mesh = isExternal ? __lblGetActiveExternalRoot() : CURRENT_TS_MODEL;
   const s = mesh ? mesh.scale : {x:1,y:1,z:1};
   const html = `<div class="insp-section">
       <div class="insp-row"><div class="insp-key">Selection</div><div class="insp-val ac">${label}</div></div>
@@ -13121,6 +13232,13 @@ function addTsModelToScene(group, meta, lightsGroup){
   // this file (e.g. the top of buildScene()) — keeps a stale blueprint
   // mesh, contact shadow, or convex hull from an earlier scene lingering.
   sceneGroup.clear(); meshMap.clear(); sceneObjects=[]; selectedId=null;
+  // LBL MULTI-FILE UPDATE — also wipe every previously loaded 3D model
+  // (TS-model swaps should still present a clean canvas, same as blueprint rebuilds).
+  window.__lblSelectedModelIndex = null;
+  if(__lblLoaded3DModels && __lblLoaded3DModels.length){
+    __lblLoaded3DModels.forEach(g=>{ if(g && g.parent) g.parent.remove(g); });
+    __lblLoaded3DModels = [];
+  }
   if(loaded3dGroup){ scene.remove(loaded3dGroup); loaded3dGroup=null; }
   if(contactShadowMesh){ scene.remove(contactShadowMesh); contactShadowMesh.geometry.dispose(); contactShadowMesh.material.dispose(); contactShadowMesh=null; }
   if(convexHullMesh){ scene.remove(convexHullMesh); convexHullMesh.geometry.dispose(); convexHullMesh.material.dispose(); convexHullMesh=null; }
@@ -13553,6 +13671,11 @@ canvas.addEventListener('click',e=>{
   // attached. The symptom was "click a part, gizmo flashes for a
   // frame then disappears". Bail out for any LBL-managed case.
   if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) return;
+  // LBL MULTI-FILE UPDATE — bail out when ANY 3D model is loaded, not
+  // just the latest one. (Sub-mesh clicks inside a multi-model scene
+  // still need the same raycast-vs-meshMap walk the original guard was
+  // protecting against.)
+  if(typeof __lblLoaded3DModels !== 'undefined' && __lblLoaded3DModels && __lblLoaded3DModels.length) return;
   if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) return;
   const rect=canvas.getBoundingClientRect();
   mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
@@ -16476,14 +16599,89 @@ window.exportGLB=exportGLB; window.exportOBJ=exportOBJ;
 // ═══════════════════════════════════════════
 function readFile(file){ lblModelStoreHideNav(); const r=new FileReader(); r.onload=e=>validateAndBuild(e.target.result,file.name); r.readAsText(file); }
 
+// LBL MULTI-FILE UPDATE — single entry point used by every file-input /
+// drop handler below. Sorts a FileList into images / 3D models / blueprints
+// and dispatches each batch to the right loader:
+//   • image     → lblApplyImageFileToSelected (texture the currently selected part)
+//   • 3D model  → load3DFile with append=true when the scene is non-empty,
+//                 otherwise the default "replace scene" anchor behavior
+//   • blueprint → readFile (full scene replacement). When more than one
+//                 blueprint is dropped, we load the first and warn the user
+//                 that merging multiple blueprints is not supported in a
+//                 single drop — the others are queued via the file picker.
+const __LBL_MODEL_EXTS  = new Set(['glb','gltf','fbx','obj','stl','dae','usdz']);
+const __LBL_BLUEPRT_EXTS= new Set(['json','js','ts','mts','cts']);
+const __LBL_IMAGE_EXTS  = new Set(['png','jpg','jpeg','gif','webp','bmp','svg','avif','heic','heif']);
+function __lblClassifyFile(file){
+  const name = (file && file.name) || '';
+  const ext  = (name.split('.').pop() || '').toLowerCase();
+  if(file && /^image\//.test(file.type)) return 'image';
+  if(__LBL_MODEL_EXTS.has(ext)) return 'model';
+  if(__LBL_BLUEPRT_EXTS.has(ext)) return 'blueprint';
+  if(__LBL_IMAGE_EXTS.has(ext)) return 'image'; // tolerate missing MIME type on mobile captures
+  return 'blueprint'; // last-resort fallback: treat unknown extensions as blueprint text
+}
+function lblRouteFiles(fileList){
+  if(!fileList || !fileList.length) return;
+  const files = Array.from(fileList);
+  if(files.length === 1){
+    // Single-file path — keep the original behavior (no extra toast, no batching).
+    lblRouteDroppedFile(files[0]);
+    return;
+  }
+  // Multi-file path — bucket then dispatch.
+  const buckets = { image:[], model:[], blueprint:[] };
+  files.forEach(f=>{ buckets[__lblClassifyFile(f)].push(f); });
+
+  // Images first — each one textures the currently selected part (or
+  // spawns a new textured plane if nothing is selected), exactly as the
+  // single-image drop behavior.
+  buckets.image.forEach(f=>{
+    if(typeof window.lblApplyImageFileToSelected === 'function'){
+      window.lblApplyImageFileToSelected(f);
+    } else {
+      readFile(f);
+    }
+  });
+
+  // 3D models — append to the existing scene in a row. The first model
+  // still gets the "anchor" replace treatment when the scene is empty,
+  // so the first load lands centered on origin as it always did.
+  if(buckets.model.length){
+    if(buckets.model.length > 1){
+      toast(`Loading ${buckets.model.length} 3D models — arranging in a row…`);
+    }
+    const sceneHasContent = (loaded3dGroup || (__lblLoaded3DModels && __lblLoaded3DModels.length) || (sceneGroup && sceneGroup.children && sceneGroup.children.length));
+    buckets.model.forEach((f, i)=>{
+      // First model: anchor (replace) if scene is empty, otherwise append.
+      // Subsequent models: always append.
+      const append = i > 0 || !!sceneHasContent;
+      load3DFile(f, { append });
+    });
+  }
+
+  // Blueprints — load the first one normally, warn the user about the rest.
+  // Merging two full scenes is out of scope for the drop path; users can
+  // paste multiple blueprints into the editor one at a time if needed.
+  if(buckets.blueprint.length){
+    if(buckets.blueprint.length > 1){
+      toast(`Multiple blueprint files detected — loading "${buckets.blueprint[0].name}" first. Drop the others one at a time to load them sequentially.`, 'err');
+    }
+    readFile(buckets.blueprint[0]);
+  }
+}
+
 document.getElementById('upload-btn').addEventListener('click',()=>document.getElementById('file-input').click());
-document.getElementById('file-input').addEventListener('change',e=>{ if(e.target.files[0]) readFile(e.target.files[0]); });
+document.getElementById('file-input').addEventListener('change',e=>{ lblRouteFiles(e.target.files); e.target.value=''; });
 
 const dz=document.getElementById('dropzone');
 // LBL update T2 — a dropped/picked file that's an image is routed to the
 // Image Texture feature (applies to the selected part, or spawns a new
 // textured plane if nothing is selected); everything else falls through
 // to the original JSON/JS/TS blueprint path unchanged.
+// LBL MULTI-FILE UPDATE — preserved as the single-file path; lblRouteFiles
+// above handles the multi-file case before falling through to this for
+// single drops.
 function lblRouteDroppedFile(file){
   if(file && /^image\//.test(file.type) && typeof window.lblApplyImageFileToSelected==='function'){
     window.lblApplyImageFileToSelected(file);
@@ -16491,12 +16689,32 @@ function lblRouteDroppedFile(file){
     readFile(file);
   }
 }
-document.getElementById('dz-input').addEventListener('change',e=>{ if(e.target.files[0]) lblRouteDroppedFile(e.target.files[0]); });
+document.getElementById('dz-input').addEventListener('change',e=>{ lblRouteFiles(e.target.files); e.target.value=''; });
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over'); if(e.dataTransfer.files[0]) lblRouteDroppedFile(e.dataTransfer.files[0]);});
+dz.addEventListener('drop',e=>{
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  // LBL MULTI-FILE UPDATE — accept ALL dropped files, not just the first.
+  // dataTransfer.items is checked first so we never miss files on browsers
+  // that hide items once getAsFile() is called.
+  const dt = e.dataTransfer;
+  if(!dt) return;
+  if(dt.files && dt.files.length){
+    lblRouteFiles(dt.files);
+    return;
+  }
+  if(dt.items && dt.items.length){
+    const fallback = [];
+    for(let i=0; i<dt.items.length; i++){
+      const it = dt.items[i];
+      if(it.kind === 'file'){ const f = it.getAsFile(); if(f) fallback.push(f); }
+    }
+    if(fallback.length) lblRouteFiles(fallback);
+  }
+});
 
-document.getElementById('mob-dz-input').addEventListener('change',e=>{ if(e.target.files[0]) lblRouteDroppedFile(e.target.files[0]); });
+document.getElementById('mob-dz-input').addEventListener('change',e=>{ lblRouteFiles(e.target.files); e.target.value=''; });
 document.getElementById('demo-btn').addEventListener('click',()=>lblOpenModelStore());
 document.getElementById('demo-prev').addEventListener('click',()=>lblModelStorePrev());
 document.getElementById('demo-next').addEventListener('click',()=>lblModelStoreNext());
@@ -16732,24 +16950,50 @@ document.getElementById('mob-apply-btn').addEventListener('click',()=>{
 
 // ═══════════════════════════════════════════
 // UPLOAD 3D — load external GLB/glTF/FBX/OBJ/STL/DAE models
+// LBL MULTI-FILE UPDATE — supports dropping / picking many files at once
+// ──────────────────────────────────────────────────────────────────────
+//  • `load3DFile(file, opts)` now accepts an `append` flag.
+//      false (default) — original "replace scene" behavior, anchors the model at origin.
+//      true            — keeps the current scene; auto-positions the new model in a
+//                        row to the right of the previously loaded 3D models and
+//                        re-fits the camera to the combined bounding box.
+//  • `__lblLoaded3DModels[]` is the canonical list of all 3D models the user
+//    has loaded in the current session. `loaded3dGroup` is kept as a back-compat
+//    alias for the most recently loaded model so the existing single-model
+//    selection / gizmo / inspector code keeps working unchanged.
+//  • `lblRouteFiles(fileList)` is the single entry point for the 4 file-input
+//    handlers below — it sorts the files into images / 3D models / blueprints
+//    and dispatches each batch to the right loader (append for 3D, replace for
+//    blueprint, texture-apply for image).
 // ═══════════════════════════════════════════
-function load3DFile(file){
+function load3DFile(file, opts){
+  const append = !!(opts && opts.append);
   const ext = file.name.split('.').pop().toLowerCase();
   const url = URL.createObjectURL(file);
-  toast('Loading ' + file.name + '…');
+  toast('Loading ' + file.name + (append ? ' (appending)…' : '…'));
 
-  // Remove previously loaded 3D model and any active JSON/demo scene
-  if(loaded3dGroup){ scene.remove(loaded3dGroup); loaded3dGroup = null; }
-  sceneGroup.clear(); meshMap.clear(); sceneObjects=[]; selectedId=null;
-  // LBL TS update — same TS-model retirement as clearScene()/buildScene();
-  // uploading a 3D file is a third top-level "replace the scene" action
-  // and needs the same cleanup so a stale .ts model doesn't keep ticking
-  // in the background or block the Parts library afterward.
-  if(CURRENT_TS_LIGHTS){ scene.remove(CURRENT_TS_LIGHTS); CURRENT_TS_LIGHTS=null; }
-  CURRENT_TS_MODEL=null; CURRENT_TS_META=null;
-  updateFormatChip(null); updateGenModeChip(null); setTsExclusiveUiState(false); // RJS UPDATE 2 — N2
-  sceneGroup.position.set(0,0,0);
-  lblModelStoreHideNav(); updateTree(); updateInspector(null);
+  if(!append){
+    // Replace mode — same as the original behavior, plus also clear
+    // __lblLoaded3DModels so the new "anchor" model is the only one in
+    // the scene.
+    window.__lblSelectedModelIndex = null;
+    __lblLoaded3DModels.forEach(g=>{ if(g && g.parent) g.parent.remove(g); });
+    __lblLoaded3DModels = [];
+    if(loaded3dGroup){ scene.remove(loaded3dGroup); loaded3dGroup = null; }
+    sceneGroup.clear(); meshMap.clear(); sceneObjects=[]; selectedId=null;
+    // LBL TS update — same TS-model retirement as clearScene()/buildScene();
+    // uploading a 3D file is a third top-level "replace the scene" action
+    // and needs the same cleanup so a stale .ts model doesn't keep ticking
+    // in the background or block the Parts library afterward.
+    if(CURRENT_TS_LIGHTS){ scene.remove(CURRENT_TS_LIGHTS); CURRENT_TS_LIGHTS=null; }
+    CURRENT_TS_MODEL=null; CURRENT_TS_META=null;
+    updateFormatChip(null); updateGenModeChip(null); setTsExclusiveUiState(false); // RJS UPDATE 2 — N2
+    sceneGroup.position.set(0,0,0);
+    lblModelStoreHideNav(); updateTree(); updateInspector(null);
+  }
+  // In append mode we deliberately leave sceneGroup, CURRENT_TS_MODEL,
+  // format chips, and selection alone — the new model is added on top of
+  // whatever is already in the scene.
 
   function onLoaded(object){
     URL.revokeObjectURL(url);
@@ -16761,36 +17005,67 @@ function load3DFile(file){
     // only the on-load UI wiring fires — which is the right behavior
     // (we don't surface fake "spec violations" for non-LBL uploads).
     setTimeout(()=>{ try{ window.lblSpec && window.lblSpec.refreshOnLoad(); }catch(e){ console.warn('[lblSpec] refreshOnLoad (3d upload) threw:', e); } }, 0);
-    // Auto-fit: center and scale to reasonable size
+    // Auto-fit: center and scale to reasonable size (matches original behavior)
     const bb = new THREE.Box3().setFromObject(object);
-    const center = new THREE.Vector3(); bb.getCenter(center);
     const size = new THREE.Vector3(); bb.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
     const scale = maxDim > 0 ? 8 / maxDim : 1;
     object.scale.setScalar(scale);
-    // Re-center after scale
+    // Re-center after scale — bounding box is now in world space
     const bb2 = new THREE.Box3().setFromObject(object);
+    const s2 = new THREE.Vector3(); bb2.getSize(s2);
     const c2 = new THREE.Vector3(); bb2.getCenter(c2);
-    object.position.set(-c2.x, -bb2.min.y, -c2.z);
+    if(append && __lblLoaded3DModels.length > 0){
+      // LBL MULTI-FILE UPDATE — place the new model in a row to the right
+      // of all previously loaded models, with a 1.0-unit gap. The combined
+      // bounding box of earlier models is computed in world space, so
+      // models that were manually moved by the user are still respected.
+      const prevBB = new THREE.Box3();
+      __lblLoaded3DModels.forEach(g=>{ prevBB.union(new THREE.Box3().setFromObject(g)); });
+      const prevSize = new THREE.Vector3(); prevBB.getSize(prevSize);
+      const prevCenter = new THREE.Vector3(); prevBB.getCenter(prevCenter);
+      const offsetX = prevCenter.x + (prevSize.x / 2) + (s2.x / 2) + 1.0;
+      object.position.set(offsetX - c2.x, -bb2.min.y, -c2.z);
+    } else {
+      // Anchor mode — same as the original behavior.
+      object.position.set(-c2.x, -bb2.min.y, -c2.z);
+    }
     // Enable shadows on all meshes
     object.traverse(n=>{ if(n.isMesh){ n.castShadow=true; n.receiveShadow=true; } });
+    // Tag with a friendly label + index so the scene tree can show one row
+    // per loaded model instead of collapsing them all into "Uploaded model".
+    object.userData.__lblFileName = file.name;
+    object.userData.__lblModelIndex = __lblLoaded3DModels.length;
+    __lblLoaded3DModels.push(object);
     scene.add(object);
     // LBL update H2/FIX — register every sub-mesh of the uploaded model
     // so the user can click + transform / texture / group them just like
     // blueprint parts. Animation clips (e.g. embedded in glTF) are
     // collected separately below for the Start/Stop/Next control.
-    lblRegisterExternalMeshes(object);
+    // LBL MULTI-FILE UPDATE — now APPENDs to lblExtMeshIds instead of
+    // wiping previous models' ids, so multi-model scenes keep every
+    // sub-mesh selectable.
+    lblRegisterExternalMeshes(object, { append: true });
     if(typeof lblCollectAnimations === 'function') lblCollectAnimations(object, object.userData && object.userData.__gltf);
     hideWelcome();
     updateTree(); // show the new "📦 Uploaded model" row (see updateTree's whole-model branch)
-    // Fit camera
-    const bb3 = new THREE.Box3().setFromObject(object);
-    const s3 = new THREE.Vector3(); bb3.getSize(s3);
-    const dist = Math.max(s3.x, s3.y, s3.z) * 1.6;
-    camera.position.set(dist, dist*0.7, dist);
-    controls.target.set(0, s3.y*0.4, 0);
+    // Fit camera to the COMBINED bounding box (every loaded 3D model
+    // plus any blueprint parts already in sceneGroup), so all newly
+    // added models are visible without the user having to manually
+    // zoom out.
+    const combinedBB = new THREE.Box3();
+    __lblLoaded3DModels.forEach(g=>{ combinedBB.union(new THREE.Box3().setFromObject(g)); });
+    if(sceneGroup && sceneGroup.children && sceneGroup.children.length){
+      combinedBB.union(new THREE.Box3().setFromObject(sceneGroup));
+    }
+    const combinedSize = new THREE.Vector3(); combinedBB.getSize(combinedSize);
+    const combinedCenter = new THREE.Vector3(); combinedBB.getCenter(combinedCenter);
+    const dist = Math.max(combinedSize.x, combinedSize.y, combinedSize.z, 1) * 0.85;
+    camera.position.set(combinedCenter.x + dist, combinedCenter.y + dist * 0.5, combinedCenter.z + dist);
+    controls.target.set(combinedCenter.x, combinedSize.y * 0.4, combinedCenter.z);
     controls.update();
-    toast('✓ Loaded ' + file.name, 'ok');
+    const suffix = (__lblLoaded3DModels.length > 1) ? ` (${__lblLoaded3DModels.length} models)` : '';
+    toast('✓ Loaded ' + file.name + suffix, 'ok');
   }
 
   function onError(err){ URL.revokeObjectURL(url); console.error(err); toast('Failed to load: ' + file.name,'err'); }
@@ -16824,7 +17099,21 @@ function load3DFile(file){
 }
 
 document.getElementById('upload3d-btn').addEventListener('click',()=>document.getElementById('file3d-input').click());
-document.getElementById('file3d-input').addEventListener('change',e=>{ if(e.target.files[0]) load3DFile(e.target.files[0]); e.target.value=''; });
+// LBL MULTI-FILE UPDATE — accept several 3D files at once. The first
+// file replaces the scene (matches the original "Upload 3D" semantics)
+// and every subsequent file is appended in a row, with the camera
+// refit to the combined bounding box.
+document.getElementById('file3d-input').addEventListener('change',e=>{
+  const files = e.target.files;
+  if(!files || !files.length) return;
+  const arr = Array.from(files);
+  const sceneHasContent = (loaded3dGroup || (__lblLoaded3DModels && __lblLoaded3DModels.length) || (sceneGroup && sceneGroup.children && sceneGroup.children.length));
+  arr.forEach((f, i)=>{
+    const append = i > 0 || !!sceneHasContent;
+    load3DFile(f, { append });
+  });
+  e.target.value='';
+});
 
 // ═══════════════════════════════════════════
 // THEME SYSTEM
@@ -17161,7 +17450,18 @@ function lblCurrentObj(){
   return sceneObjects.find(o=>o.id===selectedId) || null;
 }
 function lblCurrentMesh(){
-  if(selectedId===LBL_EXTERNAL_ID) return loaded3dGroup;
+  if(selectedId===LBL_EXTERNAL_ID){
+    // LBL MULTI-FILE UPDATE — honor __lblSelectedModelIndex so a
+    // per-model tree row resolves to the right group, not just whatever
+    // the latest `loaded3dGroup` happens to be.
+    if(typeof window.__lblSelectedModelIndex === 'number'
+       && __lblLoaded3DModels
+       && __lblSelectedModelIndex >= 0
+       && __lblSelectedModelIndex < __lblLoaded3DModels.length){
+      return __lblLoaded3DModels[__lblSelectedModelIndex];
+    }
+    return loaded3dGroup;
+  }
   if(selectedId===LBL_TSMODEL_ID) return CURRENT_TS_MODEL;
   return selectedId ? meshMap.get(selectedId) : null;
 }
@@ -17377,7 +17677,10 @@ if(__lblGizmoToggleBtn){
     // single tap on a fresh-loaded demo immediately reveals the handles.
     if(!transformControls.object){
       if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) selectObj(LBL_TSMODEL_ID);
-      else if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) selectObj(LBL_EXTERNAL_ID);
+      // LBL MULTI-FILE UPDATE — also fire when any 3D model is loaded
+      // (not just the latest one), so the gizmo auto-attaches after a
+      // multi-file drop too.
+      else if(__lblGetActiveExternalRoot()) selectObj(LBL_EXTERNAL_ID);
       return;
     }
     window.lblToggleGizmoVisibility();
@@ -17740,7 +18043,11 @@ window.addEventListener('keydown', (e)=>{
   if(k==='q' && !e.ctrlKey && !e.metaKey){
     if(!transformControls.object){
       if(typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) selectObj(LBL_TSMODEL_ID);
-      else if(typeof loaded3dGroup !== 'undefined' && loaded3dGroup) selectObj(LBL_EXTERNAL_ID);
+      // LBL MULTI-FILE UPDATE — auto-select the active external root
+      // even when only the array (not the single-value `loaded3dGroup`)
+      // is populated, so the Q-key shortcut still works after a
+      // multi-file drop.
+      else if(__lblGetActiveExternalRoot()) selectObj(LBL_EXTERNAL_ID);
     } else {
       window.lblToggleGizmoVisibility();
     }
@@ -18097,13 +18404,21 @@ function lblRegisterTsMeshes(group){
   });
 }
 
-function lblRegisterExternalMeshes(group){
+function lblRegisterExternalMeshes(group, opts){
   if(!group) return;
-  lblExtMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
-  lblTsMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
-  lblTsMeshIds = [];
-  lblExtMeshIds = [];
-  let n=1;
+  const append = !!(opts && opts.append);
+  if(!append){
+    // Single-model replace path — same as the original behavior.
+    lblExtMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
+    lblTsMeshIds.forEach(id=>{ if(meshMap.has(id)) meshMap.delete(id); });
+    lblTsMeshIds = [];
+    lblExtMeshIds = [];
+  }
+  // LBL MULTI-FILE UPDATE — when `append` is true, we keep every previously
+  // registered id and just continue numbering from after the last one, so
+  // multiple models can coexist in the scene with all sub-meshes still
+  // individually clickable in the scene tree.
+  let n = (lblExtMeshIds.length || 0) + 1;
   group.traverse(o=>{
     if(!o.isMesh) return;
     if(o.userData && o.userData.__helper) return;
@@ -18160,7 +18475,10 @@ function lblResolveHitId(node){
     const byId = n.userData && n.userData.__lblId;
     if(byId && meshMap.has(byId)) return {id: byId, helper:false};
     if(n.name && meshMap.has(n.name)) return {id: n.name, helper:false};
-    if(n===sceneGroup || n===loaded3dGroup || n===CURRENT_TS_MODEL) break;
+    // LBL MULTI-FILE UPDATE — stop the ancestor walk at ANY loaded 3D
+    // model root, not just `loaded3dGroup` (which is only the latest one).
+    if(n===sceneGroup || n===CURRENT_TS_MODEL) break;
+    if(__lblLoaded3DModels && __lblLoaded3DModels.indexOf(n) !== -1) break;
     n = n.parent;
   }
   return {id: null, helper: sawHelper};
@@ -18170,7 +18488,13 @@ function lblResolveHitId(node){
 // the whole-model sentinel), mirroring the meshMap-based highlight loop
 // in selectObj() but scoped to ONE mesh.
 function lblHighlightExternalMesh(id){
-  [CURRENT_TS_MODEL, loaded3dGroup].forEach(group=>{
+  // LBL MULTI-FILE UPDATE — walk every loaded 3D model so a sub-mesh
+  // highlight inside a multi-model scene actually finds the mesh.
+  const groups = [];
+  if(__lblLoaded3DModels && __lblLoaded3DModels.length) groups.push(...__lblLoaded3DModels);
+  else if(loaded3dGroup) groups.push(loaded3dGroup);
+  if(CURRENT_TS_MODEL) groups.push(CURRENT_TS_MODEL);
+  groups.forEach(group=>{
     if(!group) return;
     const on = (id !== null);
     group.traverse(o=>{
@@ -18217,15 +18541,21 @@ canvas.addEventListener('pointerup', (e)=>{
     -((e.clientY-rect.top)/rect.height)*2+1
   );
   lblRaycaster.setFromCamera(pointer, camera);
-  // loaded3dGroup lives under `scene` directly (not sceneGroup — see
-  // load3DFile), so it has to be raycast separately or an uploaded model
-  // could never be clicked at all. CURRENT_TS_MODEL also lives in scene
-  // (under sceneGroup in addTsModelToScene, but at runtime it can be
-  // attached to scene directly too via the TS model path) — we union
-  // all available targets.
+  // loaded3dGroup / __lblLoaded3DModels live under `scene` directly
+  // (not sceneGroup — see load3DFile), so they have to be raycast
+  // separately or an uploaded model could never be clicked at all.
+  // CURRENT_TS_MODEL also lives in scene (under sceneGroup in
+  // addTsModelToScene, but at runtime it can be attached to scene
+  // directly too via the TS model path) — we union all available
+  // targets. LBL MULTI-FILE UPDATE — push every loaded 3D model, not
+  // just the most recent one.
   const raycastTargets = [];
   sceneGroup.children.forEach(c => raycastTargets.push(c));
-  if(loaded3dGroup) raycastTargets.push(loaded3dGroup);
+  if(__lblLoaded3DModels && __lblLoaded3DModels.length){
+    __lblLoaded3DModels.forEach(g => { if(g) raycastTargets.push(g); });
+  } else if(loaded3dGroup){
+    raycastTargets.push(loaded3dGroup);
+  }
   if(CURRENT_TS_MODEL) raycastTargets.push(CURRENT_TS_MODEL);
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
   // v6.3/BUGFIX — skeleton joint marker spheres (and other decoration:
@@ -18251,9 +18581,23 @@ canvas.addEventListener('pointerup', (e)=>{
     // factory-authored mesh that was never registered), fall back to the
     // whole-uploaded-model or whole-TS-model sentinel so the object is at
     // least selectable/movable as one rigid piece.
-    if(!newId && loaded3dGroup){
+    // LBL MULTI-FILE UPDATE — walk the ancestor chain against EVERY
+    // loaded 3D model, not just `loaded3dGroup` (which is only the
+    // most recently loaded one).
+    if(!newId && __lblLoaded3DModels && __lblLoaded3DModels.length){
+      let m=hit.object, foundIdx=-1;
+      while(m){
+        const idx = __lblLoaded3DModels.indexOf(m);
+        if(idx !== -1){ foundIdx = idx; break; }
+        m = m.parent;
+      }
+      if(foundIdx !== -1){
+        newId = LBL_EXTERNAL_ID;
+        window.__lblSelectedModelIndex = foundIdx;
+      }
+    } else if(!newId && loaded3dGroup){
       let m=hit.object;
-      while(m){ if(m===loaded3dGroup){ newId = LBL_EXTERNAL_ID; break; } m=m.parent; }
+      while(m){ if(m===loaded3dGroup){ newId = LBL_EXTERNAL_ID; window.__lblSelectedModelIndex=null; break; } m=m.parent; }
     }
     if(!newId && CURRENT_TS_MODEL){
       let m=hit.object;
@@ -19227,7 +19571,11 @@ canvas.addEventListener('pointerup', (e)=>{
   const rect = canvas.getBoundingClientRect();
   const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
   lblRaycaster.setFromCamera(pointer, camera);
-  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  // LBL MULTI-FILE UPDATE — union every loaded 3D model into the
+  // raycast set, not just the most recently loaded one.
+  const raycastTargets = __lblLoaded3DModels && __lblLoaded3DModels.length
+    ? [...sceneGroup.children, ...__lblLoaded3DModels]
+    : (loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children);
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
   // BUGFIX — was walking hit.object up with no CURRENT_TS_MODEL stop
   // condition, so for a TS model the walk continued past the actual
@@ -19252,7 +19600,11 @@ canvas.addEventListener('pointerup', (e)=>{
   const rect = canvas.getBoundingClientRect();
   const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
   lblRaycaster.setFromCamera(pointer, camera);
-  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  // LBL MULTI-FILE UPDATE — union every loaded 3D model into the
+  // raycast set, not just the most recently loaded one.
+  const raycastTargets = __lblLoaded3DModels && __lblLoaded3DModels.length
+    ? [...sceneGroup.children, ...__lblLoaded3DModels]
+    : (loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children);
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
   // BUGFIX — same root cause as G13 above: no CURRENT_TS_MODEL stop
   // condition meant this always walked past the clicked part to the
@@ -19281,7 +19633,11 @@ canvas.addEventListener('pointerdown', (e)=>{
   const rect = canvas.getBoundingClientRect();
   const pointer = new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -((e.clientY-rect.top)/rect.height)*2+1);
   lblRaycaster.setFromCamera(pointer, camera);
-  const raycastTargets = loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children;
+  // LBL MULTI-FILE UPDATE — union every loaded 3D model into the
+  // raycast set, not just the most recently loaded one.
+  const raycastTargets = __lblLoaded3DModels && __lblLoaded3DModels.length
+    ? [...sceneGroup.children, ...__lblLoaded3DModels]
+    : (loaded3dGroup ? [...sceneGroup.children, loaded3dGroup] : sceneGroup.children);
   const hits = lblRaycaster.intersectObjects(raycastTargets, true);
   if(!hits.length){
     lblBoxSelectStart = {x:e.clientX, y:e.clientY, additive: true};
@@ -21054,7 +21410,7 @@ window.lblSpec = (function(){
   // Triggered by the spec chip click + on every model load.
   function revalidate(){
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup) ||
+                 __lblGetActiveExternalRoot() ||
                  sceneGroup;
     const w = validate(root);
     applyToUI(w);
@@ -21088,7 +21444,7 @@ window.lblSpec = (function(){
     lblSpecState.shading = mode;
 
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup) ||
+                 __lblGetActiveExternalRoot() ||
                  sceneGroup;
     if(!root) return;
 
@@ -21154,7 +21510,7 @@ window.lblSpec = (function(){
   // was declared — the AI didn't follow PART 33.1[5]'s recommendation.
   function triggerFsmState(stateName){
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+                 __lblGetActiveExternalRoot();
     if(!root || !root.userData || !root.userData.animationFsm){
       if(typeof toast === 'function') toast('No animationFsm on this model (PART 33.1[5] not used)', 'warn');
       return;
@@ -21193,7 +21549,7 @@ window.lblSpec = (function(){
   // dialog letting the user drag a part-library entry onto a socket).
   function listSockets(){
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+                 __lblGetActiveExternalRoot();
     if(!root || !root.userData || !root.userData.sockets) return [];
     const out = [];
     for(const [name, g] of Object.entries(root.userData.sockets)){
@@ -21243,7 +21599,7 @@ window.lblSpec = (function(){
   }
   function listRigGraph(){
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+                 __lblGetActiveExternalRoot();
     if(!root || !root.userData || !root.userData.rigGraph) return null;
     if(root.userData.skeletonSource !== 'three-rig-helpers') return null;
     const graph = root.userData.rigGraph;
@@ -21346,7 +21702,7 @@ window.lblSpec = (function(){
   // when the user clicks "Re-measure" in the 🔺 Tris panel.
   function refreshTriMetrics(){
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup) ||
+                 __lblGetActiveExternalRoot() ||
                  sceneGroup;
     lblSpecState.trisMetrics = inspectModelTriangles(root);
     return lblSpecState.trisMetrics;
@@ -21518,7 +21874,7 @@ window.lblSpec = (function(){
   // renderer's existing OBJ/STL/GLB buttons stay untouched.
   async function exportUSDZ(){
     const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+                 __lblGetActiveExternalRoot();
     const exportRoot = (root && root.children && root.children.length) ? root : sceneGroup;
     if(!exportRoot || !exportRoot.children || exportRoot.children.length === 0){
       if(typeof toast === 'function') toast('No scene to export to USDZ', 'err');
@@ -21630,7 +21986,7 @@ window.lblSpec = (function(){
     const sel = document.getElementById('shading-mode-select');
     if(sel){
       const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
-                   (typeof loaded3dGroup !== 'undefined' && loaded3dGroup);
+                   __lblGetActiveExternalRoot();
       const mode = (root && root.userData && root.userData.options && root.userData.options.shadingMode) ||
                    (root && root.userData && root.userData.shadingMode) ||
                    null;
