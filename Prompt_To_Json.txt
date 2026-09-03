@@ -123,7 +123,7 @@ behavior that the AI doesn't have to author. Bumped from v8.1 to v8.2.
     joint rotates but mesh doesn't deform / low-poly / static
     pose), a 6-item pre-emission checklist, and a runtime
     contract describing the renderer's E11 validator + Rig
-    button. The pre-bundled library is shipped at /public/rig/
+    button. The pre-bundled library is shipped at ./public/rig/
     three-rig-helpers.js (3.9 KB minified, ES2020, ZERO deps
     beyond the page's own 'three' build). PART 34 reinforces —
     never replaces — PARTs 1, 4, 30, 32, 64, 65, 66. The pivot-
@@ -6972,7 +6972,7 @@ actually about, per PART 53.6's model-integrity framing.
 
 --------------------------------------------------------------------------
 57.3 — colorVariation + cavityShading: THE STANDARD SURFACE PAIRING
-       (mechanism = PART 26.4 colorVariation / PART 34's B4 cavityShading)
+       (mechanism = PART 26.4 colorVariation / PART 33.5's B4 cavityShading)
 --------------------------------------------------------------------------
 colorVariation's full technical range is 0-0.25 (PART 26.4), but the range
 that actually reads as hand-painted low-poly rather than flat plastic (one
@@ -9152,7 +9152,7 @@ v8.3 sanctions a single, narrow exception for the JSON/JS path:
 the renderer will read `userData.rigGraph` (a RigGraph-shaped object
 on the root) and `userData.skeletonSource === 'three-rig-helpers'`
 (marker), and at load time it will use the pre-bundled helpers
-declared at /public/rig/three-rig-helpers.js (3.9 KB, ES2020,
+declared at ./public/rig/three-rig-helpers.js (3.9 KB, ES2020,
 minified, served by the page's own static directory, ZERO external
 deps beyond the page's own 'three' build) to compile a real
 THREE.Skeleton for the model.

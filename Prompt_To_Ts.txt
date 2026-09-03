@@ -24,7 +24,7 @@ CHANGELOG
     but mesh doesn't deform / low-poly / static pose), a 6-
     item pre-emission checklist, and a runtime contract
     describing the renderer's E11 validator + Rig button. The
-    pre-bundled library is shipped at /public/rig/three-rig-
+    pre-bundled library is shipped at ./public/rig/three-rig-
     helpers.js (3.9 KB minified, ES2020, single import spec
     `'three-rig-helpers'` resolved through the page's import
     map, with `'three'` left as a bare specifier). PART 34
@@ -5790,9 +5790,9 @@ v1.11 sanctions a single, narrow exception:
     } from 'three-rig-helpers';
 
 The bare specifier 'three-rig-helpers' resolves through the renderer's
-import map (the only entry added in v1.11, the third line in the
+import map (the only entry added in v1.11, the fifth line in the
 `imports` object — see PART 4.1's import-map convention) to a
-pre-bundled, minified ES module at /public/rig/three-rig-helpers.js
+pre-bundled, minified ES module at ./public/rig/three-rig-helpers.js
 (3.9 KB, single file, ES2020 target, ZERO deps beyond the page's own
 'three' build — the bundle's `import * as THREE from 'three'` is left
 as a bare specifier so the page's import map resolves it).

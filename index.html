@@ -1371,7 +1371,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
        joint (id, parent, rest position) with a red banner if
        validateRigGraph() reports errors. The validator runs on every
        open. The bundle is loaded once at page load via the import
-       map (the third entry added in v1.11). -->
+       map (the fifth entry added in v1.11). -->
   <button class="tbtn hide-xs" id="rig-btn" title="PART 34 — pre-bundled rig helpers. List the joint hierarchy when the model exports userData.rigGraph + skeletonSource === 'three-rig-helpers'." disabled>🦴 Rig</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
   <div class="vdiv"></div>
@@ -1988,7 +1988,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
     "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.3/build/index.module.js",
     "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.16/build/index.module.js",
-    "three-rig-helpers": "/public/rig/three-rig-helpers.js"
+    "three-rig-helpers": "./public/rig/three-rig-helpers.js"
   }
 }
 </script>
@@ -20910,7 +20910,7 @@ window.lblSpec = (function(){
         // from PART 4's single-file rule. If a model declares a rig
         // graph on root.userData.rigGraph, the ONLY sanctioned
         // skeleton source is the pre-bundled 'three-rig-helpers'
-        // import (resolved through the import map's third entry, see
+        // import (resolved through the import map's fifth entry, see
         // <head>). A model with a custom-built SkinnedMesh is allowed
         // (PART 30.7's auto-promotion + per-part skin handles it) but
         // should NOT also declare userData.rigGraph — pick one path or
