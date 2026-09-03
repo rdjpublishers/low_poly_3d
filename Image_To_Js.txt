@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.3 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.4 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -118,6 +118,33 @@ universal rigging standard with the twelve canonical Bone_* part
 ids, plus the 6 renderer-side behaviors the AI doesn't have to
 author. PART 66 reinforces — never replaces — PARTs 5, 28, 30, 64,
 65. Bumped from v8.1 to v8.2.
+
+  v8.4 (2026-09-03) — TRIANGLE-FIRST GEOMETRY (TRIS) (source:
+    WORKING_WITH_TRIANGLES guide attached by the maintainer).
+    New PART 35 documents the 5 methods of working with
+    triangles in Three.js, adapted for the JSON/JS blueprint
+    DSL: (1) the new `mergeGeometries: true` part-level flag
+    that collapses multi-shape parts into a single
+    BufferGeometry, (2) the `customGeometry.type` extension
+    (now accepts both "nonIndexed" and "indexed" raw triangle
+    buffers), (3) low-poly flat shading + segment optimization
+    with a 50,000-tri soft cap and the new top-level
+    `meta.trisBudget` / `meta.trisBudgetTolerance` declarative
+    soft-cap, (4) the triangle count calculator + per-geometry
+    metrics inspector (PART 65.2's `inspectModelTriangles`
+    EXTENDED with 4 additive fields: totalTriangles,
+    totalVertices, drawCalls, geometries[].indexed — original
+    5 fields preserved for back-compat), and (5) the correct
+    attachTo + updateMatrixWorld order for merged triangle
+    meshes. Adds the 6-item pre-emission checklist (items
+    17-22 — APPENDED to PART 65.3's 16-item list) and a
+    runtime contract describing the renderer's new E12
+    validator + the `🔺 Tris` topbar button (enabled for every
+    loaded model) + the `window.lblSpec.helpers` re-exports
+    for any .ts factory that wants to call the underlying
+    functions directly. PART 35 reinforces — never replaces
+    — PART 1, 2, 4, 22, 30, 32, 33, 34, 64, 65, 66. Bumped
+    from v8.3 to v8.4.
 
   v8.3 (2026-09-03) — PRE-BUNDLED RIG HELPERS (OPT-IN ESCAPE
     HATCH FROM PART 4's SINGLE-FILE RULE) (source: weights.ts +
@@ -9789,4 +9816,485 @@ vertex skin weights; reach for PART 34 only when the decision table in
 blueprint that declares userData.rigGraph (no-op for every other
 blueprint). Nothing in this PART removes or weakens any rule from
 PARTs 1-33 (TS) / 1-66 (JSON/JS).
+================================================================================
+
+================================================================================
+PART 35 — v1.12 / v8.4 ADDITIONS: TRIANGLE-FIRST GEOMETRY (TRIS)
+The "everything is a triangle" mental model for the JSON/JS
+blueprint DSL. Source: the attached WORKING_WITH_TRIANGLES guide.
+Layers on top of PART 1 (blueprint schema), PART 2 (typed values),
+PART 4 (no relative imports), PART 30 (rigging), PART 32 / PART 65
+(canonical helpers — already shipped an `inspectModelTriangles` stub;
+PART 35 EXTENDS that stub with a per-geometry breakdown), and PART
+34 / PART 34.R (rig helpers). The renderer gains a new `🔺 Tris`
+topbar button + E12 validator check that surfaces the triangle /
+vertex / draw-call counts of the currently-loaded blueprint.
+================================================================================
+
+--------------------------------------------------------------------------
+35.1 — EXECUTIVE OVERVIEW: HOW TRIS WORK IN GPU RASTERIZATION
+--------------------------------------------------------------------------
+In WebGL, WebGPU, OpenGL, and DirectX, the fundamental unit of
+every 3D surface is a TRIANGLE (a "tri"). Every Three.js geometry
+(`BoxGeometry`, `CylinderGeometry`, `SphereGeometry`, ...) is just
+a collection of triangles stored inside a `THREE.BufferGeometry`.
+
+A single triangle requires:
+  - 3 VERTICES — points in 3D space [X, Y, Z].
+  - 1 NORMAL   — surface-facing direction [NX, NY, NZ], for lighting.
+  - 3 UVs      — 2D texture-mapping coordinates [U, V].
+
+When building procedural blueprints, the renderer already does the
+COMPOSE & MERGE workflow automatically — each `Box` / `Cylinder` /
+`Sphere` primitive in the blueprint is converted to triangles at
+build time, and the entire model is rendered as a single Group of
+one or more `THREE.Mesh` objects.
+
+PART 35 adds a fifth blueprint-level tool — `meta.trisBudget` — that
+lets a blueprint declare its intended triangle budget upfront, plus
+runtime hooks for blueprints that want raw triangle-level control
+(armor plates, decals, sci-fi cockpits) via the existing
+`blueprint.parts[].customGeometry` field, now extended to accept
+either an indexed or a non-indexed raw triangle buffer.
+
+--------------------------------------------------------------------------
+35.2 — METHOD 1: MERGING COMPOSED SHAPES INTO UNIFIED TRIANGLE BUFFERS
+--------------------------------------------------------------------------
+The renderer ALREADY merges every part's underlying triangles into
+one BufferGeometry at build time when the part contains 2+ primitive
+shapes (PART 30.7's "auto-collapse small parts" rule). PART 35 makes
+this an explicit, AI-controllable behavior via the new
+`mergeGeometries` blueprint directive.
+
+New blueprint DSL (additive — no existing field changes):
+  {
+    "id": "MechLeg_v2",
+    "mergeGeometries": true,        // PART 35.2: collapse this part
+                                    // into ONE BufferGeometry.
+    "shapes": [
+      { "type": "box",    "w": 0.18, "h": 0.22, "d": 1.20, "offset": [0, 0, 0.60] },
+      { "type": "box",    "w": 0.20, "h": 0.05, "d": 1.15, "offset": [0, 0.12, 0.60] },
+      { "type": "cylinder","r": 0.04, "h": 0.80, "segments": 8, "offset": [0, -0.08, 0.50], "rotateX": 1.5708 },
+      { "type": "cylinder","r": 0.12, "h": 0.22, "segments": 12, "offset": [0, 0, 1.20], "rotateZ": 1.5708 }
+    ],
+    "material": "SteelOrangeFlat"
+  }
+
+Default behavior (no `mergeGeometries` key): the renderer preserves
+the existing per-shape sub-mesh structure. PART 35.2 only forces
+collapse when the blueprint EXPLICITLY says so.
+
+Benefits:
+  - Performance: reduces N draw calls per part to 1.
+  - Single transform, single material slot per merged part.
+  - Cleaner GLB / JSON export (one mesh per part instead of N).
+
+RULE: prefer `mergeGeometries: true` whenever a single body part has
+2+ primitive shapes. The renderer's PART 30.7 auto-collapse pass
+detects that a part has multiple children and emits a soft warning
+otherwise (E12 below).
+
+--------------------------------------------------------------------------
+35.3 — METHOD 2: CONSTRUCTING CUSTOM GEOMETRY TRIANGLE-BY-TRIANGLE
+--------------------------------------------------------------------------
+Use this for armor plates, blades, sci-fi cockpits, mechanical
+claws, or any shape whose topology you want exact control over.
+The existing `blueprint.parts[].customGeometry` field (introduced in
+PART 22) is extended in PART 35 to accept both indexed and non-
+indexed raw triangle buffers.
+
+----- 35.3.A — Non-Indexed Triangles (3 verts per triangle) -----
+
+Each triangle is 3 sequential points in the position array. Triangle
+0 = vertices [0,1,2]; triangle 1 = [3,4,5]; etc.
+
+  {
+    "id": "KneeBlade",
+    "customGeometry": {
+      "type": "nonIndexed",
+      "positions": [
+        // Triangle 1: Upper Right Face
+         0.0,  0.75,  0.0,   // Apex tip
+         0.18, 0.0,   0.08,  // Mid right
+         0.0,  0.0,   0.25,  // Mid center ridge
+
+        // Triangle 2: Upper Left Face
+         0.0,  0.75,  0.0,
+         0.0,  0.0,   0.25,
+        -0.18, 0.0,   0.08,
+
+        // Triangle 3: Lower Right Bevel
+         0.0,  0.0,   0.25,
+         0.18, 0.0,   0.08,
+         0.0, -0.45,  0.05,
+
+        // Triangle 4: Lower Left Bevel
+         0.0,  0.0,   0.25,
+         0.0, -0.45,  0.05,
+        -0.18, 0.0,   0.08,
+
+        // Triangle 5: Back Base Top
+         0.0,  0.75,  0.0,
+        -0.18, 0.0,   0.08,
+         0.18, 0.0,   0.08,
+
+        // Triangle 6: Back Base Bottom
+        -0.18, 0.0,   0.08,
+         0.0, -0.45,  0.05,
+         0.18, 0.0,   0.08
+      ],
+      "computeNormals": true   // renderer calls geom.computeVertexNormals()
+    },
+    "material": "SteelOrangeFlat"
+  }
+
+----- 35.3.B — Indexed Triangles (shared vertices + index array) -----
+
+Indexed geometry stores unique vertices ONCE and defines triangles
+via an index array. Use this when the same vertex position is shared
+by multiple triangles (5 verts → 6 triangles in the example below
+vs 18 verts for the same shape non-indexed).
+
+  {
+    "id": "Pyramid",
+    "customGeometry": {
+      "type": "indexed",
+      "positions": [
+         0.0,  0.5,  0.0,   // 0: Top Tip
+        -0.5,  0.0, -0.5,   // 1: Back Left
+         0.5,  0.0, -0.5,   // 2: Back Right
+         0.5,  0.0,  0.5,   // 3: Front Right
+        -0.5,  0.0,  0.5    // 4: Front Left
+      ],
+      "indices": [
+        0, 4, 3,   // Front
+        0, 3, 2,   // Right
+        0, 2, 1,   // Back
+        0, 1, 4,   // Left
+        1, 2, 3,
+        1, 3, 4
+      ],
+      "computeNormals": true
+    },
+    "material": "Sandstone"
+  }
+
+DECISION TABLE (35.3.A vs 35.3.B):
+  - 35.3.A (non-indexed): use when each triangle is its own
+    independent face (decals, splinters, floating armor panels,
+    anything with hard edges + flatShading: true).
+  - 35.3.B (indexed):     use when vertices are shared (spheres,
+    cylinders, organic curves, any surface that smooth-shades).
+
+The renderer auto-detects the type from the presence of the `indices`
+array. The default `customGeometry.type` (when omitted) is
+`"nonIndexed"` for back-compat with PART 22.
+
+--------------------------------------------------------------------------
+35.4 — METHOD 3: LOW-POLY FLAT SHADING & SEGMENT OPTIMIZATION
+--------------------------------------------------------------------------
+
+----- 35.4.A — Flat Shading Material -----
+
+To render distinct, faceted low-poly planes with crisp edge
+highlights, set `flatShading: true` on the material:
+
+  "materials": {
+    "SteelOrangeFlat": {
+      "type":       "MeshStandardMaterial",
+      "color":      0xe65c00,
+      "metalness":  0.25,
+      "roughness":  0.40,
+      "flatShading": true        // sharp, visible triangle facets
+    }
+  }
+
+----- 35.4.B — Controlling Triangle Density on Primitives -----
+
+When using procedural Three.js shapes, adjust radial + height
+segments to target specific triangle budgets. The blueprint's
+`segments` field on cylinders / spheres / cones takes the same
+value the underlying Three.js constructor does:
+
+  Low-Poly Barrel / Piston:
+    { "type": "cylinder", "r": 0.05, "h": 1.2, "segments": 6 }
+    -> 6 radial = 12 side tris + 8 cap tris = 20 tris.
+
+  Low-Poly Cockpit / Torso Sphere:
+    { "type": "sphere", "r": 0.6, "widthSeg": 8, "heightSeg": 6 }
+    -> 8 × 6 = 48 tris.
+
+  Low-Poly Quadruped Foot Talon / Spike:
+    { "type": "cone", "r": 0.12, "h": 0.35, "segments": 4 }
+    -> 4 radial = 4 side tris + 2 base tris = 6 tris.
+
+  Low-Poly Turret Base:
+    { "type": "cylinder", "rTop": 0.6, "rBot": 0.7, "h": 0.25, "segments": 8 }
+    -> 8 radial = 16 side + 12 cap (top) + 12 cap (bottom) = 40 tris.
+
+----- 35.4.C — The `meta.trisBudget` Declarative Soft-Cap -----
+
+A blueprint can declare an intended triangle budget. The renderer's
+E12 validator reads this and surfaces a soft warning if the actual
+count exceeds the declared budget by more than 20%:
+
+  {
+    "meta": {
+      "trisBudget": 12000,       // intended triangle count
+      "trisBudgetTolerance": 0.2 // 20% over is OK (default)
+    }
+  }
+
+The renderer's E12 ALSO surfaces a warning if `totalTriangles >
+50,000` regardless of the blueprint's declared budget (PART 35's
+own global soft cap — 60 FPS on mid-range hardware).
+
+--------------------------------------------------------------------------
+35.5 — METHOD 4: TRIANGLE COUNT CALCULATOR & REAL-TIME MESH INSPECTOR
+--------------------------------------------------------------------------
+This is the EXTENSION of PART 65.2's `inspectModelTriangles` stub.
+PART 65 shipped a small helper that returned { triangles, meshes,
+materials, bones, clips }. PART 35 extends it with a richer per-
+geometry breakdown that the 🔺 Tris panel uses.
+
+  {
+    "triangles":    number,    // PART 65 (back-compat)
+    "meshes":       number,    // PART 65 (back-compat)
+    "materials":    number,    // PART 65 (back-compat)
+    "bones":        number,    // PART 65 (back-compat)
+    "clips":        number,    // PART 65 (back-compat)
+    "totalTriangles": number,  // PART 35 (new)
+    "totalVertices":  number,  // PART 35 (new)
+    "drawCalls":      number,  // PART 35 (new) = mesh count for non-instanced
+    "geometries": [             // PART 35 (new) — per-mesh breakdown
+      {
+        "name":      "string",
+        "triangles": "number",
+        "vertices":  "number",
+        "indexed":   "boolean"
+      }
+    ]
+  }
+
+The function is available at runtime via
+`window.lblSpec.helpers.inspectModelTriangles(rootGroup)`. The
+function signature is unchanged from PART 65; the return shape is
+extended (additive — the 5 original fields are preserved for any
+existing PART 65 reader).
+
+Blueprints that need metrics on a per-frame basis (e.g. an LOD
+auto-switcher) read `window.lblSpec.lastTriMetrics` after every
+`buildScene()`.
+
+--------------------------------------------------------------------------
+35.6 — METHOD 5: RIGGING & GLB / JSON EXPORT WITH TRIANGLE MESHES
+--------------------------------------------------------------------------
+When using merged or custom triangle meshes with an animated bone
+armature:
+
+  1. BONE PARENTING. The existing `attachTo` field on each part
+     (PART 30.2) handles this — every merged / raw-triangle part
+     declares which `Bone_*` pivot it belongs to. The renderer
+     auto-collapses each bone's children into a single Mesh when
+     the `mergeGeometries: true` flag (35.2) is set on at least
+     one child.
+
+  2. WORLD MATRIX UPDATE. The renderer's `buildScene()` already
+     calls `rootGroup.updateMatrixWorld(true)` after the build
+     completes. No blueprint-side action needed.
+
+  3. GLTF / GLB / JSON EXPORT. When exported via the renderer's
+     existing export pipeline (GLB / OBJ / STL / USDZ buttons),
+     all triangle indices, vertex attributes (position + normal +
+     uv), and parent node transforms are baked into the output.
+     The `inspectModelTriangles` count is the LAST line of the
+     renderer's export toast, so the user can confirm what
+     shipped.
+
+PART 35 does NOT introduce a new export path. It documents the
+correct order of operations for the EXISTING path: build tris →
+parent to bone → renderer auto-updates world matrix → export.
+
+--------------------------------------------------------------------------
+35.7 — REFERENCE: DROP-IN LOW-POLY TURRET (JSON/JS blueprint form)
+--------------------------------------------------------------------------
+A drop-in blueprint part that builds a low-poly turret using ALL of
+Methods 1-3 from above. Useful as a starting point for mech /
+vehicle / sci-fi props. Ships with both the merged-triangle path
+(35.2) and the raw-triangle blade path (35.3).
+
+  {
+    "id": "Turret_v2",
+    "mergeGeometries": true,        // PART 35.2
+    "shapes": [
+      { "type": "cylinder", "rTop": 0.6, "rBot": 0.7, "h": 0.25,
+        "segments": 8, "material": "SteelOrangeFlat" },
+      { "type": "sphere",   "r": 0.45, "widthSeg": 8, "heightSeg": 6,
+        "offset": [0, 0.20, 0], "material": "SteelOrangeFlat" },
+      { "type": "box",      "w": 0.12, "h": 0.14, "d": 0.90,
+        "offset": [0, 0.22, 0.45], "material": "GunmetalDark" }
+    ],
+    "attachTo": "Bone_TorsoTop"
+  }
+
+  "materials": {
+    "SteelOrangeFlat": {
+      "type":        "MeshStandardMaterial",
+      "color":       0xe65c00,
+      "metalness":   0.25,
+      "roughness":   0.40,
+      "flatShading": true
+    },
+    "GunmetalDark": {
+      "type":        "MeshStandardMaterial",
+      "color":       0x222222,
+      "metalness":   0.85,
+      "roughness":   0.30
+    }
+  }
+
+This pattern is exposed as a starter recipe via the renderer's
+existing "📚 Recipes" button (PART 53.2's starter library) so
+users can drop it in with one click.
+
+--------------------------------------------------------------------------
+35.8 — PRE-EMISSION CHECKLIST (append to PART 65.3's 16-item list)
+--------------------------------------------------------------------------
+Any unchecked item is a soft warning (E12 below) surfaced via the
+🔺 Tris button.
+
+  [ ] 17. [PART 35.2] Every body part with 2+ primitive shapes has
+         `mergeGeometries: true` set. (The renderer's E12 surfaces a
+         warning otherwise.)
+  [ ] 18. [PART 35.3] `customGeometry` either uses 35.3.A
+         (non-indexed, no `indices` field) OR 35.3.B (indexed, with
+         an `indices` array). Mixed approaches in the same model are
+         an anti-pattern.
+  [ ] 19. [PART 35.4] Low-poly materials declare `"flatShading": true`
+         when the intent is faceted; smooth-shaded organic models
+         leave it off and use indexed geometry from 35.3.B.
+  [ ] 20. [PART 35.4] Either `meta.trisBudget` is set AND actual
+         `totalTriangles` is within `meta.trisBudgetTolerance` (default
+         20%) of that value, OR `totalTriangles <= 50,000` (PART 35's
+         own global soft cap).
+  [ ] 21. [PART 35.6] Each animated part's `attachTo` field references
+         an alphanumeric+underscore bone id matching the
+         STANDARD_BONES catalog (PART 33.1[10] / 66.1[10]).
+  [ ] 22. [PART 35.5] The renderer-side metrics on the 🔺 Tris panel
+         match the AI's stated budget. (The user can click
+         "Re-measure" to confirm; the panel is the source of truth.)
+
+If a blueprint uses none of PART 35's methods (purely primitive
+geometry, no merging, no raw tris, no `trisBudget`), this checklist
+is a no-op — don't add fake entries to satisfy the form.
+
+--------------------------------------------------------------------------
+35.9 — RUNTIME CONTRACT (what the renderer does)
+--------------------------------------------------------------------------
+The renderer's `window.lblSpec` object gains three PART 35-specific
+behaviors on every load — these are observable by any blueprint
+that uses PART 35's tools, and INERT for every other blueprint.
+
+  (a) VALIDATOR E12 (triangle density + un-merged-part check)
+      Runs on every `window.lblSpec.refreshOnLoad()` call. Reads
+      `inspectModelTriangles(currentRoot)`. Surfaces a non-blocking
+      warning via the spec chip when ANY of the following is true:
+        - `totalTriangles > 50_000` ("Model uses N triangles
+          (PART 35 soft cap: 50,000). Consider merging or
+          decimating.")
+        - A part has 2+ primitive shapes but `mergeGeometries` is
+          not set / is false ("Part '<name>' has N sub-shapes
+          (PART 35.2 prefers mergeGeometries: true).")
+        - `meta.trisBudget` is set AND actual count exceeds
+          `meta.trisBudget * (1 + meta.trisBudgetTolerance)`
+          ("Triangle count N exceeds meta.trisBudget B (T% over).")
+      Multiple warnings stack on the chip.
+
+  (b) 🔺 TRIS BUTTON (topbar, between "Rig" and "Recipes")
+      Enabled for EVERY loaded blueprint — there is no
+      `userData.rigGraph` / `userData.skeletonSource` gate here,
+      the metrics exist for every blueprint that has at least one
+      Mesh. Clicking it opens a panel showing:
+        - Total triangles, total vertices, mesh count (= draw calls)
+        - Per-geometry breakdown table (name, triangles, vertices,
+          indexed?) — sorted by triangle count descending
+        - A "Copy JSON" button that puts the full metrics object on
+          the clipboard (so the user can paste it back into a prompt
+          when iterating on a blueprint)
+        - A "Re-measure" button that re-runs inspectModelTriangles
+          on the current scene (useful after live edits)
+      The button is ALWAYS enabled (never `disabled`). Blueprints
+      with zero meshes (an empty scene) get a "No meshes to inspect"
+      placeholder.
+
+  (c) lblSpec.helpers RE-EXPORTS
+      The renderer exposes the following PART 35 functions on
+      `window.lblSpec.helpers` so .ts factories (or any external
+      runtime script) can use them without copying the body:
+        - inspectModelTriangles(root): MeshTriangleMetrics
+        - createUnifiedLimbSegment(bone, mat): THREE.Mesh
+        - createLowPolyKneeBlade(): THREE.BufferGeometry
+        - createIndexedPyramid():    THREE.BufferGeometry
+        - buildLowPolyTurretWithTris(material): THREE.Mesh
+      These are the SAME functions the TS-side spec (PART 35.5 /
+      35.2 / 35.3.A / 35.3.B / 35.7) defines. The renderer's copy
+      is the same one the 🔺 Tris panel uses.
+
+--------------------------------------------------------------------------
+35.10 — CROSS-REFERENCES
+--------------------------------------------------------------------------
+PART 35 layers on top of, never replaces:
+
+  - PART 1 (blueprint schema). 35.2's `mergeGeometries`, 35.3's
+    extended `customGeometry.type`, and 35.4.C's `meta.trisBudget`
+    are all NEW fields — no existing field changes meaning.
+  - PART 2 (typed values). The `MeshTriangleMetrics` extension in
+    35.5 keeps the original 5 fields from PART 65.2 and adds 4
+    new ones — a back-compat additive change.
+  - PART 4 (no relative imports). Blueprints never imported code;
+    this rule is unaffected. The renderer-side `lblSpec.helpers`
+    re-exports in 35.9(c) are the bridge for any .ts factory.
+  - PART 22 (customGeometry). 35.3 EXTENDS the existing field with
+    a `type` discriminator — the default is `"nonIndexed"` for back-
+    compat.
+  - PART 30 (rigging & animation). 35.6 documents the correct
+    bone-parenting order for merged triangle meshes; reinforces —
+    never replaces — PART 30.7's auto-collapse rule.
+  - PART 33.1[10] / 66.1[10] (STANDARD_BONES catalog). 35.8 item
+    21 references the canonical bone names.
+  - PART 32 / PART 65 (canonical helpers). 35.5 EXTENDS PART 65.2's
+    `inspectModelTriangles` with a per-geometry breakdown; the
+    original 5-field shape is preserved.
+  - PART 32.3 / PART 65.3 (16-item checklist). 35.8's 6 items
+    APPEND to that list (17-22), not a replacement.
+  - PART 33 / PART 66 (architectural features). 35.4.B's 50,000-tri
+    soft cap is consistent with PART 33.1 / 66.1's existing
+    complexity budgets.
+  - PART 34 / PART 34.R (rig helpers). 35.6's "updateMatrixWorld"
+    is the same call the renderer makes for the Rig panel to read
+    correct rest positions.
+  - PART 34.6 (6-item checklist). Orthogonal — none of PART 35's
+    items overlap with PART 34's items.
+
+PART 35 does NOT introduce:
+  - Any new required field (every PART 35 field is OPT-IN with a
+    safe default)
+  - Any new export path (35.6 documents the EXISTING path, doesn't
+    add a new path)
+  - Any new render-time behavior beyond (a) the E12 validator,
+    (b) the 🔺 Tris button, and (c) the `lblSpec.helpers` re-exports
+    described in 35.9
+  - Any removal or weakening of rules from PARTs 1-34 (TS) /
+    1-66 (JSON/JS)
+
+================================================================================
+END OF PART 35 — v1.12 / v8.4 ADDITIONS: TRIANGLE-FIRST GEOMETRY (TRIS)
+The "everything is a triangle" mental model is now first-class in
+the LBL spec: 5 documented methods, 6-item pre-emission checklist,
+1 new topbar button, 1 new validator, 5 renderer-side helpers on
+`window.lblSpec.helpers`. Layers on top of PART 32 / PART 65's
+existing `inspectModelTriangles` (extended, not replaced) and PART
+30's rigging pipeline (reinforced, not replaced). Nothing in this
+PART removes or weakens any rule from PARTs 1-34 (TS) / 1-66
+(JSON/JS).
 ================================================================================

@@ -1,8 +1,32 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.11 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.12 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.12 (2026-09-03) — TRIANGLE-FIRST GEOMETRY (TRIS) (source:
+    WORKING_WITH_TRIANGLES guide attached by the maintainer).
+    New PART 35 documents the 5 methods of working with triangles
+    in Three.js: (1) compose-and-merge with mergeGeometries, (2)
+    custom geometry triangle-by-triangle (both non-indexed and
+    indexed variants), (3) low-poly flat shading + segment
+    optimization with a 50,000-tri soft cap, (4) the triangle
+    count calculator + per-geometry metrics inspector, and (5)
+    the correct bone-parenting + updateMatrixWorld order for
+    merged triangle meshes. Adds the 6-item pre-emission
+    checklist (items 17-22 — APPENDED to PART 32.3's 16-item
+    list), 5 reference implementations (inspectModelTriangles
+    EXTENDED with 4 new fields, createUnifiedLimbSegment,
+    createLowPolyKneeBlade, createIndexedPyramid,
+    buildLowPolyTurretWithTris), and a runtime contract
+    describing the renderer's new E12 validator + the
+    `🔺 Tris` topbar button + the `window.lblSpec.helpers`
+    re-exports. PART 35 EXTENDS PART 32's existing
+    `inspectModelTriangles` (additive 4 fields on the return
+    shape: totalTriangles, totalVertices, drawCalls,
+    geometries[].indexed) — original 5 fields preserved for
+    back-compat. PART 35 layers on top of — never replaces —
+    PART 1, 2, 4, 30, 32, 33, 34. Bumped from v1.11 to v1.12.
+
   v1.11 (2026-09-03) — PRE-BUNDLED RIG HELPERS (OPT-IN ESCAPE
     HATCH FROM PART 4's SINGLE-FILE RULE) (source: weights.ts
     + skeleton.ts attached by the maintainer). New PART 34
@@ -6613,4 +6637,566 @@ vertex skin weights; reach for PART 34 only when the decision table in
 34.4 says YES. The 6-item checklist in 34.6 is MANDATORY for any model
 that imports 'three-rig-helpers' (no-op for every other model). Nothing
 in this PART removes or weakens any rule from PARTs 1-33.
+================================================================================
+
+================================================================================
+PART 35 — v1.12 / v8.4 ADDITIONS: TRIANGLE-FIRST GEOMETRY (TRIS)
+The "everything is a triangle" mental model. Source: the attached
+WORKING_WITH_TRIANGLES guide. Layers on top of PART 1 (single-file),
+PART 2 (types), PART 32 (canonical helpers — already shipped an
+`inspectModelTriangles` stub; PART 35 EXTENDS that stub with a
+per-geometry breakdown), PART 4 (no relative imports), PART 30
+(rigging), and PART 34 (rig helpers). The renderer gains a new
+`🔺 Tris` topbar button + E12 validator check that surfaces the
+triangle/vertex/draw-call counts of the currently-loaded model.
+================================================================================
+
+--------------------------------------------------------------------------
+35.1 — EXECUTIVE OVERVIEW: HOW TRIS WORK IN GPU RASTERIZATION
+--------------------------------------------------------------------------
+In WebGL, WebGPU, OpenGL, and DirectX, the fundamental unit of every
+3D surface is a TRIANGLE (a "tri"). Every Three.js geometry
+(`BoxGeometry`, `CylinderGeometry`, `SphereGeometry`, ...) is just a
+collection of triangles stored inside a `THREE.BufferGeometry`.
+
+A single triangle requires:
+  - 3 VERTICES — points in 3D space [X, Y, Z].
+  - 1 NORMAL   — surface-facing direction [NX, NY, NZ], for lighting.
+  - 3 UVs      — 2D texture-mapping coordinates [U, V].
+
+When building procedural models, you can move from stacking primitive
+shapes to working DIRECTLY with triangles via two distinct workflows:
+
+  1. COMPOSE & MERGE — build parts from transformed primitive shapes,
+     then merge every part's triangles into ONE `THREE.BufferGeometry`
+     via `mergeGeometries`. Result: 1 draw call per bone instead of 10.
+  2. RAW PROCEDURAL TRIS — define exact vertex coords + triangle face
+     indices directly via `Float32Array` + `Uint16Array`. Result: full
+     control over topology (armor plates, sci-fi cockpits, mechanical
+     claws, etc.).
+
+PART 35 documents five methods, all compatible with the LBL spec's
+single-file / no-relative-imports / no-`three/addons/`-outside-the-
+allow-list rules: every helper below is reachable from a .ts factory
+through the renderer-side `window.lblSpec` re-exports OR through a
+verbatim copy of the function (the spec is self-contained).
+
+--------------------------------------------------------------------------
+35.2 — METHOD 1: MERGING COMPOSED SHAPES INTO UNIFIED TRIANGLE BUFFERS
+--------------------------------------------------------------------------
+Instead of adding 10 separate mini-meshes to a bone (10 GPU draw
+calls), combine every underlying triangle into ONE BufferGeometry via
+`mergeGeometries`.
+
+Benefits:
+  - Performance: reduces 100+ draw calls down to 5-10.
+  - Single transform, single material slot per merged part.
+  - Clean GLB / glTF / JSON export.
+
+TypeScript reference implementation (the canonical helper every .ts
+factory may copy verbatim, or reach for via
+`window.lblSpec.helpers.createUnifiedLimbSegment` — see 35.9):
+
+  import * as THREE from 'three';
+  import { mergeGeometries }
+    from 'three/addons/utils/BufferGeometryUtils.js';
+
+  export function createUnifiedLimbSegment(
+    bone: THREE.Object3D,
+    material: THREE.Material
+  ): THREE.Mesh {
+    // 1. Instantiate individual geometric components.
+    const mainBeam     = new THREE.BoxGeometry(0.18, 0.22, 1.20);
+    const topPlate     = new THREE.BoxGeometry(0.20, 0.05, 1.15);
+    const pistonCyl    = new THREE.CylinderGeometry(0.04, 0.04, 0.80, 8);
+    const kneeJointCap = new THREE.CylinderGeometry(0.12, 0.12, 0.22, 12);
+
+    // 2. Position / rotate each component relative to the joint origin.
+    topPlate.applyMatrix4(
+      new THREE.Matrix4().makeTranslation(0, 0.12, 0.60));
+
+    const rotPiston = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+    const posPiston = new THREE.Matrix4().makeTranslation(0, -0.08, 0.50);
+    pistonCyl.applyMatrix4(posPiston.multiply(rotPiston));
+
+    const rotCap = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
+    const posCap = new THREE.Matrix4().makeTranslation(0, 0, 1.20);
+    kneeJointCap.applyMatrix4(posCap.multiply(rotCap));
+
+    mainBeam.applyMatrix4(
+      new THREE.Matrix4().makeTranslation(0, 0, 0.60));
+
+    // 3. Force non-indexed for uniform vertex structures.
+    const shapesToMerge = [
+      mainBeam.toNonIndexed(),
+      topPlate.toNonIndexed(),
+      pistonCyl.toNonIndexed(),
+      kneeJointCap.toNonIndexed()
+    ];
+    shapesToMerge.forEach(g => {
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.attributes.uv) {
+        g.setAttribute('uv', new THREE.BufferAttribute(
+          new Float32Array(g.attributes.position.count * 2), 2));
+      }
+    });
+
+    // 4. Merge into a single unified triangle BufferGeometry.
+    const merged = mergeGeometries(shapesToMerge, false);
+    merged.computeVertexNormals();
+
+    // 5. Wrap in a single Mesh and parent it to the bone.
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    bone.add(mesh);
+    return mesh;
+  }
+
+RULE: prefer mergeGeometries whenever a single body part has 2+
+sub-meshes. The renderer's PART 30.7 auto Bone-promotion pass detects
+that a bone has multiple children and emits a soft warning (see E12
+below). Merging fixes that warning AND cuts the draw-call count.
+
+--------------------------------------------------------------------------
+35.3 — METHOD 2: CONSTRUCTING CUSTOM GEOMETRY TRIANGLE-BY-TRIANGLE
+--------------------------------------------------------------------------
+Use this for armor plates, blades, sci-fi cockpits, mechanical claws,
+or any shape whose topology you want exact control over.
+
+----- 35.3.A — Non-Indexed Triangles (3 vertices per triangle) -----
+
+Each triangle is 3 sequential points in the position array. Triangle
+0 = vertices [0,1,2]; triangle 1 = [3,4,5]; etc.
+
+  import * as THREE from 'three';
+
+  export function createLowPolyKneeBlade(): THREE.BufferGeometry {
+    const geom = new THREE.BufferGeometry();
+
+    const vertices = new Float32Array([
+      // Triangle 1: Upper Right Face
+       0.0,  0.75,  0.0,   // Apex tip
+       0.18, 0.0,   0.08,  // Mid right
+       0.0,  0.0,   0.25,  // Mid center ridge
+
+      // Triangle 2: Upper Left Face
+       0.0,  0.75,  0.0,
+       0.0,  0.0,   0.25,
+      -0.18, 0.0,   0.08,
+
+      // Triangle 3: Lower Right Bevel
+       0.0,  0.0,   0.25,
+       0.18, 0.0,   0.08,
+       0.0, -0.45,  0.05,
+
+      // Triangle 4: Lower Left Bevel
+       0.0,  0.0,   0.25,
+       0.0, -0.45,  0.05,
+      -0.18, 0.0,   0.08,
+
+      // Triangle 5: Back Base Top
+       0.0,  0.75,  0.0,
+      -0.18, 0.0,   0.08,
+       0.18, 0.0,   0.08,
+
+      // Triangle 6: Back Base Bottom
+      -0.18, 0.0,   0.08,
+       0.0, -0.45,  0.05,
+       0.18, 0.0,   0.08
+    ]);
+
+    geom.setAttribute('position',
+      new THREE.BufferAttribute(vertices, 3));
+    geom.computeVertexNormals();
+    return geom;
+  }
+
+----- 35.3.B — Indexed Triangles (shared vertices + index array) -----
+
+Indexed geometry stores unique vertices ONCE and defines triangles
+via an index array (`Uint16Array`). Use this when the same vertex
+position is shared by multiple triangles (5 verts → 6 triangles in
+the example below vs 18 verts for the same shape non-indexed).
+
+  export function createIndexedPyramid(): THREE.BufferGeometry {
+    const geom = new THREE.BufferGeometry();
+
+    const positions = new Float32Array([
+       0.0,  0.5,  0.0,  // 0: Top Tip
+      -0.5,  0.0, -0.5,  // 1: Back Left
+       0.5,  0.0, -0.5,  // 2: Back Right
+       0.5,  0.0,  0.5,  // 3: Front Right
+      -0.5,  0.0,  0.5   // 4: Front Left
+    ]);
+
+    const indices = new Uint16Array([
+      // 4 side triangles
+      0, 4, 3,   // Front
+      0, 3, 2,   // Right
+      0, 2, 1,   // Back
+      0, 1, 4,   // Left
+      // 2 base triangles
+      1, 2, 3,
+      1, 3, 4
+    ]);
+
+    geom.setAttribute('position',
+      new THREE.BufferAttribute(positions, 3));
+    geom.setIndex(new THREE.BufferAttribute(indices, 1));
+    geom.computeVertexNormals();
+    return geom;
+  }
+
+DECISION TABLE (35.3.A vs 35.3.B):
+  - 35.3.A (non-indexed): use when each triangle is its own
+    independent face (decals, splinters, floating armor panels,
+    anything with hard edges + flatShading: true).
+  - 35.3.B (indexed):     use when vertices are shared (spheres,
+    cylinders, organic curves, any surface that smooth-shades).
+
+--------------------------------------------------------------------------
+35.4 — METHOD 3: LOW-POLY FLAT SHADING & SEGMENT OPTIMIZATION
+--------------------------------------------------------------------------
+
+----- 35.4.A — Flat Shading Material -----
+
+To render distinct, faceted low-poly planes with crisp edge
+highlights, enable `flatShading: true` on the material:
+
+  const lowPolyMechMaterial = new THREE.MeshStandardMaterial({
+    color:       0xe65c00,   // Industrial Orange
+    metalness:   0.25,
+    roughness:   0.40,
+    flatShading: true         // sharp, visible triangle facets
+  });
+
+----- 35.4.B — Controlling Triangle Density on Primitives -----
+
+When using procedural Three.js shapes, adjust radial + height
+segments to target specific triangle budgets:
+
+  Low-Poly Barrel / Piston:
+    new THREE.CylinderGeometry(0.05, 0.05, 1.2, 6)
+    -> 6 radial segments = 12 side tris + 8 cap tris = 20 tris.
+
+  Low-Poly Cockpit / Torso Sphere:
+    new THREE.SphereGeometry(0.6, 8, 6)
+    -> 8 × 6 = 48 tris.
+
+  Low-Poly Quadruped Foot Talon / Spike:
+    new THREE.ConeGeometry(0.12, 0.35, 4)
+    -> 4 radial segments = 4 side tris + 2 base tris = 6 tris.
+
+  Low-Poly Turret Base:
+    new THREE.CylinderGeometry(0.6, 0.7, 0.25, 8)
+    -> 8 radial = 16 side + 12 cap (top) + 12 cap (bottom) = 40 tris.
+
+The renderer's E12 validator (35.9) reads each model's `totalTriangles`
+and surfaces a soft warning if it exceeds 50,000 (rule of thumb for
+60 FPS at 1080p on a mid-range laptop with this scene complexity).
+
+--------------------------------------------------------------------------
+35.5 — METHOD 4: TRIANGLE COUNT CALCULATOR & REAL-TIME MESH INSPECTOR
+--------------------------------------------------------------------------
+This is the EXTENSION of PART 32.2's `inspectModelTriangles` stub.
+PART 32 shipped a small helper that returned { triangles, meshes,
+materials, bones, clips }. PART 35 extends it with a richer
+per-geometry breakdown that the 🔺 Tris panel uses.
+
+  export interface MeshTriangleMetrics {
+    // Original PART 32 fields (unchanged for back-compat):
+    triangles: number;
+    meshes:    number;
+    materials: number;
+    bones:     number;
+    clips:     number;
+
+    // NEW in PART 35 (renderer-side inspector reads these):
+    totalTriangles: number;
+    totalVertices:  number;
+    drawCalls:      number;        // = mesh count for non-instanced
+    geometries: Array<{
+      name:      string;
+      triangles: number;
+      vertices:  number;
+      indexed:   boolean;
+    }>;
+  }
+
+  export function inspectModelTriangles(
+    root: THREE.Object3D
+  ): MeshTriangleMetrics {
+    let totalTriangles = 0, totalVertices = 0, meshCount = 0;
+    const materials   = new Set<THREE.Material>();
+    const bones       = new Set<THREE.Bone>();
+    const geometries: MeshTriangleMetrics['geometries'] = [];
+
+    root.traverse(child => {
+      const m = child as THREE.Mesh;
+      if (!m.isMesh) return;
+      meshCount++;
+      const g = m.geometry; if (!g) return;
+
+      let tris = 0, verts = 0;
+      if (g.index) tris = g.index.count / 3;
+      else if (g.attributes.position) tris = g.attributes.position.count / 3;
+      if (g.attributes.position) verts = g.attributes.position.count;
+
+      totalTriangles += tris;
+      totalVertices  += verts;
+
+      const mat = m.material as
+        THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach(x => materials.add(x));
+      else if (mat) materials.add(mat);
+
+      geometries.push({
+        name:      m.name || `Mesh_${meshCount}`,
+        triangles: Math.floor(tris),
+        vertices:  verts,
+        indexed:   !!g.index
+      });
+    });
+    root.traverse(o => {
+      if ((o as THREE.Bone).isBone) bones.add(o as THREE.Bone);
+    });
+    const clips: THREE.AnimationClip[] = (root as any).animations || [];
+    return {
+      // PART 32 (back-compat):
+      triangles: Math.round(totalTriangles),
+      meshes:    meshCount,
+      materials: materials.size,
+      bones:     bones.size,
+      clips:     clips.length,
+      // PART 35 (extended):
+      totalTriangles: Math.floor(totalTriangles),
+      totalVertices:  totalVertices,
+      drawCalls:      meshCount,
+      geometries
+    };
+  }
+
+The function is available TWO ways from any .ts factory:
+
+  1. Copy the verbatim reference above into your file.
+  2. Import from the renderer's re-export at runtime:
+       const m = (window as any).lblSpec.helpers
+                   .inspectModelTriangles(rootGroup);
+
+Option 2 is the recommended path: the renderer's copy is the same
+function the 🔺 Tris panel uses, so the AI factory's output and the
+inspector's display never disagree.
+
+JSON/JS path: the renderer's `window.lblSpec.helpers` exposes
+`inspectModelTriangles` directly to blueprint evaluators. Blueprints
+that need metrics on a per-frame basis (e.g. an LOD auto-switcher)
+read `window.lblSpec.lastTriMetrics` after every `buildScene()`.
+
+--------------------------------------------------------------------------
+35.6 — METHOD 5: RIGGING & GLB / JSON EXPORT WITH TRIANGLE MESHES
+--------------------------------------------------------------------------
+When using merged or custom triangle meshes with an animated bone
+armature:
+
+  1. BONE PARENTING. Attach each merged triangle mesh DIRECTLY as a
+     child of its respective `THREE.Bone` (or `THREE.Group` for the
+     pivot-hierarchy default from PART 30):
+       thighBone.add(mergedThighTriangleMesh);
+       kneeBone.add(mergedShinTriangleMesh);
+
+  2. WORLD MATRIX UPDATE. Always call `rootGroup.updateMatrixWorld(true)`
+     after building your triangle meshes. Without this, the merged
+     mesh's `matrixWorld` lags by one frame, and the rig panel's
+     "rest position" readout in PART 34 will show stale coordinates.
+
+  3. GLTF / GLB / JSON EXPORT. When exported via `GLTFExporter` (or
+     the renderer's JSON/JS blueprint serializer), all triangle
+     indices, vertex attributes (position + normal + uv), and parent
+     node transforms are baked into the output container. The
+     `inspectModelTriangles` count is the LAST line of the renderer's
+     export toast, so the user can confirm what shipped.
+
+PART 35 does NOT introduce a new export path. It documents the
+correct ORDER of operations for the EXISTING path: build tris →
+parent to bone → update world matrix → export.
+
+--------------------------------------------------------------------------
+35.7 — COMPLETE COPY-PASTEABLE IMPLEMENTATION MODULE
+--------------------------------------------------------------------------
+A drop-in factory that builds a low-poly turret using ALL of Methods
+1-3 from above. Useful as a starting point for mech / vehicle / sci-
+fi props. Ships with both the merged-triangle path (default) and the
+raw-triangle blade path (commented out at the bottom).
+
+  import * as THREE from 'three';
+  import { mergeGeometries }
+    from 'three/addons/utils/BufferGeometryUtils.js';
+
+  /**
+   * Build a low-poly turret using merged triangle geometry.
+   * Returns a single Mesh ready to add to a bone / group.
+   */
+  export function buildLowPolyTurretWithTris(
+    material: THREE.Material
+  ): THREE.Mesh {
+    // 1. Primitive shapes with controlled low-poly segments.
+    const baseGeom = new THREE.CylinderGeometry(0.6, 0.7, 0.25, 8);
+    const domeGeom = new THREE.SphereGeometry(0.45, 8, 6);
+    const gunGeom  = new THREE.BoxGeometry(0.12, 0.14, 0.90);
+
+    // 2. Position sub-components.
+    domeGeom.applyMatrix4(
+      new THREE.Matrix4().makeTranslation(0, 0.20, 0));
+    gunGeom.applyMatrix4(
+      new THREE.Matrix4().makeTranslation(0, 0.22, 0.45));
+
+    // 3. Merge into a unified triangle buffer (1 draw call).
+    const merged = mergeGeometries([
+      baseGeom.toNonIndexed(),
+      domeGeom.toNonIndexed(),
+      gunGeom.toNonIndexed()
+    ], false);
+    merged.computeVertexNormals();
+
+    const turretMesh = new THREE.Mesh(merged, material);
+    turretMesh.name = 'LowPolyTurret_TriangleMesh';
+    turretMesh.castShadow    = true;
+    turretMesh.receiveShadow = true;
+    return turretMesh;
+  }
+
+This function is exposed on `window.lblSpec.helpers` (35.9.b below)
+so any .ts factory can call it WITHOUT copying the body.
+
+--------------------------------------------------------------------------
+35.8 — PRE-EMISSION CHECKLIST (append to PART 32.3's 16-item list)
+--------------------------------------------------------------------------
+Any unchecked item is a soft warning (E12 below) surfaced via the
+🔺 Tris button.
+
+  [ ] 17. [PART 35.2] Every body part with 2+ child meshes is merged
+         via `mergeGeometries` into a single BufferGeometry before
+         being added to a bone. (The renderer's E12 surfaces a
+         warning otherwise.)
+  [ ] 18. [PART 35.3] Custom geometry either uses 35.3.A (non-
+         indexed) with a fresh Float32Array per triangle, OR 35.3.B
+         (indexed) with a Uint16Array index buffer. Mixed approaches
+         in the same model are an anti-pattern.
+  [ ] 19. [PART 35.4] Low-poly materials declare `flatShading: true`
+         when the intent is faceted; smooth-shaded organic models
+         leave it off and use indexed geometry from 35.3.B.
+  [ ] 20. [PART 35.4] Total triangle budget stays under 50,000 for
+         a single model (60 FPS on mid-range hardware). The renderer's
+         E12 reads the inspectModelTriangles count and warns above
+         this threshold.
+  [ ] 21. [PART 35.6] After building all triangle meshes,
+         `rootGroup.updateMatrixWorld(true)` is called once before
+         any export or animation playback.
+  [ ] 22. [PART 35.5] The factory either (a) copies the canonical
+         `inspectModelTriangles` from 35.5 verbatim OR (b) calls
+         `window.lblSpec.helpers.inspectModelTriangles(rootGroup)`
+         to get the same metrics the 🔺 Tris panel uses.
+
+If a model uses none of PART 35's methods (purely primitive geometry,
+no merging, no raw tris), this checklist is a no-op — don't add fake
+entries to satisfy the form.
+
+--------------------------------------------------------------------------
+35.9 — RUNTIME CONTRACT (what the renderer does)
+--------------------------------------------------------------------------
+The renderer's `window.lblSpec` object (RJS UPDATE 3 / RJS UPDATE 4
+block in index.html) gains three PART 35-specific behaviors on every
+load — these are observable by any model that uses PART 35's
+helpers, and INERT for every other model.
+
+  (a) VALIDATOR E12 (triangle density + un-merged-mesh check)
+      Runs on every `window.lblSpec.refreshOnLoad()` call. Reads
+      `inspectModelTriangles(currentRoot)`. Surfaces a non-blocking
+      warning via the spec chip when EITHER of the following is
+      true:
+        - `totalTriangles > 50_000` ("Model uses N triangles
+          (PART 35 soft cap: 50,000). Consider merging or
+          decimating.")
+        - A single Bone / Group has >= 3 child meshes
+          ("Bone '<name>' has N child meshes (PART 35.2 prefers
+          mergeGeometries into a single BufferGeometry per part).")
+      Multiple warnings stack on the chip.
+
+  (b) 🔺 TRIS BUTTON (topbar, between "Rig" and "Recipes")
+      Enabled for EVERY loaded model — there is no
+      `userData.rigGraph` / `userData.skeletonSource` gate here, the
+      metrics exist for every model that has at least one Mesh.
+      Clicking it opens a panel showing:
+        - Total triangles, total vertices, mesh count (= draw calls)
+        - Per-geometry breakdown table (name, triangles, vertices,
+          indexed?) — sorted by triangle count descending
+        - A "Copy JSON" button that puts the full metrics object on
+          the clipboard (so the AI can paste it back into a prompt
+          when iterating on a model)
+        - A "Re-measure" button that re-runs inspectModelTriangles
+          on the current scene (useful after live edits)
+      The button is ALWAYS enabled (never `disabled`). Models with
+      zero meshes (an empty scene) get a "No meshes to inspect"
+      placeholder.
+
+  (c) lblSpec.helpers RE-EXPORTS
+      The renderer exposes the following PART 35 functions on
+      `window.lblSpec.helpers` so .ts factories can use them
+      without copying the body:
+        - inspectModelTriangles(root): MeshTriangleMetrics
+        - createUnifiedLimbSegment(bone, mat): THREE.Mesh
+        - createLowPolyKneeBlade(): THREE.BufferGeometry
+        - createIndexedPyramid():    THREE.BufferGeometry
+        - buildLowPolyTurretWithTris(material): THREE.Mesh
+      These are the SAME functions the spec defines (35.5, 35.2,
+      35.3.A, 35.3.B, 35.7). A factory that calls them gets the
+      same behavior the 🔺 Tris panel measures.
+
+--------------------------------------------------------------------------
+35.10 — CROSS-REFERENCES
+--------------------------------------------------------------------------
+PART 35 layers on top of, never replaces:
+
+  - PART 1 (single-file rule). 35.2/35.3/35.7 use only `'three'` and
+    `'three/addons/utils/BufferGeometryUtils.js'` (allowed by PART 4
+    / PART 34.1's allow-list).
+  - PART 2 (typed public surface). The `MeshTriangleMetrics`
+    extension in 35.5 keeps the original 5 fields from PART 32.2
+    and adds 4 new ones — a back-compat additive change.
+  - PART 4 (no relative imports). 35.2/35.3/35.7 only import from
+    the allowed `'three'` and `'three/addons/'` specifiers.
+  - PART 30 (rigging & animation). 35.6 documents the correct
+    bone-parenting order for merged triangle meshes; reinforces —
+    never replaces — PART 30.7's auto Bone-promotion.
+  - PART 32 (canonical helpers). 35.5 EXTENDS PART 32.2's
+    `inspectModelTriangles` with a per-geometry breakdown; the
+    original 5-field shape is preserved.
+  - PART 32.3 (16-item checklist). 35.8's 6 items APPEND to that
+    list (17-22), not a replacement.
+  - PART 33 (architectural features). 35.4.B's 50,000-tri soft cap
+    is consistent with PART 33.1's existing complexity budgets.
+  - PART 34 (rig helpers). 35.6's "updateMatrixWorld(true) before
+    export" is the same fix that PART 34.7(a) requires for the
+    Rig panel to read correct rest positions.
+  - PART 34.6 (6-item checklist). Orthogonal — none of PART 35's
+    items overlap with PART 34's items.
+
+PART 35 does NOT introduce:
+  - Any new relative import (still PART 4.1 / 4.2 clean)
+  - Any new dependency in the model file (helpers reachable via
+    `window.lblSpec.helpers.*` instead)
+  - Any new GLB-export user-visible behavior (35.6 documents the
+    EXISTING path, doesn't add a new path)
+  - Any removal or weakening of rules from PARTs 1-34
+
+================================================================================
+END OF PART 35 — v1.12 / v8.4 ADDITIONS: TRIANGLE-FIRST GEOMETRY (TRIS)
+The "everything is a triangle" mental model is now first-class in the
+LBL spec: 5 documented methods, 6-item pre-emission checklist, 1
+new topbar button, 1 new validator, 5 renderer-side helpers on
+`window.lblSpec.helpers`. Layers on top of PART 32's existing
+`inspectModelTriangles` (extended, not replaced) and PART 30's
+rigging pipeline (reinforced, not replaced). Nothing in this PART
+removes or weakens any rule from PARTs 1-34.
 ================================================================================

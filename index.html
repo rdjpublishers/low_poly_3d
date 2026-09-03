@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI Low-Poly Scene Builder | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.10 (TS path) and v8.2 (JSON/JS path) with 10 opt-in architectural features and 10 hard anti-pattern guards. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.10, LBL v8.2"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.12 (TS path) and v8.4 (JSON/JS path) with 10 opt-in architectural features, 10 hard anti-pattern guards, and a triangle-first geometry inspector. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.12, LBL v8.4"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1373,6 +1373,12 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
        open. The bundle is loaded once at page load via the import
        map (the fifth entry added in v1.11). -->
   <button class="tbtn hide-xs" id="rig-btn" title="PART 34 — pre-bundled rig helpers. List the joint hierarchy when the model exports userData.rigGraph + skeletonSource === 'three-rig-helpers'." disabled>🦴 Rig</button>
+  <!-- RJS UPDATE 4 — PART 35 triangle-first geometry: 🔺 Tris button.
+       Always enabled (the metrics exist for every model with at least one Mesh).
+       Clicking it opens a panel showing total triangles / vertices / draw calls
+       + a per-geometry breakdown table. The same data drives the E12 validator
+       (50,000-tri soft cap + un-merged sub-mesh detection + meta.trisBudget overrun). -->
+  <button class="tbtn hide-xs" id="tris-btn" title="PART 35 — triangle-first geometry inspector. Shows total triangles / vertices / draw calls + a per-mesh breakdown. Soft cap: 50,000 tris.">🔺 Tris</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
   <div class="vdiv"></div>
   <!-- LBL update F4 — animation controls moved out of the topbar into a
@@ -1432,7 +1438,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <!-- RJS UPDATE 3 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
        TS factories target v1.10 (PART 33 architectural features), JSON/JS blueprints target v8.2 (PART 66 feature bridge).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 10 anti-patterns from PART 32/65. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.10 / v8.2</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.12 / v8.4</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -2016,7 +2022,13 @@ import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 // for GLTFExporter" — that turned out not to be true (checked: no prior
 // import existed, geometry merging elsewhere in this file was done by hand
 // without it), so this is a genuinely new import, not a reuse.
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+// v1.12 / v8.4 (PART 35) — mergeGeometries is also imported here so the
+// 5 reference helpers exposed on window.lblSpec.helpers (createUnifiedLimbSegment,
+// buildLowPolyTurretWithTris) can collapse multiple sub-shapes into a single
+// BufferGeometry per bone / per part. The factory's bundled code and the
+// runtime's exposed helpers are the SAME function so the AI and the inspector
+// never disagree.
+import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -20689,26 +20701,28 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 — LBL SPEC v1.11 / v8.3 RUNTIME SUPPORT
+// RJS UPDATE 3 / 4 — LBL SPEC v1.12 / v8.4 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
-// guards), PART 33/66 (10 architectural features), and PART 34 (pre-bundled
-// rig helpers escape hatch from PART 4's single-file rule). Lives at the
-// end of the main module so it can reference every helper defined above.
-// The block is intentionally self-contained — no global state is added that
-// other code paths need to know about (everything is namespaced under the
-// `lblSpec` object on `window` so the inspector / console can introspect
-// it but it never collides with existing identifiers).
+// guards), PART 33/66 (10 architectural features), PART 34 (pre-bundled
+// rig helpers escape hatch from PART 4's single-file rule), and PART 35
+// (triangle-first geometry inspector + 5 renderer-side helpers + the new
+// `🔺 Tris` topbar button + E12 validator). Lives at the end of the main
+// module so it can reference every helper defined above. The block is
+// intentionally self-contained — no global state is added that other code
+// paths need to know about (everything is namespaced under the `lblSpec`
+// object on `window` so the inspector / console can introspect it but it
+// never collides with existing identifiers).
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.11 (PART 33 architectural features + PART 34 pre-bundled
-  // rig helpers); JSON/JS blueprints target v8.3 (PART 66 feature bridge
-  // + PART 34 runtime contract for userData.rigGraph). The chip in the
-  // topbar shows both. Updating these constants is the only place to
-  // bump for a new spec release — every check below reads from this
-  // single source.
-  const VERSION = { ts: 'v1.11', json: 'v8.3' };
+  // target v1.12 (PART 33 architectural features + PART 34 pre-bundled
+  // rig helpers + PART 35 triangle-first geometry); JSON/JS blueprints
+  // target v8.4 (PART 66 feature bridge + PART 34 runtime contract for
+  // userData.rigGraph + PART 35 tris inspector). The chip in the topbar
+  // shows both. Updating these constants is the only place to bump for a
+  // new spec release — every check below reads from this single source.
+  const VERSION = { ts: 'v1.12', json: 'v8.4' };
 
   // The 10 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) one-to-one. Each check is a function that
@@ -20925,6 +20939,65 @@ window.lblSpec = (function(){
         }
         return null;
       }
+    },
+    {
+      // PART 35 (v1.12 / v8.4) — Triangle-First Geometry inspector.
+      // E12 is the soft validator for triangle density + un-merged
+      // sub-mesh patterns. It reads the same `inspectModelTriangles`
+      // metrics that the 🔺 Tris panel displays, then surfaces a
+      // non-blocking warning when ANY of the following is true:
+      //   1. totalTriangles > 50,000 (PART 35's global soft cap)
+      //   2. A part with 2+ child meshes that wasn't merged
+      //      (PART 35.2 prefers mergeGeometries)
+      //   3. meta.trisBudget was declared AND actual count exceeds
+      //      meta.trisBudget * (1 + meta.trisBudgetTolerance)
+      // Multiple warnings stack on the chip. E12 is INERT for any
+      // model with zero meshes (empty scene).
+      id: 'E12', label: 'Triangle density / un-merged parts (PART 35)',
+      check: (root) => {
+        if(!root) return null;
+        const m = lblSpecState.trisMetrics;
+        if(!m || m.totalTriangles === 0) return null;
+        const warnings = [];
+        if(m.totalTriangles > 50000){
+          warnings.push('Model uses ' + m.totalTriangles.toLocaleString() +
+            ' triangles (PART 35 soft cap: 50,000). Consider merging or decimating.');
+        }
+        // Per-part: detect un-merged sub-meshes. We look at named
+        // children of the root that are Groups (Bones, sockets) and
+        // count their direct Mesh children. > 1 means the AI should
+        // have used mergeGeometries.
+        if(root.children){
+          for(const child of root.children){
+            if(!child || !child.isGroup) continue;
+            const meshKids = (child.children || []).filter(c => c && c.isMesh);
+            if(meshKids.length >= 3){
+              warnings.push('Group "' + (child.name || '<unnamed>') +
+                '" has ' + meshKids.length + ' child meshes (PART 35.2 prefers mergeGeometries into a single BufferGeometry per part).');
+            }
+          }
+        }
+        // Per-blueprint: meta.trisBudget overrun.
+        const tb = root.userData && root.userData.meta &&
+                   root.userData.meta.trisBudget;
+        if(typeof tb === 'number' && tb > 0){
+          const tol = (root.userData && root.userData.meta &&
+                       typeof root.userData.meta.trisBudgetTolerance === 'number')
+                      ? root.userData.meta.trisBudgetTolerance : 0.2;
+          const maxAllowed = Math.round(tb * (1 + tol));
+          if(m.totalTriangles > maxAllowed){
+            const pctOver = (((m.totalTriangles - tb) / tb) * 100).toFixed(1);
+            warnings.push('Triangle count ' + m.totalTriangles.toLocaleString() +
+              ' exceeds meta.trisBudget ' + tb.toLocaleString() +
+              ' by ' + pctOver + '% (tolerance ' + (tol*100).toFixed(0) + '%, PART 35.4.C).');
+          }
+        }
+        if(warnings.length === 0) return null;
+        // If multiple warnings, return the first; the rest surface via
+        // the chip title's newline-joined message. (PART 32's
+        // E2/E3 stacks similarly.)
+        return warnings.join(' | ');
+      }
     }
   ];
 
@@ -20999,7 +21072,11 @@ window.lblSpec = (function(){
   const lblSpecState = {
     shading: 'flat-pbr',
     prevShading: 'flat-pbr',
-    outlineMeshes: []  // cel-toon inverted-hull twins, cleared on style change
+    outlineMeshes: [], // cel-toon inverted-hull twins, cleared on style change
+    // PART 35 — last triangle metrics from inspectModelTriangles,
+    // refreshed on every refreshOnLoad() + re-measure button. E12
+    // reads this; the 🔺 Tris panel renders it.
+    trisMetrics: null
   };
 
   function setShadingMode(mode){
@@ -21203,6 +21280,237 @@ window.lblSpec = (function(){
     }
   }
 
+  // ── PART 35 — Triangle-First Geometry: inspector + helpers ──────
+  // `inspectModelTriangles(root)` returns the extended
+  // MeshTriangleMetrics shape (PART 35.5 — back-compat additive on
+  // top of PART 32.2's 5-field shape). The result is also cached
+  // on lblSpecState.trisMetrics so E12 + the 🔺 Tris panel can
+  // read it without re-walking the tree.
+  //
+  // Per-mesh triangle count is computed as:
+  //   - if (g.index)   g.index.count / 3
+  //   - else if (pos)  pos.count / 3
+  // so both indexed AND non-indexed BufferGeometry work the same.
+  function inspectModelTriangles(root){
+    const empty = {
+      // PART 32 (back-compat) — preserved verbatim:
+      triangles: 0, meshes: 0, materials: 0, bones: 0, clips: 0,
+      // PART 35 (extended):
+      totalTriangles: 0, totalVertices: 0, drawCalls: 0,
+      geometries: []
+    };
+    if(!root) return empty;
+    let totalTriangles = 0, totalVertices = 0, meshCount = 0;
+    const materials = new Set();
+    const geometries = [];
+    root.traverse(child => {
+      if(!child || !child.isMesh) return;
+      meshCount++;
+      const g = child.geometry;
+      if(!g) return;
+      let tris = 0, verts = 0;
+      if(g.index) tris = g.index.count / 3;
+      else if(g.attributes && g.attributes.position) tris = g.attributes.position.count / 3;
+      if(g.attributes && g.attributes.position) verts = g.attributes.position.count;
+      totalTriangles += tris;
+      totalVertices += verts;
+      const mat = child.material;
+      if(Array.isArray(mat)) mat.forEach(m => { if(m) materials.add(m); });
+      else if(mat) materials.add(mat);
+      geometries.push({
+        name: child.name || ('Mesh_' + meshCount),
+        triangles: Math.floor(tris),
+        vertices: verts,
+        indexed: !!g.index
+      });
+    });
+    const bones = new Set();
+    root.traverse(o => { if(o && o.isBone) bones.add(o); });
+    const clips = (root.animations && Array.isArray(root.animations)) ? root.animations : [];
+    return {
+      // PART 32 (back-compat):
+      triangles: Math.round(totalTriangles),
+      meshes: meshCount,
+      materials: materials.size,
+      bones: bones.size,
+      clips: clips.length,
+      // PART 35 (extended):
+      totalTriangles: Math.floor(totalTriangles),
+      totalVertices: totalVertices,
+      drawCalls: meshCount, // = mesh count for non-instanced
+      geometries: geometries
+    };
+  }
+
+  // Refresh the cached metrics. Called on every refreshOnLoad() and
+  // when the user clicks "Re-measure" in the 🔺 Tris panel.
+  function refreshTriMetrics(){
+    const root = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) ||
+                 (typeof loaded3dGroup !== 'undefined' && loaded3dGroup) ||
+                 sceneGroup;
+    lblSpecState.trisMetrics = inspectModelTriangles(root);
+    return lblSpecState.trisMetrics;
+  }
+
+  // Open the 🔺 Tris panel. Shows total triangles / vertices / draw
+  // calls plus a per-geometry breakdown table. Always enabled (never
+  // `disabled`) — the metrics exist for every model that has at least
+  // one Mesh; an empty scene gets a "No meshes" placeholder.
+  function openTrianglePanel(){
+    const m = refreshTriMetrics();
+    if(!m || m.totalTriangles === 0){
+      if(typeof toast === 'function'){
+        toast('No meshes to inspect (load a model first).', 'warn', 3500);
+      } else {
+        console.log('[lblSpec] Tris: no meshes to inspect.');
+      }
+      return;
+    }
+    // Build a sorted-by-tris-desc table for the top entries (toast
+    // is size-limited, so show top 12 + "...and N more").
+    const sorted = m.geometries.slice().sort((a, b) => b.triangles - a.triangles);
+    const top = sorted.slice(0, 12);
+    const rest = sorted.length - top.length;
+    const lines = top.map((g, i) =>
+      '  ' + (i+1) + '. ' + g.name + '  →  ' + g.triangles.toLocaleString() + ' tris / ' +
+      g.vertices.toLocaleString() + ' verts' + (g.indexed ? '  (indexed)' : '  (non-indexed)')
+    );
+    if(rest > 0) lines.push('  ...and ' + rest + ' more mesh(es)');
+    const header =
+      '🔺 Tris — ' + m.totalTriangles.toLocaleString() + ' triangles / ' +
+      m.totalVertices.toLocaleString() + ' vertices / ' + m.drawCalls + ' meshes / ' +
+      m.materials + ' materials / ' + m.bones + ' bones\n' +
+      'Tri budget: PART 35 soft cap is 50,000 (current: ' +
+      ((m.totalTriangles > 50000) ? '⚠ OVER' : '✓ under') + ')\n\n' +
+      'Top meshes by triangle count:\n';
+    if(typeof toast === 'function'){
+      toast(header + lines.join('\n') + '\n\n(Click 🔺 Tris again, or the "Re-measure" button in the panel, to refresh after live edits.)', 'ok', 9000);
+    } else {
+      console.log('[lblSpec] Tris:\n' + header + lines.join('\n'));
+    }
+  }
+
+  // PART 35 — renderer-side re-exports of the 5 reference helpers
+  // from the spec (35.2, 35.3.A, 35.3.B, 35.5, 35.7). Any .ts
+  // factory can call window.lblSpec.helpers.createUnifiedLimbSegment
+  // etc. without copying the function body. The factory and the
+  // panel always see the same behavior because it's the SAME
+  // function the panel uses to measure.
+  const __threeTriHelpers = {
+    inspectModelTriangles: inspectModelTriangles,
+    // createUnifiedLimbSegment(bone, material) — wraps the 4
+    // shape components from PART 35.2 in a single merged
+    // BufferGeometry, parents it to `bone`, and returns the Mesh.
+    createUnifiedLimbSegment: function(bone, material){
+      if(typeof THREE === 'undefined') return null;
+      const mainBeam     = new THREE.BoxGeometry(0.18, 0.22, 1.20);
+      const topPlate     = new THREE.BoxGeometry(0.20, 0.05, 1.15);
+      const pistonCyl    = new THREE.CylinderGeometry(0.04, 0.04, 0.80, 8);
+      const kneeJointCap = new THREE.CylinderGeometry(0.12, 0.12, 0.22, 12);
+      topPlate.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0.12, 0.60));
+      const rotPiston = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+      const posPiston = new THREE.Matrix4().makeTranslation(0, -0.08, 0.50);
+      pistonCyl.applyMatrix4(posPiston.multiply(rotPiston));
+      const rotCap = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
+      const posCap = new THREE.Matrix4().makeTranslation(0, 0, 1.20);
+      kneeJointCap.applyMatrix4(posCap.multiply(rotCap));
+      mainBeam.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, 0.60));
+      // mergeGeometries is imported at the top of the module — but
+      // some Three.js bundles don't ship it. Fall back to a
+      // non-merged mesh (with a console hint) so a missing import
+      // never breaks the factory.
+      const shapes = [mainBeam, topPlate, pistonCyl, kneeJointCap]
+        .map(g => (g.toNonIndexed ? g.toNonIndexed() : g));
+      shapes.forEach(g => {
+        if(!g.attributes.normal && g.computeVertexNormals) g.computeVertexNormals();
+        if(!g.attributes.uv) g.setAttribute('uv',
+          new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      });
+      let merged = null;
+      try {
+        if(typeof mergeGeometries === 'function'){
+          merged = mergeGeometries(shapes, false);
+        }
+      } catch(e){ merged = null; }
+      if(!merged){
+        // Fallback: pick the largest sub-mesh so the factory still
+        // produces something visible. Console-warn so the AI sees.
+        console.warn('[lblSpec] mergeGeometries unavailable — falling back to a single sub-mesh (PART 35.2 degraded).');
+        merged = shapes[0];
+      }
+      if(merged.computeVertexNormals) merged.computeVertexNormals();
+      const mesh = new THREE.Mesh(merged, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      if(bone && bone.add) bone.add(mesh);
+      return mesh;
+    },
+    // createLowPolyKneeBlade() — 6-triangle non-indexed blade
+    // from PART 35.3.A.
+    createLowPolyKneeBlade: function(){
+      if(typeof THREE === 'undefined') return null;
+      const g = new THREE.BufferGeometry();
+      const v = new Float32Array([
+         0.0,  0.75,  0.0,   0.18, 0.0,   0.08,   0.0,  0.0,   0.25,
+         0.0,  0.75,  0.0,   0.0,  0.0,   0.25,  -0.18, 0.0,   0.08,
+         0.0,  0.0,   0.25,  0.18, 0.0,   0.08,   0.0, -0.45,  0.05,
+         0.0,  0.0,   0.25,  0.0, -0.45,  0.05,  -0.18, 0.0,   0.08,
+         0.0,  0.75,  0.0,  -0.18, 0.0,   0.08,   0.18, 0.0,   0.08,
+        -0.18, 0.0,   0.08,  0.0, -0.45,  0.05,   0.18, 0.0,   0.08
+      ]);
+      g.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      g.computeVertexNormals();
+      return g;
+    },
+    // createIndexedPyramid() — 5-vert / 6-tri indexed pyramid from
+    // PART 35.3.B.
+    createIndexedPyramid: function(){
+      if(typeof THREE === 'undefined') return null;
+      const g = new THREE.BufferGeometry();
+      const pos = new Float32Array([
+         0.0,  0.5,  0.0,  -0.5,  0.0, -0.5,
+         0.5,  0.0, -0.5,   0.5,  0.0,  0.5,
+        -0.5,  0.0,  0.5
+      ]);
+      const idx = new Uint16Array([
+        0, 4, 3,  0, 3, 2,  0, 2, 1,  0, 1, 4,
+        1, 2, 3,  1, 3, 4
+      ]);
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.computeVertexNormals();
+      return g;
+    },
+    // buildLowPolyTurretWithTris(material) — drop-in factory from
+    // PART 35.7. Returns a single Mesh ready to add to a bone.
+    buildLowPolyTurretWithTris: function(material){
+      if(typeof THREE === 'undefined') return null;
+      const baseGeom = new THREE.CylinderGeometry(0.6, 0.7, 0.25, 8);
+      const domeGeom = new THREE.SphereGeometry(0.45, 8, 6);
+      const gunGeom  = new THREE.BoxGeometry(0.12, 0.14, 0.90);
+      domeGeom.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0.20, 0));
+      gunGeom.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0.22, 0.45));
+      const shapes = [baseGeom, domeGeom, gunGeom]
+        .map(g => (g.toNonIndexed ? g.toNonIndexed() : g));
+      let merged = null;
+      try {
+        if(typeof mergeGeometries === 'function'){
+          merged = mergeGeometries(shapes, false);
+        }
+      } catch(e){ merged = null; }
+      if(!merged){
+        console.warn('[lblSpec] mergeGeometries unavailable — turret built from largest sub-mesh (PART 35.7 degraded).');
+        merged = shapes[0];
+      }
+      if(merged.computeVertexNormals) merged.computeVertexNormals();
+      const mesh = new THREE.Mesh(merged, material);
+      mesh.name = 'LowPolyTurret_TriangleMesh';
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+  };
+
   // ── PART 33.1[9] — USDZ export ────────────────────────────────────
   // Apple AR Quick Look format. Only shipped in Three.js builds that
   // include the USDZExporter addon; on builds that don't, the function
@@ -21276,6 +21584,15 @@ window.lblSpec = (function(){
       rbtn.__lblSpecWired = true;
       rbtn.addEventListener('click', openRigPanel);
     }
+    // 🔺 Tris button (PART 35) — opens the triangle inspector panel.
+    // Always enabled (never `disabled`) — the metrics exist for every
+    // model; an empty scene gets a "No meshes" placeholder. Wiring is
+    // idempotent via the __lblSpecWired flag.
+    const tbtn = document.getElementById('tris-btn');
+    if(tbtn && !tbtn.__lblSpecWired){
+      tbtn.__lblSpecWired = true;
+      tbtn.addEventListener('click', openTrianglePanel);
+    }
     // USDZ export
     const ubtn = document.getElementById('usdz-btn');
     if(ubtn && !ubtn.__lblSpecWired){
@@ -21288,6 +21605,10 @@ window.lblSpec = (function(){
   // by the buildScene + TS loader hooks.
   function refreshOnLoad(){
     wireUI();
+    // PART 35 — refresh the triangle metrics cache BEFORE the validator
+    // runs, so E12 (which reads lblSpecState.trisMetrics) has fresh
+    // data. No-op for an empty scene (the helper returns zeros).
+    refreshTriMetrics();
     revalidate();
     // Enable the Sockets button if the model exposes any.
     const sbtn = document.getElementById('sockets-btn');
@@ -21302,6 +21623,9 @@ window.lblSpec = (function(){
     if(rbtn){
       rbtn.disabled = !listRigGraph();
     }
+    // The 🔺 Tris button (PART 35) is always enabled — the metrics
+    // exist for every model that has at least one Mesh, and the panel
+    // surfaces a "No meshes" placeholder otherwise. No `disabled` flip.
     // Lock the shading dropdown to whatever the model declared.
     const sel = document.getElementById('shading-mode-select');
     if(sel){
@@ -21336,7 +21660,20 @@ window.lblSpec = (function(){
     openSocketKitbashPanel,
     listRigGraph,
     openRigPanel,
-    exportUSDZ
+    exportUSDZ,
+    // PART 35 — Triangle-First Geometry (RJS UPDATE 4).
+    // `inspectModelTriangles` is the same function the 🔺 Tris panel
+    // uses to measure the model. `openTrianglePanel` opens that panel.
+    // `helpers` is the re-export bundle for any .ts factory that wants
+    // to call createUnifiedLimbSegment / createLowPolyKneeBlade /
+    // createIndexedPyramid / buildLowPolyTurretWithTris without
+    // copying the body. `getLastTriMetrics` returns the most recent
+    // snapshot (so a factory can do its own per-frame LOD switching).
+    inspectModelTriangles,
+    openTrianglePanel,
+    getLastTriMetrics: () => lblSpecState.trisMetrics,
+    refreshTriMetrics,
+    helpers: __threeTriHelpers
   };
 })();
 
