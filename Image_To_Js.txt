@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.4 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.5 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -10297,4 +10297,313 @@ existing `inspectModelTriangles` (extended, not replaced) and PART
 30's rigging pipeline (reinforced, not replaced). Nothing in this
 PART removes or weakens any rule from PARTs 1-34 (TS) / 1-66
 (JSON/JS).
+================================================================================
+
+================================================================================
+PART 36 — v1.13 / v8.5 ADDITIONS: MULTI-FILE DROP + MODEL + RIG PAIRING
+The renderer now accepts a FileList (or a multi-select file picker, or
+a multi-file drag-and-drop) instead of only ever processing the first
+file. The new behavior is opt-in by virtue of the user dropping more
+than one file at a time — every single-file drop is unchanged. This
+PART layers on top of PART 1 (single-file factory output contract),
+PART 2 (types), PART 4 (imports), PART 32 / PART 65 (canonical helpers
++ validators), PART 34 (pre-bundled rig helpers), and PART 35
+(triangle-first geometry). The renderer gains:
+  - `multiple` attribute on the 4 file inputs (file-input, file3d-input,
+    dz-input, mob-dz-input) so the browser's file picker accepts a batch
+  - a `lblRouteFiles(fileList)` dispatcher that buckets each File by
+    extension / MIME and routes to the right loader
+  - a `__lblLoaded3DModels[]` array that holds every uploaded 3D model
+    in the current session (was a single `loaded3dGroup` before)
+  - a new "rig" file type — a .ts/.mts/.cts file that doesn't define a
+    `create*Model` factory but DOES expose a `RigGraph` data structure
+================================================================================
+
+--------------------------------------------------------------------------
+36.1 — EXECUTIVE OVERVIEW: WHAT CHANGES FOR AI-AUTHORED FACTORIES
+--------------------------------------------------------------------------
+NOTHING. A single model.ts file dropped by the user behaves exactly as
+it always has. A single blueprint.json file is unchanged. A single
+GLB/OBJ/STL is unchanged. A single image-texture drop is unchanged.
+
+What changes is ONLY when the user drops more than one file at once:
+
+  1. 3D models (.glb / .gltf / .fbx / .obj / .stl / .dae / .usdz)
+     - The first one anchors at the origin (matches the old behavior).
+     - Every subsequent one is APPENDED to the right of the previously
+       loaded 3D models, with a 1.0-unit gap, and the camera is
+       refit to the combined bounding box of all loaded models.
+     - The scene tree shows one row per loaded model.
+     - Each row is independently selectable; the gizmo / inspector /
+       sub-mesh highlight all honor the per-model selection.
+
+  2. Images (.png / .jpg / .jpeg / .gif / .webp / .svg / .bmp / .avif)
+     - Each image is applied as a texture to the currently selected
+       part (or spawns a new textured plane if nothing is selected).
+     - All images in the batch are processed.
+
+  3. Blueprints + rigs (.json / .js / .ts / .mts / .cts)
+     - Loaded sequentially (one finishes before the next starts) so
+       a rig file in the batch can attach to a model file that loaded
+       earlier in the same drop.
+     - The first blueprint replaces the scene (matches the old
+       behavior). Subsequent blueprints trigger a toast: "Multiple
+       blueprint files detected — drop them one at a time to load
+       them sequentially." (Merging two full scenes is intentionally
+       out of scope for the drop path; the editor paste path is the
+       supported workflow for that.)
+     - A .ts file that fails the regular `create*Model` factory check
+       is automatically retried as a RIG (see 36.2). If it also
+       fails as a rig, the user gets a clear error toast.
+
+The 6-item pre-emission checklist in 35.6 and the 34.6 PART 34
+checklist are unchanged. No new contract is imposed on .ts factories
+— every model you wrote for v1.12 / v8.4 still loads, still exports,
+still renders. The new behavior is purely additive on the dropper.
+
+--------------------------------------------------------------------------
+36.2 — THE "RIG" FILE TYPE: 4 SUPPORTED EXPORT SHAPES
+--------------------------------------------------------------------------
+A .ts file is treated as a RIG (instead of a model) when:
+
+  (a) it has no `create*Model` factory (so the regular pipeline throws
+      "No create*Model() export found in <file>"), AND
+  (b) it exposes a `RigGraph` data structure in one of these 4 shapes:
+
+  SHAPE 1 — default export is a RigGraph OBJECT:
+    ```ts
+    export default {
+      joints: [
+        { id: 'hips',  parentId: null,     restPosition: [0, 1, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'spine', parentId: 'hips',  restPosition: [0, 0.6, 0], restRotation: [0, 0, 0, 1] },
+        { id: 'head',  parentId: 'spine', restPosition: [0, 0.5, 0], restRotation: [0, 0, 0, 1] }
+      ]
+    };
+    ```
+
+  SHAPE 2 — default export is a FUNCTION that returns a RigGraph:
+    ```ts
+    export default function makeRig() {
+      return { joints: [/* ... */] };
+    }
+    ```
+
+  SHAPE 3 — named export `rigGraph` is a RigGraph:
+    ```ts
+    export const rigGraph = { joints: [/* ... */] };
+    ```
+
+  SHAPE 4 — named getter function returns a RigGraph:
+    ```ts
+    export function getRigGraph() { return { joints: [/* ... */] }; }
+    // also accepted: createRigGraph, buildRigGraph, getRig, createRig
+    ```
+
+A RigGraph is `{ joints: Array<{ id: string, parentId: string|null,
+restPosition: [number, number, number], restRotation: [number, number,
+number, number] }> }`. The exact same shape the bundled
+`three-rig-helpers` library consumes (see PART 34 for the full type
+definitions and the validation rules).
+
+When a rig is detected, the renderer:
+
+  1. compiles the .ts file through the same TS pipeline as models
+  2. dynamically imports the compiled module
+  3. extracts the RigGraph via one of the 4 shapes above
+  4. validates it with `three-rig-helpers.validateRigGraph(rigGraph)`
+     (throws with a clear error message on duplicate joint ids,
+     dangling parents, non-root trees, etc.)
+  5. calls `three-rig-helpers.buildSkeleton(rigGraph)` to get
+     `{ root: Bone, bones: Map, skeleton: Skeleton, restWorldPositions }`
+  6. attaches `root` to the most recently loaded TS model group
+  7. sets `userData.rigGraph` and `userData.skeletonSource = 'three-rig-helpers'`
+     (the existing 🦴 Rig button + PART 34 spec checks then enable
+     automatically — no separate "rig was applied" UI to wire)
+  8. toasts: `✓ Rig applied — N joints on "<model name>"`
+
+If no TS model is currently loaded, the rig is QUEUED in
+`window.__lblPendingRigs` and a toast says
+`"Rig "<file>" queued — drop a model .ts next and it will attach
+automatically"`. The queue is drained in `addTsModelToScene()` right
+after `CURRENT_TS_MODEL` is assigned, so a rig dropped first + a model
+dropped second still ends up with the rig attached.
+
+The renderer re-applies a rig to a model that already has one (drops
+the old rig root before adding the new one), so re-dropping a rig
+file replaces the previous skeleton — no duplicate Bones.
+
+--------------------------------------------------------------------------
+36.3 — WHAT A RIG FILE MUST NOT DO
+--------------------------------------------------------------------------
+The PART 4 single-file / no-relative-imports rules apply to rig files
+the same as they apply to model files. Specifically:
+
+  - Imports of `'three'` and `'three/addons/...'` are allowed (the
+    import map resolves them). No relative imports to other files in
+    the same drop.
+  - No `fetch()` / `XMLHttpRequest` / `import()` of any URL outside
+    the import map. The rig file must be self-contained.
+  - No browser globals beyond what a model file is allowed to touch.
+  - No `document.createElement` / direct DOM manipulation — the
+    renderer's UI updates are driven by the userData markers set
+    by the attach step, not by the rig file itself.
+
+If the rig file does any of these, the user gets a clear error toast.
+The spec does not enforce this with a separate linter — the renderer's
+existing PART 4 validators handle it on the model side, and the
+dynamic-import failure surfaces naturally on the rig side.
+
+--------------------------------------------------------------------------
+36.4 — MINIMAL WORKED EXAMPLE: a model.ts + rig.ts pair
+--------------------------------------------------------------------------
+Drop these two files together (any order — model first or rig first
+both work) and the rig attaches to the model automatically:
+
+  // model.ts
+  import * as THREE from 'three';
+
+  export default function createCubeCharacter(opts = {}) {
+    const g = new THREE.Group();
+    g.name = 'CubeCharacter';
+
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 2, 0.6),
+      new THREE.MeshStandardMaterial({ color: 0x88aaff, flatShading: true })
+    );
+    body.position.y = 1.0;
+    body.castShadow = true; body.receiveShadow = true;
+    g.add(body);
+
+    const head = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.7, 0.7),
+      new THREE.MeshStandardMaterial({ color: 0xffcc88, flatShading: true })
+    );
+    head.position.y = 2.35;
+    head.castShadow = true; head.receiveShadow = true;
+    g.add(head);
+
+    g.userData.sculptRuntime = { tick: () => {} };
+    return g;
+  }
+
+  // rig.ts — note: NO create*Model factory, so the dropper treats it
+  //          as a rig and attaches it to the just-loaded model.
+  export default {
+    joints: [
+      { id: 'hips', parentId: null,
+        restPosition: [0, 1.0, 0], restRotation: [0, 0, 0, 1] },
+      { id: 'spine', parentId: 'hips',
+        restPosition: [0, 0.6, 0], restRotation: [0, 0, 0, 1] },
+      { id: 'head', parentId: 'spine',
+        restPosition: [0, 0.5, 0], restRotation: [0, 0, 0, 1] }
+    ]
+  };
+
+What the user sees when they drop both:
+
+  1. Toast: "Loading CubeCharacter.ts…"
+  2. Model appears, centered on the origin, auto-camera-fit.
+  3. Toast: "✓ Rig applied — 3 joints on CubeCharacter"
+  4. The 🦴 Rig button (PART 34) becomes enabled — clicking it
+     lists the 3-joint hierarchy.
+  5. The skeleton is visible in the viewport (when "Show Skeleton"
+     is on in the topbar).
+
+Drop rig.ts alone first:
+
+  1. Toast: 'Rig "rig.ts" queued — drop a model .ts next and it
+     will attach automatically'
+  2. Then drop model.ts:
+  3. Toast: "Loading CubeCharacter.ts…"
+  4. Toast: '✓ Queued rig "rig.ts" applied — 3 joints'
+
+Drop model.ts + rig.ts + a 3D model (e.g. a GLB) in one batch:
+
+  1. Model.ts loads → CURRENT_TS_MODEL set, rig attaches immediately.
+  2. The GLB is APPENDED in a row to the right of the character
+     (because the scene is non-empty when it drops). The camera
+     refits to the combined bounding box.
+  3. The rig only attaches to the TS model — the GLB is unaffected
+     (PART 34 was the contract that introduces the rig pipeline,
+     and it only applies to TS models with `userData.rigGraph`).
+
+--------------------------------------------------------------------------
+36.5 — BACKWARDS COMPATIBILITY: WHAT THE SINGLE-FILE PATH DOES
+--------------------------------------------------------------------------
+The single-file path is the SAME dispatch as before — `lblRouteFiles`
+short-circuits to `lblRouteDroppedFile` which is the original
+"image → texture, anything else → readFile" branch. So:
+
+  - 1 model.ts   → unchanged (loads, sets CURRENT_TS_MODEL)
+  - 1 rig.ts     → NEW: tries model first, fails, tries rig,
+                   succeeds, queues (or applies if a model is
+                   already in the scene)
+  - 1 GLB/OBJ/etc → unchanged
+  - 1 image      → unchanged (textures the selection)
+  - 1 JSON/JS blueprint → unchanged
+  - N of anything → NEW: bucketed + dispatched as documented above
+
+The `multiple` attribute on the 4 file inputs is a no-op for the
+single-file case (browsers just behave the same), so the change is
+fully backwards-compatible at the file-picker level too.
+
+--------------------------------------------------------------------------
+36.6 — PRE-EMISSION CHECKLIST (extends the 35.6 + 34.6 lists)
+--------------------------------------------------------------------------
+The 6-item pre-emission checklist in 35.6 and the 6-item PART 34
+checklist are unchanged. If you write a .ts file that exposes a
+RigGraph (PART 36), add these 2 items to your personal mental
+checklist (not part of the official gate — the renderer doesn't
+enforce them, they're here so you don't ship a broken rig file):
+
+  [PART-36.1] If your .ts file has NO `create*Model` factory, the
+              dropper will try to load it as a RIG. Make sure one of
+              the 4 SHAPES in 36.2 is present, otherwise the user
+              gets a "no RigGraph found" error.
+  [PART-36.2] Every joint in the `joints` array needs a UNIQUE `id`,
+              exactly ONE joint with `parentId: null` (the root), and
+              every non-root joint's `parentId` must point at an id
+              that appears EARLIER in the array (topological order).
+              `three-rig-helpers.validateRigGraph()` enforces these.
+
+PART 36 does NOT introduce a new export path, a new mandatory contract,
+or a new validator on .ts factories. The new behavior is purely the
+dropper's — a .ts file either IS a model (and goes through the existing
+PART 1 pipeline) or IS a rig (and goes through 36.2). No file is
+forced to be one or the other; the user picks by which file they
+choose to drop.
+
+PART 36 layers on top of, never replaces:
+  - PART 1 (TS output contract) — every model still has a factory
+  - PART 2 (type safety) — rig exports are untyped or self-typed
+  - PART 4 (no relative imports) — same rule for rig files
+  - PART 30 (rigging) — auto-promotion still happens for blueprints
+  - PART 32 / PART 65 (canonical helpers) — extended, not replaced
+  - PART 34 (rig helpers) — rig files use the same `three-rig-helpers`
+  - PART 35 (tris inspector) — multi-model scenes still report their
+    combined triangle budget via the 🔺 Tris button
+
+PART 36 does NOT introduce:
+  - A new mandatory field on any existing userData namespace
+  - A new top-level API surface (no `lblAttachRig` global — the
+    queue + drain pattern is the only public hook)
+  - A new pre-emission gate or validator item
+  - A change to the GLB / OBJ / STL / FBX / DAE / USDZ loader
+  - A change to the editor paste path (still single-file at a time)
+  - A change to the Demo / Model Store (still one .ts per click)
+
+================================================================================
+END OF PART 36 — v1.13 / v8.5 ADDITIONS: MULTI-FILE DROP + MODEL + RIG PAIRING
+Multi-file drop is now first-class: the user can pick N files at once
+or drop N files in one drag, the dropper buckets them by extension /
+MIME, and 3D models get arranged in a row + camera-refit while
+blueprints + rigs process sequentially. A new "rig" file type lets a
+model.ts + rig.ts pair render together with zero changes to either
+file (just write the rig as `export default { joints: [...] }` and
+drop them in any order). Every existing single-file workflow is
+preserved. The new behavior is purely additive on the dropper and
+the renderer state — no new contract, no new validator, no new
+mandatory field. Layers on top of PART 1, PART 2, PART 4, PART 30,
+PART 32 / PART 65, PART 34, PART 35. Nothing in this PART removes or
+weakens any rule from PARTs 1-35.
 ================================================================================

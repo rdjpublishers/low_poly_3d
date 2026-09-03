@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI Low-Poly Scene Builder | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.12 (TS path) and v8.4 (JSON/JS path) with 10 opt-in architectural features, 10 hard anti-pattern guards, and a triangle-first geometry inspector. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.12, LBL v8.4"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.13 (TS path) and v8.5 (JSON/JS path) with 10 opt-in architectural features, 10 hard anti-pattern guards, and a triangle-first geometry inspector. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.13, LBL v8.5"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1438,7 +1438,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <!-- RJS UPDATE 3 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
        TS factories target v1.10 (PART 33 architectural features), JSON/JS blueprints target v8.2 (PART 66 feature bridge).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 10 anti-patterns from PART 32/65. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.12 / v8.4</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.13 / v8.5</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -21327,28 +21327,34 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 / 4 — LBL SPEC v1.12 / v8.4 RUNTIME SUPPORT
+// RJS UPDATE 3 / 4 / 5 — LBL SPEC v1.13 / v8.5 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
 // guards), PART 33/66 (10 architectural features), PART 34 (pre-bundled
-// rig helpers escape hatch from PART 4's single-file rule), and PART 35
+// rig helpers escape hatch from PART 4's single-file rule), PART 35
 // (triangle-first geometry inspector + 5 renderer-side helpers + the new
-// `🔺 Tris` topbar button + E12 validator). Lives at the end of the main
-// module so it can reference every helper defined above. The block is
-// intentionally self-contained — no global state is added that other code
-// paths need to know about (everything is namespaced under the `lblSpec`
-// object on `window` so the inspector / console can introspect it but it
-// never collides with existing identifiers).
+// `🔺 Tris` topbar button + E12 validator), and PART 36 (multi-file drop
+// + model + rig pairing — adds the `lblRouteFiles(fileList)` dispatcher,
+// the `__lblLoaded3DModels[]` array, the `__lblExtractRigGraph` /
+// `__lblApplyRigToModel` helpers, the `__lblPendingRigs` queue, and the
+// `multiple` attribute on the 4 file inputs). Lives at the end of the
+// main module so it can reference every helper defined above. The block
+// is intentionally self-contained — no global state is added that other
+// code paths need to know about (everything is namespaced under the
+// `lblSpec` object on `window` so the inspector / console can introspect
+// it but it never collides with existing identifiers).
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.12 (PART 33 architectural features + PART 34 pre-bundled
-  // rig helpers + PART 35 triangle-first geometry); JSON/JS blueprints
-  // target v8.4 (PART 66 feature bridge + PART 34 runtime contract for
-  // userData.rigGraph + PART 35 tris inspector). The chip in the topbar
-  // shows both. Updating these constants is the only place to bump for a
-  // new spec release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.12', json: 'v8.4' };
+  // target v1.13 (PART 33 architectural features + PART 34 pre-bundled
+  // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
+  // drop + model + rig pairing); JSON/JS blueprints target v8.5 (PART
+  // 66 feature bridge + PART 34 runtime contract for userData.rigGraph
+  // + PART 35 tris inspector + PART 36 same). The chip in the topbar
+  // shows both. Updating these constants is the only place to bump for
+  // a new spec release — every check below reads from this single
+  // source.
+  const VERSION = { ts: 'v1.13', json: 'v8.5' };
 
   // The 10 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) one-to-one. Each check is a function that
