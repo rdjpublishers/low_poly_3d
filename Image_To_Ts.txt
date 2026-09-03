@@ -1,8 +1,23 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.7 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.9 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.9 (2026-09-03) — STRUCTURAL ERROR CORRECTIONS (source:
+    SYSTEM_DIAGNOSTIC_AND_ARCHITECTURAL_ERROR_REPORT_THREEJS.txt). New
+    PART 32 documents the 10 anti-patterns documented in the diagnostic
+    (relative imports, KeyframeTrack binding, un-normalized quaternions,
+    bone pivot misalignment, canvas-texture lifecycle, GLTFExporter
+    serialization, deprecated r150+ APIs, shared material mutation,
+    missing TypeScript contracts, inconsistent factory entrypoints),
+    adds 4 canonical helpers (pushQuatKeyframe, createDecalTexture,
+    exportRiggedModelToGlb, disposeRig, inspectModelTriangles), and a
+    16-item structural reference checklist that locks the rules in
+    before any .ts emission. PART 32 reproduces Prompt_To_Ts.txt's
+    PART 32 unchanged on the image-input fork (the anti-patterns are
+    output-side, identical regardless of how the subject was sourced).
+    PART 32 reinforces — never replaces — PARTs 1, 4, 5, 7, 8, 15, and
+    30. Bumped from v1.8 to v1.9.
   v1.8 (2026-09-02) — CHARACTER / MASCOT SCULPT ENRICHMENT (source:
     Character_Sculpt_Enrichment_v1.txt). New PART 31 appends the
     macro/meso/micro hierarchy, attachment contract, actionProfile,
@@ -5006,4 +5021,445 @@ exist so future rig/animation layers can consume them, and so the AI
 is forced to author a proper component hierarchy instead of a flat
 1-2-Group character. The rules in this PART apply ONLY when the
 subject is a character, mascot, creature, or humanoid.
+================================================================================
+
+================================================================================
+PART 32 — v1.9 ADDITIONS: THREE.JS STRUCTURAL ERROR CORRECTIONS
+(Diagnostic & Anti-Pattern Hard Rules — System Diagnostic Report)
+================================================================================
+Source: SYSTEM_DIAGNOSTIC_AND_ARCHITECTURAL_ERROR_REPORT_THREEJS.txt
+(captured errors 1-10 from prompt-to-ts, img2threejs, WebGL sandboxes, and
+glTF 2.0 exporter pipelines). This PART formalizes the 10 fixes as hard
+rules so the AI never re-emits any of the structural failures below.
+The rules reinforce — never contradict — PARTs 1, 4, 5, 7, 8, 15, and 30.
+Where PART 30 already covers a concept in depth, this PART is the
+single-line "do not violate" reminder with the canonical anti-pattern vs
+compliant-pattern example; cross-reference the parent PART for full
+treatment.
+
+--------------------------------------------------------------------------------
+32.1 — ANTI-PATTERN CATALOG (all 10 — verbatim, do not rephrase away)
+--------------------------------------------------------------------------------
+
+[1] RELATIVE LOCAL IMPORT SPECIFIERS IN STANDALONE MODULES
+    ❌ import { createLegGeometry } from './geometry';
+    ❌ import { buildWalkAnimation } from './animations';
+    ❌ import { DEFAULT_COLORS }     from './constants';
+    ✅ import * as THREE from 'three';
+    ✅ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+    RULE: every .ts factory is a SINGLE self-contained file. The only
+    allowed imports are 'three' and 'three/examples/jsm/...' (or the
+    'three/addons/...' alias the renderer's import map accepts — see
+    PART 4.1). ZERO relative imports — not `./`, not `../`, not anything
+    that would fail in a blob-URL/worker runner. Everything (constants,
+    geometries, materials, helpers, animation tracks, GLB export helper)
+    lives IN-FILE.
+
+[2] ANIMATION TRACK TARGET SPECIFIERS & HIERARCHY BINDING FAILURES
+    ❌ const leftThigh = new THREE.Bone(); // .name never set!
+    ❌ new THREE.QuaternionKeyframeTrack(
+           'armature/left_thigh/rotation',   // wrong path prefix
+           times, quaternionValues);
+    ✅ const leftThigh = new THREE.Bone();
+       leftThigh.name = 'Bone_Thigh_L';     // explicit, alphanumeric
+       rootGroup.add(leftThigh);
+       new THREE.QuaternionKeyframeTrack(
+           'Bone_Thigh_L.quaternion',        // exact "NodeName.prop"
+           times, quaternionValues);
+    RULE: every animated node has an explicit alphanumeric .name. Every
+    KeyframeTrack name is exactly "<NodeName>.<property>" — no path
+    prefix, no spaces, no special characters. All animated bones are
+    attached to the root group BEFORE the AnimationMixer(root) is
+    constructed (PART 30.2-30.5).
+
+[3] UN-NORMALIZED QUATERNIONS & SLERP INTERPOLATION JITTER
+    ❌ const q = new THREE.Quaternion().setFromEuler(
+                     new THREE.Euler(0.5, 0.2, 0));
+       values.push(q.x, q.y, q.z, q.w);    // floating-point drift
+    ✅ const tempEuler = new THREE.Euler();
+       const tempQuat  = new THREE.Quaternion();
+       function pushQuatKeyframe(x, y, z, arr) {
+         tempEuler.set(x, y, z, 'XYZ');
+         tempQuat.setFromEuler(tempEuler).normalize();
+         arr.push(tempQuat.x, tempQuat.y, tempQuat.z, tempQuat.w);
+       }
+    RULE: always call .normalize() after setFromEuler before pushing
+    quaternion values. Times array MUST be strictly monotonic
+    (0 <= t0 < t1 < ... < tn). For looping clips, frame 0 must equal
+    frame N (same quaternion components). The pushQuatKeyframe helper
+    above is the canonical pattern — keep one per file, reuse it.
+
+[4] BONE PIVOT MISALIGNMENT & DISLOCATION (LOCAL VS. WORLD SPACE)
+    ❌ // world-space positions, both added to root — calf detaches on rotate
+       const thigh = new THREE.Bone();
+       thigh.position.set(0.6, 1.2, 0);
+       const calf = new THREE.Bone();
+       calf.position.set(0.6, 0.6, 0);
+       rootGroup.add(thigh);
+       rootGroup.add(calf);
+    ✅ // proper local-offset hierarchy
+       const boneThigh = new THREE.Bone();
+       boneThigh.name = 'Bone_Thigh_L';
+       boneThigh.position.set(0.6, 1.2, 0);     // local to pelvis
+       rootPelvis.add(boneThigh);
+       const boneCalf = new THREE.Bone();
+       boneCalf.name = 'Bone_Calf_L';
+       boneCalf.position.set(0, -0.6, 0.15);    // LOCAL to thigh joint
+       boneThigh.add(boneCalf);
+    RULE: strict parent-child transform hierarchy (Root -> Pelvis ->
+    Torso -> HipSocket -> Thigh -> Calf -> Foot). Child .position is
+    ALWAYS a local offset relative to the immediate parent. Limb mesh
+    geometry has its rotation pivot at (0,0,0) in local mesh space —
+    use geometry.translate() to anchor vertices to the joint origin
+    before attaching to a bone.
+
+[5] PROCEDURAL CANVAS DECAL CONTEXT LIFECYCLE & MISSING FLAGS
+    ❌ const canvas = document.createElement('canvas');
+       const ctx = canvas.getContext('2d');
+       ctx.fillText('42', 10, 10);
+       const texture = new THREE.CanvasTexture(canvas);
+       // missing: needsUpdate, colorSpace
+    ✅ if (typeof document === 'undefined') return null;
+       const canvas = document.createElement('canvas');
+       canvas.width = 256; canvas.height = 256;
+       const ctx = canvas.getContext('2d');
+       if (!ctx) return null;
+       ctx.clearRect(0, 0, 256, 256);
+       ctx.fillStyle = '#ffffff';
+       ctx.font = 'bold 120px sans-serif';
+       ctx.textAlign = 'center';
+       ctx.textBaseline = 'middle';
+       ctx.fillText(label, 128, 128);
+       const texture = new THREE.CanvasTexture(canvas);
+       texture.colorSpace = THREE.SRGBColorSpace;   // r150+ replacement
+       texture.needsUpdate = true;
+       return texture;
+    RULE: guard `typeof document === 'undefined'` for SSR/Node test
+    paths. Guard `if (!ctx) return null;`. Always set both
+    `texture.colorSpace = THREE.SRGBColorSpace` and
+    `texture.needsUpdate = true` immediately after CanvasTexture
+    construction. Reinforces PART 8.
+
+[6] GLTF 2.0 / GLTFEXPORTER SERIALIZATION INCOMPATIBILITIES
+    ❌ mesh.userData = {
+         parentReference: rootGroup,    // CIRCULAR ref crashes exporter
+         onClick: () => console.log('clicked'),  // function breaks JSON
+       };
+    ✅ mesh.userData = {
+         partName: 'Chassis_Main',      // pure JSON-safe scalar fields
+         isMechanicalLimb: true,
+       };
+       // Animations embedded on the root group:
+       rootGroup.animations = clips;
+       export async function exportRiggedModelToGlb(
+         rootGroup, clips, filename = 'model.glb'
+       ): Promise<ArrayBuffer> {
+         const exporter = new GLTFExporter();
+         return new Promise((resolve, reject) => {
+           exporter.parse(
+             rootGroup,
+             gltf => resolve(gltf as ArrayBuffer),
+             err   => reject(err),
+             { binary: true, animations: clips }
+           );
+         });
+       }
+    RULE: userData MUST be JSON-serializable (plain strings, numbers,
+    booleans, arrays, plain objects). No functions, no EventListeners,
+    no circular parent references. Embed baked clips in
+    `rootGroup.animations = clips`. The standalone
+    `exportRiggedModelToGlb(root, clips, filename)` helper above is
+    the canonical pattern — keep one per file, even if the AI never
+    wires it to UI; it documents the export contract and survives in
+    the inspector console.
+
+[7] DEPRECATED THREE.JS LEGACY APIs (r150+ COMPATIBILITY)
+    ❌ new THREE.Geometry();                     // REMOVED in r125+
+    ❌ geometry.computeFaceNormals();            // REMOVED
+    ❌ texture.encoding = THREE.sRGBEncoding;    // DEPRECATED in r152
+    ✅ new THREE.BoxGeometry(), CylinderGeometry(), ExtrudeGeometry(),
+       SphereGeometry(), IcosahedronGeometry(), CapsuleGeometry(),
+       RoundedBoxGeometry(), ... (always BufferGeometry subclasses)
+    ✅ geometry.computeVertexNormals();
+    ✅ texture.colorSpace = THREE.SRGBColorSpace;
+    ✅ renderer.outputColorSpace = THREE.SRGBColorSpace;
+    ✅ MeshStandardMaterial / MeshPhysicalMaterial only (PBR)
+    RULE: target Three.js r150+ exclusively. No THREE.Geometry, no
+    THREE.Face3, no computeFaceNormals, no sRGBEncoding, no
+    LambertMaterial / PhongMaterial / BasicMaterial as the primary
+    surface shader. Reinforces PART 7 and PART 28.
+
+[8] MATERIAL/GEOMETRY SHARED MUTATION & MEMORY LEAKAGE
+    ❌ // same material on left + right leg, then mutate color on one
+       const legMat = new THREE.MeshStandardMaterial({ color: 0xc8763a });
+       leftLegMesh.material  = legMat;
+       rightLegMesh.material = legMat;
+       leftLegMesh.material.color.set(0xff0000);   // also recolors right
+    ✅ // distinct material instances for distinct visual roles
+       const chassisMat = new THREE.MeshStandardMaterial({ color: 0xc8763a });
+       const metalMat   = new THREE.MeshStandardMaterial({
+         color: 0xb8b8b8, metalness: 0.85, roughness: 0.35
+       });
+       // mirror limbs via cloned geometry, not shared material:
+       const leftGeom  = baseGeom.clone();
+       const rightGeom = baseGeom.clone();
+       // always export a dispose() helper that walks the tree:
+       export function disposeRig(rootGroup: THREE.Object3D): void {
+         rootGroup.traverse(obj => {
+           const m = obj as THREE.Mesh;
+           if (m.isMesh) {
+             m.geometry?.dispose();
+             const mat = m.material as
+               THREE.Material | THREE.Material[] | undefined;
+             if (Array.isArray(mat)) mat.forEach(x => x.dispose());
+             else if (mat) mat.dispose();
+           }
+         });
+       }
+    RULE: distinct material per visual role. Mirror limbs via cloned
+    geometry (leftGeom = baseGeom.clone()), not via shared material
+    mutation. Always provide a dispose() helper that traverses the
+    tree and disposes geometries + materials + textures (the
+    inspector can invoke it on model swap).
+
+[9] TYPESCRIPT TYPE INCOHERENCE & MISSING RETURN CONTRACTS
+    ❌ export function createMech(opts) {   // no return type, no opts type
+         return new THREE.Group();
+       }
+    ✅ export interface ModelOptions {
+         /** overall scale multiplier (default 1) */
+         scale?: number;
+         /** enable cast/receive shadows (default true) */
+         shadows?: boolean;
+         /** show as wireframe (default false) — used by the inspector */
+         wireframe?: boolean;
+         // model-specific typed fields below
+       }
+       export interface ModelBuildResult {
+         rootGroup: THREE.Group;
+         bones: Map<string, THREE.Bone>;
+         materials: Record<string, THREE.Material>;
+         clips: THREE.AnimationClip[];
+         dispose: () => void;
+       }
+       export interface MeshTriangleMetrics {
+         triangles: number;
+         meshes:    number;
+         materials: number;
+         bones:     number;
+         clips:     number;
+       }
+    RULE: every public surface is typed. `export interface XxxOptions`
+    on the factory's options arg. `export interface XxxBuildResult`
+    when the factory returns more than just the THREE.Group (e.g.,
+    rigged models). `export interface XxxMeshTriangleMetrics` for any
+    metrics helper. Reinforces PART 2.
+
+[10] INCONSISTENT FACTORY ENTRYPOINT SIGNATURES
+    ❌ // output one day calls it createModel, next day buildModel, then init
+       export function createModel(opts) { ... }
+       // and the file has no create*Model() export → loader rejects
+    ✅ // ALWAYS export BOTH the named primary builder AND a default alias
+       export function buildMechWalker(
+         options?: MechWalkerOptions
+       ): ModelBuildResult {
+         // … build the model …
+         return { rootGroup, bones, materials, clips, dispose };
+       }
+       // Universal alias — every renderer's loader pattern picks this up
+       export function createMechWalkerModel(
+         options?: MechWalkerOptions
+       ): THREE.Group {
+         return buildMechWalker(options).rootGroup;
+       }
+       export default buildMechWalker;
+    RULE: every TS factory file exports a function matching
+    /^create\w+Model$/ (the renderer's loader pattern — PART 1.2). For
+    non-character models that need a richer return (bones + clips +
+    metrics), ALSO export a named primary builder (buildXxx) plus a
+    default export. The loader-facing name is the canonical entry
+    point; the richer builder is for tests and the inspector.
+
+--------------------------------------------------------------------------------
+32.2 — CANONICAL HELPERS (copy these into every TS file as needed)
+--------------------------------------------------------------------------------
+These four helpers collectively close errors [3], [5], [6], [8] when
+included in a file. Drop them in verbatim; do not rewrite.
+
+  // ---- Quaternion keyframe pusher (closes error [3]) -----------------
+  const _euler = new THREE.Euler();
+  const _quat  = new THREE.Quaternion();
+  function pushQuatKeyframe(
+    xRad: number, yRad: number, zRad: number, arr: number[]
+  ): void {
+    _euler.set(xRad, yRad, zRad, 'XYZ');
+    _quat.setFromEuler(_euler).normalize();
+    arr.push(_quat.x, _quat.y, _quat.z, _quat.w);
+  }
+
+  // ---- Canvas decal texture (closes error [5]) -----------------------
+  export function createDecalTexture(
+    label = '42',
+    size  = 256
+  ): THREE.CanvasTexture | null {
+    if (typeof document === 'undefined') return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle    = '#ffffff';
+    ctx.font         = `bold ${Math.floor(size * 0.45)}px sans-serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, size / 2, size / 2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace  = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  // ---- GLB export helper (closes error [6]) --------------------------
+  export function exportRiggedModelToGlb(
+    rootGroup: THREE.Group,
+    clips: THREE.AnimationClip[],
+    filename = 'model.glb'
+  ): Promise<ArrayBuffer> {
+    const exporter = new GLTFExporter();
+    return new Promise((resolve, reject) => {
+      exporter.parse(
+        rootGroup,
+        gltf => resolve(gltf as ArrayBuffer),
+        err   => reject(err),
+        { binary: true, animations: clips }
+      );
+    });
+  }
+
+  // ---- Full-tree dispose (closes error [8]) --------------------------
+  export function disposeRig(rootGroup: THREE.Object3D): void {
+    rootGroup.traverse(obj => {
+      const m = obj as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry?.dispose();
+      const mat = m.material as
+        THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach(x => x.dispose());
+      else if (mat) mat.dispose();
+    });
+  }
+
+  // ---- Inspect metrics (closes error [9] + feeds the inspector) ------
+  export function inspectModelTriangles(
+    rootGroup: THREE.Object3D
+  ): MeshTriangleMetrics {
+    let triangles = 0, meshes = 0;
+    const materials = new Set<THREE.Material>();
+    rootGroup.traverse(obj => {
+      const m = obj as THREE.Mesh;
+      if (!m.isMesh) return;
+      meshes++;
+      const idx = m.geometry?.getIndex();
+      const pos = m.geometry?.getAttribute('position');
+      if (idx) triangles += idx.count / 3;
+      else if (pos) triangles += pos.count / 3;
+      const mat = m.material as
+        THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach(x => materials.add(x));
+      else if (mat) materials.add(mat);
+    });
+    const bones  = new Set<THREE.Bone>();
+    const clips  = new Set<THREE.AnimationClip>();
+    rootGroup.traverse(obj => {
+      if ((obj as THREE.Bone).isBone) bones.add(obj as THREE.Bone);
+    });
+    const root = rootGroup as THREE.Group;
+    (root.animations || []).forEach(c => clips.add(c));
+    return {
+      triangles: Math.round(triangles),
+      meshes,
+      materials: materials.size,
+      bones:     bones.size,
+      clips:     clips.size,
+    };
+  }
+
+  export interface MeshTriangleMetrics {
+    triangles: number;
+    meshes:    number;
+    materials: number;
+    bones:     number;
+    clips:     number;
+  }
+
+--------------------------------------------------------------------------------
+32.3 — STRUCTURAL REFERENCE CHECKLIST (run through silently before output)
+--------------------------------------------------------------------------------
+Before you emit a .ts factory, mentally walk this list. Any unchecked
+item is a build failure on the renderer's TS loader.
+
+  [ ] 1. ZERO relative local imports (`./...` or `../...`).
+  [ ] 2. All imports strictly from 'three' or 'three/examples/jsm/...'
+        (or the 'three/addons/...' alias the import map accepts).
+  [ ] 3. Every animated Bone has an explicit, matching .name string.
+  [ ] 4. All QuaternionKeyframeTracks are normalized and use
+        "BoneName.quaternion" — no path prefix, no spaces.
+  [ ] 5. Child bones are parented to their respective parent bones
+        with LOCAL offsets (not world coordinates).
+  [ ] 6. Every animated node is attached to the root group BEFORE
+        `new THREE.AnimationMixer(root)` is constructed.
+  [ ] 7. All quaternion keyframe arrays are strictly monotonic in
+        time, and the first/last frames match for looping clips.
+  [ ] 8. All materials use MeshStandardMaterial (or MeshPhysicalMaterial
+        for clearcoat/transmission) with valid PBR values; no
+        LambertMaterial/PhongMaterial/BasicMaterial as primary.
+  [ ] 9. Every CanvasTexture has both `needsUpdate = true` and
+        `colorSpace = THREE.SRGBColorSpace`.
+  [ ] 10. userData is free of functions, EventListeners, and circular
+         parent references — pure JSON-serializable values only.
+  [ ] 11. All AnimationClips are embedded in `rootGroup.animations`
+         (or passed directly to GLTFExporter.parse).
+  [ ] 12. Distinct material instances for distinct visual roles;
+         mirrored limbs use cloned geometry, not shared material.
+  [ ] 13. A `dispose()` helper exists that walks the tree and disposes
+         geometry + materials + textures.
+  [ ] 14. Public surfaces are typed: XxxOptions, XxxBuildResult,
+         MeshTriangleMetrics — no implicit `any`.
+  [ ] 15. The file exports a function matching /^create\w+Model$/
+         (the renderer's loader pattern) AND (for rigged models) a
+         named `buildXxx()` + `export default`.
+  [ ] 16. Three.js r150+ only — no THREE.Geometry, no
+         computeFaceNormals, no sRGBEncoding.
+
+--------------------------------------------------------------------------------
+32.4 — INTERSECTION WITH EXISTING PARTS (read this once, then trust them)
+--------------------------------------------------------------------------------
+This PART does NOT replace any existing rule — it consolidates and
+references them so a new AI session that hasn't fully absorbed PART 30
+still cannot emit broken code. The 10 errors above are addressed in
+depth at the following existing locations; cross-reference is in [brackets]:
+
+  [1] single-file architecture          → PART 1.1, PART 4 (entire)
+  [2] bone .name + track binding         → PART 30.2-30.5
+  [3] normalized quaternions             → PART 30.3
+  [4] local bone offsets                 → PART 30.2, PART 31.1-31.3
+  [5] canvas texture lifecycle           → PART 8 (entire)
+  [6] GLB export / userData hygiene      → PART 1.5, PART 30.5, PART 30.7
+  [7] r150+ API compatibility            → PART 3, PART 7, PART 28
+  [8] material / geometry instance split → PART 7, PART 15
+  [9] TypeScript type contracts          → PART 2, PART 1.2
+  [10] factory entrypoint signature      → PART 1.2, PART 30.0, PART 30.6
+
+PART 32 is the safety net for any PART above that an AI session might
+have skimmed. If you remember ONLY one thing from this file, remember
+the 10-line catalog in 32.1 — the rest is depth.
+
+================================================================================
+END OF PART 32 — THREE.JS STRUCTURAL ERROR CORRECTIONS
+Output remains a valid TS factory module. The 4 canonical helpers in
+32.2 are OPTIONAL inclusions — drop them in if and only if the model
+actually exercises the corresponding feature (a procedural decal, a
+rig, a GLB export path, a metrics inspector). The structural checklist
+in 32.3 is MANDATORY before every emission. Nothing in this PART
+removes or weakens any rule from PARTs 1-31.
 ================================================================================

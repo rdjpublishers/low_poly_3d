@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.0 — IMAGE-TO-JSON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.1 — IMAGE-TO-JSON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -84,7 +84,19 @@ instead of a flat 1-2-part character, and future renderer versions +
 the TS factory path can consume them. Applies ONLY when the subject is a
 character, mascot, creature, or humanoid — NOT to props, vehicles,
 architecture, food, or abstract shapes. For image input, this PART layers
-on top of PART 27's image analysis protocol.
+on top of PART 27's image analysis protocol. PART 65's v8.1 structural
+error corrections (source: SYSTEM_DIAGNOSTIC_AND_ARCHITECTURAL_ERROR_
+REPORT_THREEJS.txt) appended 2026-09-03 — reproduces Prompt_To_Js.txt's
+PART 65 unchanged on the image-input JSON fork (the 4 of 10 anti-
+patterns that apply to the JSON/JS blueprint path are output-side,
+identical regardless of how the subject was sourced). Documents the
+canvas-texture / textureImageColorSpace lifecycle, GLTFExporter
+userData hygiene, deprecated r150+ material + color-space tokens, and
+shared material instance mutation, with canonical blueprint-side
+compliant shapes and a 10-item pre-emission reference checklist. PART
+65 reinforces — never replaces — PARTs 3, 7, 8, 15, and 63. The
+remaining 6 of 10 errors do not apply on the JSON/JS path — see PART
+65.3 for the cross-reference table. Bumped from v8.0 to v8.1.
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  AI SYSTEM PROMPT — PASTE THIS WHOLE FILE, OR JUST THIS BOX, AS CONTEXT  ║
@@ -8570,4 +8582,256 @@ renderer versions and the TS factory path can consume them, and so the
 AI is forced to author a proper component hierarchy instead of a flat
 1-2-part character. The rules in this PART apply ONLY when the subject
 is a character, mascot, creature, or humanoid.
+================================================================================
+
+================================================================================
+PART 65 — v8.1 ADDITIONS: STRUCTURAL ERROR CORRECTIONS
+(JSON / JS blueprint → Three.js output pipeline)
+================================================================================
+Source: SYSTEM_DIAGNOSTIC_AND_ARCHITECTURAL_ERROR_REPORT_THREEJS.txt
+(captured errors 1-10 from prompt-to-ts, img2threejs, WebGL sandboxes,
+and glTF 2.0 exporter pipelines). For the JSON/JS blueprint path, only
+the renderer-level failures (errors 5, 6, 7, 8) apply — the AI does not
+emit raw Three.js code here, so the TS-specific errors (1, 2, 3, 4, 9,
+10) are already structurally impossible. The renderer's buildScene()
+honors the rules below, and the AI is required to author blueprints that
+do not force the renderer to violate them.
+
+This PART formalizes the 4 JSON/JS-relevant fixes as hard rules so the
+AI never re-emits any of the structural failures below. Where existing
+PARTs already cover a concept in depth, this PART is the single-line
+"do not violate" reminder with the canonical anti-pattern vs compliant-
+pattern example; cross-reference the parent PART for full treatment.
+
+--------------------------------------------------------------------------------
+65.1 — ANTI-PATTERN CATALOG (JSON/JS-relevant subset)
+--------------------------------------------------------------------------------
+
+[5] PROCEDURAL CANVAS DECAL CONTEXT LIFECYCLE & MISSING FLAGS
+    The blueprint path does not let the AI write canvas code directly,
+    but two blueprint fields can still trigger the underlying error:
+    `texturePattern` (procedural) and `textureImage` (data URL / file).
+    The renderer wraps both into a CanvasTexture / Texture on the AI's
+    behalf. Hard rules the AI must observe so the renderer never trips
+    the error:
+
+    ❌ // "textureImageColorSpace" missing or wrong casing:
+       { "id":"decal", "type":"plane",
+         "textureImage": "logo.png" }                  // no color space
+       { "id":"decal", "type":"plane",
+         "textureImage": "logo.png",
+         "textureImageColorSpace": "RGB" }             // WRONG value
+
+    ✅ { "id":"decal", "type":"plane",
+         "material":"glossy",
+         "textureImage": "textures/logo.png",
+         "textureImageRepeat":   [1, 1],
+         "textureImageOffset":   [0, 0],
+         "textureImageRotation": 0,
+         "textureImageColorSpace": "srgb" }            // required for color
+       // or for normal/roughness/metalness/AO maps:
+       { "id":"panel", "type":"cube", "material":"brushed-metal",
+         "textureImage": "textures/panel-normal.png",
+         "textureImageColorSpace": "no-color" }        // required for data
+
+    RULE: every `textureImage` field MUST be paired with an explicit
+    `textureImageColorSpace` — `"srgb"` for color/albedo textures,
+    `"no-color"` for normal/roughness/metalness/AO/data maps. The
+    renderer uses this to set the correct THREE colorSpace flag; a
+    missing field is auto-defaulted to "srgb" but the AI MUST state it
+    explicitly so the blueprint is self-documenting and survives
+    external GLB round-trips. (See PART 8 for the full texture spec.)
+    Reinforces PART 8 (procedural patterns) and the
+    `textureImageColorSpace` companion fields described around PART 3.
+
+[6] GLTF 2.0 / GLTFEXPORTER SERIALIZATION INCOMPATIBILITIES
+    The renderer's buildScene() copies each object's `userData`
+    sub-object verbatim onto the resulting mesh's `userData`. The AI's
+    job is to keep `userData` JSON-serializable so the export-to-GLB
+    path never throws "Converting circular structure to JSON".
+
+    ❌ // functions and circular refs break the GLB exporter
+       { "id":"leg", "type":"capsule", "material":"metal",
+         "userData": {
+           "onPick":  "() => focusCamera()",     // ❌ FUNCTION
+           "sibling": "<<ref:other-leg>>"        // ❌ non-JSON ref
+         } }
+
+    ✅ { "id":"leg-l", "type":"capsule", "material":"metal",
+         "userData": {
+           "partName":    "leg-left",              // pure scalar
+           "isPickable":  true,                    // used by inspector
+           "mirrorOf":    "leg-r",                 // sibling NAME, not ref
+           "jointParent": "thigh-l"                // string id only
+         } }
+       { "id":"leg-r", "type":"capsule", "material":"metal",
+         "userData": {
+           "partName":   "leg-right",
+           "isPickable": true,
+           "mirrorOf":   "leg-l",
+           "jointParent":"thigh-r"
+         } }
+
+    RULE: `userData` is STRICT JSON (plain strings, numbers, booleans,
+    arrays, plain objects). No functions. No EventListeners. No
+    cross-references to other object ids expressed as anything but
+    a plain string — store the sibling's id, not a JS reference.
+    Companion rules in PART 63 (`isPickable`, `partName`) and
+    PART 30.7 (TS path) reinforce this on the factory path.
+
+[7] DEPRECATED THREE.JS LEGACY APIs (r150+ COMPATIBILITY)
+    The renderer targets Three.js r150+. Blueprint-side, this surfaces
+    as: (a) the `material` field must reference a preset that compiles
+    to MeshStandardMaterial / MeshPhysicalMaterial — NOT Lambert /
+    Phong / Basic; and (b) `textureImageColorSpace: "srgb"` must use
+    the modern SRGBColorSpace token, not the legacy sRGBEncoding string.
+
+    ❌ // legacy material names or legacy color-space tokens
+       { "id":"panel", "material":"lambert" }               // REMOVED
+       { "id":"decal", "textureImageColorSpace":
+                    "sRGBEncoding" }                         // DEPRECATED
+
+    ✅ { "id":"panel", "material":"brushed-metal" }         // PBR preset
+       { "id":"decal", "textureImageColorSpace": "srgb" }   // modern token
+       // Custom PBR via direct numeric material:
+       { "id":"panel", "material": {
+           "baseColor":  "#c8763a",
+           "metalness":  0.0,
+           "roughness":  0.7
+         } }
+
+    RULE: prefer the named preset list in PART 3 (`mat` values resolve
+    to MeshStandardMaterial in the renderer). For custom PBR, use the
+    `material: { baseColor, metalness, roughness, ... }` object form
+    with numeric PBR fields — never emit `material: "lambert"`,
+    `material: "phong"`, or `material: "basic"`. Color-space tokens
+    are exactly `"srgb"` or `"no-color"` — never the legacy
+    `sRGBEncoding` / `LinearEncoding` strings. Reinforces PART 3 and
+    PART 7.
+
+[8] MATERIAL/GEOMETRY SHARED MUTATION & MEMORY LEAKAGE
+    Blueprint-side, this surfaces when the AI references a single
+    material name across many objects that should be visually distinct,
+    or re-uses one `material: { ... }` object literal across multiple
+    parts. The renderer's preset system already de-duplicates material
+    names (so 200 objects sharing `"material":"fur"` share one
+    MeshStandardMaterial instance — good), but object-literal
+    materials are instantiated per-object, and intentional visual
+    variation between two surfaces requires DISTINCT material names
+    or DISTINCT baseColor/metalness/roughness numeric values.
+
+    ❌ // same custom material on visually-different panels
+       { "id":"panel-warm",  "material": { "baseColor":"#cc6633" } }
+       { "id":"panel-cool",  "material": { "baseColor":"#cc6633" } }  // dup
+       { "id":"panel-warm2", "material": { "baseColor":"#cc6633" } }  // dup
+
+    ✅ // distinct material per visual role
+       { "id":"panel-warm",  "material":"copper",  "baseColor":"#cc6633" }
+       { "id":"panel-cool",  "material":"steel",   "baseColor":"#7a8a99" }
+       { "id":"panel-trim",  "material":"rubber",  "baseColor":"#1a1a1a" }
+       // or, when no preset fits, use distinct numeric values:
+       { "id":"panel-a", "material": { "baseColor":"#cc6633",
+                                       "metalness":0.0, "roughness":0.7 } }
+       { "id":"panel-b", "material": { "baseColor":"#cc6633",
+                                       "metalness":0.0, "roughness":0.4 } }
+
+    RULE: two visually-different surfaces = two distinct material
+    references (different preset names, OR identical preset name with
+    different `baseColor` / `metalness` / `roughness` numeric values,
+    OR one preset + one object-literal). Never reuse the SAME
+    `material: { ... }` object-literal across multiple parts expecting
+    different future PBR edits. Reinforces PART 7's "one preset per
+    visual role" guidance and PART 15's "don't repeat the same flat
+    material everywhere" anti-pattern.
+
+--------------------------------------------------------------------------------
+65.2 — JSON/JS BLUEPRINT REFERENCE CHECKLIST (silent pre-output pass)
+--------------------------------------------------------------------------------
+Before emitting any blueprint, mentally walk this list. Any unchecked
+item is a renderer-side failure that will surface in the inspector or
+the external GLB export.
+
+  [ ] 1. Every `textureImage` is paired with an explicit
+        `textureImageColorSpace` of exactly `"srgb"` or `"no-color"`.
+  [ ] 2. Every `userData` is JSON-serializable — no functions, no
+        EventListeners, no live JS references; sibling references are
+        string ids only.
+  [ ] 3. Every multi-part body uses `userData.isPickable: true` +
+        `userData.partName: "<semantic-name>"` (PART 63.1 contract)
+        so external GLB rig-test viewers can address each part.
+  [ ] 4. No `material: "lambert" | "phong" | "basic"` — all materials
+        are PBR presets or numeric PBR object-literal forms.
+  [ ] 5. `textureImageColorSpace` never uses the legacy
+        `"sRGBEncoding"` / `"LinearEncoding"` strings — exactly
+        `"srgb"` or `"no-color"`.
+  [ ] 6. Visually-distinct surfaces use distinct material references
+        (different preset names OR distinct numeric PBR values) —
+        not the same `material: { ... }` literal copy-pasted across
+        parts.
+  [ ] 7. Materials that need transparency (`opacity < 1`) explicitly
+        set `"transparent": true` so the renderer enables alpha
+        blending (PART 15 pitfall).
+  [ ] 8. Materials that need double-sided rendering explicitly set
+        `"side": "double"` (or `"back"`) — the default is single-sided.
+  [ ] 9. Procedural `texturePattern` and image `textureImage` are
+        never combined on the same part (PART 8 override rule).
+  [ ] 10. Each rig-relevant articulation (where present) names its
+         parent joint and child segment in `userData.jointParent` /
+         `userData.jointChild` as plain strings (mirrors PART 30.7's
+         TS-path discipline on the JSON/JS side).
+
+--------------------------------------------------------------------------------
+65.3 — WHY ONLY 4 OF 10 ERRORS APPLY HERE (cross-reference table)
+--------------------------------------------------------------------------------
+The full diagnostic catalog has 10 errors. For the JSON/JS blueprint
+path, the AI does not emit raw Three.js code, so the TS-only errors
+are already structurally impossible to produce from a valid blueprint:
+
+  [1] relative local imports     → N/A (no imports in blueprint)
+  [2] KeyframeTrack binding      → N/A (no keyframes in blueprint;
+                                     animation is a TS-path concern)
+  [3] un-normalized quaternions  → N/A (no quaternion math in blueprint)
+  [4] bone pivot misalignment    → N/A (no THREE.Bone in blueprint;
+                                     rig is a TS-path concern)
+  [9] TypeScript type contracts  → N/A (no TS types in blueprint)
+  [10] factory entrypoint name   → N/A (no factory function in
+                                     blueprint; buildScene() is the
+                                     fixed entry point)
+
+The remaining 4 (5, 6, 7, 8) ARE achievable from a valid blueprint and
+are the ones the catalog above locks down. The TS-path equivalent is
+in PART 32 (Prompt_To_Ts.txt / Image_To_Ts.txt) and addresses the full
+10.
+
+--------------------------------------------------------------------------------
+65.4 — INTERSECTION WITH EXISTING PARTS
+--------------------------------------------------------------------------------
+This PART does NOT replace any existing rule — it consolidates and
+references them so a new AI session that hasn't fully absorbed the
+parent PARTs still cannot emit broken blueprints. The 4 errors above
+are addressed in depth at the following existing locations;
+cross-reference is in [brackets]:
+
+  [5] textureImageColorSpace + procedural pattern lifecycle
+        → PART 8 (procedural canvas), PART 3 (textureImage companion
+          fields around line 572-594), PART 15 (common mistakes)
+  [6] userData hygiene + GLB export
+        → PART 1.5, PART 63.1 (isPickable/partName), PART 30.7 (TS-side
+          mirror)
+  [7] r150+ API compatibility (material + color-space tokens)
+        → PART 3 (material preset list), PART 7 (PBR recipes), PART 15
+  [8] material instance split
+        → PART 7, PART 15, PART 30 (TS-side mirror on the factory
+          path)
+
+PART 65 is the JSON/JS-path safety net. If you remember ONLY one thing
+from this PART, remember the 4-line catalog in 65.1 — the rest is depth.
+
+================================================================================
+END OF PART 65 — STRUCTURAL ERROR CORRECTIONS (JSON/JS PATH)
+Output remains a valid LBL JSON/JS blueprint. The 4 anti-pattern
+fixes in 65.1 and the 10-item checklist in 65.2 are MANDATORY before
+every emission. The cross-reference table in 65.3 documents why the
+remaining 6 of 10 TS-path errors do not apply here. Nothing in this
+PART removes or weakens any rule from PARTs 1-64.
 ================================================================================
