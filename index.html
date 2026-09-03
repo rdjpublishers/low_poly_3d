@@ -13306,6 +13306,14 @@ function addTsModelToScene(group, meta, lightsGroup){
   CURRENT_TS_MODEL=group;
   CURRENT_TS_META=meta;
 
+  // LBL MODEL + RIG MULTI-FILE — drain any rig files that were queued
+  // before this model loaded (e.g. a user dropped `rig.ts` first, then
+  // `model.ts`). Each queued rig gets validated, built with the bundled
+  // three-rig-helpers, and attached to the freshly loaded model.
+  if(typeof __lblDrainPendingRigs === 'function'){
+    setTimeout(()=>{ try{ __lblDrainPendingRigs(group); }catch(e){ console.error('[rig-drain]', e); } }, 0);
+  }
+
   updateTree(); // sceneObjects is empty, so this renders its normal "No objects." state — see PART 8 of the update prompt (no blueprint editor for TS)
   renderTsRuntimeInspector(meta, group);
   hideWelcome();
@@ -16599,6 +16607,239 @@ window.exportGLB=exportGLB; window.exportOBJ=exportOBJ;
 // ═══════════════════════════════════════════
 function readFile(file){ lblModelStoreHideNav(); const r=new FileReader(); r.onload=e=>validateAndBuild(e.target.result,file.name); r.readAsText(file); }
 
+// LBL MODEL + RIG MULTI-FILE — support dropping a separate rig.ts file
+// alongside a model.ts. A rig.ts file is one that doesn't define a
+// `create*Model` factory (so the regular validateAndBuild path throws)
+// but does expose a `RigGraph` (the `{ joints: [...] }` data structure
+// the bundled three-rig-helpers library consumes). The supported export
+// shapes are:
+//   1) default export is a RigGraph object:
+//        export default { joints: [{ id, parentId, restPosition, restRotation }, ...] }
+//   2) default export is a function that returns a RigGraph:
+//        export default function makeRig() { return { joints: [...] }; }
+//   3) named export `rigGraph` is a RigGraph object
+//   4) named export `getRigGraph()` / `createRigGraph()` returns one
+//
+// If a rig.ts is loaded and there's a model already in the scene
+// (CURRENT_TS_MODEL or the most recent TS load), the rig is built with
+// three-rig-helpers.buildSkeleton() and attached to that model. If no
+// model is present yet, the rig is queued in `__lblPendingRigs` and
+// applied to the next model that loads.
+
+// Try to extract a RigGraph from a compiled TS module's exports. Returns
+// the RigGraph or null. Throws with a helpful message when the module
+// has no recognisable rig export.
+function __lblExtractRigGraph(mod, filename){
+  const looksLikeRigGraph = (v) => v && typeof v === 'object'
+    && Array.isArray(v.joints)
+    && v.joints.every(j => j && typeof j.id === 'string'
+      && Array.isArray(j.restPosition) && j.restPosition.length === 3
+      && Array.isArray(j.restRotation) && j.restRotation.length === 4);
+  const callAndCheck = (fn) => {
+    try { const v = fn(); return looksLikeRigGraph(v) ? v : null; }
+    catch(e){ console.warn('[rig]', filename || 'rig file', 'export threw:', e); return null; }
+  };
+  // 1) default export — object form
+  if(looksLikeRigGraph(mod.default)) return mod.default;
+  // 2) default export — function form
+  if(typeof mod.default === 'function'){
+    const v = callAndCheck(mod.default);
+    if(v) return v;
+  }
+  // 3) named export `rigGraph`
+  if(looksLikeRigGraph(mod.rigGraph)) return mod.rigGraph;
+  // 4) named getter functions
+  for(const fname of ['getRigGraph','createRigGraph','buildRigGraph','getRig','createRig','rig']){
+    if(typeof mod[fname] === 'function'){
+      const v = callAndCheck(mod[fname]);
+      if(v) return v;
+    } else if(looksLikeRigGraph(mod[fname])){
+      return mod[fname];
+    }
+  }
+  throw new Error(`No RigGraph found in ${filename || 'the rig file'}. The file must export either a default RigGraph object ({ joints: [...] }), a default function returning one, or a named "rigGraph" / "getRigGraph()" export. See the bundled three-rig-helpers API for the RigJoint / RigGraph shape.`);
+}
+
+// Read a .ts file as text, compile it through the same TS pipeline
+// validateAndBuildTs uses, and try to extract a RigGraph. Returns
+// { rigGraph, mod, factory } on success. Re-throws the TS compile /
+// import errors so the caller can toast them.
+async function __lblLoadRigFromFile(file){
+  const text = await file.text();
+  const filename = file.name;
+  const ts = await getTsCompiler();
+  let out;
+  try{
+    out = ts.transpileModule(text, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2020,
+        module: ts.ModuleKind.ESNext,
+        esModuleInterop: true,
+        isolatedModules: true,
+      },
+      reportDiagnostics: true,
+    });
+  }catch(e){
+    throw new Error(`TypeScript syntax error in ${filename}: ${e.message}`);
+  }
+  if(out.diagnostics && out.diagnostics.length){
+    const d = out.diagnostics[0];
+    const msg = ts.flattenDiagnosticMessageText(d.messageText, ' ');
+    if(d.file && d.start != null){
+      const {line} = d.file.getLineAndCharacterOfPosition(d.start);
+      throw new Error(`TypeScript syntax error in ${filename} at line ${line+1}: ${msg}`);
+    }
+    throw new Error(`TypeScript syntax error in ${filename}: ${msg}`);
+  }
+  const resolvedSrc = rewriteImportsForRuntime(out.outputText);
+  const blob = new Blob([resolvedSrc], {type:'text/javascript'});
+  const url = URL.createObjectURL(blob);
+  let mod;
+  try{
+    mod = await import(/* @vite-ignore */ url);
+  }finally{
+    URL.revokeObjectURL(url);
+  }
+  const rigGraph = __lblExtractRigGraph(mod, filename);
+  return { rigGraph, mod, filename };
+}
+
+// Build the skeleton from a RigGraph using the bundled three-rig-helpers
+// library, validate it first, attach the root Bone to the model, and set
+// the userData markers the existing Rig-button / lblSpec code already
+// understands. Returns the SkeletonBuildResult on success or throws
+// when validation fails / helpers aren't available.
+function __lblApplyRigToModel(model, rigGraph, opts){
+  if(!model){ throw new Error('No model to attach the rig to.'); }
+  if(!rigGraph || !Array.isArray(rigGraph.joints)){
+    throw new Error('Invalid RigGraph — expected an object with a "joints" array.');
+  }
+  const helpers = (typeof window !== 'undefined') ? window.__threeRigHelpers : null;
+  if(!helpers || typeof helpers.buildSkeleton !== 'function'){
+    throw new Error('three-rig-helpers bundle is not loaded — cannot build skeleton.');
+  }
+  if(typeof helpers.validateRigGraph === 'function'){
+    const errs = helpers.validateRigGraph(rigGraph);
+    if(errs && errs.length){
+      throw new Error('Rig validation failed: ' + errs.join('; '));
+    }
+  }
+  // Drop any previously-attached rig on this model — the user might be
+  // re-applying a different rig to the same model.
+  const oldRig = (model.children || []).filter(c => c && c.isBone && c.userData && c.userData.__lblRigRoot);
+  oldRig.forEach(b => model.remove(b));
+  const built = helpers.buildSkeleton(rigGraph);
+  built.root.userData.__lblRigRoot = true;
+  built.root.name = (model.name || 'model') + '__rig';
+  model.add(built.root);
+  // Mark the model so the existing Rig button + spec checks see it.
+  model.userData.rigGraph = rigGraph;
+  model.userData.skeletonSource = 'three-rig-helpers';
+  model.userData.__lblSkeleton = built.skeleton;
+  model.userData.__lblBones = built.bones;
+  if(typeof window.lblSpec !== 'undefined' && window.lblSpec && typeof window.lblSpec.refreshOnLoad === 'function'){
+    setTimeout(()=>{ try{ window.lblSpec.refreshOnLoad(); }catch(_){} }, 0);
+  }
+  const jointCount = (rigGraph.joints || []).length;
+  if(!(opts && opts.silent)){
+    toast(`✓ Rig applied — ${jointCount} joint${jointCount===1?'':'s'} on "${model.name || 'model'}"`, 'ok');
+  }
+  return built;
+}
+
+// Queue of RigGraphs waiting for a model. Filled when a rig file is
+// loaded but no model is in the scene yet, drained after every model
+// load (validateAndBuildTs, addTsModelToScene, load3DFile).
+const __lblPendingRigs = [];
+function __lblQueueRig(rigGraph, filename){
+  __lblPendingRigs.push({ rigGraph, filename });
+}
+function __lblDrainPendingRigs(targetModel){
+  if(!__lblPendingRigs.length || !targetModel) return 0;
+  let applied = 0;
+  // Drain a snapshot so a thrown error mid-loop doesn't skip the rest.
+  const queue = __lblPendingRigs.splice(0, __lblPendingRigs.length);
+  for(const item of queue){
+    try{
+      __lblApplyRigToModel(targetModel, item.rigGraph, { silent: true });
+      toast(`✓ Queued rig "${item.filename}" applied — ${item.rigGraph.joints.length} joint${item.rigGraph.joints.length===1?'':'s'}`, 'ok');
+      applied++;
+    }catch(e){
+      toast(`Queued rig "${item.filename}" failed: ${e.message}`, 'err');
+      console.error('[rig-queue] apply failed:', e);
+    }
+  }
+  return applied;
+}
+
+// Try to read a file as a model blueprint (JSON/JS/TS). If the TS path
+// fails because there's no `create*Model` factory, fall back to loading
+// it as a rig and apply / queue it. Returns a string describing the
+// outcome so the dispatcher can show the right toast.
+async function __lblReadBlueprintOrRig(file){
+  const text = await file.text();
+  const filename = file.name;
+  // JSON / JS — always blueprint, never a rig. (Rig files are .ts only.)
+  const trimmed = text.trim();
+  const isJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  const isJs = !isJson && /^(export\s+default|module\.exports|return\s|const\s+\w+\s*=|function\s)/.test(trimmed);
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  if(isJson || isJs || (ext === 'json' || ext === 'js' || ext === 'mjs')){
+    // Pure blueprint path — no rig fallback needed.
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = e => {
+        try { validateAndBuild(e.target.result, filename); resolve('blueprint:' + (isJson ? 'json' : 'js')); }
+        catch(err){ reject(err); }
+      };
+      r.onerror = () => reject(r.error);
+      r.readAsText(file);
+    });
+  }
+  // TS / MTS / CTS — try the regular model pipeline first.
+  try{
+    const origRead = readFile;
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = e => {
+        try { validateAndBuild(e.target.result, filename); resolve('model'); }
+        catch(err){
+          // Did the failure look like the "no factory" case? If so, try
+          // the rig fallback. Other errors (real syntax / import errors)
+          // should bubble up so the user sees a clear message.
+          const msg = (err && err.message) || String(err);
+          const noFactory = /No create\*Model\(\) export found/i.test(msg)
+            || /Factory .* did not return a THREE\.Object3D/i.test(msg)
+            || /Factory .* returned an empty THREE\.Object3D/i.test(msg);
+          if(!noFactory){ reject(err); return; }
+          // Rig fallback — compile the same file as a rig.
+          (async () => {
+            try{
+              const { rigGraph } = await __lblLoadRigFromFile(file);
+              // Apply to the most recent model, or queue for the next one.
+              const target = (typeof CURRENT_TS_MODEL !== 'undefined' && CURRENT_TS_MODEL) || null;
+              if(target){
+                __lblApplyRigToModel(target, rigGraph);
+                resolve('rig:applied');
+              } else {
+                __lblQueueRig(rigGraph, filename);
+                toast(`Rig "${filename}" queued — drop a model .ts next and it will attach automatically`, 'ok');
+                resolve('rig:queued');
+              }
+            }catch(rigErr){
+              reject(new Error(`${filename} is not a model and is not a rig either: ${rigErr.message}`));
+            }
+          })();
+        }
+      };
+      r.onerror = () => reject(r.error);
+      r.readAsText(file);
+    });
+  }catch(e){
+    throw e;
+  }
+}
+
 // LBL MULTI-FILE UPDATE — single entry point used by every file-input /
 // drop handler below. Sorts a FileList into images / 3D models / blueprints
 // and dispatches each batch to the right loader:
@@ -16660,14 +16901,25 @@ function lblRouteFiles(fileList){
     });
   }
 
-  // Blueprints — load the first one normally, warn the user about the rest.
-  // Merging two full scenes is out of scope for the drop path; users can
-  // paste multiple blueprints into the editor one at a time if needed.
+  // Blueprints + rigs — process SEQUENTIALLY because a rig file may
+  // depend on a model that loads earlier in the same batch. The
+  // blueprint path also tries the rig fallback: if a .ts file has no
+  // `create*Model` factory, we treat it as a rig and attach it to the
+  // most recently loaded model (or queue it for the next one).
   if(buckets.blueprint.length){
     if(buckets.blueprint.length > 1){
-      toast(`Multiple blueprint files detected — loading "${buckets.blueprint[0].name}" first. Drop the others one at a time to load them sequentially.`, 'err');
+      toast(`Loading ${buckets.blueprint.length} blueprint/rig file${buckets.blueprint.length===1?'':'s'} sequentially…`);
     }
-    readFile(buckets.blueprint[0]);
+    (async () => {
+      for(const f of buckets.blueprint){
+        try{
+          await __lblReadBlueprintOrRig(f);
+        }catch(e){
+          toast(`Failed to load ${f.name}: ${e.message}`, 'err');
+          console.error('[lblRouteFiles]', f.name, e);
+        }
+      }
+    })();
   }
 }
 
@@ -16685,9 +16937,27 @@ const dz=document.getElementById('dropzone');
 function lblRouteDroppedFile(file){
   if(file && /^image\//.test(file.type) && typeof window.lblApplyImageFileToSelected==='function'){
     window.lblApplyImageFileToSelected(file);
-  } else {
-    readFile(file);
+    return;
   }
+  // LBL MODEL + RIG MULTI-FILE — for blueprint-ish files (JSON/JS/TS),
+  // route through the new reader which tries the model pipeline first
+  // and falls back to a rig attach when the TS file has no factory.
+  // (Image drops are handled by the branch above.)
+  const ext = (file && file.name ? file.name.split('.').pop() : '').toLowerCase();
+  if(__LBL_BLUEPRT_EXTS.has(ext)){
+    (async () => {
+      try{
+        await __lblReadBlueprintOrRig(file);
+      }catch(e){
+        toast(`Failed to load ${file.name}: ${e.message}`, 'err');
+        console.error('[lblRouteDroppedFile]', file.name, e);
+      }
+    })();
+    return;
+  }
+  // Last-resort fallback — defer to the original behavior for anything
+  // we don't classify above.
+  readFile(file);
 }
 document.getElementById('dz-input').addEventListener('change',e=>{ lblRouteFiles(e.target.files); e.target.value=''; });
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
