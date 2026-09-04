@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Low Poly 3D — AI Low-Poly Scene Builder | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.15 (TS path) and v8.7 (JSON/JS path) with 10 opt-in architectural features, 16 hard anti-pattern guards (incl. 4 new character-pipeline validators E13-E16), and a triangle-first geometry inspector. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.15, LBL v8.7, zip bundle, model rig, character pipeline, skeletal skinning"/>
+<title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.15 (TS path) and v8.7 (JSON/JS path) with 10 opt-in architectural features, 16 hard anti-pattern guards (incl. 4 new character-pipeline validators E13-E16), and a triangle-first geometry inspector. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.15, LBL v8.7, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -16,16 +16,16 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="RDJ Publishers"/>
-<meta property="og:title" content="Low Poly 3D — AI Low-Poly Scene Builder"/>
-<meta property="og:description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Export GLB or OBJ."/>
+<meta property="og:title" content="Low Poly 3D — AI 3D Scene Builder (any style)"/>
+<meta property="og:description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name, but the system supports any 3D style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX. Export GLB or OBJ."/>
 <meta property="og:url" content="https://rdjpublishers.com/low_poly_3d/"/>
 <meta property="og:image" content="https://rdjpublishers.com/low_poly_3d/Logo.png"/>
 <meta property="og:locale" content="en_US"/>
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:title" content="Low Poly 3D — AI Low-Poly Scene Builder"/>
-<meta name="twitter:description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device."/>
+<meta name="twitter:title" content="Low Poly 3D — AI 3D Scene Builder (any style)"/>
+<meta name="twitter:description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name, but the system supports any 3D style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted. Free, no sign-up, nothing ever leaves your device."/>
 <meta name="twitter:image" content="https://rdjpublishers.com/low_poly_3d/Logo.png"/>
 
 <!-- Structured data -->
@@ -42,7 +42,7 @@
     "price": "0",
     "priceCurrency": "USD"
   },
-  "description": "Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes in your browser. Export GLB or OBJ. Free, no sign-up, nothing ever leaves your device.",
+  "description": "Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name, but the system supports any 3D style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted. Export GLB or OBJ. Free, no sign-up, nothing ever leaves your device.",
   "publisher": {
     "@type": "Organization",
     "name": "RDJ Publishers",
@@ -1438,7 +1438,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <!-- RJS UPDATE 3 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
        TS factories target v1.15 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline), JSON/JS blueprints target v8.7 (PART 66 feature bridge + PART 34-37 + PART 38).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 16 anti-patterns from PART 32/65/38. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns and PART 38 character-pipeline validators (E13-E16) as non-blocking warnings.">LBL: v1.15 / v8.7</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.15 TS / v8.7 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns and PART 38 character-pipeline validators (E13-E16) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec).">LBL: v1.15 / v8.7</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->

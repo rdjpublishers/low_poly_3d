@@ -1,4 +1,4 @@
-# v1.15 / v8.7 — Character pipeline upgrade (PART 38)
+# v1.15 / v8.7 — Character pipeline upgrade (PART 38) + style agnosticism (PART 38.22)
 
 The character output path is upgraded from primitive-assembly to a
 continuous-topology + deformation-aware + GLB-first pipeline. The
@@ -83,6 +83,17 @@ character poses).
 - **38.20** Priority order (top 10 — start with continuous head/torso
             topology, not more decorative primitives)
 - **38.21** Final design principle (the 9-item quality bar)
+- **38.22** **Style agnosticism** — the system is NOT limited to low-poly.
+            The project is named "Low Poly 3D" and the v1.0 → v8.6 history
+            favored low-poly, but the renderer and the spec support ANY
+            3D model style: low-poly, mid-poly, high-poly, smooth-shaded,
+            stylized, photoreal, voxel, hand-painted, toon / cel,
+            retro-PSX, or any combination. Low-poly is the DEFAULT for
+            short prompts because the project is named for it, NOT
+            because the system rejects other styles. PART 38.22 makes
+            this explicit so the AI does not self-limit when the user
+            asks for something that is not low-poly. See the dedicated
+            "Style agnosticism" section below.
 
 ## What PART 38 does NOT introduce
 
@@ -162,6 +173,57 @@ without any caller-side changes.
   by line-count diff of each file before vs after the change
   (the only added lines are the new CHANGELOG entry, the new
   header version, and the appended PART 38)
+
+## Style agnosticism — the system is NOT limited to low-poly
+
+The maintainer confirmed: the project is named "Low Poly 3D" but
+the system does NOT limit output to low-poly. PART 38.22 makes
+this explicit in every spec file, and the AI system prompt in
+each spec file was rewritten to:
+
+  - Reframe the task from "You generate ... for a low-poly 3D
+    model viewer" to "You generate ... for the Low Poly 3D 3D
+    model viewer (the project is named 'Low Poly 3D' but the
+    renderer and this spec support ANY 3D model style)".
+  - Reframe the AI's mindset from "Think like a low-poly
+    artist" to "Think like a 3D artist first, a [TS / JS / JSON
+    author] second". The same principles (silhouette, secondary
+    forms, action-readiness, surface detail) apply to every
+    style, not just low-poly.
+  - Add a 3-step style detection rule: (1) explicit style
+    keyword in the prompt, (2) reference image style, (3)
+    default to low-poly. The AI does not over-correct toward
+    the project name when the user asks for something else.
+  - List 13 supported styles explicitly: low-poly, mid-poly,
+    high-poly, smooth-shaded, stylized, photoreal, voxel,
+    hand-painted, toon / cel, retro-PSX, hologram, wireframe,
+    and any combination.
+
+The renderer (index.html) was also updated:
+
+  - Page `<title>`: "Low Poly 3D — AI Low-Poly Scene Builder"
+    → "Low Poly 3D — AI 3D Scene Builder (any style)". The
+    project name "Low Poly 3D" stays as a brand, but the
+    description now reflects the actual system scope.
+  - Meta description: now lists all 12 supported styles
+    (low-poly, mid-poly, high-poly, smooth-shaded, stylized,
+    photoreal, voxel, hand-painted, toon / cel, retro-PSX,
+    or any combination) instead of just "low-poly".
+  - Open Graph and Twitter Card descriptions: same update.
+  - JSON-LD structured data `description`: same update.
+  - Meta keywords: added "mid poly, high poly, smooth shaded,
+    stylized, photoreal, voxel, hand painted, toon shading,
+    cel shading, retro PSX" alongside the existing
+    "low poly 3D".
+  - LBL spec chip `title` attribute: now mentions that the
+    renderer supports any 3D model style and points to
+    PART 38.22 in the spec.
+
+The project name "Low Poly 3D" is preserved throughout (it's
+the brand / product name). What changed is the IMPLICATION that
+the system is limited to low-poly — that implication is removed
+from the spec, the AI system prompt, the meta description, and
+the chip title.
 
 ## Related prior rounds (for context)
 
