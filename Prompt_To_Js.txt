@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.7 — MASTER AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.8 — MASTER AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -102,6 +102,32 @@ reference checklist. PART 66 reinforces — never replaces — PARTs 5,
 28, 30, 64, 65. The remaining 6 features are renderer behavior that
 the AI doesn't have to author. Bumped from v8.1 to v8.2.
 
+  v8.8 (2026-09-04) — 3D MODELING TECHNIQUES (source: the maintainer's
+    "3D MODELING TECHNIQUES — practical guide for reducing bugs and
+    making better models"). New PART 39 mirrors the v1.16 upgrade in
+    Prompt_To_Ts.txt for the JSON/JS blueprint path. Six practical
+    disciplines: (39.1) catch dumb stuff early — the
+    "// ----...---const X" pattern silently comments out the next
+    declaration, so always put a blank line between a `//`
+    separator and the next declaration, and bake a boot-time
+    `validateBlueprint(bp)` helper that runs in the JSON/JS
+    validator pipeline and reports floating-part gaps; (39.2)
+    build a visual dev loop — runtime knobs and PNG snapshot;
+    (39.3) use the right geometry primitive — prefer
+    `geometry.kind: "tube"` / `"lathe"` / `"extrude"` over
+    hand-rolled box stacks; (39.4) proportions and recognition
+    — the silhouette test, reference-first, the "is it
+    cheating" check; (39.5) procedural / parametric modeling
+    — a `params` object on the blueprint root that drives all
+    dimensions / colors / curve points; (39.6) the three
+    things that help right now. Adds two new non-blocking
+    validators E17 (bbox-overlap gap detector on every
+    blueprint `nodes[]` entry sorted by X) and E18
+    (draw-call / mesh-count sanity on the assembled scene).
+    PART 39 is style-agnostic and applies to every JSON/JS
+    blueprint. No new dependency, no new export path, no new
+    mandatory blueprint field, no removed / weakened rule.
+    Bumped from v8.7 to v8.8.
   v8.7 (2026-09-04) — CHARACTER PIPELINE UPGRADE.
     New PART 38 mirrors the v1.15 upgrade in Prompt_To_Ts.txt for
     the JSON/JS blueprint path. The character output path is
@@ -12362,3 +12388,539 @@ low-poly. The AI's job is to match the request, not to
 over-correct toward the project name.
 ================================================================================
 
+
+================================================================================
+PART 39 — v1.16 / v8.8 ADDITIONS: 3D MODELING TECHNIQUES
+================================================================================
+Source: the maintainer's "3D MODELING TECHNIQUES — practical guide
+for reducing bugs and making better models" (2026-09-04). The guide
+captures six practical disciplines the AI must follow when generating
+.ts factory geometry (or any JSON/JS blueprint that ultimately ends
+up as a Three.js Group). PART 39 layers on top of — never replaces —
+PART 1, PART 2, PART 3, PART 4, PART 30, PART 32, PART 34, PART 35,
+PART 36, PART 37, PART 38.
+
+  39.0  CENTRAL PRINCIPLE
+  -----------------------
+
+    Three practical disciplines drive the rest of PART 39:
+
+    1.  Catch the dumb stuff EARLY (39.1) — silent-comment-
+        declaration bugs and floating-part gaps are caught at
+        boot with a `validate*Model()` walk, not at runtime by
+        the user staring at a screen.
+    2.  Build a VISUAL dev loop (39.2) — runtime knobs,
+        `renderer.info` logs, and on-demand PNG snapshots make
+        proportion work 10x faster than recompile.
+    3.  Use the RIGHT geometry primitive (39.3) — the
+        primitive that makes curves, the primitive that makes
+        round profiles, the primitive that blends smoothly,
+        the primitive that repeats. Stack boxes to fake curves
+        is always wrong.
+
+    Everything else in PART 39 (39.4 proportions, 39.5
+    procedural, 39.6 the three things) flows from these
+    three.
+
+  39.1  CATCH THE DUMB STUFF EARLY
+  --------------------------------
+
+  39.1.1  Ban the "comment eats code" pattern.
+
+    The pattern
+
+        // ------- section header
+        // -------const COL = { ...
+
+    silently comments out the `const COL = {` declaration
+    because the second line starts with `//`. ESLint can't
+    catch this directly, but a simple custom rule can.
+
+    The fix the AI must adopt going forward: ALWAYS put a
+    blank line between a `//` separator and the next
+    declaration. Specifically, never start a non-`//` line
+    that comes after a `//`-prefixed separator with another
+    `//`.
+
+    BAD (silently breaks the file):
+        // ------- section header
+        // -------const COL = { ... };
+
+    GOOD (blank line, no leading `//` on the const line):
+        // ------- section header
+        // -----------------------------------------------------------------------------
+        const COL = { ... };   // on its own line, no leading //
+
+    This rule applies to every .ts factory the AI emits. It
+    is style-agnostic; low-poly / high-poly / voxel / smooth
+    / photoreal all suffer the same bug.
+
+  39.1.2  Bake a boot-time `validate*Model()` function into
+          every .ts factory.
+
+    The factory MUST call a `validateModel(root, opts)`
+    helper at the end of `create*Model()` and log warnings
+    (do NOT throw — the model still loads) for:
+
+    - gaps > maxGap (default 0.02) between adjacent parts
+      sorted by their X-axis bounding box (the canonical
+      "floating parts" detector);
+    - model X dimension < 0.5 or > 20 (sanity range);
+    - total mesh count > 500 (caller should consider
+      InstancedMesh — see 39.3.4).
+
+    Reference implementation (Appendix C; re-exported on
+    `window.lblSpec.helpers.validateModel` — see 39.8):
+
+        function validateModel(root, opts = {}) {
+          const nodes = (root.userData.sculptRuntime as any)?.nodes ?? {};
+          const ranges = Object.entries(nodes).map(([n, o]) => {
+            const b = new THREE.Box3().setFromObject(o);
+            return {
+              name: n,
+              minX: b.min.x, maxX: b.max.x,
+              minY: b.min.y, maxY: b.max.y,
+              minZ: b.min.z, maxZ: b.max.z
+            };
+          }).sort((a, b) => a.minX - b.minX);
+
+          const errors: string[] = [];
+          for (let i = 0; i < ranges.length - 1; i++) {
+            const gap = ranges[i+1].minX - ranges[i].maxX;
+            if (gap > (opts.maxGap ?? 0.02)) {
+              errors.push(
+                `Gap ${gap.toFixed(3)} between ` +
+                `${ranges[i].name} and ${ranges[i+1].name}`
+              );
+            }
+          }
+
+          const total = new THREE.Box3().setFromObject(root);
+          const size = total.getSize(new THREE.Vector3());
+          if (size.x < 0.5) errors.push(
+            `Model too small: total X = ${size.x.toFixed(3)}`);
+          if (size.x > 20)  errors.push(
+            `Model too large: total X = ${size.x.toFixed(3)}`);
+
+          let meshCount = 0;
+          root.traverse(o => { if (o.isMesh) meshCount++; });
+          if (meshCount > 500) errors.push(
+            `Too many meshes: ${meshCount} (consider InstancedMesh)`);
+
+          return {
+            ok: errors.length === 0,
+            errors,
+            meshCount,
+            bbox: { size }
+          };
+        }
+
+    The factory's tail should look like:
+
+        export function create*Model(): THREE.Group {
+          // ... build root ...
+          const v = validateModel(root, { maxGap: 0.02 });
+          if (!v.ok) {
+            console.warn(
+              `[create*Model] ${v.errors.length} issue(s):`,
+              v.errors
+            );
+          }
+          return root;
+        }
+
+    The renderer's E17 validator (see 39.7.1) re-runs the
+    same walk on every load, so the user sees the warnings
+    in the topbar chip even when the factory's own call is
+    quiet.
+
+  39.2  BUILD A VISUAL DEV LOOP
+  -----------------------------
+
+  39.2.1  Add runtime knobs (Leva / dat.gui / Tweakpane).
+
+    Make scale, mag curve angle, stock taper, recoil
+    strength — every dimension that the user can
+    meaningfully tune — tweakable in real time. The AI finds
+    proportions 10x faster by sliding a slider than by
+    recompiling. Default the suggested knob to Tweakpane
+    (already widely used; the Tweakpane `Pane` import is
+    the recommended path for v1.16 / v8.8).
+
+    Reference implementation (Appendix B; the `pane.addBinding`
+    pattern is documented in full there):
+
+        import { Pane } from 'tweakpane';
+        const params = {
+          scale: 1.8,
+          magCurve: 0.22,
+          stockTaper: 0.045,
+          fireInterval: 0.10,
+        };
+        const pane = new Pane();
+        pane.addBinding(params, 'scale', { min: 0.5, max: 3.0 })
+            .on('change', e => { root.scale.setScalar(e.value); });
+        pane.addBinding(params, 'magCurve', { min: 0.0, max: 0.5 })
+            .on('change', e => { rebuildMagazine(e.value); });
+
+    The factory does NOT need to ship the Pane code in the
+    final emission — the Pane is for the AI's own
+    authoring-time iteration. The factory should still
+    publish the parameters as a top-level `params` object
+    (see 39.5.2) so they are auditable in the final file.
+
+  39.2.2  Log `WebGLRenderer.info` for sanity.
+
+    Every .ts factory's `tick(dt)` (if present) and every
+    dev-time harness should log:
+
+        console.log(renderer.info.render);   // triangles, calls, geometries
+
+    The signal "1 tris  1 calls" is suspicious — it usually
+    means the model isn't actually rendering or `tick()` is
+    not being driven. The renderer's E18 validator (see
+    39.7.2) catches the "too many meshes" case; the
+    `renderer.info` log is the author's own sanity check
+    while iterating.
+
+  39.2.3  Snapshot a frame to PNG on demand.
+
+    Drop this helper (Appendix A; re-exported on
+    `window.lblSpec.helpers.snapshotToPng` — see 39.8)
+    behind a button or `?debug=1` query param:
+
+        function snapshotToPng(renderer, path) {
+          renderer.render(scene, camera);
+          const c = renderer.domElement;
+          const url = c.toDataURL('image/png');
+          // save url to disk via fetch, or auto-download:
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = path || 'snapshot.png';
+          a.click();
+        }
+
+    The AI iterates visually without leaving the browser.
+    Useful while the AI is building the model — not
+    required in the shipped .ts factory.
+
+  39.3  USE THE RIGHT GEOMETRY PRIMITIVE
+  --------------------------------------
+
+    The "chain of rings" bug is a CLASS of error: stacking
+    rotated boxes to fake a curve always reads as separate
+    rings. The fix is not "more boxes with smaller gaps" —
+    it is "use the primitive that makes curves". The full
+    intent-to-primitive table:
+
+      Want to make...             Use                              Don't use
+      -------------------------  -------------------------------   -------------------------
+      Curved surface (mag,       ExtrudeGeometry along a           Stacked rotated boxes
+      grip, sling, sling-strap)  CatmullRomCurve3
+      Round profile (barrel,     LatheGeometry                     32 stacked boxes
+      cap, magazine tube)
+      Smoothly blended shape     BufferGeometry with               Multiple overlapping
+      (organic, melted)          computed vertices                 meshes
+      Repeated detail (vents,    InstancedMesh                     50 individual meshes
+      holes, rivets, buttons)
+
+  39.3.1  Curved surface → ExtrudeGeometry along a
+          CatmullRomCurve3.
+
+    A banana mag, a curved handguard, a slung sling — all
+    are extruded cross-sections along a curve, not
+    rotated boxes. Appendix A's `curvedPart(curve, crossW,
+    crossD, mat, opts)` helper (re-exported on
+    `window.lblSpec.helpers.curvedPart` — see 39.8) is the
+    canonical implementation. The `opts.steps` default
+    of 80 is high enough for a smooth visual curve; lower
+    it to 20 for a chunky low-poly curve.
+
+  39.3.2  Round profile → LatheGeometry.
+
+    A barrel, a bottle cap, a magazine tube, a bolt body
+    — all are 2D profiles revolved around an axis. Use
+    `new THREE.LatheGeometry(points, segments)`. The
+    `segments` default of 12 is fine for low-poly; raise
+    to 32 for smooth / photoreal.
+
+  39.3.3  Smoothly blended shape → BufferGeometry with
+          computed vertices.
+
+    For a "melted" or organic shape, build the vertex
+    array directly: `Float32Array` of XYZ triples, an
+    index buffer for the triangulation, then
+    `geometry.computeVertexNormals()`. Do NOT try to
+    blend multiple overlapping meshes — the seams will
+    show.
+
+  39.3.4  Repeated detail → InstancedMesh.
+
+    Vents, rivets, screw heads, buttons, repeated panels
+    — all are one InstancedMesh with N matrix4
+    transforms, NOT N individual meshes. The renderer's
+    existing PART 35 already covers mergeGeometries for
+    ONE-OFF detail; PART 39.3.4 covers REPEATED detail
+    with InstancedMesh (the two compose cleanly).
+
+  39.3.5  Useful rule of thumb.
+
+    If you find yourself writing a `for` loop to make N
+    copies of the same mesh along a path, STOP. Use
+    ExtrudeGeometry or InstancedMesh instead. The loop
+    version is always worse — worse performance, worse
+    silhouette, worse authoring.
+
+  39.4  PROPORTIONS & RECOGNITION
+  -------------------------------
+
+  39.4.1  The silhouette test.
+
+    Render the model in pure black against white at
+    256×256 and squint. If you can't tell what it is, the
+    proportions are wrong — NOT the textures, NOT the
+    lighting, NOT the details. The silhouette carries
+    80 % of recognizability. The banana curve, the long
+    barrel, the gas tube, the stock taper — these ARE the
+    silhouette.
+
+  39.4.2  Reference first.
+
+    Keep a folder of 3-4 real reference photos and trace
+    the outline before writing geometry. Use real-world
+    ratios:
+      - total length / barrel length / receiver length
+      - mag curve radius (~250 mm on a real AK)
+      - stock angle (~5° downward from bore axis)
+
+    For the image-driven paths (Image_To_Ts.txt,
+    Image_To_Js.txt, Image_To_Json.txt), the image-to-3D
+    analysis protocol (PART 17 of the TS spec; PART 27 of
+    the JSON/JS specs) IS the reference. The AI extracts
+    proportions and landmark positions from the reference
+    image and uses them to drive the part library and
+    config object from 39.5.
+
+  39.4.3  The "is it cheating" check.
+
+    If a part of the model requires the user to be at
+    exactly the right angle to look right, it's a hack.
+    Real shapes look right from any angle. If a barrel
+    only reads as a barrel at 90° to the camera, the AI
+    has a silhouette problem, not a perspective problem.
+
+  39.5  PROCEDURAL / PARAMETRIC MODELING
+  -------------------------------------
+
+  39.5.1  Build a part library.
+
+    Every model is combinations of the same primitives:
+
+        barrel(r, len)
+        taperedBox(x0, x1, h0, h1, d)
+        curvedMag(curve, w, d)
+        woodBlock(x, y, z, w, h, d)
+
+    Once the AI has these, building an AKM, an RPK, an
+    SVD becomes an afternoon instead of a week. The
+    Appendix A `curvedPart` helper is one member of the
+    library; the others are factory-local. Every .ts
+    factory should declare its part-library helpers
+    BEFORE the `create*Model()` body.
+
+  39.5.2  Drive everything from a config object.
+
+    All colors, dimensions, curve points, recoil numbers
+    — in a SINGLE config object at the top of the file
+    (TS path: a `const CONFIG: *Config = { ... }`; JSON
+    path: a top-level `params: { ... }` object on the
+    blueprint root). Now the AI can have presets:
+
+        const AK47_CONFIG: Ak47Config = {
+          barrelLen: 0.66, magCurveAngle: 0.22, ...
+        };
+        const AKM_CONFIG:  Ak47Config = {
+          barrelLen: 0.66, magCurveAngle: 0.22, ...   // same
+        };
+        const RPK_CONFIG:  Ak47Config = {
+          barrelLen: 0.92, magCurveAngle: 0.15, ...   // longer barrel, straighter mag
+        };
+
+    The `params` object on the JSON/JS blueprint root is
+    the analog. The renderer exposes it on the loaded
+    scene root as `root.userData.params` so the user can
+    tweak it at runtime via the Tweakpane panel (39.2.1).
+
+  39.6  THE THREE THINGS THAT HELP RIGHT NOW
+  ------------------------------------------
+
+    1.  Snapshot to PNG on every save
+          → fastest visual feedback loop
+    2.  Run a bbox-overlap validator at boot
+          → catches floating parts automatically
+    3.  Stop stacking boxes to fake curves
+          → use ExtrudeGeometry + CatmullRomCurve3 the
+            first time
+
+    Every other item in PART 39 follows from one of these
+    three.
+
+  39.7  RENDERER-SIDE RUNTIME CONTRACT
+  ------------------------------------
+
+    Two new non-blocking validators are added to the
+    existing 16 (E1-E12 from PART 32, E13-E16 from
+    PART 38) in `index.html`'s `ANTI_PATTERN_CHECKS` array
+    (the same `lblSpec` object that already owns the rest
+    of the spec runtime). Like all other PART 32 / 38
+    validators, these are NON-BLOCKING: the model still
+    loads, the user just sees a friendly toast + a red
+    spec chip so they know the AI's generation deviated
+    from the targeted spec.
+
+  39.7.1  E17 — boot-time bbox-overlap gap detector
+          (PART 39.1.2 / 39.6[2]).
+
+    Walks the loaded model's `userData.sculptRuntime.nodes`
+    map (TS path) or, for the JSON/JS path, every node in
+    `blueprint.nodes[]`. Sorts entries by their X-axis
+    bounding-box min. For each adjacent pair, computes the
+    gap = next.minX - current.maxX. If gap > 0.02 (the
+    PART 39.1.2 default `maxGap`), emits a warning naming
+    both parts and the gap size.
+
+    On the JSON/JS path the validator runs on the
+    assembled scene, not the blueprint text (the
+    blueprint text only carries the nodes' positions, not
+    their world-space bboxes). The validator's tolerance
+    is the same 0.02 default; a future v1.17 / v8.9 round
+    can promote the tolerance to a config field if users
+    ask for it.
+
+  39.7.2  E18 — draw-call / mesh-count sanity
+          (PART 39.6[3]).
+
+    Counts the total number of THREE.Mesh nodes under
+    the root. If meshCount > 500, emits a warning
+    pointing at InstancedMesh (PART 39.3.4). This is the
+    "draw-call / mesh-count" half of `renderer.info.render`
+    (the triangles / vertices half is already in the
+    renderer's PART 35 / 🔺 Tris panel — see index.html
+    line 22350's `openTrianglePanel`).
+
+  39.7.3  E17 / E18 do NOT change load behavior.
+
+    Both validators are non-blocking. A model that emits
+    E17 or E18 warnings still loads, still renders, is
+    still exportable. The validators exist to surface
+    authoring issues to the AI / maintainer, not to
+    reject the user's scene.
+
+  39.8  CANONICAL HELPERS (re-exported on window.lblSpec)
+  --------------------------------------------------------
+
+    Three new helpers join the existing PART 35
+    `__threeTriHelpers` bundle (createUnifiedLimbSegment,
+    createLowPolyKneeBlade, createIndexedPyramid,
+    buildLowPolyTurretWithTris) on
+    `window.lblSpec.helpers`:
+
+    - `curvedPart(curve, crossW, crossD, mat, opts)`
+        The Appendix A ExtrudeGeometry-along-curve
+        helper. Build a curved mag, curved handguard,
+        curved sling strap with one call:
+
+            const magCurve = new THREE.CatmullRomCurve3([
+              new THREE.Vector3(0, 0, 0),
+              new THREE.Vector3(0, -0.05, 0.10),
+              new THREE.Vector3(0, -0.12, 0.20),
+              new THREE.Vector3(0, -0.18, 0.30)
+            ]);
+            const mag = lblSpec.helpers.curvedPart(
+              magCurve, 0.082, 0.055, M.bakelite,
+              { steps: 80, bevel: true }
+            );
+
+    - `validateModel(root, opts)`
+        The Appendix C boot-time validator. Walks
+        `root.userData.sculptRuntime.nodes`, reports
+        gaps, mesh count, and bounding-box size. The
+        factory's `create*Model()` tail calls this and
+        logs warnings; the renderer's E17 validator
+        (39.7.1) re-runs the same walk on every load.
+
+    - `snapshotToPng(renderer, scene, camera, fileName)`
+        The Appendix A PNG snapshot helper. Renders one
+        frame, calls `renderer.domElement.toDataURL('image/png')`,
+        triggers a download with the given file name. For
+        AI authoring-time iteration; not required in the
+        shipped .ts factory.
+
+    These are pure additions to the existing
+    `__threeTriHelpers` bundle — the existing 5 helpers
+    stay untouched. The renderer's runtime contract
+    update is `lblSpec.helpers.curvedPart`,
+    `lblSpec.helpers.validateModel`, and
+    `lblSpec.helpers.snapshotToPng` become the canonical
+    way to do these three things in a .ts factory; the
+    factory does NOT need to copy the function bodies.
+
+  WHAT PART 39 DOES NOT INTRODUCE
+  --------------------------------
+
+    - No new mandatory field on any existing userData
+      namespace (the existing `userData.sculptRuntime` is
+      the consumer of `nodes` for E17; no new top-level
+      userData key is required)
+    - No new export path (the existing GLB / OBJ / STL /
+      FBX / DAE / USDZ / .ts paths are unchanged)
+    - No new dependency (the new helpers use only
+      Three.js APIs that are already imported; Tweakpane
+      is the AI's authoring-time choice and is not
+      required at runtime)
+    - No new validator that blocks the model from
+      loading (E17 and E18 are non-blocking, like E1-E16
+      before them)
+    - No change to the existing PART 1-38 rules (PART 39
+      reinforces them — see the 39.0 cross-references)
+    - No change to the existing E1-E16 validators (they
+      stay exactly as they were in v1.15 / v8.7)
+    - No change to the project's "Low Poly 3D" name
+      (PART 38.22's style-agnosticism still applies —
+      PART 39 is also style-agnostic)
+
+  CROSS-REFERENCES
+  -----------------
+
+    PART 39 layers on top of, never replaces:
+      - PART 1  (factory contract)        — TS path
+      - PART 2  (primitives)              — TS path
+      - PART 3  (materials)               — TS path
+      - PART 4  (single-file rule)        — TS path
+      - PART 17 (image-to-3D analysis)    — TS image path
+      - PART 27 (image-to-3D analysis)    — JSON/JS image path
+      - PART 30 (rigging & animation)     — both paths
+      - PART 31 (character sculpt)        — character subjects
+      - PART 32 (anti-pattern guards)     — E1-E12
+      - PART 35 (triangle-first geometry) — E12, the 🔺 Tris panel
+      - PART 36 (multi-file drop)         — both paths
+      - PART 37 (zip bundle)              — both paths
+      - PART 38 (character pipeline)      — E13-E16
+      - PART 38.22 (style agnosticism)    — both paths
+      - PART 65 (JSON/JS anti-patterns)   — E1-E12 on JSON/JS
+
+================================================================================
+END OF PART 39 — v1.16 / v8.8 ADDITIONS: 3D MODELING TECHNIQUES
+Six disciplines for reducing bugs and making better models:
+catch the dumb stuff early, build a visual dev loop, use the
+right geometry primitive, drive proportions and recognition,
+build a part library + config object, ship the three things
+that help right now. Adds E17 bbox-overlap gap detector and
+E18 draw-call / mesh-count sanity to the existing 16
+non-blocking validators. Re-exports `curvedPart`,
+`validateModel`, and `snapshotToPng` on `window.lblSpec.helpers`
+alongside the PART 35 tris bundle. Style-agnostic, applies
+to every .ts factory, every JSON/JS blueprint, every
+subject. No new dependency, no new export path, no new
+mandatory field, no removed / weakened rule.
+================================================================================

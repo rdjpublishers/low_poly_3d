@@ -1,3 +1,152 @@
+# v1.16 / v8.8 — 3D modeling techniques (PART 39)
+
+The spec now teaches the AI the six practical disciplines from the
+maintainer's "3D MODELING TECHNIQUES — practical guide for reducing
+bugs and making better models": (1) catch dumb stuff early — ban
+the `// ----...---const X` silent-comment pattern, and bake a
+`validate*Model()` boot-time bbox-overlap / mesh-count / size-sanity
+walker into every factory; (2) build a visual dev loop — runtime
+knobs (Tweakpane), `renderer.info` logs, on-demand PNG snapshots;
+(3) use the right geometry primitive — ExtrudeGeometry-along-
+CatmullRomCurve3 for curved surfaces, LatheGeometry for round
+profiles, computed BufferGeometry for smooth blends, InstancedMesh
+for repeated detail, never stacked rotated boxes to fake a curve;
+(4) proportions and recognition — the silhouette test (256×256
+black-on-white), reference-first, the "is it cheating" check;
+(5) procedural / parametric modeling — a part library
+(barrel / taperedBox / curvedMag / woodBlock) and a single config
+object driving all dimensions, colors, curve points, recoil
+numbers; (6) the three things that help right now. The renderer
+adds 2 new non-blocking validators (E17 boot-time bbox-overlap gap
+detector, E18 draw-call / mesh-count sanity) to the existing 16
+(E1-E12 from PART 32, E13-E16 from PART 38), and 3 new canonical
+helpers re-exported on `window.lblSpec.helpers` alongside the PART
+35 tris bundle: `curvedPart(curve, crossW, crossD, mat, opts)`,
+`validateModel(root, opts)`, and `snapshotToPng(renderer, scene,
+camera, fileName)`. No new dependency, no new export path, no new
+mandatory userData field, no removed / weakened rule, no change to
+PART 38.22's style agnosticism.
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `Prompt_To_Ts.txt`   | header v1.15 → v1.16; new v1.16 CHANGELOG entry; appended PART 39 (8 sub-sections: 39.0 central principle, 39.1 catch dumb stuff early, 39.2 visual dev loop, 39.3 right geometry primitive, 39.4 proportions & recognition, 39.5 procedural / parametric modeling, 39.6 the three things that help right now, 39.7 renderer-side runtime, 39.8 canonical helpers) |
+| `Image_To_Ts.txt`    | header v1.15 → v1.16; new v1.16 CHANGELOG entry; appended PART 39 (same content; image-to-TS analysis protocol feeds 39.4) |
+| `Prompt_To_Js.txt`   | header v8.7 → v8.8; new v8.8 CHANGELOG entry; appended PART 39 (same content; references the `params` config object on the blueprint root as the JSON/JS analog of the TS config object from 39.5) |
+| `Image_To_Js.txt`    | header v8.7 → v8.8; new v8.8 CHANGELOG entry; appended PART 39 |
+| `Prompt_To_Json.txt` | header v8.7 → v8.8; new v8.8 CHANGELOG entry; appended PART 39 |
+| `Image_To_Json.txt`  | header v8.7 → v8.8; new v8.8 CHANGELOG entry; appended PART 39 |
+| `index.html`         | `lblSpec.VERSION` bumped to `{ts:'v1.16', json:'v8.8'}`; LBL spec chip text + title updated; meta description + keywords updated; 2 new modeling-techniques validators (E17 bbox-overlap gap, E18 mesh-count / InstancedMesh) added to `ANTI_PATTERN_CHECKS`; 3 new canonical helpers (`curvedPart`, `validateModel`, `snapshotToPng`) added to the existing `__threeTriHelpers` bundle re-exported on `window.lblSpec.helpers`; top-of-block comment updated to "RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8" |
+| `CHANGES_SUMMARY.md` | this round added at the top (this section); prior v1.15 round preserved below |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` (still work
+  standalone, including Model_1.ts which is a character subject
+  and is the prime candidate for the optional PART 38 upgrade
+  plus the new PART 39 boot-time validator hook)
+- `public/models/manifest.json` (still works as-is)
+- `.github/workflows/manifest.yml`
+- `public/rig/three-rig-helpers.js`
+- `public/rig/src/*.ts`
+- `public/rig/build.sh`
+
+## What PART 39 covers (8 sub-sections + 3 appendices)
+
+- **39.0**  Central principle — three disciplines drive the rest
+            of PART 39: catch dumb stuff early, build a visual
+            dev loop, use the right geometry primitive
+- **39.1**  Catch dumb stuff early
+  - **39.1.1** Ban the "comment eats code" pattern (BAD/GOOD
+              examples reproduced verbatim from the maintainer's
+              guide)
+  - **39.1.2** Bake a `validate*Model()` function into every
+              .ts factory (gaps > 0.02, mesh count > 500, X
+              size 0.5-20)
+- **39.2**  Build a visual dev loop
+  - **39.2.1** Runtime knobs (Tweakpane / Leva / dat.gui)
+  - **39.2.2** Log `WebGLRenderer.info` for sanity
+  - **39.2.3** Snapshot a frame to PNG on demand
+- **39.3**  Use the right geometry primitive — 4-row
+            intent-to-primitive table (ExtrudeGeometry along
+            CatmullRomCurve3 / LatheGeometry / computed
+            BufferGeometry / InstancedMesh) + the
+            "if you find yourself writing a for loop to make
+            N copies, STOP" rule of thumb
+- **39.4**  Proportions & recognition
+  - **39.4.1** The silhouette test (256×256 black-on-white)
+  - **39.4.2** Reference first (real-world ratios)
+  - **39.4.3** The "is it cheating" check
+- **39.5**  Procedural / parametric modeling
+  - **39.5.1** Part library (barrel / taperedBox / curvedMag /
+              woodBlock)
+  - **39.5.2** Drive everything from a config object
+              (AKM_CONFIG, RPK_CONFIG, SVD_CONFIG from one
+              interface)
+- **39.6**  The three things that help right now — snapshot to
+            PNG on every save, run a bbox-overlap validator at
+            boot, stop stacking boxes to fake curves
+- **39.7**  Renderer-side runtime contract — adds 2 new
+            non-blocking validators to the existing 16:
+  - **39.7.1** E17 — boot-time bbox-overlap gap detector
+  - **39.7.2** E18 — draw-call / mesh-count sanity
+  - **39.7.3** E17 / E18 do NOT change load behavior (both
+              non-blocking; the model still loads)
+- **39.8**  Canonical helpers (re-exported on window.lblSpec):
+  - `curvedPart(curve, crossW, crossD, mat, opts)` — Appendix A
+  - `validateModel(root, opts)` — Appendix C
+  - `snapshotToPng(renderer, scene, camera, fileName)` —
+    Appendix A
+
+## What PART 39 does NOT introduce
+
+- No new mandatory field on any existing userData namespace
+- No new export path (existing GLB / OBJ / STL / FBX / DAE /
+  USDZ / .ts paths unchanged)
+- No new dependency (Tweakpane is the AI's authoring-time
+  choice and is not required at runtime; the new helpers use
+  only Three.js APIs that are already imported)
+- No new validator that blocks the model from loading (E17
+  and E18 are non-blocking, like E1-E16 before them)
+- No change to the existing PART 1-38 rules (PART 39
+  reinforces them — see the 39.0 cross-references)
+- No change to the existing E1-E16 validators (they stay
+  exactly as they were in v1.15 / v8.7)
+- No change to PART 38.22's style agnosticism (PART 39 is
+  also style-agnostic — applies to every subject, every
+  style, every path)
+- No change to the project's "Low Poly 3D" name
+
+## Quick reference for the renderer build
+
+```js
+// In the loaded .ts factory, after the create*Model() body:
+import { validateModel } from 'three';      // or your own path
+const v = window.lblSpec.helpers.validateModel(root, { maxGap: 0.02 });
+if(!v.ok) console.warn('[create*Model]', v.errors);
+
+// Or, in a click handler / debug button:
+window.lblSpec.helpers.snapshotToPng(renderer, scene, camera, 'frame.png');
+
+// Or, for a curved part:
+const curve = new THREE.CatmullRomCurve3([/* ... */]);
+const mag = window.lblSpec.helpers.curvedPart(
+  curve, 0.082, 0.055, M.bakelite, { steps: 80, bevel: true }
+);
+```
+
+## Related prior rounds (for context)
+
+- **v1.11 / v8.3** — Pre-bundled rig helpers (PART 34)
+- **v1.12 / v8.4** — Triangle-first geometry (PART 35)
+- **v1.13 / v8.5** — Multi-file drop + Model + Rig pairing (PART 36)
+- **v1.14 / v8.6** — Zip bundle support (PART 37)
+- **v1.15 / v8.7** — Character pipeline upgrade (PART 38, prev round)
+- **v1.16 / v8.8** — 3D modeling techniques (PART 39, this round)
+
+---
+
 # v1.15 / v8.7 — Character pipeline upgrade (PART 38) + style agnosticism (PART 38.22)
 
 The character output path is upgraded from primitive-assembly to a
@@ -382,4 +531,6 @@ e7a30ce feat: support dropping / picking many files at once (RJS LBL update)
 - **v1.12 / v8.4** — Triangle-first geometry (PART 35)
 - **v1.13 / v8.5** — Multi-file drop + Model + Rig pairing (PART 36)
 - **v1.14 / v8.6** — Zip bundle support (PART 37, this round)
+- **v1.15 / v8.7** — Character pipeline upgrade (PART 38) — see the round above
+- **v1.16 / v8.8** — 3D modeling techniques (PART 39) — see the round at the very top of this file
 
