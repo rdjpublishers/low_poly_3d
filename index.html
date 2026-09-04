@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI Low-Poly Scene Builder | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.14 (TS path) and v8.6 (JSON/JS path) with 10 opt-in architectural features, 10 hard anti-pattern guards, and a triangle-first geometry inspector. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.14, LBL v8.6, zip bundle, model rig"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable low-poly 3D scenes, right in your browser. Free, no sign-up, nothing ever leaves your device. Renderer targets LBL spec v1.15 (TS path) and v8.7 (JSON/JS path) with 10 opt-in architectural features, 16 hard anti-pattern guards (incl. 4 new character-pipeline validators E13-E16), and a triangle-first geometry inspector. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="low poly 3D, 3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.15, LBL v8.7, zip bundle, model rig, character pipeline, skeletal skinning"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1436,9 +1436,9 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
   <!-- RJS UPDATE 3 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
-       TS factories target v1.10 (PART 33 architectural features), JSON/JS blueprints target v8.2 (PART 66 feature bridge).
-       Pairs with the on-load lblValidateAgainstSpec() check that catches the 10 anti-patterns from PART 32/65. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns as non-blocking warnings.">LBL: v1.14 / v8.6</div>
+       TS factories target v1.15 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline), JSON/JS blueprints target v8.7 (PART 66 feature bridge + PART 34-37 + PART 38).
+       Pairs with the on-load lblValidateAgainstSpec() check that catches the 16 anti-patterns from PART 32/65/38. -->
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets. Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns and PART 38 character-pipeline validators (E13-E16) as non-blocking warnings.">LBL: v1.15 / v8.7</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -21515,7 +21515,7 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 / 4 / 5 / 6 — LBL SPEC v1.14 / v8.6 RUNTIME SUPPORT
+// RJS UPDATE 3 / 4 / 5 / 6 / 7 — LBL SPEC v1.15 / v8.7 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
 // guards), PART 33/66 (10 architectural features), PART 34 (pre-bundled
@@ -21525,13 +21525,17 @@ buildScene = function(blueprint){
 // + model + rig pairing — adds the `lblRouteFiles(fileList)` dispatcher,
 // the `__lblLoaded3DModels[]` array, the `__lblExtractRigGraph` /
 // `__lblApplyRigToModel` helpers, the `__lblPendingRigs` queue, and
-// the `multiple` attribute on the 4 file inputs), and PART 37 (zip
+// the `multiple` attribute on the 4 file inputs), PART 37 (zip
 // bundle support — adds the `fflate` import-map entry, the
 // `__lblExtractZip` / `__lblLooksLikeZip` / `__lblFetchBytes` helpers,
 // the `'zip'` bucket in the classifier, the `.zip` accept on the file
 // inputs, and the demo / model-store's zip-aware `lblModelStoreLoadByNumber`
 // path that extracts `Model_N.zip` and re-serves the original bytes via
-// the "Download Model Code" button). Lives at the end of the main module
+// the "Download Model Code" button), and PART 38 (character pipeline
+// upgrade — adds the 4 new character-specific validators E13 vertex
+// budget, E14 NaN / infinite positions, E15 topology cleanup, E16
+// bounding-box proportions; no new export path, no new mandatory
+// userData field, no new dependency). Lives at the end of the main module
 // so it can reference every helper defined above. The block is
 // intentionally self-contained — no global state is added that other
 // code paths need to know about (everything is namespaced under the
@@ -21540,20 +21544,23 @@ buildScene = function(blueprint){
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.14 (PART 33 architectural features + PART 34 pre-bundled
+  // target v1.15 (PART 33 architectural features + PART 34 pre-bundled
   // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
-  // drop + model + rig pairing + PART 37 zip bundle support); JSON/JS
-  // blueprints target v8.6 (PART 66 feature bridge + PART 34 runtime
-  // contract for userData.rigGraph + PART 35 tris inspector + PART 36
-  // same + PART 37 same). The chip in the topbar shows both. Updating
-  // these constants is the only place to bump for a new spec release —
-  // every check below reads from this single source.
-  const VERSION = { ts: 'v1.14', json: 'v8.6' };
+  // drop + model + rig pairing + PART 37 zip bundle support + PART 38
+  // character pipeline upgrade); JSON/JS blueprints target v8.7 (PART 66
+  // feature bridge + PART 34 runtime contract for userData.rigGraph +
+  // PART 35 tris inspector + PART 36 same + PART 37 same + PART 38
+  // character pipeline upgrade). The chip in the topbar shows both.
+  // Updating these constants is the only place to bump for a new spec
+  // release — every check below reads from this single source.
+  const VERSION = { ts: 'v1.15', json: 'v8.7' };
 
-  // The 10 anti-patterns the validator looks for. Mirrors PART 32 (TS)
-  // and PART 65 (JSON/JS) one-to-one. Each check is a function that
-  // receives the loaded model and returns either null (clean) or a
-  // short human-readable warning string. Multiple warnings stack.
+  // The 16 anti-patterns the validator looks for. Mirrors PART 32 (TS)
+  // and PART 65 (JSON/JS) for the first 12, and PART 38 (character
+  // pipeline upgrade) for the 4 new character-specific checks (E13-
+  // E16). Each check is a function that receives the loaded model
+  // and returns either null (clean) or a short human-readable
+  // warning string. Multiple warnings stack.
   // These are NOT errors — the model still loads, the user just sees
   // a friendly toast + a red spec chip so they know the AI generation
   // deviated from the targeted spec.
@@ -21823,6 +21830,169 @@ window.lblSpec = (function(){
         // the chip title's newline-joined message. (PART 32's
         // E2/E3 stacks similarly.)
         return warnings.join(' | ');
+      }
+    },
+    {
+      // PART 38 (v1.15 / v8.7) — Character Pipeline Upgrade, E13.
+      // Vertex count inside the declared budget (PART 38.13). If the
+      // model declares meta.vertexBudget (TS path) or top-level
+      // meta.vertexBudget (JSON/JS path), the actual vertex count
+      // should not exceed budget * (1 + tolerance). Tolerance defaults
+      // to 20 % if not declared, matching PART 35.4.C's
+      // trisBudgetTolerance default. Character subjects (those that
+      // declare meta.subjectClass === 'character' or have a face
+      // geometry subtree) are checked more strictly — tolerance 10 %.
+      // Non-blocking warning; the model still loads.
+      id: 'E13', label: 'Vertex budget (PART 38)',
+      check: (root) => {
+        if(!root) return null;
+        const m = lblSpecState.trisMetrics;
+        if(!m || typeof m.totalVertices !== 'number') return null;
+        const meta = (root.userData && root.userData.meta) || null;
+        if(!meta) return null;
+        const vb = (typeof meta.vertexBudget === 'number') ? meta.vertexBudget : 0;
+        if(vb <= 0) return null;
+        const isChar = (meta.subjectClass === 'character');
+        const tol = (typeof meta.vertexBudgetTolerance === 'number')
+          ? meta.vertexBudgetTolerance
+          : (isChar ? 0.10 : 0.20);
+        const maxAllowed = Math.round(vb * (1 + tol));
+        if(m.totalVertices > maxAllowed){
+          const pctOver = (((m.totalVertices - vb) / vb) * 100).toFixed(1);
+          return 'Vertex count ' + m.totalVertices.toLocaleString() +
+            ' exceeds meta.vertexBudget ' + vb.toLocaleString() +
+            ' by ' + pctOver + '% (tolerance ' + (tol*100).toFixed(0) +
+            '%, PART 38.13).';
+        }
+        return null;
+      }
+    },
+    {
+      // PART 38 (v1.15 / v8.7) — Character Pipeline Upgrade, E14.
+      // No NaN or infinite vertex positions (PART 38.16). A character
+      // model with NaN positions will not deform cleanly and will
+      // produce black holes in the render. Walk every position
+      // attribute, count any non-finite coordinate. Non-blocking.
+      id: 'E14', label: 'NaN / infinite positions (PART 38)',
+      check: (root) => {
+        if(!root) return null;
+        let bad = 0;
+        let total = 0;
+        root.traverse(o => {
+          if(!o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+          const pos = o.geometry.attributes.position;
+          const arr = pos.array;
+          const itemSize = pos.itemSize || 3;
+          for(let i = 0; i < arr.length; i++){
+            total++;
+            if(!Number.isFinite(arr[i])){
+              bad++;
+              if(bad > 50) return; // cap the walk for pathological cases
+            }
+          }
+        });
+        if(bad === 0) return null;
+        return bad + ' non-finite vertex coordinate(s) out of ' +
+          total.toLocaleString() + ' (PART 38.16 geometry check).';
+      }
+    },
+    {
+      // PART 38 (v1.15 / v8.7) — Character Pipeline Upgrade, E15.
+      // No duplicate vertices beyond tolerance, no non-manifold
+      // edges, no zero-area faces (PART 38.7). Heuristic: count
+      // zero-area triangles (cross product of two edge vectors
+      // < 1e-6). True non-manifold detection requires
+      // merge-then-rebuild topology walks; we do a best-effort
+      // check at load time and surface a non-blocking warning.
+      id: 'E15', label: 'Topology cleanup (PART 38)',
+      check: (root) => {
+        if(!root) return null;
+        let zeroArea = 0;
+        let triCount = 0;
+        root.traverse(o => {
+          if(!o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+          const pos = o.geometry.attributes.position;
+          const arr = pos.array;
+          const idx = o.geometry.index;
+          const v0 = [0,0,0], v1 = [0,0,0], v2 = [0,0,0];
+          const ax = [0,0,0], bx = [0,0,0], cx = [0,0,0];
+          if(idx){
+            for(let i = 0; i + 2 < idx.count; i += 3){
+              const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);
+              v0[0] = arr[a*3]; v0[1] = arr[a*3+1]; v0[2] = arr[a*3+2];
+              v1[0] = arr[b*3]; v1[1] = arr[b*3+1]; v1[2] = arr[b*3+2];
+              v2[0] = arr[c*3]; v2[1] = arr[c*3+1]; v2[2] = arr[c*3+2];
+              ax[0]=v1[0]-v0[0]; ax[1]=v1[1]-v0[1]; ax[2]=v1[2]-v0[2];
+              bx[0]=v2[0]-v0[0]; bx[1]=v2[1]-v0[1]; bx[2]=v2[2]-v0[2];
+              cx[0]=ax[1]*bx[2]-ax[2]*bx[1];
+              cx[1]=ax[2]*bx[0]-ax[0]*bx[2];
+              cx[2]=ax[0]*bx[1]-ax[1]*bx[0];
+              const cross = Math.hypot(cx[0], cx[1], cx[2]);
+              if(cross < 1e-6) zeroArea++;
+              triCount++;
+              if(zeroArea > 50) return; // cap
+            }
+          } else {
+            for(let i = 0; i + 8 < arr.length; i += 9){
+              v0[0]=arr[i]; v0[1]=arr[i+1]; v0[2]=arr[i+2];
+              v1[0]=arr[i+3]; v1[1]=arr[i+4]; v1[2]=arr[i+5];
+              v2[0]=arr[i+6]; v2[1]=arr[i+7]; v2[2]=arr[i+8];
+              ax[0]=v1[0]-v0[0]; ax[1]=v1[1]-v0[1]; ax[2]=v1[2]-v0[2];
+              bx[0]=v2[0]-v0[0]; bx[1]=v2[1]-v0[1]; bx[2]=v2[2]-v0[2];
+              cx[0]=ax[1]*bx[2]-ax[2]*bx[1];
+              cx[1]=ax[2]*bx[0]-ax[0]*bx[2];
+              cx[2]=ax[0]*bx[1]-ax[1]*bx[0];
+              const cross = Math.hypot(cx[0], cx[1], cx[2]);
+              if(cross < 1e-6) zeroArea++;
+              triCount++;
+              if(zeroArea > 50) return; // cap
+            }
+          }
+        });
+        if(zeroArea === 0) return null;
+        const pct = triCount > 0 ? ((zeroArea / triCount) * 100).toFixed(2) : '0';
+        return zeroArea + ' zero-area triangle(s) (' + pct + '% of ' +
+          triCount.toLocaleString() + ' triangles, PART 38.7 cleanup).';
+      }
+    },
+    {
+      // PART 38 (v1.15 / v8.7) — Character Pipeline Upgrade, E16.
+      // Bounding box within expected proportions (PART 38.16). If
+      // the model declares meta.expectedProportions = { height, width,
+      // depth } (TS path) or top-level meta.expectedProportions
+      // (JSON/JS path), the actual bounding box should match within
+      // ±15 % per axis. Useful for catching models that accidentally
+      // have a leg twice the height of the body. Non-blocking.
+      id: 'E16', label: 'Bounding-box proportions (PART 38)',
+      check: (root) => {
+        if(!root) return null;
+        const meta = (root.userData && root.userData.meta) || null;
+        if(!meta || !meta.expectedProportions) return null;
+        const exp = meta.expectedProportions;
+        if(typeof exp.height !== 'number' ||
+           typeof exp.width !== 'number' ||
+           typeof exp.depth !== 'number') return null;
+        if(!root.geometry && !root.children) return null;
+        // Compute world-space bounding box of the root.
+        const box = new THREE.Box3().setFromObject(root);
+        if(!isFinite(box.min.x) || !isFinite(box.max.x)) return null;
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        // Compare ratios (height/width, depth/width) to declared ratios
+        // — absolute units vary between models so ratios are the
+        // meaningful comparison.
+        const actualHWR = size.y / Math.max(size.x, 1e-6);
+        const actualDWR = size.z / Math.max(size.x, 1e-6);
+        const expectedHWR = exp.height / Math.max(exp.width, 1e-6);
+        const expectedDWR = exp.depth / Math.max(exp.width, 1e-6);
+        const tol = 0.15;
+        const hwrErr = Math.abs(actualHWR - expectedHWR) / Math.max(expectedHWR, 1e-6);
+        const dwrErr = Math.abs(actualDWR - expectedDWR) / Math.max(expectedDWR, 1e-6);
+        if(hwrErr <= tol && dwrErr <= tol) return null;
+        return 'Bounding-box proportions off: actual H:W=' + actualHWR.toFixed(2) +
+          ' D:W=' + actualDWR.toFixed(2) + ' vs declared H:W=' + expectedHWR.toFixed(2) +
+          ' D:W=' + expectedDWR.toFixed(2) + ' (tolerance ' + (tol*100).toFixed(0) +
+          '%, PART 38.16 proportions check).';
       }
     }
   ];

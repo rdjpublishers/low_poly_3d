@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.6 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.7 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -118,6 +118,21 @@ universal rigging standard with the twelve canonical Bone_* part
 ids, plus the 6 renderer-side behaviors the AI doesn't have to
 author. PART 66 reinforces — never replaces — PARTs 5, 28, 30, 64,
 65. Bumped from v8.1 to v8.2.
+
+  v8.7 (2026-09-04) — CHARACTER PIPELINE UPGRADE.
+    Mirrors the v8.7 update in Prompt_To_Js.txt. New PART 38
+    (character pipeline upgrade) applies the same way to image-
+    driven JS blueprint generation: continuous topology, real
+    skeletal rigging, fitted clothing, baked animation, GLB-first
+    architecture, multi-view validation. The image-to-3D analysis
+    protocol (PART 27 of this file) feeds the character
+    specification schema from PART 38.5 — the analysis of the
+    reference image produces the identity / proportions / silhouette
+    / face / costume / palette / rig / animation / budget fields
+    that drive the geometry. E13-E16 validators (PART 38.16) are
+    added in index.html and apply the same way to both prompt-
+    driven and image-driven character subjects. Bumped from v8.6
+    to v8.7.
 
   v8.4 (2026-09-03) — TRIANGLE-FIRST GEOMETRY (TRIS) (source:
     WORKING_WITH_TRIANGLES guide attached by the maintainer).
@@ -11152,3 +11167,1005 @@ workflows are unchanged. Layers on top of PART 1, PART 2, PART
 4, PART 30, PART 32 / PART 65, PART 34, PART 35, PART 36. Nothing
 in this PART removes or weakens any rule from PARTs 1-36.
 ================================================================================
+================================================================================
+PART 38 — v1.15 / v8.7 ADDITIONS: CHARACTER PIPELINE UPGRADE
+This PART is an UPGRADE GUIDE. It does NOT replace any rule from
+PARTs 1-37 (TS) / 1-66 (JSON/JS). It is the answer to a recurring
+diagnosis the maintainer reported against the renderer's existing
+character outputs: more polygons do not automatically create a better
+model. The character looked assembled, not modeled. Joints overlapped
+as primitives, hands were mitten-like, faces were flat, clothing
+floated, materials were uniform, and a single camera view hid most
+of the problems. PART 38 teaches the AI how to upgrade its character
+output from primitive-assembly to a professional character pipeline:
+continuous topology, deliberate edge loops, fitted clothing, real
+skeletal skinning, named animation clips, GLB export, and multi-view
+validation. The PART is the spec-side counterpart to the same
+upgrade guide the maintainer pasted as input. The guide's central
+principle is the first thing this PART records and the last thing
+it reminds the AI of before emission.
+
+Source: 3D CHARACTER GENERATION SYSTEM UPGRADE GUIDE (the txt file
+the maintainer attached when requesting this upgrade). Bumped from
+v1.14 / v8.6 to v1.15 / v8.7.
+================================================================================
+
+--------------------------------------------------------------------------
+38.0 — THE CENTRAL PRINCIPLE (READ THIS BEFORE EVERY CHARACTER EMISSION)
+--------------------------------------------------------------------------
+
+    More polygons do not automatically create a better model.
+
+A model made from many high-segment spheres, cones, and cylinders
+is still a collection of primitives. Professional quality comes from
+continuous topology, deliberate silhouettes, deformation-aware edge
+loops, consistent proportions, UVs, texture variation, real skeletal
+skinning, animation testing, and multi-view validation — NOT from
+raw vertex count.
+
+If you are about to emit a character and your plan is "add more
+segments to the existing primitives", STOP and re-plan. Increase
+polygon count deliberately, on the parts of the silhouette that
+actually need it (ears, hands, eyes, shoulders, elbows, hips, knees,
+armor edges, cloth hems), and decrease it where it does not help.
+
+--------------------------------------------------------------------------
+38.1 — DIAGNOSIS OF THE PRIMITIVE-ASSEMBLY APPROACH
+--------------------------------------------------------------------------
+
+The classic approach — place independent primitives into a hierarchy
+of THREE.Group pivots — is fine for low-poly props and quick blockouts,
+but it is NOT a professional character-authoring method. PART 30's
+pivot hierarchy is a valid runtime choice for jointed poses, but the
+character is being MODELLED as if every body part were an unrelated
+ellipsoid. The ten visible symptoms are:
+
+  1. The head, torso, arms, and legs look assembled rather than modeled.
+  2. Joints appear as overlapping spheres or cylinders instead of
+     connected anatomy.
+  3. Increasing segment counts increases geometry density but does
+     not improve the actual form.
+  4. The face lacks continuous eyelid, cheek, mouth, and jaw topology.
+  5. Hands and feet remain mitten-like because they do not have proper
+     finger and toe structure.
+  6. Armor and clothing are separate visual blocks instead of layered
+     garments fitted to a body.
+  7. Transform pivots provide basic motion but do not deform a
+     continuous skin mesh.
+  8. Flat material colors make the result appear like a technical
+     prototype.
+  9. A single camera view hides problems in the side, rear, and
+     animated poses.
+  10. The factory becomes too large and difficult to maintain when
+     used as a full sculpting environment.
+
+The fix is NOT to abandon the existing factory pattern. The fix is
+to divide work into TWO layers (PART 38.3) and to follow the 14-stage
+production pipeline (PART 38.4) instead of emitting a one-shot primitive
+assembly.
+
+--------------------------------------------------------------------------
+38.2 — WHEN THIS PART APPLIES (AND WHEN IT DOES NOT)
+--------------------------------------------------------------------------
+
+PART 38 only binds when the subject is a CHARACTER, MASCOT, CREATURE,
+or HUMANOID — not a prop, vehicle, food, building, or abstract shape.
+For non-character subjects, PART 38 is informational and the existing
+PARTs 1-37 still govern.
+
+A subject is "character-class" if any of the following is true:
+
+  - The user prompt asks for a person, humanoid, creature, monster,
+    goblin, orc, knight, mage, robot with a face, animal with
+    recognizable facial identity, or similar.
+  - The subject has a face (eye sockets, mouth, jaw topology).
+  - The subject has identifiable limbs (arms with elbows, legs with
+    knees, articulated hands).
+  - The subject needs to deform believably under animation.
+
+For a clearly mechanical subject (vehicle, turret, drone, sentry
+without a face), the existing PART 30 pivot hierarchy + PART 33
+features remain the default and PART 38.5-38.14 are skipped. PART 38.0,
+38.1, 38.15, 38.16, 38.20, and 38.21 still apply as design discipline.
+
+--------------------------------------------------------------------------
+38.3 — TWO-LAYER ARCHITECTURE
+--------------------------------------------------------------------------
+
+Divide the system into two layers, even inside a single .ts file:
+
+  Asset-authoring layer (this PART's primary focus):
+    - Creates the actual mesh, UVs, textures, skeleton, weights, and
+      named animation clips.
+    - Lives in the factory's body (PART 1.2 / PART 5.x).
+    - Owns topology, materials, the rig, and the animation library.
+
+  Viewer-integration layer (PART 1 + PART 30 + PART 5 + PART 6):
+    - Loads the asset, exposes the runtime contract (sculptRuntime),
+      creates named sockets, controls animations, supplies look-dev
+      lights, and runs validation.
+    - Lives in the factory's tail (after the geometry is built) plus
+      the inspector / renderer code.
+
+The TypeScript file's recommended internal layout (PART 1.4) already
+supports this split: build geometry → build materials → build rig →
+build clips → expose runtime. PART 38 reinforces that order. A factory
+that builds the rig BEFORE the geometry it deforms is a build-order
+bug and will not export cleanly.
+
+--------------------------------------------------------------------------
+38.4 — 14-STAGE PRODUCTION PIPELINE + 7 QUALITY GATES
+--------------------------------------------------------------------------
+
+For every character subject, walk the following stages in order. Do
+not skip stages. Each stage should produce a reviewable intermediate
+result, not just a mental checkpoint.
+
+  1.  Character specification     (PART 38.5)
+  2.  Design and proportion blockout
+  3.  Continuous base mesh        (PART 38.6)
+  4.  Sculpt and secondary forms
+  5.  Retopology and edge-loop cleanup (PART 38.7)
+  6.  UV unwrap and texture atlas (PART 38.11)
+  7.  Material authoring
+  8.  Skeleton creation           (PART 38.12)
+  9.  Skin weights and deformation cleanup
+  10. Animation authoring         (PART 38.13)
+  11. GLB/GLTF export             (PART 38.14)
+  12. TypeScript viewer adapter
+  13. Multi-view validation       (PART 38.17)
+  14. Optimization and LOD generation (PART 38.18)
+
+Quality gates (each is a CHECK that must pass before the next stage
+opens; do not silently skip):
+
+  Blockout gate    — silhouette reads from front, side, back, 3/4
+  Form gate        — body, face, clothing, armor, props have volume
+                     and clean attachments
+  Topology gate    — edge loops exist at joints + face features;
+                     no degenerate faces; quads dominate deforming
+                     areas
+  Material gate    — skin / cloth / leather / metal / bone / magic
+                     have different roughness + color behavior
+  Rig gate         — deforming vertices have valid normalized weights;
+                     skeleton has a predictable hierarchy (PART 38.12)
+  Animation gate   — idle / walk / attack / hit clips do not collapse
+                     shoulders, elbows, hips, or knees (PART 38.13)
+  Runtime gate     — asset loads, exposes named runtime nodes and
+                     sockets, animates inside the viewer (PART 38.14)
+
+The "single-pass emit and inspect at the end" workflow that the
+diagnosis called out (PART 38.1 item 10) is what the gates exist to
+prevent.
+
+--------------------------------------------------------------------------
+38.5 — CHARACTER SPECIFICATION SCHEMA
+--------------------------------------------------------------------------
+
+Before generating geometry, create a structured character spec. It
+is a plain TypeScript const or JSON literal — separate from the mesh-
+building code. PART 38 RECOMMENDS the following fields; the existing
+PART 5.6 (sculptRuntime) contract continues to govern what the
+runtime sees. The character spec is INTERNAL — it never needs to be
+exposed on userData; it is the planning document the AI uses before
+it writes geometry.
+
+  identity: {
+    name, species, ageCategory, personality, faction, role,
+    visualKeywords  // e.g. "scarred goblin scout with bone charms"
+  }
+
+  proportions: {
+    totalHeight, headHeight, shoulderWidth, chestDepth, hipWidth,
+    upperArmLength, forearmLength, thighLength, shinLength,
+    footLength
+  }
+
+  silhouette: {
+    headShape, earLength, earAngle, shoulderShape, torsoTaper,
+    limbThickness, footShape, posture, asymmetry
+  }
+
+  face: {
+    eyeSize, eyeSpacing, browAngle, noseLength, jawWidth,
+    mouthWidth, tuskSize, cheekShape, facialMarkings
+  }
+
+  costume: {
+    garmentLayers, armorPieces, straps, belt, backpack, jewelry,
+    materialAssignments, damageLevel, dirtLevel
+  }
+
+  palette: {
+    skin, cloth, leather, metal, accent, emissive
+  }
+
+  rig: {
+    requiredBones, optionalBones, sockets, constraints,
+    deformationZones
+  }
+
+  animation: {
+    idle, walk, attack, hit, death, expression, interaction
+  }
+
+  budget: {
+    targetVertices, targetTriangles, maxMaterials, maxTextureSize,
+    maxDrawCalls, lodTargets
+  }
+
+The spec is the answer to "what character am I making?" If you cannot
+fill the schema, the prompt is too vague — ask the user one focused
+question, then proceed. The schema is also the lens the multi-view
+review uses (PART 38.17) to flag deviations: it knows what the eyes,
+ears, shoulders, and hands were SUPPOSED to be, so it can compare.
+
+--------------------------------------------------------------------------
+38.6 — CONTINUOUS MESH GENERATION (4 APPROACHES)
+--------------------------------------------------------------------------
+
+The main anatomy should be CONNECTED meshes rather than unrelated
+ellipsoids. Pick one of the four approaches below (or a documented
+hybrid) before writing the geometry. The default for this renderer
+is Approach D (hybrid), because the system ships a static TS factory
+and a runtime that loads GLB.
+
+  Approach A — Parametric body topology:
+    Create a reusable humanoid topology template with rings and
+    loops for torso, neck, shoulders, arms, hips, legs, hands, feet.
+    Move the vertices based on the character spec.
+    Best for: humanoid characters with consistent anatomy.
+
+  Approach B — Lofted cross-sections:
+    Define cross-sections along the body and connect them into a
+    surface. Torso = elliptical rings at pelvis, waist, chest,
+    shoulders. Arm = rings from shoulder to wrist. Rings MUST have
+    consistent vertex counts so they connect as quads.
+    Best for: stylized characters with non-standard proportions.
+
+  Approach C — Implicit surface / voxel blockout + retopology:
+    For highly variable body shapes, generate an implicit surface
+    or voxel volume, extract an initial mesh, smooth it, run a
+    retopology step. More complex; allows unusual creatures and
+    exaggerated fantasy anatomy.
+    Best for: creatures, exaggerated fantasy anatomy, monstrosities.
+
+  Approach D — Hybrid (RECOMMENDED for this renderer):
+    Use a professionally authored base topology for the body and
+    head (the existing PART 30 pivot groups are the start point).
+    Generate proportions and colors procedurally from the spec
+    (PART 38.5). Create clothing and props procedurally as fitted
+    layers (PART 38.10). Export a GLB and load it through TypeScript
+    if the geometry exceeds ~10k triangles, otherwise keep it inline.
+    This is the most common path in this renderer.
+
+Whichever approach you choose, the OUTPUT the inspector sees is the
+same: a single THREE.Group root with named child Groups for each
+anatomical region, real geometry (not lollipops), and named sockets.
+
+--------------------------------------------------------------------------
+38.7 — TOPOLOGY TECHNIQUES
+--------------------------------------------------------------------------
+
+Use polygons where they improve the silhouette or deformation. Do
+NOT distribute them uniformly. Edge loops go in these locations:
+
+  Face:
+    - eye socket loops (around the eye inset, not on the surface)
+    - eyelid loops (one for the upper lid, one for the lower lid)
+    - mouth loops (one at the lip line, one below the chin)
+    - cheek loops (subtle, two per side)
+    - jaw loop (along the underside of the jaw)
+    - nose support loops (around the nostrils, not through them)
+    - ear attachment loops (where the ear meets the head)
+
+  Shoulders:
+    - clavicle loop (across the collarbone)
+    - armpit loop (one extra ring of density for the underarm)
+    - deltoid loop (around the deltoid muscle cap)
+    - upper-arm twist loop (one extra ring of density to absorb
+      twisting without pinching)
+
+  Elbows:
+    - at least two support loops around the elbow bend (one above,
+      one below). Without these, the elbow pinches on bend.
+
+  Hips:
+    - pelvis loop (around the hip bones)
+    - gluteal loop (under the gluteal fold)
+    - hip socket loop (around the ball joint)
+    - upper-leg twist loop (one extra ring for twisting)
+
+  Knees:
+    - kneecap loop (around the patella)
+    - rear-knee compression loops (two extra rings behind the knee
+      to absorb bend compression)
+
+  Wrists and ankles:
+    - support loops for rotation and taper (one per side)
+
+Quad-dominant body. Triangles are acceptable in rigid armor, small
+props, and areas that do not deform. Avoid long thin triangles and
+sliver faces. Canonical cleanup operations (run before export):
+
+  - weld duplicate vertices (use BufferGeometryUtils.mergeVertices)
+  - remove degenerate triangles
+  - recalculate normals (computeVertexNormals after weld)
+  - unify winding order (assert all faces are CCW)
+  - validate UV ranges (every UV in [0, 1])
+  - validate material indices (no out-of-range indices)
+  - validate bounding boxes (no NaN, no infinite values)
+  - validate disconnected components (no orphan vertices)
+  - detect non-manifold edges (no edge shared by > 2 faces)
+  - detect zero-area faces (no faces with cross product ~ 0)
+
+These checks are also the SHAPE of the geometry validators in
+PART 38.16; emit a non-blocking warning when any of them fails on
+the produced model.
+
+--------------------------------------------------------------------------
+38.8 — POLYGON & VERTEX BUDGETING
+--------------------------------------------------------------------------
+
+For a 10,000-20,000 vertex fantasy character, use a deliberate
+allocation. Do NOT just increase every primitive segment count.
+
+  Recommended allocation (parts of the total):
+
+    Head and face                20-28 %
+    Torso and connected limbs    32-40 %
+    Hands and feet                8-12 %
+    Clothing and armor           15-22 %
+    Weapons and props             6-10 %
+    Small secondary detail        3- 6 %
+
+  Practical target for this renderer (single character, inline TS):
+
+    Vertices    ~ 12,000 - 18,000
+    Triangles   ~ 18,000 - 28,000
+    Materials   <= 8 (atlas when possible)
+    Draw calls  <= 12
+
+  Hard cap reminder: PART 35 sets a 50,000-triangle soft cap. If you
+  exceed it, mergeGeometries + decimate before claiming the model is
+  ready (PART 35.2). A character that exceeds the soft cap is a
+  signal that the budget was not allocated, not that the character
+  needed the triangles.
+
+  Do NOT spend the budget on hidden geometry. Prioritize:
+    - silhouette-critical ears, horns, noses, shoulders, hands, feet
+    - facial planes and eyes
+    - shoulder, elbow, hip, knee deformation areas
+    - armor edges and cloth hems
+    - visible asymmetry and identity-defining features
+
+  When in doubt, spend vertices on the SILHOUETTE, not the SURFACE.
+  A character with a clean silhouette and a plain material reads as
+  better than a character with a noisy surface and a confused silhouette.
+
+--------------------------------------------------------------------------
+38.9 — FACIAL MODELING SYSTEM
+--------------------------------------------------------------------------
+
+The face is the strongest quality multiplier. A simple body with a
+good face looks convincing; a detailed body with a primitive face
+looks unfinished. Build the face using these 10 steps, in order:
+
+  1. Build a continuous head mesh (NOT a sphere with a face glued on).
+  2. Add INSET eye sockets (the eye sits inside the head, not on
+     the surface).
+  3. Create eyelid loops around the eyes (upper + lower).
+  4. Shape cheek planes and the brow ridge (deliberate planar
+     transitions, not a single rounded mass).
+  5. Add a jaw and chin transition (a real edge, not a smooth blend).
+  6. Build the nose from connected planes or a controlled insert
+     (not a single cone).
+  7. Add a mouth cavity, lip planes, and tooth or tusk sockets.
+  8. Use asymmetry intentionally but subtly (a 1-2 mm offset
+     between left and right reads as "real" without reading as
+     "broken").
+  9. Use separate iris and pupil geometry, or a face texture.
+     One color = dead eyes.
+  10. Add facial blend shapes for blink, brow, jaw, snarl, and
+      pain (see PART 38.13 for animation wiring).
+
+Goblin identity features (when the subject is a goblin) — use these
+deliberately, not as a checklist of how many you can fit:
+
+  - large but not oversized eyes (oversized = cartoon, not goblin)
+  - angled brow ridge (sharp inward angle)
+  - broad or hooked nose
+  - short muzzle area (a long muzzle reads as a different species)
+  - cheek planes (slight inward angle, two planes per side)
+  - pointed ears angled outward
+  - controlled tusks (two lower tusks, sized to the head; do not
+    let them dominate the silhouette)
+  - uneven teeth or facial scars
+  - slightly asymmetrical jaw
+  - subtle color variation around the nose, ears, cheeks, and eyes
+    (achieved via vertex color or face texture, not flat material)
+
+Avoid the temptation to over-scale ears or tusks. A 1.5x oversized
+feature reads as costume, not character.
+
+--------------------------------------------------------------------------
+38.10 — CLOTHING, ARMOR, AND PROPS
+--------------------------------------------------------------------------
+
+Clothing is generated as FITTED LAYERS over the body, not floating
+primitives. The technique in priority order:
+
+  1. Offset and shrinkwrap a body region to create cloth layers
+     (start from the body geometry, push vertices outward by the
+     cloth thickness, then trim the openings at the seams).
+  2. Add thickness with a controlled shell or solidify operation
+     (every garment has an inner and outer face — single-sided
+     geometry z-fights on the seams).
+  3. Use edge loops around hems and seams (the hem and seam
+     locations are the silhouette-critical detail; do not skip
+     them).
+  4. Create folds through directional displacement or sculpted
+     vertex offsets (two or three major fold directions per
+     garment, not noise).
+  5. Keep straps and belts physically attached to their parent
+     garment (a belt that floats above the waist is a visual bug).
+  6. Create armor plates with bevels and consistent thickness
+     (every plate is a chamfered box, not a flat quad).
+  7. Use rivets and seams sparingly at visible hero locations
+     (every rivet is a small cost in geometry; 30 rivets on a
+     pauldron is too many).
+
+Material hierarchy for a professional fantasy character (skin,
+cloth, leather, metal, bone, magic) — each has a distinct
+roughness + color profile:
+
+  skin     : matte, slightly varied roughness (~ 0.6 - 0.8)
+  cloth    : high roughness (~ 0.9), soft color variation
+  leather  : medium-high roughness (~ 0.7 - 0.85), edge wear
+  iron     : low roughness (~ 0.3 - 0.5), dark metallic response
+  bronze   : warmer metallic response, similar roughness to iron
+  bone     : warm off-white, high roughness (~ 0.8 - 0.9)
+  magic    : emissive color with controlled bloom intensity
+
+If you find yourself assigning the same material to skin and cloth,
+stop — the inspector's E8 (material instance mutation) check plus
+this rule say you have lost a quality dimension.
+
+Props must be attached to SOCKETS or HAND BONES. Never leave a
+weapon in world space while the character animates. The renderer's
+socket naming convention (PART 33.1[7]) is:
+
+  Socket_HeadTop       — hats, helms, hair, headpieces
+  Socket_Arm_Left      — held weapons (left hand)
+  Socket_Arm_Right     — held weapons (right hand)
+  Socket_Backpack      — back-mounted items, capes, quivers
+
+If your character holds a prop in a hand, parent the prop to the
+appropriate hand bone / socket, NOT to the scene root. Props
+parented to the scene root will NOT move with the character.
+
+--------------------------------------------------------------------------
+38.11 — UVS AND TEXTURES
+--------------------------------------------------------------------------
+
+Add UV support as soon as the topology is stable. A texture atlas
+is usually more efficient than a large number of independent
+materials. The minimum professional texture set is:
+
+  - albedo (or base color)     — REQUIRED
+  - roughness                  — REQUIRED
+  - normal (or bump)           — REQUIRED
+  - metallic                   — OPTIONAL
+  - emissive                   — OPTIONAL
+
+A hand-painted fantasy style does not require photorealism. It
+requires CONTROLLED VARIATION. Add:
+
+  - darker creases (along seam and fold lines)
+  - lighter planar highlights (on cheekbones, brow, shoulder caps)
+  - dirt near the feet (gradient from ankle to knee, not uniform)
+  - wear on armor edges (chamfered edge color brighter than flat
+    face)
+  - redness around ears and nose (small region, not the whole face)
+  - color variation across the skin (per-vertex color or texture
+    gradient, not flat)
+
+Texture resolution: 1024 or 2048 atlas is generally more useful than
+many small textures. Pack UV islands carefully and reserve space
+for face features and hero props. The renderer's existing canvas-
+texture helpers (PART 8.2 / PART 32) are the right tool for
+procedural texture synthesis at runtime.
+
+--------------------------------------------------------------------------
+38.12 — REAL SKELETAL RIGGING
+--------------------------------------------------------------------------
+
+For any character subject, REPLACE transform-only group animation
+with a true skeletal rig for the deforming body. The renderer's
+existing PART 30 pivot hierarchy is acceptable for static jointed
+poses (PART 38.2 exception), but a character with continuous skin
+should use a real SkinnedMesh.
+
+  Recommended skeleton (REQUIRED bones):
+
+    root
+      pelvis
+        spine
+          chest
+            neck
+              head
+                jaw
+            clavicle_left
+              upperArm_left
+                forearm_left
+                  hand_left
+            clavicle_right
+              upperArm_right
+                forearm_right
+                  hand_right
+        thigh_left
+          shin_left
+            foot_left
+        thigh_right
+          shin_right
+            foot_right
+
+  Optional bones (add when the character needs them):
+
+    fingers, toes, ears, tusks, backpack straps, weapon parts,
+    facial controls (jaw + lip + brow + eyelid)
+
+The body mesh must include:
+
+  - skinIndex attribute (THREE.BoneIndex buffer attribute)
+  - skinWeight attribute (THREE.BoneWeight buffer attribute)
+  - normalized weights (sum to 1.0 per vertex within tolerance)
+  - no vertices with zero total weight
+  - no extreme weight spikes near joints (cap individual influence
+    at ~ 0.8, distribute the remainder)
+
+Use up to four influences per vertex. Clean weights manually or with
+a weight-smoothing pass around shoulders, elbows, hips, knees,
+wrists, and ankles.
+
+For advanced quality, add corrective shape keys or corrective
+rotation logic for:
+
+  - shoulder lifting (avoids the deltoid collapse on arm raise)
+  - elbow bending (avoids the elbow pinch on full flexion)
+  - hip bending (avoids the gluteal pinch on leg raise)
+  - knee bending (avoids the knee cap popping on full flexion)
+  - neck turning (avoids the neck twist bulge)
+  - jaw opening (avoids the chin collapsing)
+  - goblin snarl (character-specific facial corrective)
+
+The renderer's PART 34 pre-bundled `three-rig-helpers` library is
+the SANCTIONED tool for skeleton creation in this codebase. The
+existing E11 check enforces that any model declaring
+`userData.rigGraph` also declares `userData.skeletonSource ===
+"three-rig-helpers"` — that rule is preserved and re-affirmed here.
+Models that use PART 30's pivot-hierarchy approach (no real
+SkinnedMesh) do NOT need rigGraph and do NOT need skeletonSource.
+
+--------------------------------------------------------------------------
+38.13 — ANIMATION TECHNIQUES
+--------------------------------------------------------------------------
+
+Create animation clips from the skeleton, not only from rotating
+parent groups. The minimum animation set:
+
+  idle:
+    - breathing (subtle chest scale modulation)
+    - weight shift (subtle pelvis left-right)
+    - eye blinking (eyelid blend shape)
+    - subtle head motion (small noise on neck + head)
+
+  walk:
+    - alternating feet (one contact frame per step)
+    - opposite arm swing (left arm forward when right leg forward)
+    - pelvis motion (small lateral and rotational sway)
+    - controlled foot contact (no sliding — see below)
+
+  attack:
+    - anticipation (wind-back pose, 0.2-0.3 s)
+    - weapon wind-up (the strike preparation)
+    - fast strike (the actual hit, 0.1-0.2 s)
+    - follow-through (the recovery pose, 0.3-0.5 s)
+    - recovery (back to idle)
+
+  hit:
+    - impact recoil (head + spine compression)
+    - head reaction (slight backward + sideways)
+    - spine compression (one frame of -5 % spine height)
+    - arm response (involuntary limb motion)
+
+Additional useful clips (add when the character has the need):
+
+  run, crouch, jump, death, inspect_weapon, roar, snarl, pickup,
+  hurt_left, hurt_right
+
+Animation quality checks (the same shape as the validator's
+Animation Gate from PART 38.4):
+
+  - feet should NOT slide during walk
+  - hands should remain attached to held props (parent to hand bone)
+  - shoulders should NOT collapse during arm lifts
+  - elbows should bend in a believable direction (knee-direction
+    mirror)
+  - knees should NOT invert (kneecap faces forward always)
+  - head should remain attached during extreme poses
+  - attack should have readable anticipation and follow-through
+  - idle should remain subtle (not look like random vibration)
+
+Store clips in the GLB when possible (see PART 38.14), then expose
+them through the existing `sculptRuntime.animations` contract from
+PART 5.6. The renderer's existing AnimationMixer wiring
+(`root.userData.tick` + `sculptRuntime.animations.mixer`) is the
+path of least resistance; the new rules in this PART do not change
+that wiring.
+
+--------------------------------------------------------------------------
+38.14 — GLB-FIRST ARCHITECTURE
+--------------------------------------------------------------------------
+
+Use GLB/GLTF as the primary interchange format for professional
+character assets when the asset is large (over ~ 10k triangles),
+authored outside the runtime, or shared between tools. GLB can
+preserve the mesh, materials, UVs, skeleton, skin weights, animation
+clips, and morph targets in a single file.
+
+The TypeScript factory's role is then the VIEWER ADAPTER, not the
+full asset author. The adapter's responsibilities:
+
+  1. Load the GLB (use GLTFLoader from three/addons).
+  2. Find named nodes (head, hand_left, hand_right, foot_left,
+     foot_right, etc.).
+  3. Find the skeleton and animation clips.
+  4. Create runtime sockets (Socket_HeadTop, Socket_Arm_Left,
+     Socket_Arm_Right, Socket_Backpack).
+  5. Expose sculptRuntime metadata (PART 5.6) with the loaded
+     asset's nodes / materials / animations.
+  6. Expose animation names via the existing AnimationMixer
+     contract.
+  7. Apply model options (scale, shadows, wireframe, animation).
+  8. Provide look-dev lights via the create*ModelLookDevLights
+     factory (PART 1.3).
+  9. Provide root.userData.tick for mixer updates.
+
+The adapter does NOT manually construct the full body from
+primitives when a GLB source exists. Keep primitive helpers for
+small details, props, debug markers, and the fallback path (when
+GLB loading fails, the factory can fall back to a low-poly
+primitive assembly so the inspector still has something to show).
+
+GLB export is the renderer's PART 30.5 + PART 32 responsibility
+(the existing `exportRiggedModelToGlb` helper). The new content
+in this PART is: when you build a character with > ~ 10k triangles
+or with a real SkinnedMesh, plan to export to GLB and load it back,
+rather than trying to inline the whole thing in the factory's source.
+
+--------------------------------------------------------------------------
+38.15 — TOOLING OPTIONS (3 PATHS)
+--------------------------------------------------------------------------
+
+  Path A — Blender-assisted pipeline (best for highest quality and
+           lowest topology risk):
+    Use Blender for modeling, retopology, UVs, materials, rigging,
+    animation, and GLB export. Use the TypeScript system only for
+    loading, inspection, runtime metadata, and presentation.
+
+  Path B — Procedural mesh pipeline (best for fully generated
+           characters with strong variation):
+    Implement continuous topology templates, lofting, welding, UV
+    generation, skeleton creation, automatic weights, and GLB
+    export. Significantly more engineering; provides strong
+    variation across many characters.
+
+  Path C — Hybrid pipeline (RECOMMENDED for this renderer):
+    Use reusable high-quality body and head templates, generate
+    proportions and colors procedurally, create clothing and props
+    procedurally as fitted layers, export to GLB if the asset is
+    large, then load it through TypeScript. This is the most common
+    path in this renderer and is the default that the existing
+    PART 1 + PART 5 + PART 6 + PART 30 + PART 33 + PART 34 + PART
+    35 + PART 36 + PART 37 + this PART 38 support.
+
+Supporting libraries and tools (this renderer's current set):
+
+  Three.js                      runtime rendering, GLTF loading,
+                                animation mixers, skeletons, materials
+  three / addons                GLTFLoader, GLTFExporter, helpers
+  three-rig-helpers (PART 34)   skeleton + skin weights
+  fflate (PART 37)              zip bundle extraction
+  mergeGeometries               topology composition (PART 35)
+  mergeVertices                 duplicate-vertex cleanup (PART 38.7)
+  BufferGeometryUtils           vertex welding, normals, simplification
+  Image / canvas textures       albedo, roughness, decals, masks
+  (future) automated render     multi-view previews for validation
+
+PART 38 does not introduce a new dependency. It tells the AI how
+to USE the existing dependencies more deliberately on character
+subjects.
+
+--------------------------------------------------------------------------
+38.16 — VALIDATION SYSTEM
+--------------------------------------------------------------------------
+
+The geometry / rig / animation / material / presentation checks
+the maintainer called for are listed below. Some are already
+implemented in the renderer's E1-E12 validators; PART 38 ADDS the
+character-specific checks (E13-E16) that the existing set did not
+cover. All character-specific checks are non-blocking warnings,
+not errors — the model still loads.
+
+  Geometry checks:
+    E1   relative imports (existing)            — already implemented
+    E7   deprecated THREE.Geometry (existing)   — already implemented
+    E12  triangle density / un-merged parts
+         (existing, PART 35)                    — already implemented
+    E13  vertex count inside the declared budget
+         (character-specific)                   — NEW in this PART
+    E14  no NaN / infinite vertex positions
+         (character-specific)                   — NEW in this PART
+    E15  no duplicate vertices beyond tolerance,
+         no non-manifold edges, no zero-area faces
+         (character-specific)                   — NEW in this PART
+    E16  bounding box within expected proportions
+         (character-specific)                   — NEW in this PART
+
+  Rig checks:
+    E11  rig helpers marker (existing)          — already implemented
+    (character-specific, future) — bone names unique, hierarchy has
+         one root, skin indices refer to valid bones, weights sum
+         to ~ 1.0, no vertex has zero total influence, all sockets
+         are descendants of the model root. The current E11 is a
+         marker test; deeper rig checks ship in a future release.
+
+  Animation checks:
+    E2   animation track binding (existing)     — already implemented
+    E3   normalized quaternions (existing)      — already implemented
+    (character-specific, future) — all required clips exist, clips
+         have nonzero duration, no clip contains invalid tracks,
+         feet contact ground during walk, held props remain attached.
+
+  Material checks:
+    E5   canvas texture lifecycle (existing)    — already implemented
+    E6   GLTF userData hygiene (existing)       — already implemented
+    E8   material instance mutation (existing)  — already implemented
+    (character-specific, future) — every mesh has a material, material
+         count is controlled, texture references resolve, roughness
+         and metalness values are sensible, emissive materials are
+         limited to intended regions.
+
+  Presentation checks (character-specific, future):
+    - front, side, back, three-quarter renders
+    - neutral, grazing, reference lighting modes
+    - wireframe preview (already supported)
+    - skeleton overlay (already supported via PART 34)
+    - socket overlay (already supported via PART 33.1[7])
+    - animation preview (already supported via the mixer)
+    - mobile viewport preview
+
+The four new validators (E13-E16) are added to ANTI_PATTERN_CHECKS
+in index.html alongside the existing twelve. They are non-blocking;
+their findings surface on the spec chip just like E1-E12 do today.
+
+--------------------------------------------------------------------------
+38.17 — MULTI-VIEW AND SILHOUETTE REVIEW
+--------------------------------------------------------------------------
+
+Do not evaluate the character from the default camera alone. A
+character that reads well from the front but breaks on the side is
+a broken character. The renderer's existing camera + look-dev
+lighting surface PART 1.3 + PART 33 supports this when the author
+uses them, but PART 38 makes the multi-view review a REQUIREMENT
+for character subjects.
+
+The required review angles for every character emission:
+
+  - front
+  - left side
+  - right side
+  - back
+  - three-quarter front
+  - three-quarter back
+  - low camera
+  - high camera
+  - idle pose
+  - walk contact pose
+  - attack anticipation
+  - attack impact
+  - hit pose
+
+Compare the character against the character spec (PART 38.5) using
+landmarks:
+
+  - eye centers
+  - nose tip
+  - chin
+  - ear tips
+  - shoulder corners
+  - hand positions
+  - knee centers
+  - foot tips
+  - weapon tip
+
+When a landmark deviates from the spec by more than the budget
+declared in PART 38.8, flag it as a non-blocking warning in the
+spec chip. PART 38 does not implement automatic landmark detection
+in this release; it instructs the AI to perform the review before
+emission, and the renderer surfaces the existing spec chip as the
+collection point for any human review notes.
+
+--------------------------------------------------------------------------
+38.18 — LOD AND PERFORMANCE
+--------------------------------------------------------------------------
+
+Create at least three levels of detail when the character is used
+in a scene with multiple instances or wide camera movement:
+
+  LOD0  10,000 - 20,000 vertices   hero view, close inspection
+  LOD1   5,000 -  8,000 vertices   normal gameplay distance
+  LOD2   1,500 -  3,000 vertices   distant views
+
+Keep the skeleton and animation behavior consistent across LODs.
+Do not strip the rig from LOD1/LOD2 — a rigged LOD0 + un-rigged
+LOD1 produces a visible pop on LOD switch.
+
+Use texture compression and reduce draw calls by combining
+compatible material regions where possible. The existing PART 35
+triangle inspector + the existing material instance check (E8)
+are the runtime-side helpers for staying within budget.
+
+Avoid creating a separate material for every small object. Use
+atlases and shared materials. PART 38.10's material hierarchy
+(skin / cloth / leather / metal / bone / magic) is the right
+granularity — one material per category, not one material per part.
+
+--------------------------------------------------------------------------
+38.19 — IMPLEMENTATION ROADMAP (9 PHASES)
+--------------------------------------------------------------------------
+
+If you are migrating a large existing character subject, walk the
+phases in order. Each phase produces a reviewable intermediate.
+
+  Phase 1  Improve the specification layer (PART 38.5).
+  Phase 2  Build reusable continuous body templates (PART 38.6).
+  Phase 3  Add deforming rig support (PART 38.12).
+  Phase 4  Add clothing and armor layers (PART 38.10).
+  Phase 5  Add UVs and texture generation (PART 38.11).
+  Phase 6  Add baked animation (PART 38.13).
+  Phase 7  Add GLB export and TypeScript loading (PART 38.14).
+  Phase 8  Add automated review renders (PART 38.17).
+  Phase 9  Add LOD and optimization (PART 38.18).
+
+This roadmap is the long-form guide for reworking an existing
+character subject. For a fresh character subject, the AI walks the
+14-stage production pipeline from PART 38.4 instead — same stages,
+different framing.
+
+--------------------------------------------------------------------------
+38.20 — PRIORITY ORDER (IF TIME IS LIMITED)
+--------------------------------------------------------------------------
+
+When you have limited time or limited vertex budget, implement
+improvements in this order. Each step is a meaningful upgrade on
+its own; the first 5 cover the diagnosis from PART 38.1.
+
+  1.  Continuous head and torso topology
+  2.  Real skeletal skinning (replaces transform-only animation
+      on the deforming body)
+  3.  Better facial proportions and inset eye sockets
+  4.  Connected limbs with deformation edge loops
+  5.  UVs and hand-painted texture variation
+  6.  Fitted clothing and armor layers
+  7.  Baked walk and attack animations
+  8.  GLB export and TypeScript adapter
+  9.  Multi-view validation
+  10. LOD and compression
+
+Do NOT start by adding more decorative primitive parts. That
+increases complexity without solving the main quality problems.
+The diagnosis from PART 38.1 is the one to keep re-reading until
+it is no longer the description of your output.
+
+--------------------------------------------------------------------------
+38.21 — FINAL DESIGN PRINCIPLE
+--------------------------------------------------------------------------
+
+A professional procedural character system is judged by the quality
+of the silhouette, anatomy, face, deformation, materials, and
+animation — not by the number of primitives or the raw vertex
+count.
+
+The target output is a character that:
+
+  - reads clearly from every major angle (PART 38.17)
+  - has continuous and intentional anatomy (PART 38.6)
+  - deforms cleanly when animated (PART 38.12 - 38.13)
+  - has a recognizable face and identity (PART 38.9)
+  - uses believable material variation (PART 38.10 - 38.11)
+  - keeps clothing and props physically attached (PART 38.10)
+  - exports cleanly as GLB/GLTF (PART 38.14)
+  - integrates cleanly into the TypeScript viewer (PART 1, PART 5,
+    PART 6, PART 30, PART 33, PART 34, PART 35, PART 36, PART 37,
+    this PART 38)
+  - remains performant on desktop and mobile (PART 38.8, PART 38.18)
+
+The central architectural change is to move from primitive assembly
+to a continuous-topology, deformation-aware, GLB-first pipeline
+while retaining TypeScript as the runtime integration and inspection
+layer. PART 38 is the spec-side counterpart to that change.
+
+================================================================================
+PART 38 does NOT introduce:
+  - A new mandatory field on any existing userData namespace
+  - A new export path (no new factory signature; PART 1.2 still
+    governs; the optional look-dev lights factory from PART 1.3
+    still governs)
+  - A change to the existing pivot-hierarchy approach from PART 30
+    (which remains valid for non-character subjects per PART 38.2
+    and for jointed-only character poses when the AI elects not to
+    use a real SkinnedMesh)
+  - A change to PART 34 (three-rig-helpers) — the E11 marker
+    remains in force; the rig helpers are still the ONE sanctioned
+    skeleton source when userData.rigGraph is declared
+  - A change to the renderer's existing E1-E12 validators (E13-E16
+    are NEW additions, not replacements; E1-E12 are unchanged)
+  - A change to the GLB / OBJ / STL / FBX / DAE loaders
+  - A change to the editor paste path
+  - A change to the file-picker UI
+  - A change to the scene tree or the Rig / Tris / Sockets buttons
+  - A new dependency (no new import-map entry)
+  - A change to the bundle format from PART 37
+  - A change to the multi-file drop / model + rig pairing from
+    PART 36
+
+PART 38 layers on top of, never replaces:
+  - PART 1 (TS output contract)
+  - PART 2 (type safety)
+  - PART 4 (imports)
+  - PART 5 (sculptRuntime + tick)
+  - PART 6 (runtime contract)
+  - PART 7 (palette)
+  - PART 8 (deterministic PRNG + canvas textures)
+  - PART 9 (shadows)
+  - PART 12 (validation checklist)
+  - PART 15 (common mistakes)
+  - PART 30 (rigging + animation authoring standard)
+  - PART 31 (character / mascot sculpt enrichment — macro/meso/micro
+    hierarchy, attachment contract, actionProfile — which remains
+    the system of record for the named THREE.Group hierarchy)
+  - PART 32 (structural error corrections + canonical helpers)
+  - PART 33 (10 opt-in architectural features)
+  - PART 34 (pre-bundled rig helpers — three-rig-helpers)
+  - PART 35 (triangle-first geometry)
+  - PART 36 (multi-file drop + model + rig pairing)
+  - PART 37 (zip bundle support)
+
+Every existing rule still binds. PART 38 ADDS the character-pipeline
+upgrade principles on top. Models that follow PART 38 produce a
+better character; models that do not follow PART 38 still load,
+still pass the existing validators, and still ship — the new
+validators E13-E16 are non-blocking warnings, not load failures.
+
+================================================================================
+END OF PART 38 — v1.15 / v8.7 ADDITIONS: CHARACTER PIPELINE UPGRADE
+The character output path is upgraded from primitive-assembly to
+continuous-topology + deformation-aware + GLB-first, while
+TypeScript remains the runtime integration and inspection layer.
+The existing PART 30 pivot hierarchy + PART 34 three-rig-helpers
++ PART 35 triangle-first geometry + PART 36 multi-file drop +
+PART 37 zip bundle support all continue to apply; PART 38 adds
+the 14-stage production pipeline, the character specification
+schema, the 4 continuous-mesh-generation approaches, the topology
++ edge-loop discipline, the polygon budget, the facial modeling
+system, the clothing + armor + props system, the UV + texture
+system, the real skeletal rigging standard, the animation
+techniques, the GLB-first architecture, the tooling options, the
+4 new validators (E13-E16), the multi-view review requirement,
+the LOD strategy, the 9-phase implementation roadmap, the 10-step
+priority order, and the final design principle. Nothing in this
+PART removes or weakens any rule from PARTs 1-37.
+================================================================================
+

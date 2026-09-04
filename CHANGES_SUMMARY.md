@@ -1,4 +1,176 @@
-# v1.14 / v8.6 — Zip bundle support (PART 37)
+# v1.15 / v8.7 — Character pipeline upgrade (PART 38)
+
+The character output path is upgraded from primitive-assembly to a
+continuous-topology + deformation-aware + GLB-first pipeline. The
+spec now teaches the AI the principles from the maintainer's
+"3D CHARACTER GENERATION SYSTEM UPGRADE GUIDE": more polygons do
+not automatically create a better model; professional quality comes
+from continuous topology, deliberate edge loops, fitted clothing,
+real skeletal skinning, baked animation, GLB export, and multi-view
+validation. The renderer adds 4 new non-blocking validators (E13
+vertex budget, E14 NaN / infinite positions, E15 topology cleanup,
+E16 bounding-box proportions) to the existing 12 (E1-E12) from
+PART 32 / PART 65. No new dependency, no new export path, no new
+mandatory userData field, no change to PART 30's pivot hierarchy
+(which remains valid for non-character subjects and for jointed-only
+character poses).
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `Prompt_To_Ts.txt`   | header v1.14 → v1.15; new v1.15 CHANGELOG entry; appended PART 38 (21 sub-sections) |
+| `Image_To_Ts.txt`    | header v1.14 → v1.15; new v1.15 CHANGELOG entry; appended PART 38 |
+| `Prompt_To_Js.txt`   | header v8.6 → v8.7; new v8.7 CHANGELOG entry; appended PART 38 |
+| `Image_To_Js.txt`    | header v8.6 → v8.7; new v8.7 CHANGELOG entry; appended PART 38 |
+| `Prompt_To_Json.txt` | header v8.6 → v8.7; new v8.7 CHANGELOG entry; appended PART 38 |
+| `Image_To_Json.txt`  | header v8.6 → v8.7; new v8.7 CHANGELOG entry; appended PART 38 |
+| `index.html`         | `lblSpec.VERSION` bumped to `{ts:'v1.15', json:'v8.7'}`; LBL spec chip text + title updated; meta description + keywords updated; 4 new character-pipeline validators (E13-E16) added to `ANTI_PATTERN_CHECKS`; top-of-block comment updated to "RJS UPDATE 3 / 4 / 5 / 6 / 7" |
+| `CHANGES_SUMMARY.md` | this round added at the top (this section); prior v1.14 round preserved below |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` (still work
+  standalone, including Model_1.ts which is a character subject and
+  is the prime candidate for the optional PART 38 upgrade)
+- `public/models/manifest.json` (still works as-is)
+- `.github/workflows/manifest.yml`
+- `public/rig/three-rig-helpers.js`
+- `public/rig/src/*.ts`
+- `public/rig/build.sh`
+
+## What the new PART 38 covers (21 sub-sections)
+
+- **38.0**  Central principle — "more polygons do not automatically
+            create a better model"
+- **38.1**  Diagnosis of the primitive-assembly approach (10 symptoms)
+- **38.2**  When PART 38 applies (character / mascot / creature /
+            humanoid subjects only) and when it does not
+- **38.3**  Two-layer architecture (asset-authoring + viewer-integration)
+- **38.4**  14-stage production pipeline + 7 quality gates
+- **38.5**  Character specification schema (9 fields: identity /
+            proportions / silhouette / face / costume / palette / rig /
+            animation / budget)
+- **38.6**  4 continuous-mesh-generation approaches (parametric /
+            lofted / implicit / hybrid — hybrid is the default for
+            this renderer)
+- **38.7**  Topology techniques + edge-loop locations (face, shoulders,
+            elbows, hips, knees, wrists, ankles) + 10 cleanup operations
+- **38.8**  Polygon + vertex budgeting (6-category allocation table +
+            ~12-18k vertex target + PART 35 50k soft cap reminder)
+- **38.9**  Facial modeling system (10 steps + goblin identity features)
+- **38.10** Clothing, armor, and props (7 garment techniques + 7
+            material category profiles + 4 canonical socket names)
+- **38.11** UVs and textures (minimum set: albedo, roughness, normal,
+            optional metallic, optional emissive)
+- **38.12** Real skeletal rigging (REQUIRED + optional bone hierarchy,
+            skinIndex / skinWeight, normalized weights, corrective
+            shape keys; PART 34's three-rig-helpers is re-confirmed as
+            the ONE sanctioned skeleton source)
+- **38.13** Animation techniques (idle / walk / attack / hit minimum
+            set + extras; 8 animation quality checks)
+- **38.14** GLB-first architecture (TypeScript file becomes the
+            viewer adapter; 9-step adapter contract)
+- **38.15** Tooling options (3 paths: Blender-assisted / Procedural
+            / Hybrid — Hybrid is the recommended default)
+- **38.16** Validation system (4 new character-specific validators
+            E13-E16; existing E1-E12 are unchanged)
+- **38.17** Multi-view and silhouette review (13 required angles + 9
+            landmark comparisons against the spec)
+- **38.18** LOD and performance (3 LOD levels: 10-20k / 5-8k /
+            1.5-3k vertices; rig preserved across LODs)
+- **38.19** Implementation roadmap (9 phases)
+- **38.20** Priority order (top 10 — start with continuous head/torso
+            topology, not more decorative primitives)
+- **38.21** Final design principle (the 9-item quality bar)
+
+## What PART 38 does NOT introduce
+
+- No new mandatory field on any existing userData namespace
+- No new export path (PART 1.2 still governs; PART 1.3's optional
+  look-dev lights factory still governs)
+- No change to the existing PART 30 pivot hierarchy (remains valid
+  for non-character subjects per PART 38.2 and for jointed-only
+  character poses when the AI elects not to use a real SkinnedMesh)
+- No change to PART 34 (three-rig-helpers) — E11 marker remains
+  in force
+- No change to the renderer's existing E1-E12 validators (E13-E16
+  are additive, not replacements)
+- No change to GLB / OBJ / STL / FBX / DAE loaders
+- No change to the editor paste path
+- No change to the file-picker UI
+- No change to the scene tree or the Rig / Tris / Sockets buttons
+- No new dependency (no new import-map entry)
+- No change to the bundle format from PART 37
+- No change to the multi-file drop from PART 36
+
+PART 38 layers on top of — never replaces — PARTs 1-37 (TS) and
+PARTs 1-66 (JSON/JS). The v1.14 / v8.6 round's content (zip bundle
+support, PART 37) is preserved below for cross-reference.
+
+## Renderer-side changes (index.html)
+
+- `lblSpec.VERSION = { ts: 'v1.15', json: 'v8.7' }` (was v1.14 / v8.6)
+- `lbl-spec-chip` text: `LBL: v1.15 / v8.7` (was `LBL: v1.14 / v8.6`)
+- `lbl-spec-chip` title attribute: now mentions the 4 new E13-E16
+  character-pipeline validators alongside the existing E1-E12
+- `meta name="description"`: now mentions "16 hard anti-pattern
+  guards (incl. 4 new character-pipeline validators E13-E16)"
+  (was "10 hard anti-pattern guards")
+- `meta name="keywords"`: now includes "character pipeline,
+  skeletal skinning" (was "LBL v1.14, LBL v8.6")
+- Top-of-block comment: now says "RJS UPDATE 3 / 4 / 5 / 6 / 7"
+  (was "RJS UPDATE 3 / 4 / 5 / 6")
+- 4 new validators added to `ANTI_PATTERN_CHECKS`:
+  - **E13** Vertex budget (PART 38.13): if the model declares
+        `meta.vertexBudget` (and optionally `vertexBudgetTolerance`
+        and `meta.subjectClass === 'character'`), the actual
+        vertex count should not exceed budget × (1 + tolerance).
+        Default tolerance is 20% for non-character subjects,
+        10% for character subjects (stricter).
+  - **E14** NaN / infinite positions (PART 38.16): walks every
+        position attribute and flags non-finite coordinates.
+        A character model with NaN positions will not deform
+        cleanly and will produce black holes in the render.
+  - **E15** Topology cleanup (PART 38.7): counts zero-area
+        triangles (cross product of two edge vectors < 1e-6)
+        and surfaces a warning if any are present. True
+        non-manifold detection requires topology rebuild; this
+        is a best-effort heuristic.
+  - **E16** Bounding-box proportions (PART 38.16): if the model
+        declares `meta.expectedProportions = { height, width,
+        depth }`, the actual H:W and D:W ratios should match
+        the declared ratios within ±15%. Useful for catching
+        models where a leg is twice the height of the body.
+
+All 4 new validators are non-blocking warnings (the model still
+loads, the user just sees a toast + a red spec chip). They mirror
+the E1-E12 pattern from PART 32 / PART 65 and integrate into the
+existing `validate()` / `applyToUI()` / `revalidate()` pipeline
+without any caller-side changes.
+
+## Verification
+
+- `node --check` on the extracted `index.html` module script → OK
+- All 6 spec files have a v1.15 / v8.7 (TS) or v8.7 (JSON/JS)
+  CHANGELOG entry at the top AND a complete PART 38 appended
+  at the end with the closing `END OF PART 38` marker
+- `lblSpec.VERSION` reads from a single source-of-truth constant;
+  every check below the VERSION line uses the same value
+- All PART 38 references preserve the existing PART 1-37
+  (TS) and PART 1-66 (JSON/JS) content unchanged — verified
+  by line-count diff of each file before vs after the change
+  (the only added lines are the new CHANGELOG entry, the new
+  header version, and the appended PART 38)
+
+## Related prior rounds (for context)
+
+- **v1.11 / v8.3** — Pre-bundled rig helpers (PART 34)
+- **v1.12 / v8.4** — Triangle-first geometry (PART 35)
+- **v1.13 / v8.5** — Multi-file drop + Model + Rig pairing (PART 36)
+- **v1.14 / v8.6** — Zip bundle support (PART 37)
+
+# v1.14 / v8.6 — Zip bundle support (PART 37) (PRESERVED BELOW)
 
 The renderer now accepts a `.zip` file (drop, file-picker, drag, or
 demo/model-store URL) as a "bundle" of model + rig + any other files.
