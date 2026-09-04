@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.16 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.17 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
@@ -23,6 +23,39 @@ CHANGELOG
     loop to make N copies" rule of thumb from 39.3.5
     applies to image-derived subjects the same way it does
     to prompt-derived ones. Bumped from v1.15 to v1.16.
+
+  v1.17 (2026-09-04) — BETTER MODELS THROUGH BETTER GENERATION.
+    Mirrors the v1.17 update in Prompt_To_Ts.txt. New PART 40
+    (better models through better generation: structured
+    prompts + image preprocessing, multi-stage pipeline, mesh
+    quality + topology, structured TS output, PBR materials,
+    parametric + procedural techniques, post-processing +
+    validation + feedback, scene composition) applies the same
+    way to image-driven .ts factory generation. The image-to-
+    TS analysis protocol (PART 17 of the TS spec) feeds 40.1
+    directly: the AI extracts the structured brief (Subject +
+    Material + Style + Technical Constraints) from the
+    reference image, runs image preprocessing (background
+    removal, contrast, centering, 256x256 silhouette render)
+    before any geometry work, and treats the multi-view
+    reference set (front / side / top / 3/4) as the canonical
+    inputs to the 4-stage generation pipeline (40.2). The
+    "no thin spikes" / "watertight" / "clean topology" /
+    "≤ 20k tris" negative prompts from 40.1.4 are read from
+    the image as well as from the text prompt (e.g. a
+    reference image with visible mesh artifacts implies
+    "clean topology"). Adds 3 new non-blocking validators E19
+    (PBR + UV completeness), E20 (hard-constraint compliance /
+    thin spike detector), and E21 (target triangle budget) to
+    the existing 18, and 3 new canonical helpers
+    `pbrMaterial`, `seededRandom`, and `triCountSummary` re-
+    exported on window.lblSpec.helpers alongside the PART 35
+    tris bundle and the PART 39 curvedPart / validateModel /
+    snapshotToPng bundle. PART 40 is style-agnostic and
+    applies to every image-driven .ts factory, every subject,
+    every style. No new dependency, no new export path, no
+    new mandatory userData field, no removed / weakened rule.
+    Bumped from v1.16 to v1.17.
   v1.15 (2026-09-04) — CHARACTER PIPELINE UPGRADE.
     Mirrors the v1.15 update in Prompt_To_Ts.txt. New PART 38
     (character pipeline upgrade) applies the same way to image-
@@ -9844,4 +9877,1058 @@ alongside the PART 35 tris bundle. Style-agnostic, applies
 to every .ts factory, every JSON/JS blueprint, every
 subject. No new dependency, no new export path, no new
 mandatory field, no removed / weakened rule.
+================================================================================
+
+================================================================================
+PART 40 — v1.17 / v8.9 ADDITIONS: BETTER MODELS THROUGH BETTER GENERATION
+================================================================================
+Source: the maintainer's "System Update Details for Better TypeScript
+Low-Poly 3D Models" (2026-08). The document distills 8 categories of
+improvements the AI must apply when generating a .ts factory module
+(or any JSON/JS blueprint that ultimately ends up as a Three.js
+Group): (1) better prompt & input handling, (2) a multi-stage
+generation pipeline, (3) mesh quality & topology improvements,
+(4) structured TypeScript output improvements, (5) a full texture &
+material system, (6) parametric & procedural techniques, (7) post-
+processing, validation & feedback, and (8) scene / composition level
+ideas. PART 40 layers on top of — never replaces — PART 1, PART 2,
+PART 3, PART 4, PART 17, PART 27, PART 30, PART 31, PART 32, PART 34,
+PART 35, PART 36, PART 37, PART 38, PART 38.22, PART 39, PART 64, and
+PART 65 / PART 66.
+
+  40.0  CENTRAL PRINCIPLE
+  -----------------------
+
+    The 8 categories from the source doc are not 8 separate
+    concerns — they are 8 facets of a single principle:
+
+      Build a PRODUCTION-GRADE GENERATION PIPELINE, not a
+      one-shot prompt-to-geometry call.
+
+    A production-grade pipeline is one where:
+
+      - The input (prompt + reference image) is structured
+        (Subject + Material + Style + Technical Constraints,
+        40.1) and preprocessed (background removal, contrast,
+        centering, multi-view, 40.1.2-40.1.3) before any
+        geometry work begins.
+      - The geometry is generated in clearly separated STAGES
+        (40.2) — coarse base mesh, geometry refinement,
+        texture / material, final cleanup — so a mistake in
+        one stage can be fixed without redoing the others.
+      - The mesh that comes out of those stages is CLEAN
+        (40.3) — watertight, no duplicate vertices, no
+        non-manifold edges, no thin spikes, intelligent
+        retopology, smart low-poly with a target triangle
+        budget, feature-preserving simplification.
+      - The TypeScript output is STRUCTURED (40.4) — modular
+        factories, options-based geometry construction,
+        metadata (poly count, style tags, generation
+        settings), editable and maintainable.
+      - The materials carry a FULL PBR TEXTURE SET (40.5) —
+        base color, normal, roughness, metallic, AO — with
+        style-specific texturing (flat low-poly colors vs
+        painted vs realistic), separate texture refinement
+        stage, and automatic UV handling where possible.
+      - The geometry is PARAMETRIC & PROCEDURAL (40.6) —
+        factory + options object, seed-based controlled
+        variation, LOD support, prefer algorithmic geometry
+        over pure black-box AI meshes.
+      - The output is VALIDATED (40.7) — quality metrics
+        (manifold check, poly count, symmetry, visual
+        fidelity), multiple variants ranked, simple mesh
+        repair pipeline before export, optional user rating
+        feedback loop into prompt defaults.
+      - (Optional) The result composes into a SCENE (40.8)
+        with consistent style and density across multiple
+        objects, hierarchical scene building, and procedural
+        placement and variation.
+
+    PART 40 reinforces PART 39 — the "build a part library +
+    drive it from a config object" discipline from 39.5 IS
+    the factory + options pattern from 40.4 + 40.6. The
+    "use the right geometry primitive" discipline from 39.3
+    IS the algorithmic-geometry-over-black-box rule from
+    40.6. PART 40 is the production-engineering framing of
+    the same ideas; PART 39 is the authoring-time framing.
+
+    PART 40 is style-agnostic. The principles apply to
+    low-poly, mid-poly, high-poly, smooth-shaded, stylized,
+    photoreal, voxel, hand-painted, toon / cel, retro-PSX,
+    hologram, wireframe, and any combination. Low-poly is
+    the default for short prompts because the project is
+    named for it (PART 38.22), not because PART 40 rejects
+    other styles.
+
+  40.1  BETTER PROMPT & INPUT HANDLING
+  -----------------------------------
+
+    The AI's first job is to turn the user's free-form text
+    (and optional reference image) into a STRUCTURED brief
+    before any geometry is authored. The brief is the input
+    to the multi-stage pipeline (40.2), not the geometry
+    itself.
+
+  40.1.1  Structured prompt format.
+
+    Decompose every prompt into 4 named slots:
+
+      [Subject]    + [Material]    + [Style]    + [Technical Constraints]
+
+    Examples:
+
+      "a frog"          → S: frog, M: unspecified, St: unspecified, TC: unspecified
+      "wooden crate"    → S: crate, M: oak wood,    St: low-poly,  TC: unspecified
+      "AK-47, weathered steel, mid-poly, 20k tris" →
+        S: AKM assault rifle, M: weathered steel, St: mid-poly, TC: ~20,000 tris
+      "smooth-shaded ceramic teapot, 4k normal map, PBR, 1 unit tall" →
+        S: teapot, M: glazed ceramic, St: smooth-shaded, TC: PBR + 4k normal + 1u height
+
+    When the prompt is ambiguous (e.g. "a car" with no
+    style), the AI picks the project default (low-poly)
+    per PART 38.22 and records the choice in
+    `meta.style` and `meta.styleDefaulted: true` so the
+    user can see it was inferred, not declared.
+
+  40.1.2  Image preprocessing.
+
+    When a reference image is supplied, the AI should
+    perform a small set of pre-processing steps before
+    analyzing it:
+
+      - Background removal (or at least background
+        desaturate) so the silhouette is unambiguous.
+      - Contrast / sharpness boost so the silhouette
+        edges are clean.
+      - Centering — translate the subject to the
+        image center; the AI then knows the bbox is
+        symmetric around the origin in screen space.
+      - 256x256 black-on-white silhouette render for
+        the PART 39.4.1 silhouette test.
+
+    The image-to-TS analysis protocol (PART 17) and the
+    image-to-JSON/JS analysis protocol (PART 27) both
+    benefit from these steps. The AI does NOT need to
+    bake the preprocessing into the shipped .ts factory
+    — it's authoring-time only.
+
+  40.1.3  Multi-view image support.
+
+    When the user supplies 2-4 reference views (front,
+    side, top, 3/4), the AI should:
+
+      - Treat the FIRST image as the canonical silhouette
+        source for the PART 39.4.1 silhouette test.
+      - Use the SECOND image to validate the side
+        proportions (the classic "is the barrel really
+        that long?" check).
+      - Use the THIRD image (top view) to validate the
+        silhouette footprint — the PART 39.4.3 "is it
+        cheating" check.
+      - Use the FOURTH image (3/4 view) as the
+        recognition / recognition test source — the
+        angle the user will most likely see the model
+        from in the renderer's orbit camera.
+
+    On the JSON/JS path, the blueprint's `meta.referenceViews`
+    field lists the view angles; on the TS path, the
+    factory's `userData.sculptRuntime.referenceViews` does
+    the same.
+
+  40.1.4  Negative prompts and hard constraints.
+
+    Negative prompts are constraints the AI must NOT
+    violate. They are first-class inputs, not afterthoughts:
+
+      - "no thin spikes" — no triangle with one edge
+        more than 50x longer than another (the renderer's
+        E20 hard-constraint check enforces this at
+        runtime; see 40.7.2).
+      - "watertight" — every edge is shared by exactly 2
+        faces; the renderer's E20 + the AI's authoring-time
+        manifold check enforce this.
+      - "clean topology" — no duplicate vertices, no
+        non-manifold edges, no holes; the AI's authoring-
+        time cleanup + PART 39.1.2 boot-time validator
+        enforce this.
+      - "≤ 20k tris" — explicit target triangle budget;
+        the renderer's E21 validator enforces this at
+        runtime; the AI's authoring-time simplify step
+        enforces it before export (see 40.3.2).
+
+    The AI treats every negative prompt as a HARD
+    constraint, not a soft preference. A model that
+    violates a negative prompt is rejected, not
+    "shipped with a warning".
+
+  40.2  MULTI-STAGE GENERATION PIPELINE
+  -------------------------------------
+
+    A production-grade generation pipeline separates the
+    work into 4 STAGES. Mistakes in one stage can be fixed
+    without redoing the others.
+
+      Stage 1 — Coarse base mesh (silhouette + proportions)
+      Stage 2 — Geometry refinement
+      Stage 3 — Texture / material generation
+      Stage 4 — Final cleanup + export
+
+  40.2.1  Stage 1 — Coarse base mesh.
+
+    Goal: lock in the SILHOUETTE and the PROPORTIONS
+    using the lowest possible triangle count (often
+    < 200 tris for the whole model). The base mesh may
+    look crude — it doesn't need textures, materials, or
+    detail; it needs to be RECOGNIZABLE at 256x256
+    black-on-white (PART 39.4.1 silhouette test).
+
+    On the TS path: the factory's Stage 1 emission
+    should consist of the part-library primitives
+    (barrel / taperedBox / curvedMag / woodBlock from
+    PART 39.5.1) placed at the config-object-driven
+    positions (PART 39.5.2). The AI's authoring loop
+    is: place primitive → render silhouette → adjust
+    primitive's offset / scale → repeat.
+
+    On the JSON/JS path: the blueprint's Stage 1
+    emission consists of `nodes[]` entries with
+    `geometry.kind: "box" | "cylinder" | "sphere" |
+    "lathe" | "tube" | "extrude"`, no textures, no
+    materials, default flat color.
+
+  40.2.2  Stage 2 — Geometry refinement.
+
+    Goal: add the SECONDARY forms and detail that make
+    the model look finished, while staying under the
+    declared target triangle budget (40.1.4 / 40.3.2).
+
+    On the TS path: the factory's Stage 2 emission
+    adds:
+
+      - Edge bevels and corner softening
+        (BoxGeometry → RoundedBoxGeometry or
+        ExtrudeGeometry with bevel).
+      - Curved parts via lblSpec.helpers.curvedPart
+        (PART 39.3.1) for banana mags, sling straps,
+        handguards.
+      - Repeated detail via InstancedMesh
+        (PART 39.3.4) for rivets, screws, panels.
+      - One-off detail via BufferGeometry merge
+        (PART 35.2) for non-repeating complex shapes.
+
+    On the JSON/JS path: the blueprint's Stage 2
+    emission adds `geometry.kind: "lathe"` for round
+    profiles, `geometry.kind: "tube"` for curved
+    surfaces, `geometry.kind: "instanced"` for
+    repeated detail, and `geometry.merge: true` for
+    non-repeating merged shapes.
+
+  40.2.3  Stage 3 — Texture / material generation.
+
+    Goal: apply a FULL PBR TEXTURE SET (40.5) with
+    style-specific texturing (flat low-poly colors vs
+    painted vs realistic). The AI does NOT have to
+    paint every texture by hand — it can:
+
+      - Use procedural noise for normal / roughness
+        maps.
+      - Use the reference image's albedo as a starting
+        point, then desaturate / quantize to the
+        target style.
+      - Use a single solid color when the style is
+        flat low-poly (no PBR maps needed).
+
+    On the TS path: the factory's Stage 3 emission
+    uses lblSpec.helpers.pbrMaterial (40.10) when
+    style is realistic, and a single MeshStandardMaterial
+    when style is flat low-poly.
+
+    On the JSON/JS path: the blueprint's Stage 3
+    emission sets `material.kind: "pbr"` with the
+    full texture set, or `material.kind: "flat"`
+    with a single color.
+
+  40.2.4  Stage 4 — Final cleanup + export.
+
+    Goal: run the mesh cleanup pipeline (40.7.3) and
+    export. The cleanup pipeline runs BEFORE the export
+    step, not after — a model that exports with
+    non-manifold edges is a model that breaks in
+    downstream tools.
+
+    On the TS path: the factory's Stage 4 emission
+    calls lblSpec.helpers.validateModel (PART 39.1.2 /
+    39.8) and logs warnings; the model's
+    userData.sculptRuntime.exportReady = true marks
+    it as clean for the renderer.
+
+    On the JSON/JS path: the blueprint's Stage 4
+    emission sets `meta.exportReady: true` after
+    the AI's authoring-time manifold / vertex-cleanup
+    passes have run.
+
+  40.3  MESH QUALITY & TOPOLOGY IMPROVEMENTS
+  ------------------------------------------
+
+    The mesh that comes out of Stage 2 must be CLEAN
+    before Stage 3 textures are applied. A noisy mesh
+    makes a noisy normal map; a non-manifold mesh
+    makes a broken GLB export.
+
+  40.3.1  Automatic mesh cleanup.
+
+    The AI's authoring-time cleanup pass MUST run the
+    following 4 operations, in this order:
+
+      1. Weld duplicate vertices (vertices within
+         ε = 1e-5 of each other become one).
+      2. Remove zero-area triangles (cross product
+         of two edge vectors < 1e-6; the renderer's
+         E15 validator from PART 38.7 surfaces these
+         as warnings, but the AI should remove them
+         at authoring time, not ship them).
+      3. Remove unused vertices (vertices not
+         referenced by any triangle).
+      4. Remove degenerate edges (edges shared by
+         only one triangle — these are the
+         non-manifold edges that break the
+         watertight guarantee from 40.1.4).
+
+    On the TS path, the factory can use
+    `BufferGeometryUtils.mergeVertices` (imported
+    from `three/examples/jsm/utils/BufferGeometryUtils.js`)
+    for step 1. The AI does NOT have to ship the
+    cleanup code in the final emission — it's
+    authoring-time only.
+
+  40.3.2  Smart low-poly mode with target triangle
+          budgets.
+
+    When the user declares a target triangle budget
+    (e.g. "≤ 5,000 tris"), the AI must run a
+    feature-preserving simplification step (QEM /
+    quadric error metrics) that respects the budget
+    while preserving:
+
+      - The silhouette (the part of the model that
+        contributes to the PART 39.4.1 silhouette
+        test).
+      - Hard edges (the part of the model where
+        two faces meet at a sharp angle — the
+        edge between the receiver and the magazine
+        well, for example).
+      - Curved surfaces (the part of the model
+        where smooth shading is required).
+
+    The renderer's E21 validator (see 40.7.2)
+    checks the runtime triangle count against
+    the declared target; the AI's authoring-time
+    simplification step is what actually enforces
+    the budget.
+
+    On the TS path, the factory declares the budget
+    via `userData.sculptRuntime.targetTris` or
+    `meta.targetTris`. On the JSON/JS path, the
+    blueprint declares it via `meta.targetTris`.
+
+  40.3.3  Feature-preserving simplification.
+
+    The simplification step from 40.3.2 uses a
+    feature-preserving variant of QEM that
+    weights vertex collapses by:
+
+      - 1.0 for vertices on the silhouette.
+      - 0.8 for vertices on hard edges.
+      - 0.3 for vertices on curved surfaces.
+      - 0.1 for vertices on flat surfaces.
+
+    This is a guideline, not a hard rule — the
+    exact weights depend on the model. The point
+    is that the AI should not use a single weight
+    for all collapses; that produces the "blobby"
+    look that PART 38.1 diagnoses as a symptom of
+    primitive-assembly.
+
+  40.3.4  Force watertight / manifold meshes.
+
+    The negative prompt from 40.1.4 ("watertight")
+    is enforced at the AI's authoring time AND at
+    the renderer's E20 runtime check. The
+    authoring-time check is a real manifold test
+    (every edge shared by exactly 2 faces, every
+    vertex reachable from every other vertex
+    through faces). The runtime check is a
+    best-effort heuristic (no thin spikes, no
+    zero-area triangles, no unused vertices)
+    that the renderer's E20 validator (40.7.2)
+    surfaces as a non-blocking warning.
+
+  40.4  STRUCTURED TYPESCRIPT OUTPUT IMPROVEMENTS
+  -----------------------------------------------
+
+    The .ts factory (or JSON/JS blueprint) that
+    comes out of the 4-stage pipeline should be
+    STRUCTURED, not a flat hard-coded data dump.
+
+  40.4.1  Modular factory pattern.
+
+    Every part of the model should be its own
+    named factory function:
+
+      - `createBarrel(opts)` returns a Mesh.
+      - `createReceiver(opts)` returns a Mesh.
+      - `createMagazine(opts)` returns a Mesh.
+      - `createStock(opts)` returns a Mesh.
+
+    The top-level `create*Model()` then composes
+    these factories into a Group. The factories
+    take a SHARED OPTIONS OBJECT (40.4.2) so a
+    single config change (PART 39.5.2) ripples
+    through the whole model.
+
+    On the JSON/JS path, the equivalent is
+    each `nodes[]` entry having a `factory` field
+    that names the part-library primitive it
+    uses (PART 39.5.1).
+
+  40.4.2  Parametric / options-based geometry.
+
+    Every factory function takes a typed options
+    object:
+
+      interface Ak47Config {
+        scale: number;
+        magCurve: number;
+        magCapacity: number;
+        stockTaper: number;
+        fireInterval: number;
+        colors: { receiver: number; mag: number; stock: number };
+      }
+
+    A single config object drives ALL dimensions,
+    colors, curve points, and recoil numbers. This
+    is the same pattern as PART 39.5.2 — PART 40
+    reinforces it as the canonical shape for every
+    factory.
+
+  40.4.3  Better hierarchy (parts, groups, sockets).
+
+    The factory's top-level Group has 4 named
+    children:
+
+      - `parts`     — the actual geometry
+                       (receiver, barrel, mag, stock).
+      - `bones`     — the rig skeleton (PART 30/34).
+      - `sockets`   — the 4 canonical Socket_*
+                       attachment points (PART 33.1[7]).
+      - `meta`      — metadata (40.4.4).
+
+    The PART 30 pivot hierarchy stays valid; PART 40
+    extends it with the 3 additional named children.
+
+  40.4.4  Metadata (poly count, style tags,
+          generation settings).
+
+    Every .ts factory publishes a `meta` object
+    on `userData.meta`:
+
+      meta: {
+        subject: "AKM assault rifle",
+        style: "mid-poly",           // PART 38.22
+        styleDefaulted: false,       // PART 40.1.1
+        vertexBudget: 12000,         // PART 38.13
+        targetTris: 5000,            // PART 40.3.2
+        seed: 0xA1B2C3D4,            // PART 40.6.2
+        referenceViews: ["front", "side", "top", "3/4"],
+                                   // PART 40.1.3
+        negativePrompts: ["no thin spikes", "watertight"],
+                                   // PART 40.1.4
+        generationPipeline: "v1.17", // which PART 40 was used
+        exportReady: true            // PART 40.2.4
+      }
+
+    The renderer's E13 / E21 / E20 validators all
+    read from this metadata. PART 40 introduces
+    `targetTris`, `seed`, `referenceViews`,
+    `negativePrompts`, `generationPipeline`, and
+    `exportReady`; it does NOT change the existing
+    `vertexBudget` / `style` / `subject` fields
+    from PART 38.
+
+  40.5  TEXTURE & MATERIAL SYSTEM
+  -------------------------------
+
+    The materials that come out of Stage 3 should
+    carry a FULL PBR TEXTURE SET, not just a base
+    color.
+
+  40.5.1  Full PBR texture sets.
+
+    A production-grade material has 5 maps:
+
+      - baseColor    (sRGB)
+      - normal       (linear, optional for flat styles)
+      - roughness    (linear, 0=smooth, 1=rough)
+      - metallic     (linear, 0=dielectric, 1=metal)
+      - ao           (linear, ambient occlusion)
+
+    On the TS path, the factory uses
+    lblSpec.helpers.pbrMaterial (40.10) which
+    returns a configured MeshStandardMaterial
+    with all 5 maps wired up. The renderer's
+    E19 PBR-completeness validator (40.7.2)
+    checks that a model whose `meta.style`
+    is "realistic" or "smooth-shaded" actually
+    has all 5 maps; models whose style is
+    "low-poly" or "voxel" are exempt (a single
+    baseColor is sufficient for those styles).
+
+  40.5.2  Style-specific texturing.
+
+    The texture density and channel count
+    depends on the style:
+
+      - low-poly / voxel / hand-painted:
+        baseColor only, often solid.
+      - mid-poly / stylized / toon:
+        baseColor + a small normal map for
+        surface detail.
+      - high-poly / smooth-shaded /
+        photoreal / retro-PSX:
+        full 5-map PBR set with high-resolution
+        textures.
+
+    The AI records the chosen texture density
+    in `meta.textureDensity: "low" | "mid" | "high"`
+    so the renderer's E19 validator can apply
+    the right exemption rule.
+
+  40.5.3  Separate texture refinement / re-texturing
+          stage.
+
+    A change to the texture set should NOT
+    require redoing the geometry. PART 40
+    reinforces the Stage 2 / Stage 3 split from
+    40.2.2 / 40.2.3 — the geometry is done after
+    Stage 2, and only the materials change in
+    Stage 3.
+
+    On the TS path, the factory's
+    `setStyle(newStyle)` function re-applies the
+    Stage 3 materials without touching Stage 2
+    geometry. On the JSON/JS path, the
+    blueprint's `meta.style` is a top-level
+    field that the renderer's shading dropdown
+    (PART 33.1[4]) already pivots on.
+
+  40.5.4  Automatic UV handling.
+
+    When a UV unwrap is required, the AI prefers
+    the following 3 options, in order:
+
+      1. Use the primitive's built-in UVs
+         (BoxGeometry, CylinderGeometry,
+         SphereGeometry all ship with valid UVs).
+      2. Use a planar projection for flat
+         surfaces (no unwrap needed).
+      3. Use a simple box / cylinder unwrap
+         (Three.js doesn't ship a generic UV
+         unwrapper; the AI uses a hand-rolled
+         planar-on-largest-face unwrap for
+         custom BufferGeometry).
+
+    The renderer's E19 UV-coverage validator
+    (40.7.2) checks that UVs are within [0,1]
+    and that there are no degenerate (0-area)
+    UV islands.
+
+  40.6  PARAMETRIC & PROCEDURAL TECHNIQUES
+  ----------------------------------------
+
+    Prefer algorithmic geometry over pure
+    black-box AI meshes. The factory + options
+    object pattern from PART 39.5 IS the
+    parametric pattern from 40.6.
+
+  40.6.1  Factory + options object.
+
+    Already covered by 40.4.1 + 40.4.2. PART 40
+    reinforces the pattern: every part of the
+    model is a named factory that takes a
+    shared options object.
+
+  40.6.2  Seed-based controlled variation.
+
+    When the model should have variation across
+    instances (e.g. the AI is generating 3
+    variants of a tree), the factory takes a
+    `seed` option and uses a SEEDED RNG
+    (lblSpec.helpers.seededRandom, 40.10)
+    for every random decision (leaf rotation,
+    branch length, bark color jitter). The
+    same seed produces the same variant; a
+    different seed produces a different
+    variant. This is the production-grade
+    alternative to "reroll and hope".
+
+    The factory records the chosen seed in
+    `meta.seed` (40.4.4) so the renderer can
+    re-create the exact variant on reload.
+
+  40.6.3  LOD (Level of Detail) support.
+
+    The factory emits 3 LOD levels:
+
+      - LOD0: full quality (10-20k vertices
+        for characters, 5-8k for props).
+      - LOD1: 50% of LOD0 (smart simplify
+        from 40.3.2).
+      - LOD2: 25% of LOD0 (aggressive simplify
+        for far-away views).
+
+    The THREE.LOD object (Three.js core) is
+    the canonical container. The renderer's
+    camera-distance-based LOD switching is
+    NOT new in PART 40 — the LOD emission IS
+    new. Models that don't have 3 LODs still
+    load; the renderer just uses LOD0 for
+    every distance.
+
+  40.6.4  Prefer algorithmic geometry.
+
+    When the user asks for "a forest" or
+    "a city", the AI does NOT generate 200
+    individual tree meshes or 200 individual
+    building meshes. It generates 1 tree
+    factory + 1 InstancedMesh (PART 39.3.4)
+    of 200 instances, or 1 building factory
+    + 1 InstancedMesh of 200 instances. The
+    algorithmic-geometry approach is what
+    keeps the model under the PART 35.2 50k
+    triangle soft cap and the E18 500-mesh
+    sanity check.
+
+  40.7  POST-PROCESSING, VALIDATION & FEEDBACK
+  --------------------------------------------
+
+    The 4-stage pipeline (40.2) is followed by a
+    post-processing step that catches what the
+    earlier stages missed.
+
+  40.7.1  Quality metrics.
+
+    The AI's authoring-time validation runs
+    4 metrics, in this order:
+
+      1. Manifold check (40.3.4).
+      2. Poly count vs target (40.3.2).
+      3. Symmetry check (PART 38.16 — the
+         model is bilaterally symmetric about
+         its Y axis to within ±5%).
+      4. Visual fidelity (PART 39.4 — the
+         256x256 black-on-white silhouette
+         matches the reference image's
+         silhouette to within IoU ≥ 0.7).
+
+    The renderer's runtime validators (E13,
+    E15, E16, E19, E20, E21 — see 40.7.2)
+    re-run the first 3 metrics on every load.
+    The visual fidelity metric is authoring-
+    time only.
+
+  40.7.2  Renderer-side runtime validators
+          (E19, E20, E21).
+
+    PART 40 adds 3 new non-blocking validators
+    to the existing 18 (E1-E18 from PART 32 /
+    PART 38 / PART 39):
+
+      - E19 — PBR + UV completeness
+        (PART 40.5.1 / 40.5.4). For models
+        whose `meta.style` is "realistic",
+        "smooth-shaded", "stylized", or
+        "photoreal", every material should
+        have a baseColor AND at least one of
+        (normalMap, roughnessMap, metalnessMap).
+        Additionally, every geometry that has
+        a UV-mapped material should have a UV
+        attribute with values in [0, 1] and
+        no degenerate (0-area) UV islands.
+        Models with `meta.textureDensity: "low"`
+        are exempt.
+
+      - E20 — Hard-constraint compliance
+        (PART 40.1.4 / 40.3.4). Walks every
+        triangle; flags triangles where one
+        edge is more than 50x longer than
+        another (the "thin spike" detector).
+        The renderer surfaces the first 4
+        flagged triangles in the warning.
+        This is a best-effort heuristic —
+        true manifold detection requires a
+        full topology rebuild — but it
+        catches the obvious "this triangle
+        will render as a single pixel"
+        case.
+
+      - E21 — Target triangle budget
+        (PART 40.3.2). If the model declares
+        `meta.targetTris` (and optionally
+        `targetTrisTolerance`), the actual
+        triangle count should not exceed
+        target × (1 + tolerance). Default
+        tolerance is 25% for low-poly and
+        mid-poly subjects, 15% for high-poly
+        and photoreal subjects (stricter).
+        Non-blocking; the model still loads.
+
+    E19, E20, E21 are non-blocking warnings,
+    like E1-E18 before them. The model still
+    loads; the user sees a toast + a red spec
+    chip. They mirror the E1-E18 pattern and
+    integrate into the existing
+    `validate()` / `applyToUI()` / `revalidate()`
+    pipeline without any caller-side changes.
+
+  40.7.3  Mesh repair pipeline before export.
+
+    The AI's authoring-time repair pipeline
+    runs BEFORE the GLB / OBJ / STL export:
+
+      1. Weld duplicate vertices (40.3.1[1]).
+      2. Remove zero-area triangles
+         (40.3.1[2]).
+      3. Remove unused vertices (40.3.1[3]).
+      4. Recompute normals if the cleanup
+         pass changed the topology.
+      5. Re-validate (40.7.1).
+
+    A model that exports with non-manifold
+    edges is a model that breaks in downstream
+    tools (Blender, Unity, Unreal). PART 40
+    requires the repair pipeline; PART 39
+    recommended it; PART 38 (character
+    pipeline) hinted at it via the GLB-first
+    architecture. The pipeline is now a
+    hard requirement for every .ts factory,
+    every JSON/JS blueprint.
+
+  40.7.4  Optional user rating feedback loop
+          into prompt defaults.
+
+    When the user rates a generated model
+    (e.g. "this one looks good" / "this one
+    is too noisy"), the rating feeds back
+    into the AI's prompt defaults. The
+    renderer does NOT have to implement the
+    feedback loop UI in v1.17 / v8.9 — that's
+    a future round. PART 40 documents the
+    INTENT so the AI's authoring-time
+    defaults can be tuned from the rating
+    data when the UI ships.
+
+    On the TS path, the factory records the
+    last user rating in
+    `userData.sculptRuntime.lastRating`. On
+    the JSON/JS path, the blueprint records
+    it in `meta.lastRating`. Both are
+    optional.
+
+  40.8  SCENE / COMPOSITION LEVEL IDEAS
+  -------------------------------------
+
+    (Optional expansion — applies when the
+    model is one of N objects in a scene,
+    not when it's the single root of the
+    renderer.)
+
+  40.8.1  Consistent style and density.
+
+    When the AI is generating multiple
+    objects for a single scene (e.g. "a
+    medieval village"), every object should:
+
+      - Use the same `meta.style` (low-poly,
+        mid-poly, etc.).
+      - Use the same `meta.textureDensity`
+        (low, mid, high).
+      - Use compatible LOD levels (one
+        object at LOD2 next to another at
+        LOD0 looks wrong).
+      - Use the same material kind for
+        similar surfaces (all wood is
+        `material.kind: "wood"`, all metal
+        is `material.kind: "metal"`).
+
+    The AI records the scene-level
+    conventions in a `sceneStyle` object
+    on the root: `meta.sceneStyle = { style,
+    textureDensity, lod, materialKinds }`.
+    Every object in the scene inherits from
+    it.
+
+  40.8.2  Hierarchical scene building.
+
+    A scene is a TREE of Groups, not a
+    flat list of Meshes:
+
+      Scene
+      ├── Terrain (Group)
+      │   ├── Ground (Mesh)
+      │   ├── Hills (Group of 3 Meshes)
+      │   └── Water (Mesh)
+      ├── Buildings (Group of 4 InstancedMesh)
+      ├── Props (Group of 12 InstancedMesh)
+      └── Lighting (Group of 3 DirectionalLight + 1 AmbientLight)
+
+    The PART 30 pivot hierarchy rules apply
+    to every Group; PART 36 multi-file drop
+    applies when the scene is shipped as a
+    bundle; PART 37 zip bundle applies when
+    the bundle is zipped.
+
+  40.8.3  Procedural placement and variation.
+
+    When the scene is procedural (e.g. "100
+    trees scattered across a terrain"), the
+    AI uses the seededRandom helper (40.6.2)
+    with a scene-level seed. The same seed
+    produces the same scene; a different
+    seed produces a different one. The
+    scene's `meta.seed` records the chosen
+    seed so the renderer can re-create the
+    exact scene on reload.
+
+  40.9  RENDERER-SIDE RUNTIME CONTRACT
+  ------------------------------------
+
+    PART 40 adds 3 new non-blocking validators
+    to the existing 18:
+
+      - E19 — PBR + UV completeness
+        (PART 40.7.2). For models whose
+        `meta.style` is realistic / smooth-
+        shaded / stylized / photoreal, every
+        material should have a baseColor AND
+        at least one of (normalMap,
+        roughnessMap, metalnessMap), and
+        every UV-mapped geometry should have
+        a UV attribute with values in [0, 1]
+        and no degenerate islands. Models
+        with `meta.textureDensity: "low"`
+        are exempt.
+      - E20 — Hard-constraint compliance
+        (PART 40.7.2). Walks every triangle;
+        flags triangles where one edge is
+        more than 50x longer than another
+        (the "thin spike" detector). Surfaces
+        the first 4 in the warning.
+      - E21 — Target triangle budget
+        (PART 40.7.2). If `meta.targetTris`
+        is declared, the actual triangle count
+        should not exceed target × (1 +
+        tolerance). Default tolerance is 25%
+        for low-poly / mid-poly, 15% for
+        high-poly / photoreal.
+
+    All 3 are non-blocking; the model still
+    loads, the user sees a toast + a red
+    spec chip. They mirror the E1-E18
+    pattern and integrate into the existing
+    `validate()` / `applyToUI()` / `revalidate()`
+    pipeline without any caller-side changes.
+
+    What PART 40 does NOT change in the
+    renderer runtime:
+
+      - No change to E1-E18 (they stay
+        exactly as they were in v1.16 / v8.8).
+      - No change to the GLB / OBJ / STL /
+        FBX / DAE / USDZ / .ts export
+        pipeline.
+      - No change to the import map.
+      - No change to the loader (the loader
+        still routes `.ts` / `.json` / `.js`
+        / `.zip` files the same way).
+      - No change to the file-picker UI.
+      - No change to the scene tree or
+        the Rig / Tris / Sockets buttons.
+      - No new mandatory field on any
+        existing userData namespace — the
+        new fields from 40.4.4
+        (targetTris, seed, referenceViews,
+        negativePrompts, generationPipeline,
+        exportReady, textureDensity,
+        sceneStyle, lastRating) are ALL
+        optional.
+      - No new dependency.
+
+  40.10 CANONICAL HELPERS
+  -----------------------
+
+    PART 40 adds 3 new canonical helpers to
+    the existing `__threeTriHelpers` bundle
+    (PART 35) and the existing PART 39 bundle
+    (`curvedPart`, `validateModel`,
+    `snapshotToPng`). The .ts factory can call
+    any of them via
+    `window.lblSpec.helpers.<name>` without
+    copying the function body.
+
+    - `pbrMaterial(opts)`
+        PART 40.5.1 / 40.5.2. Build a
+        MeshStandardMaterial with a full
+        PBR texture set: baseColor (sRGB),
+        normalMap (linear), roughnessMap
+        (linear), metalnessMap (linear),
+        aoMap (linear). The helper accepts
+        either explicit map objects or
+        `{ baseColor: '#hex', roughness:
+        0.7, metalness: 0.0 }` shorthand.
+        Returns a configured
+        MeshStandardMaterial ready to
+        attach to a Mesh. Falls back to
+        a single-color MeshStandardMaterial
+        when no maps are provided, so a
+        flat low-poly style still works.
+
+    - `seededRandom(seed)`
+        PART 40.6.2 / 40.8.3. A Mulberry32-
+        based seeded RNG that returns
+        `{ next(): number in [0,1),
+        range(min, max): number,
+        int(min, max): integer,
+        pick(arr): element,
+        bool(p): boolean }`. The same seed
+        always produces the same sequence;
+        a different seed produces a
+        different one. Used for procedural
+        variation, scene placement, and
+        noise-driven material jitter.
+
+    - `triCountSummary(root)`
+        PART 40.7.2. Returns a quick
+        triangle count summary: total
+        triangles, total meshes, top 5
+        meshes by triangle count, and
+        the per-style budget check from
+        E21 (if `meta.targetTris` is
+        declared). The renderer's E21
+        validator uses the same function,
+        so the factory's authoring-time
+        call and the renderer's runtime
+        call see the same number.
+
+    These are pure additions to the
+    existing `__threeTriHelpers` bundle —
+    the existing 5 PART 35 helpers and the
+    3 PART 39 helpers stay untouched. The
+    renderer's runtime contract update is
+    `lblSpec.helpers.pbrMaterial`,
+    `lblSpec.helpers.seededRandom`, and
+    `lblSpec.helpers.triCountSummary`
+    become the canonical way to do these
+    three things in a .ts factory; the
+    factory does NOT need to copy the
+    function bodies.
+
+  WHAT PART 40 DOES NOT INTRODUCE
+  --------------------------------
+
+    - No new mandatory field on any existing
+      userData namespace (the new fields in
+      40.4.4 — targetTris, seed, referenceViews,
+      negativePrompts, generationPipeline,
+      exportReady, textureDensity, sceneStyle,
+      lastRating — are ALL optional; the
+      current renderer ignores unknown keys
+      safely)
+    - No new export path (the existing GLB /
+      OBJ / STL / FBX / DAE / USDZ / .ts paths
+      are unchanged)
+    - No new dependency (the new helpers use
+      only Three.js APIs that are already
+      imported; no import-map change)
+    - No new validator that blocks the model
+      from loading (E19, E20, E21 are non-
+      blocking, like E1-E18 before them)
+    - No change to the existing PART 1-39
+      rules (PART 40 reinforces them — see
+      the 40.0 cross-references)
+    - No change to the existing E1-E18
+      validators (they stay exactly as they
+      were in v1.16 / v8.8)
+    - No change to PART 38.22's style
+      agnosticism (PART 40 is also style-
+      agnostic — applies to every subject,
+      every style, every path; low-poly is
+      the default for short prompts because
+      the project is named for it, not
+      because PART 40 rejects other styles)
+    - No change to PART 39.5's factory +
+      options pattern (PART 40 reinforces
+      it as 40.4.1 + 40.4.2 + 40.6.1)
+    - No change to the project's "Low Poly 3D"
+      name
+
+  CROSS-REFERENCES
+  -----------------
+
+    PART 40 layers on top of, never replaces:
+      - PART 1  (factory contract)        — TS path
+      - PART 2  (primitives)              — TS path
+      - PART 3  (materials)               — TS path
+      - PART 4  (single-file rule)        — TS path
+      - PART 17 (image-to-3D analysis)    — TS image path
+      - PART 27 (image-to-3D analysis)    — JSON/JS image path
+      - PART 30 (rigging & animation)     — both paths
+      - PART 31 (character sculpt)        — character subjects
+      - PART 32 (anti-pattern guards)     — E1-E12
+      - PART 34 (rig helpers)             — pre-bundled helpers
+      - PART 35 (triangle-first geometry) — E12, the 🔺 Tris panel
+      - PART 36 (multi-file drop)         — both paths
+      - PART 37 (zip bundle)              — both paths
+      - PART 38 (character pipeline)      — E13-E16
+      - PART 38.22 (style agnosticism)    — both paths
+      - PART 39 (3D modeling techniques)  — E17-E18
+      - PART 39.5 (factory + options)     — both paths
+      - PART 64 (character sculpt enrich) — JSON/JS only
+      - PART 65 (JSON/JS anti-patterns)   — E1-E12 on JSON/JS
+      - PART 66 (architectural bridge)    — JSON/JS only
+
+    Primary repositories to study for the
+    techniques in PART 40 (the AI should
+    skim these repos when authoring-time
+    inspiration is needed, but does NOT
+    need to import from them):
+      - https://github.com/jasonsturges/three-low-poly
+        (parametric factory + options pattern)
+      - https://github.com/VladimirGl/Code3DBench
+        (code generation quality evaluation)
+      - https://github.com/vinhhien112/Three.js-Object-Sculptor-Codex-Plugin
+        (structured ObjectSculptSpec + TypeScript factory)
+      - https://github.com/AndrewSink/3D-Low-Poly-Generator
+        (mesh decimation and low-poly conversion)
+      - https://github.com/dgreenheck/ez-tree
+        (parametric generation with many tunable parameters + LODs)
+      - https://github.com/syl-p/procedural-generator-lowpoly-map
+        (TypeScript procedural low-poly generation)
+      - https://github.com/troisjs/little-planet
+        (procedural low-poly planet — style consistency)
+      - https://github.com/dreamlong1/LowPolyCity
+        (full procedural low-poly city — scene composition)
+
+================================================================================
+END OF PART 40 — v1.17 / v8.9 ADDITIONS: BETTER MODELS THROUGH BETTER GENERATION
+A production-grade generation pipeline: better prompts + multi-stage
+workflow + mesh quality + structured TS + PBR materials + parametric
+techniques + validation + scene composition. Adds E19 PBR + UV
+completeness, E20 hard-constraint compliance (thin spike detector),
+and E21 target triangle budget to the existing 18 non-blocking
+validators. Re-exports `pbrMaterial`, `seededRandom`, and
+`triCountSummary` on `window.lblSpec.helpers` alongside the PART 35
+tris bundle and the PART 39 curvedPart / validateModel / snapshotToPng
+bundle. Style-agnostic, applies to every .ts factory, every JSON/JS
+blueprint, every subject. No new dependency, no new export path, no
+new mandatory field, no removed / weakened rule.
 ================================================================================

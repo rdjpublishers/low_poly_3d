@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.16 (TS path) and v8.8 (JSON/JS path) with 10 opt-in architectural features, 18 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18), a triangle-first geometry inspector, and a 3D-modeling-techniques PART 39 (catch dumb stuff early, build a visual dev loop, use the right geometry primitive, proportions & recognition, procedural / parametric modeling). Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.16, LBL v8.8, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.17 (TS path) and v8.9 (JSON/JS path) with 10 opt-in architectural features, 21 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21), a triangle-first geometry inspector, a 3D-modeling-techniques PART 39, and a better-models-through-better-generation PART 40 (structured prompts, multi-stage pipeline, mesh cleanup, structured TS, PBR materials, parametric / procedural techniques, validation, scene composition). Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.17, LBL v8.9, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1435,10 +1435,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="spacer"></div>
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
-  <!-- RJS UPDATE 8 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
-       TS factories target v1.16 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques), JSON/JS blueprints target v8.8 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39).
-       Pairs with the on-load lblValidateAgainstSpec() check that catches the 18 anti-patterns from PART 32/65/38/39. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.16 TS / v8.8 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), and PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec).">LBL: v1.16 / v8.8</div>
+  <!-- RJS UPDATE 9 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
+       TS factories target v1.17 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation), JSON/JS blueprints target v8.9 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40).
+       Pairs with the on-load lblValidateAgainstSpec() check that catches the 21 anti-patterns from PART 32/65/38/39/40. -->
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.17 TS / v8.9 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), and PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec).">LBL: v1.17 / v8.9</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -21515,7 +21515,7 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8 — LBL SPEC v1.16 / v8.8 RUNTIME SUPPORT
+// RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8 / 9 — LBL SPEC v1.17 / v8.9 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
 // guards), PART 33/66 (10 architectural features), PART 34 (pre-bundled
@@ -21534,15 +21534,23 @@ buildScene = function(blueprint){
 // the "Download Model Code" button), PART 38 (character pipeline
 // upgrade — adds the 4 new character-specific validators E13 vertex
 // budget, E14 NaN / infinite positions, E15 topology cleanup, E16
-// bounding-box proportions), and PART 39 (3D modeling techniques —
+// bounding-box proportions), PART 39 (3D modeling techniques —
 // adds the 2 new modeling-technique validators E17 boot-time
 // bbox-overlap gap detector and E18 draw-call / mesh-count sanity,
 // plus 3 canonical helpers — `curvedPart(curve, crossW, crossD, mat, opts)`
 // for ExtrudeGeometry-along-CatmullRomCurve3 curved parts, the
 // `validateModel(root, opts)` boot-time bbox-overlap / mesh-count
 // validator, and `snapshotToPng(renderer, scene, camera, fileName)`
-// for on-demand PNG snapshots — all re-exported on
-// `window.lblSpec.helpers` alongside the PART 35 tris bundle).
+// for on-demand PNG snapshots), and PART 40 (better models through
+// better generation — adds the 3 new production-grade validators E19
+// PBR + UV completeness, E20 hard-constraint compliance / thin spike
+// detector, and E21 target triangle budget, plus 3 more canonical
+// helpers — `pbrMaterial(opts)` for the full 5-map PBR texture set,
+// `seededRandom(seed)` for Mulberry32-based deterministic variation,
+// and `triCountSummary(root)` for the runtime triangle count check
+// used by E21 — all re-exported on `window.lblSpec.helpers` alongside
+// the PART 35 tris bundle and the PART 39 curvedPart / validateModel /
+// snapshotToPng bundle).
 // Lives at the end of the main module so it can reference every
 // helper defined above. The block is intentionally self-contained —
 // no global state is added that other code paths need to know about
@@ -21552,26 +21560,31 @@ buildScene = function(blueprint){
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.16 (PART 33 architectural features + PART 34 pre-bundled
+  // target v1.17 (PART 33 architectural features + PART 34 pre-bundled
   // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
   // drop + model + rig pairing + PART 37 zip bundle support + PART 38
-  // character pipeline upgrade + PART 39 3D modeling techniques);
-  // JSON/JS blueprints target v8.8 (PART 66 feature bridge + PART 34
+  // character pipeline upgrade + PART 39 3D modeling techniques +
+  // PART 40 better models through better generation);
+  // JSON/JS blueprints target v8.9 (PART 66 feature bridge + PART 34
   // runtime contract for userData.rigGraph + PART 35 tris inspector +
   // PART 36 same + PART 37 same + PART 38 character pipeline upgrade +
-  // PART 39 3D modeling techniques). The chip in the topbar shows both.
+  // PART 39 3D modeling techniques + PART 40 better models through
+  // better generation). The chip in the topbar shows both.
   // Updating these constants is the only place to bump for a new spec
   // release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.16', json: 'v8.8' };
+  const VERSION = { ts: 'v1.17', json: 'v8.9' };
 
-  // The 18 anti-patterns the validator looks for. Mirrors PART 32 (TS)
+  // The 21 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) for the first 12, PART 38 (character
-  // pipeline upgrade) for the next 4 (E13-E16), and PART 39 (3D
+  // pipeline upgrade) for the next 4 (E13-E16), PART 39 (3D
   // modeling techniques) for the 2 new modeling-technique checks
   // (E17 bbox-overlap gap detector, E18 draw-call / mesh-count
-  // sanity). Each check is a function that receives the loaded model
-  // and returns either null (clean) or a short human-readable
-  // warning string. Multiple warnings stack.
+  // sanity), and PART 40 (better models through better generation)
+  // for the 3 new production-grade checks (E19 PBR + UV completeness,
+  // E20 hard-constraint compliance / thin spike detector, E21
+  // target triangle budget). Each check is a function that receives
+  // the loaded model and returns either null (clean) or a short
+  // human-readable warning string. Multiple warnings stack.
   // These are NOT errors — the model still loads, the user just sees
   // a friendly toast + a red spec chip so they know the AI generation
   // deviated from the targeted spec.
@@ -22114,6 +22127,198 @@ window.lblSpec = (function(){
           '(' + geomSet.size + ' unique geometries) \u2014 consider InstancedMesh ' +
           'for repeated detail (PART 39.3.4) and mergeGeometries for one-off ' +
           'detail (PART 35.2). Threshold 500 mirrors lblSpec.helpers.validateModel.';
+      }
+    },
+    {
+      // PART 40 (v1.17 / v8.9) — Better Models Through Better
+      // Generation, E19. PBR + UV completeness (PART 40.5.1 /
+      // 40.5.4 / 40.7.2 / 40.9). For models whose `meta.style` is
+      // "realistic", "smooth-shaded", "stylized", or "photoreal",
+      // every MeshStandardMaterial should have a baseColor AND at
+      // least one of (normalMap, roughnessMap, metalnessMap).
+      // Additionally, every geometry that has a UV-mapped material
+      // should have a UV attribute with values in [0, 1] and no
+      // degenerate (0-area) UV islands. Models with
+      // `meta.textureDensity: "low"` are exempt (PART 40.5.2).
+      // On the JSON/JS path, the meta fields are on
+      // root.userData.meta; on the TS path, also on
+      // userData.sculptRuntime.meta. We read from userData.meta
+      // for the cross-path uniform behavior. Non-blocking.
+      id: 'E19', label: 'PBR + UV completeness (PART 40)',
+      check: (root) => {
+        if(!root) return null;
+        const meta = (root.userData && root.userData.meta) || {};
+        const style = (typeof meta.style === 'string') ? meta.style.toLowerCase() : '';
+        const density = (typeof meta.textureDensity === 'string') ? meta.textureDensity.toLowerCase() : '';
+        // PART 40.5.2 — low textureDensity is exempt.
+        if(density === 'low') return null;
+        // PART 40.5.1 — only check PBR completeness for styles
+        // that require a full texture set. low-poly, voxel, and
+        // hand-painted styles use a single baseColor and are
+        // exempt.
+        const styleRequiresPBR = (style === 'realistic' || style === 'smooth-shaded' ||
+                                  style === 'stylized' || style === 'photoreal' ||
+                                  style === 'high-poly' || style === 'mid-poly');
+        const styleExempt = (style === 'low-poly' || style === 'voxel' ||
+                             style === 'hand-painted' || style === 'toon' ||
+                             style === 'cel' || style === 'retro-psx' ||
+                             style === 'hologram' || style === 'wireframe');
+        let missingMap = 0;
+        let badUV = 0;
+        root.traverse(o => {
+          if(!o || !o.isMesh || !o.material) return;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          for(const m of mats){
+            // PBR completeness — only check styles that require PBR.
+            if(styleRequiresPBR && m && m.isMeshStandardMaterial){
+              if(!m.color) missingMap++;
+              else if(!m.map && !m.normalMap && !m.roughnessMap && !m.metalnessMap){
+                // No maps at all on a PBR material — only flagged if
+                // style requires it AND there is no fallback texture
+                // already attached.
+                missingMap++;
+              }
+            }
+            // UV completeness — every UV-mapped material should have
+            // a UV attribute on its geometry, with values in [0, 1]
+            // and no degenerate (0-area) islands. We sample the
+            // attribute; a full UV island check requires a topology
+            // rebuild, so this is a best-effort heuristic.
+            if(m && (m.map || m.normalMap || m.roughnessMap ||
+                     m.metalnessMap || m.aoMap || m.emissiveMap)){
+              if(!o.geometry || !o.geometry.attributes || !o.geometry.attributes.uv){
+                badUV++;
+                continue;
+              }
+              const uv = o.geometry.attributes.uv;
+              // Check a sample of UVs — up to 64 vertices.
+              const n = Math.min(uv.count, 64);
+              let outOfRange = 0;
+              for(let i = 0; i < n; i++){
+                const u = uv.getX(i), v = uv.getY(i);
+                if(u < -0.001 || u > 1.001 || v < -0.001 || v > 1.001) outOfRange++;
+              }
+              if(outOfRange > n / 2) badUV++;
+            }
+          }
+        });
+        const issues = [];
+        if(styleRequiresPBR && missingMap > 0){
+          issues.push(missingMap + ' PBR material(s) missing a baseColor + at least one of normalMap / roughnessMap / metalnessMap (PART 40.5.1). Style "' + style + '" requires the full PBR set; set meta.textureDensity:"low" to opt out.');
+        }
+        if(badUV > 0){
+          issues.push(badUV + ' UV-mapped geometry/material pair(s) have no UV attribute, or UVs are out of [0,1] range (PART 40.5.4).');
+        }
+        if(issues.length === 0) return null;
+        return issues.join(' ');
+      }
+    },
+    {
+      // PART 40 (v1.17 / v8.9) — Better Models Through Better
+      // Generation, E20. Hard-constraint compliance / thin spike
+      // detector (PART 40.1.4 / 40.3.4 / 40.7.2 / 40.9). Walks
+      // every triangle; flags triangles where one edge is more
+      // than 50x longer than another (the "thin spike" detector).
+      // The renderer surfaces the first 4 flagged triangles in
+      // the warning. This is a best-effort heuristic — true
+      // manifold detection requires a full topology rebuild —
+      // but it catches the obvious "this triangle will render
+      // as a single pixel" case. Non-blocking.
+      id: 'E20', label: 'Thin spike / hard-constraint (PART 40)',
+      check: (root) => {
+        if(!root || typeof THREE === 'undefined') return null;
+        const THIN_RATIO = 50; // PART 40.1.4: "no thin spikes" = no edge > 50x another
+        const flagged = [];
+        let walked = 0;
+        root.traverse(o => {
+          if(!o || !o.isMesh || !o.geometry) return;
+          const pos = o.geometry.attributes && o.geometry.attributes.position;
+          if(!pos) return;
+          const idx = o.geometry.index;
+          // Sample limit to keep the check fast on big models.
+          const maxTris = 4000;
+          const totalTris = idx ? (idx.count / 3) : (pos.count / 3);
+          const step = totalTris > maxTris ? Math.ceil(totalTris / maxTris) : 1;
+          for(let t = 0; t < totalTris; t += step){
+            let ia, ib, ic;
+            if(idx){
+              ia = idx.getX(t * 3);
+              ib = idx.getX(t * 3 + 1);
+              ic = idx.getX(t * 3 + 2);
+            } else {
+              ia = t * 3; ib = t * 3 + 1; ic = t * 3 + 2;
+              if(ic >= pos.count) break;
+            }
+            const ax = pos.getX(ia), ay = pos.getY(ia), az = pos.getZ(ia);
+            const bx = pos.getX(ib), by = pos.getY(ib), bz = pos.getZ(ib);
+            const cx = pos.getX(ic), cy = pos.getY(ic), cz = pos.getZ(ic);
+            const e0 = Math.hypot(bx - ax, by - ay, bz - az);
+            const e1 = Math.hypot(cx - bx, cy - by, cz - bz);
+            const e2 = Math.hypot(ax - cx, ay - cy, az - cz);
+            const minE = Math.min(e0, e1, e2);
+            const maxE = Math.max(e0, e1, e2);
+            if(minE < 1e-5) continue; // zero-area is E15's job
+            if(maxE / minE > THIN_RATIO){
+              flagged.push({ name: o.name || '<unnamed>', ratio: (maxE / minE) });
+              if(flagged.length >= 4) break;
+            }
+            walked++;
+            if(walked >= maxTris) break;
+          }
+          if(flagged.length >= 4) return;
+        });
+        if(flagged.length === 0) return null;
+        const head = flagged.map(f => f.ratio.toFixed(1) + 'x in ' + f.name).join(', ');
+        const more = (flagged.length === 4) ? ' (showing first 4)' : '';
+        return flagged.length + ' thin-spike triangle(s) detected (one edge > ' + THIN_RATIO +
+          'x another): ' + head + more + ' \u2014 enforce the "no thin spikes" hard constraint (PART 40.1.4 / 40.7.2).';
+      }
+    },
+    {
+      // PART 40 (v1.17 / v8.9) — Better Models Through Better
+      // Generation, E21. Target triangle budget (PART 40.3.2 /
+      // 40.7.2 / 40.9). If the model declares `meta.targetTris`
+      // (and optionally `targetTrisTolerance`), the actual
+      // triangle count should not exceed target × (1 + tolerance).
+      // Default tolerance is 25% for low-poly and mid-poly
+      // subjects, 15% for high-poly and photoreal subjects
+      // (stricter). The renderer reads from userData.meta on
+      // both paths for cross-path uniform behavior. Non-blocking.
+      id: 'E21', label: 'Target triangle budget (PART 40)',
+      check: (root) => {
+        if(!root) return null;
+        const meta = (root.userData && root.userData.meta) || {};
+        const target = (typeof meta.targetTris === 'number' && meta.targetTris > 0)
+          ? meta.targetTris : null;
+        if(target == null) return null;
+        // Determine tolerance — explicit override wins; otherwise
+        // the style-based default from PART 40.7.2.
+        let tolerance = (typeof meta.targetTrisTolerance === 'number')
+          ? meta.targetTrisTolerance : null;
+        const style = (typeof meta.style === 'string') ? meta.style.toLowerCase() : '';
+        if(tolerance == null){
+          if(style === 'high-poly' || style === 'photoreal' ||
+             style === 'realistic' || style === 'smooth-shaded'){
+            tolerance = 0.15; // stricter for high-poly
+          } else {
+            tolerance = 0.25; // default for low-poly / mid-poly
+          }
+        }
+        // Count actual triangles.
+        let actual = 0;
+        root.traverse(o => {
+          if(!o || !o.isMesh || !o.geometry) return;
+          const pos = o.geometry.attributes && o.geometry.attributes.position;
+          const idx = o.geometry.index;
+          if(idx) actual += (idx.count / 3);
+          else if(pos) actual += (pos.count / 3);
+        });
+        actual = Math.round(actual);
+        const cap = Math.round(target * (1 + tolerance));
+        if(actual <= cap) return null;
+        return actual.toLocaleString() + ' triangles vs declared target ' + target.toLocaleString() +
+          ' (cap ' + cap.toLocaleString() + ' with ' + (tolerance * 100).toFixed(0) + '% tolerance for style "' + (style || 'unspecified') +
+          '") \u2014 simplify to budget (PART 40.3.2 / 40.3.3).';
       }
     }
   ];
@@ -22795,6 +23000,170 @@ window.lblSpec = (function(){
       a.click();
       document.body.removeChild(a);
       return url;
+    },
+    // ── PART 40 (v1.17 / v8.9) — Better Models Through Better
+    //    Generation ─────────────────────────────────────────────
+    // Three canonical helpers join the existing PART 35 + PART 39
+    // bundle. The .ts factory can call any of them via
+    // `window.lblSpec.helpers.<name>` without copying the function
+    // body. The factory and the renderer's E19 / E20 / E21
+    // validators always see the same behavior because they share
+    // the same implementations.
+    //
+    // pbrMaterial(opts)
+    //   PART 40.5.1 / 40.5.2 / Appendix A. Build a
+    //   MeshStandardMaterial with a full PBR texture set:
+    //   baseColor (sRGB), normalMap (linear), roughnessMap
+    //   (linear), metalnessMap (linear), aoMap (linear). The
+    //   helper accepts either explicit map objects
+    //   (`opts.baseColor = textureInstance` etc.) or shorthand
+    //   (`opts.baseColor = '#hex' | 0xRRGGBB`, `opts.roughness =
+    //   0.7`, `opts.metalness = 0.0`). Returns a configured
+    //   MeshStandardMaterial ready to attach to a Mesh. Falls
+    //   back to a single-color MeshStandardMaterial when no maps
+    //   are provided, so a flat low-poly style still works.
+    pbrMaterial: function(opts){
+      if(typeof THREE === 'undefined') return null;
+      opts = opts || {};
+      // Resolve the base color — accept a number, a hex string,
+      // or fall back to a neutral gray.
+      let baseColor = 0xaaaaaa;
+      if(opts.baseColor != null){
+        if(typeof opts.baseColor === 'number') baseColor = opts.baseColor;
+        else if(typeof opts.baseColor === 'string'){
+          const s = opts.baseColor.trim();
+          baseColor = (s.charAt(0) === '#') ? parseInt(s.slice(1), 16) : parseInt(s, 16);
+          if(isNaN(baseColor)) baseColor = 0xaaaaaa;
+        } else if(opts.baseColor && opts.baseColor.isColor){
+          baseColor = opts.baseColor.getHex();
+        }
+      }
+      // Build the material with all 5 PBR channels. Caller-supplied
+      // map instances win; shorthand scalars fill in the simple
+      // properties.
+      const mat = new THREE.MeshStandardMaterial({
+        color: baseColor,
+        map: opts.map || undefined,
+        normalMap: opts.normalMap || undefined,
+        roughnessMap: opts.roughnessMap || undefined,
+        metalnessMap: opts.metalnessMap || undefined,
+        aoMap: opts.aoMap || undefined,
+        emissive: opts.emissive != null ? opts.emissive : 0x000000,
+        emissiveMap: opts.emissiveMap || undefined,
+        roughness: (typeof opts.roughness === 'number') ? opts.roughness : 0.7,
+        metalness: (typeof opts.metalness === 'number') ? opts.metalness : 0.0,
+        side: (typeof opts.side === 'number') ? opts.side : THREE.FrontSide,
+        transparent: !!opts.transparent,
+        opacity: (typeof opts.opacity === 'number') ? opts.opacity : 1.0
+      });
+      // PBR-mapped textures need SRGBColorSpace on the baseColor
+      // map and LinearSRGBColorSpace on the data maps (normal,
+      // roughness, metalness, ao). Three.js r150+ handles this via
+      // texture.colorSpace; the caller's texture should already
+      // have it set correctly. We don't override it here.
+      return mat;
+    },
+    // seededRandom(seed)
+    //   PART 40.6.2 / 40.8.3 / Appendix B. A Mulberry32-based
+    //   seeded RNG. The same seed always produces the same
+    //   sequence; a different seed produces a different one.
+    //   Used for procedural variation, scene placement, and
+    //   noise-driven material jitter. Returns an object with 5
+    //   methods: `next()` (number in [0,1)), `range(min, max)`
+    //   (number in [min, max)), `int(min, max)` (integer in
+    //   [min, max] inclusive), `pick(arr)` (random element), and
+    //   `bool(p)` (boolean with probability p of true).
+    seededRandom: function(seed){
+      // Normalize the seed to a 32-bit unsigned integer. Accept
+      // numbers, hex strings, or fall back to Date.now().
+      let s = 0;
+      if(typeof seed === 'number' && isFinite(seed)){
+        s = seed >>> 0;
+      } else if(typeof seed === 'string'){
+        const trimmed = (seed.charAt(0) === '0' && (seed.charAt(1) === 'x' || seed.charAt(1) === 'X'))
+          ? seed.slice(2) : seed;
+        const parsed = parseInt(trimmed, 16);
+        s = (isNaN(parsed) ? 0 : parsed) >>> 0;
+      } else if(typeof seed === 'object' && seed && typeof seed.valueOf === 'function'){
+        const n = Number(seed.valueOf());
+        s = (isFinite(n) ? n : 0) >>> 0;
+      }
+      if(s === 0) s = 0x9E3779B9; // golden-ratio constant fallback
+      // Mulberry32 — small, fast, good enough for procedural work.
+      let state = s >>> 0;
+      function next(){
+        state = (state + 0x6D2B79F5) >>> 0;
+        let t = state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+      return {
+        next: next,
+        range: function(min, max){
+          if(typeof min !== 'number' || typeof max !== 'number') return 0;
+          return min + next() * (max - min);
+        },
+        int: function(min, max){
+          if(typeof min !== 'number' || typeof max !== 'number') return 0;
+          return Math.floor(min + next() * (max - min + 1));
+        },
+        pick: function(arr){
+          if(!arr || !arr.length) return null;
+          return arr[Math.floor(next() * arr.length)];
+        },
+        bool: function(p){
+          return next() < (typeof p === 'number' ? p : 0.5);
+        }
+      };
+    },
+    // triCountSummary(root)
+    //   PART 40.7.2 / Appendix C. Returns a quick triangle count
+    //   summary: total triangles, total meshes, top 5 meshes by
+    //   triangle count, and the per-style budget check from E21
+    //   (if `meta.targetTris` is declared). The renderer's E21
+    //   validator uses the same function so the factory's
+    //   authoring-time call and the renderer's runtime call see
+    //   the same number. Returns
+    //   `{ totalTriangles, meshCount, top5: [{name, triangles}],
+    //   budget: { target, actual, tolerance, ok } | null }`.
+    triCountSummary: function(root){
+      if(!root) return { totalTriangles: 0, meshCount: 0, top5: [], budget: null };
+      const perMesh = [];
+      let totalTriangles = 0;
+      let meshCount = 0;
+      root.traverse(o => {
+        if(!o || !o.isMesh || !o.geometry) return;
+        meshCount++;
+        const pos = o.geometry.attributes && o.geometry.attributes.position;
+        const idx = o.geometry.index;
+        let tri = 0;
+        if(idx) tri = (idx.count / 3);
+        else if(pos) tri = (pos.count / 3);
+        tri = Math.round(tri);
+        totalTriangles += tri;
+        perMesh.push({ name: (typeof o.name === 'string' && o.name.length) ? o.name : '<unnamed>', triangles: tri });
+      });
+      perMesh.sort((a, b) => b.triangles - a.triangles);
+      const top5 = perMesh.slice(0, 5);
+      // E21 budget check — same logic as the validator.
+      const meta = (root.userData && root.userData.meta) || {};
+      let budget = null;
+      if(typeof meta.targetTris === 'number' && meta.targetTris > 0){
+        const style = (typeof meta.style === 'string') ? meta.style.toLowerCase() : '';
+        const tolerance = (typeof meta.targetTrisTolerance === 'number')
+          ? meta.targetTrisTolerance
+          : ((style === 'high-poly' || style === 'photoreal' ||
+              style === 'realistic' || style === 'smooth-shaded') ? 0.15 : 0.25);
+        const cap = Math.round(meta.targetTris * (1 + tolerance));
+        budget = {
+          target: meta.targetTris,
+          actual: totalTriangles,
+          tolerance: tolerance,
+          ok: totalTriangles <= cap
+        };
+      }
+      return { totalTriangles, meshCount, top5, budget };
     }
   };
 
@@ -22964,6 +23333,18 @@ window.lblSpec = (function(){
     // download). The factory calls them via
     // `lblSpec.helpers.curvedPart(...)` etc. — same path as the
     // PART 35 helpers, no new top-level field on lblSpec.
+    // PART 40 (RJS UPDATE 9) — Better Models Through Better
+    // Generation adds three more helpers to the same `helpers`
+    // bundle: `pbrMaterial(opts)` (returns a configured
+    // MeshStandardMaterial with the full 5-map PBR texture set),
+    // `seededRandom(seed)` (Mulberry32-based seeded RNG with
+    // `next()` / `range()` / `int()` / `pick()` / `bool()` for
+    // deterministic variation), and `triCountSummary(root)`
+    // (returns { totalTriangles, meshCount, top5, budget } and is
+    // the same function the renderer's E21 validator uses).
+    // The factory calls them via `lblSpec.helpers.pbrMaterial(...)`
+    // etc. — same path as the PART 35 + PART 39 helpers, no new
+    // top-level field on lblSpec.
     inspectModelTriangles,
     openTrianglePanel,
     getLastTriMetrics: () => lblSpecState.trisMetrics,

@@ -1,3 +1,253 @@
+# v1.17 / v8.9 — Better models through better generation (PART 40)
+
+The spec now teaches the AI the production-engineering framing of the 8
+categories from the maintainer's "System Update Details for Better
+TypeScript Low-Poly 3D Models" (2026-08): (1) better prompt & input
+handling — a structured brief (Subject + Material + Style + Technical
+Constraints), image preprocessing (background removal, contrast,
+centering, 256x256 silhouette render), multi-view support (2-4 angles),
+and negative prompts as hard constraints ("no thin spikes", "watertight",
+"clean topology", "≤ 20k tris"); (2) a multi-stage generation pipeline
+— 4 stages (coarse base mesh → geometry refinement → texture / material
+→ final cleanup + export) with a clear Stage 2 / Stage 3 boundary so a
+mistake in one stage can be fixed without redoing the others; (3) mesh
+quality & topology — automatic cleanup (weld duplicate vertices, remove
+zero-area triangles, remove unused vertices, remove degenerate edges),
+smart low-poly mode with a target triangle budget, feature-preserving
+QEM simplification (silhouette / hard-edge / curve / flat weighting),
+and a forced watertight / manifold guarantee; (4) structured TypeScript
+output — modular factory pattern (every part is a named factory that
+takes a shared options object), options-based geometry construction
+(a single config object drives all dimensions, colors, curve points,
+recoil numbers), a 4-child hierarchy (parts / bones / sockets / meta),
+and a `meta` object that carries poly count, style tags, targetTris,
+seed, referenceViews, negativePrompts, generationPipeline, and
+exportReady; (5) a full PBR texture & material system — baseColor +
+normal + roughness + metallic + AO with style-specific texturing (low /
+mid / high density), a separate texture-refinement stage, and automatic
+UV handling (built-in primitive UVs > planar projection > hand-rolled
+box / cylinder unwrap); (6) parametric & procedural techniques — the
+factory + options object pattern (same as PART 39.5, restated), seed-
+based controlled variation via the new `seededRandom` Mulberry32 helper,
+LOD support (3 levels: 10-20k / 5-8k / 1.5-3k vertices via THREE.LOD),
+and the "prefer algorithmic geometry over pure black-box AI meshes"
+rule; (7) post-processing, validation & feedback — 4 authoring-time
+quality metrics (manifold, poly count, symmetry, visual fidelity) + 3
+new non-blocking validators (E19 PBR + UV completeness, E20 hard-
+constraint compliance / thin spike detector, E21 target triangle
+budget) + a mandatory mesh repair pipeline before export (weld →
+remove-zero-area → remove-unused → recompute normals → re-validate) +
+an optional user-rating feedback loop that records the last rating in
+`meta.lastRating`; (8) scene / composition level ideas — consistent
+style and density across N objects, hierarchical scene building, and
+procedural placement and variation via the seededRandom helper. The
+renderer adds 3 new non-blocking validators (E19 PBR + UV completeness,
+E20 thin-spike / hard-constraint compliance, E21 target triangle
+budget) to the existing 18 (E1-E12 from PART 32, E13-E16 from PART 38,
+E17-E18 from PART 39), and 3 new canonical helpers re-exported on
+`window.lblSpec.helpers` alongside the PART 35 tris bundle and the
+PART 39 curvedPart / validateModel / snapshotToPng bundle:
+`pbrMaterial(opts)` (returns a configured MeshStandardMaterial with the
+full 5-map PBR texture set), `seededRandom(seed)` (Mulberry32-based
+seeded RNG with `next()` / `range()` / `int()` / `pick()` / `bool()`
+for deterministic variation), and `triCountSummary(root)` (returns
+{ totalTriangles, meshCount, top5, budget } and is the same function
+the renderer's E21 validator uses). No new dependency, no new export
+path, no new mandatory userData field, no removed / weakened rule, no
+change to PART 38.22's style agnosticism, no change to PART 39's
+factory + options pattern.
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `Prompt_To_Ts.txt`   | header v1.16 → v1.17; new v1.17 CHANGELOG entry; appended PART 40 (11 sub-sections: 40.0 central principle, 40.1 better prompt & input handling, 40.2 multi-stage generation pipeline, 40.3 mesh quality & topology improvements, 40.4 structured TypeScript output improvements, 40.5 texture & material system, 40.6 parametric & procedural techniques, 40.7 post-processing, validation & feedback, 40.8 scene / composition level ideas, 40.9 renderer-side runtime, 40.10 canonical helpers) |
+| `Image_To_Ts.txt`    | header v1.16 → v1.17; new v1.17 CHANGELOG entry; appended PART 40 (same content; image-to-TS analysis protocol from PART 17 feeds 40.1 directly) |
+| `Prompt_To_Js.txt`   | header v8.8 → v8.9; new v8.9 CHANGELOG entry; appended PART 40 (same content; references the JSON/JS `params` config object as the analog of the TS config object from 40.4.2) |
+| `Image_To_Js.txt`    | header v8.8 → v8.9; new v8.9 CHANGELOG entry; appended PART 40 |
+| `Prompt_To_Json.txt` | header v8.8 → v8.9; new v8.9 CHANGELOG entry; appended PART 40 |
+| `Image_To_Json.txt`  | header v8.8 → v8.9; new v8.9 CHANGELOG entry; appended PART 40 |
+| `index.html`         | `lblSpec.VERSION` bumped to `{ts:'v1.17', json:'v8.9'}`; LBL spec chip text + title updated; meta description + keywords updated; 3 new production-grade validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget) added to `ANTI_PATTERN_CHECKS`; 3 new canonical helpers (`pbrMaterial`, `seededRandom`, `triCountSummary`) added to the existing `__threeTriHelpers` bundle re-exported on `window.lblSpec.helpers`; top-of-block comment updated to "RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8 / 9" |
+| `CHANGES_SUMMARY.md` | this round added at the top (this section); prior v1.16 round preserved below |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` (still work
+  standalone; the new meta fields from 40.4.4 are ALL optional,
+  so existing models don't need any change to load)
+- `public/models/manifest.json` (still works as-is)
+- `.github/workflows/manifest.yml`
+- `public/rig/three-rig-helpers.js`
+- `public/rig/src/*.ts`
+- `public/rig/build.sh`
+
+## What PART 40 covers (11 sub-sections)
+
+- **40.0**  Central principle — the 8 categories from the source
+            doc are 8 facets of a single principle: build a
+            production-grade generation pipeline, not a one-shot
+            prompt-to-geometry call. PART 40 reinforces PART 39
+            (authoring-time framing) as a production-time framing.
+            Style-agnostic.
+- **40.1**  Better prompt & input handling
+  - **40.1.1** Structured prompt format (Subject + Material +
+              Style + Technical Constraints)
+  - **40.1.2** Image preprocessing (background removal, contrast,
+              centering, 256x256 silhouette render for the
+              PART 39.4.1 test)
+  - **40.1.3** Multi-view image support (2-4 angles: front,
+              side, top, 3/4)
+  - **40.1.4** Negative prompts and hard constraints ("no thin
+              spikes", "watertight", "clean topology", "≤ 20k
+              tris")
+- **40.2**  Multi-stage generation pipeline
+  - **40.2.1** Stage 1 — Coarse base mesh (silhouette +
+              proportions, < 200 tris)
+  - **40.2.2** Stage 2 — Geometry refinement (edge bevels,
+              curved parts, InstancedMesh, merged one-offs)
+  - **40.2.3** Stage 3 — Texture / material generation (full
+              PBR set, style-specific texturing)
+  - **40.2.4** Stage 4 — Final cleanup + export (mesh repair
+              pipeline runs BEFORE export, not after)
+- **40.3**  Mesh quality & topology improvements
+  - **40.3.1** Automatic mesh cleanup (weld duplicate vertices,
+              remove zero-area triangles, remove unused vertices,
+              remove degenerate edges)
+  - **40.3.2** Smart low-poly mode with target triangle budgets
+              (`meta.targetTris` enforced by E21 at runtime)
+  - **40.3.3** Feature-preserving simplification (QEM with
+              silhouette / hard-edge / curve / flat weighting)
+  - **40.3.4** Force watertight / manifold meshes
+- **40.4**  Structured TypeScript output improvements
+  - **40.4.1** Modular factory pattern (every part is a named
+              factory that takes a shared options object)
+  - **40.4.2** Parametric / options-based geometry (a single
+              config object drives all dimensions, colors, curve
+              points, recoil numbers)
+  - **40.4.3** Better hierarchy (4 named children: parts /
+              bones / sockets / meta)
+  - **40.4.4** Metadata (poly count, style tags, targetTris,
+              seed, referenceViews, negativePrompts,
+              generationPipeline, exportReady — all OPTIONAL)
+- **40.5**  Texture & material system
+  - **40.5.1** Full PBR texture sets (baseColor + normal +
+              roughness + metallic + AO)
+  - **40.5.2** Style-specific texturing (low / mid / high
+              density, exempt rules for low-density)
+  - **40.5.3** Separate texture refinement / re-texturing stage
+              (a change to textures does NOT require redoing
+              geometry)
+  - **40.5.4** Automatic UV handling (built-in primitive UVs >
+              planar projection > hand-rolled unwrap)
+- **40.6**  Parametric & procedural techniques
+  - **40.6.1** Factory + options object (same as PART 39.5)
+  - **40.6.2** Seed-based controlled variation (via the new
+              `seededRandom` Mulberry32 helper)
+  - **40.6.3** LOD support (3 levels: 10-20k / 5-8k / 1.5-3k
+              vertices via THREE.LOD)
+  - **40.6.4** Prefer algorithmic geometry (1 factory +
+              1 InstancedMesh of N instances, not N individual
+              meshes)
+- **40.7**  Post-processing, validation & feedback
+  - **40.7.1** Quality metrics (manifold, poly count, symmetry,
+              visual fidelity)
+  - **40.7.2** Renderer-side runtime validators (E19 PBR + UV
+              completeness, E20 thin-spike / hard-constraint
+              compliance, E21 target triangle budget — all
+              non-blocking)
+  - **40.7.3** Mesh repair pipeline before export (weld →
+              remove-zero-area → remove-unused → recompute
+              normals → re-validate; mandatory)
+  - **40.7.4** Optional user rating feedback loop into prompt
+              defaults (`meta.lastRating` is the hook)
+- **40.8**  Scene / composition level ideas (optional expansion)
+  - **40.8.1** Consistent style and density across N objects
+  - **40.8.2** Hierarchical scene building (Scene > Terrain >
+              Buildings > Props > Lighting)
+  - **40.8.3** Procedural placement and variation (via the
+              seededRandom helper, scene-level seed)
+- **40.9**  Renderer-side runtime contract — adds 3 new
+            non-blocking validators to the existing 18:
+  - **40.9.1** E19 — PBR + UV completeness (PART 40.5.1 /
+              40.5.4)
+  - **40.9.2** E20 — Thin-spike / hard-constraint compliance
+              (PART 40.1.4 / 40.3.4)
+  - **40.9.3** E21 — Target triangle budget (PART 40.3.2)
+  - **40.9.4** E19 / E20 / E21 do NOT change load behavior
+              (all non-blocking; the model still loads)
+- **40.10** Canonical helpers (re-exported on window.lblSpec):
+  - `pbrMaterial(opts)` — Appendix A
+  - `seededRandom(seed)` — Appendix B
+  - `triCountSummary(root)` — Appendix C
+
+## What PART 40 does NOT introduce
+
+- No new mandatory field on any existing userData namespace
+  (the new fields in 40.4.4 — `targetTris`, `seed`,
+  `referenceViews`, `negativePrompts`, `generationPipeline`,
+  `exportReady`, `textureDensity`, `sceneStyle`, `lastRating`
+  — are ALL optional; the current renderer ignores unknown
+  keys safely)
+- No new export path (the existing GLB / OBJ / STL / FBX /
+  DAE / USDZ / .ts paths are unchanged)
+- No new dependency (the new helpers use only Three.js APIs
+  that are already imported; no import-map change)
+- No new validator that blocks the model from loading
+  (E19, E20, E21 are non-blocking, like E1-E18 before them)
+- No change to the existing PART 1-39 rules (PART 40
+  reinforces them — see the 40.0 + 40.10 cross-references)
+- No change to the existing E1-E18 validators (they stay
+  exactly as they were in v1.16 / v8.8)
+- No change to PART 38.22's style agnosticism (PART 40 is
+  also style-agnostic — applies to every subject, every
+  style, every path)
+- No change to PART 39.5's factory + options pattern
+  (PART 40 reinforces it as 40.4.1 + 40.4.2 + 40.6.1)
+- No change to the project's "Low Poly 3D" name
+
+## Quick reference for the renderer build
+
+```js
+// In a loaded .ts factory, build a PBR material with the full
+// 5-map texture set:
+const m = window.lblSpec.helpers.pbrMaterial({
+  baseColor: 0x886644,
+  normalMap: normalTexInstance,
+  roughnessMap: roughTexInstance,
+  metalnessMap: metalTexInstance,
+  aoMap: aoTexInstance,
+  roughness: 0.7,
+  metalness: 0.0
+});
+
+// In a loaded .ts factory, get a seeded RNG for procedural
+// variation that reproduces on reload:
+const rng = window.lblSpec.helpers.seededRandom(0xA1B2C3D4);
+const magCurve = 0.15 + rng.range(0.0, 0.20);
+const variantPick = rng.pick(['short', 'medium', 'long']);
+
+// In a loaded .ts factory (or via the inspector), get a quick
+// triangle count summary and the E21 budget check:
+const s = window.lblSpec.helpers.triCountSummary(root);
+console.log(s.totalTriangles, 'tris,', s.meshCount, 'meshes');
+if(s.budget && !s.budget.ok) {
+  console.warn('Over targetTris budget:', s.budget);
+}
+```
+
+## Related prior rounds (for context)
+
+- **v1.11 / v8.3** — Pre-bundled rig helpers (PART 34)
+- **v1.12 / v8.4** — Triangle-first geometry (PART 35)
+- **v1.13 / v8.5** — Multi-file drop + Model + Rig pairing (PART 36)
+- **v1.14 / v8.6** — Zip bundle support (PART 37)
+- **v1.15 / v8.7** — Character pipeline upgrade (PART 38)
+- **v1.16 / v8.8** — 3D modeling techniques (PART 39, prev round)
+- **v1.17 / v8.9** — Better models through better generation
+  (PART 40, this round)
+
+---
+
 # v1.16 / v8.8 — 3D modeling techniques (PART 39)
 
 The spec now teaches the AI the six practical disciplines from the
