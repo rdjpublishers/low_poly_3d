@@ -1,3 +1,380 @@
+# v1.22 / v8.14 — CS2 PBR material profile (PART 45)
+
+The spec now teaches the AI an OPT-IN CS2 PBR material profile
+from the maintainer's "3D Technical Reference — CS2 to Three.js
+Mapping" research notebook (id
+`30ec3dba-5a20-4980-8886-ce89b506b634`, July 2026): 9 finish
+styles (Anodized, Anodized Multicolored, Custom Paint Job,
+Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus
+Steel — the last is the bonus finish the notebook treats
+separately from Case Hardened patina), a 5-tier wear system
+(FN/MW/FT/WW/BS) that maps CS2's per-item float value onto
+PBR property shifts, 8 new MAT_DB presets (`brushedsteel`,
+`gunmetal`, `damascussteel`, `anodizedblue`, `anodizedred`,
+`anodizedgold`, `casehardened`, plus the existing v6.4
+`polishedmetal` / `chrome` as the 8th alias), and 4 new
+MeshPhysicalMaterial properties the renderer now wires
+through `buildMaterial`: `iridescence` / `iridescenceIOR` /
+`iridescenceThicknessRange` (thin-film interference — Doppler
+/ Fade / Case Hardened / Damascus) and `specularIntensity` /
+`specularColor` (F0 knob for dielectrics), plus
+`attenuationColor` / `attenuationDistance` (tinted-glass
+absorption). The first 3 also extend the existing `wantsPhysical`
+switch (PART 3 / PART 7 #7 PBR Extensions) so a model that
+sets any of them gets built on `MeshPhysicalMaterial`. The
+renderer adds 1 new non-blocking validator E30 (CS2 profile
+compliance) to the existing 29 (E1-E12 from PART 32/65, E13-E16
+from PART 38, E17-E18 from PART 39, E19-E21 from PART 40, E22-E23
+from PART 41, E24-E25 from PART 42, E26-E27 from PART 43,
+E28-E29 from PART 44), and 5 new canonical helpers re-exported
+on `window.lblSpec.helpers` alongside the PART 35 + PART 39 +
+PART 40 + PART 41 + PART 42 + PART 43 + PART 44 bundles:
+`cs2PbrProfile(finish, opts)` (returns the MeshPhysicalMaterial
+property bundle for a given CS2 finish string — the SINGLE
+SOURCE OF TRUTH for the 9 finishes; the .ts factory / JSON
+blueprint never writes the PBR numbers inline), `applyWear(mat,
+wearAmount, baseMetal, baseColor)` (mutates a material's
+roughness / metalness / color in place to match a CS2 wear
+tier; skips the color pass for patina / casehardened /
+damascussteel whose worn look is DARKER, not desat'd),
+`cs2WearMaskTexture(size, opts)` (procedural wear-mask
+generator — 4-octave fBm + edge-detection blend; returns a
+CanvasTexture with repeat-wrapping; deterministic for the same
+(size, seed) pair via Mulberry32), and `wearSlider(root, opts)`
+(publishes a user-tunable wear slider on
+`root.userData.sculptRuntime.wearSlider` when
+`meta.cs2WearUserTunable: true`; the slider's `set(newValue)`
+method re-invokes `applyWear` on every Mesh's material in the
+tree). The `materialVariants` helper from PART 41.6 is
+DOCUMENTED as extensible with 1 new family (`cs2-finish`); the
+existing 4+2 = 6 families stay exactly as they were. **PART 45
+is an EXTRA CAPABILITY for weapons, blades, and metal-finish
+subjects — NOT a rule every model must follow.** See PART 45.8
+in the spec for the "when to opt in" rule (knives, guns, metal
+props, CS2 displays, or any explicit user request that names a
+CS2 finish). For every other subject (fabric, leather, skin,
+wood, plants, vehicles-as-a-whole, fantasy, organic shapes) the
+.ts factory leaves `meta.cs2Finish` unset and the model loads
+on the default PART 3 + PART 41 + PART 44 pipeline. No new
+dependency (iridescence and specularIntensity are core
+MeshPhysicalMaterial / MeshStandardMaterial properties that
+have existed in Three.js for years; the renderer just hadn't
+been wiring them through). No new export path, no new
+mandatory field, no removed / weakened rule, no change to
+PART 38.22's style agnosticism, no change to PART 38.14's
+GLB-first architecture, no change to PART 39.5's factory +
+options pattern, no change to PART 41.6's 4 default material
+families, no change to PART 44.3's bone + magic families, no
+change to the project's "Low Poly 3D" name. The 30+ existing
+MAT_DB presets stay exactly as they were (the new entries are
+PURE additions; the 1 duplicate `polishedmetal` from v6.4 is
+left in place for backward compatibility and is shadowed by
+the existing entry — JavaScript object literal semantics
+resolve the last-defined property at access time). Strict
+upgrade, zero downgrades.
+
+A supplementary addendum to PART 45 was added after the
+initial cut: (45.13) the Component Recipe Database for
+weapons (knife blade types + handle construction, pistol
+components, rifle components, boolean operations, edge
+treatment) preserved verbatim from the source notebook as
+a content guide that curates PART 2 / PART 10 / PART 39 /
+PART 42 / PART 45 into a per-component cheat sheet — purely
+a reference, not a runtime contract; (45.14) the bilingual
+EN/VI Vocabulary Glossary (5 core industry terms + 5
+spatial modifiers + the 4-way damage-type × PBR-map rubric)
+preserved verbatim from the source notebook as a reference
+resource for the AI to identify subject matter in the
+user's prompt or reference image; (45.15) the updated
+cross-references listing the PART 2 / PART 10 / PART 39 /
+PART 41 / PART 42 entries 45.13 / 45.14 depend on. These
+additions are PURE reference content — no new rules, no
+new helpers, no new fields, no removed / weakened rule.
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `Prompt_To_Ts.txt`   | header v1.21 → v1.22; new v1.22 CHANGELOG entry (above); appended PART 45 (15 sub-sections: 45.0 central principle + 4 path notes, 45.1 PBR property map, 45.2 the 9 CS2 finish-style recipes incl. bonus Damascus Steel, 45.3 wear system bridge with 5 tiers + per-skin clipping + PBR shift + spatial wear + wearMap, 45.4 8 new MAT_DB presets, 45.5 renderer-side extensions to buildMaterial, 45.6 .ts factory contract with worked Karambit example, 45.7 JSON/JS analog, 45.8 when to opt in, 45.9 E30 validator, 45.10 5 canonical helpers, 45.11 what PART 45 does NOT introduce, 45.12 cross-references, 45.13 Component Recipe Database for weapons — knife blade types + handle construction + pistol components + rifle components + boolean operations + edge treatment, 45.14 bilingual EN/VI Vocabulary Glossary — 5 core terms + 5 spatial modifiers + 4-way damage-type × PBR-map rubric, 45.15 updated cross-references) |
+| `Image_To_Ts.txt`    | header v1.21 → v1.22; new v1.22 CHANGELOG entry; appended PART 45 (same content incl. 45.13 + 45.14 + 45.15; image-to-TS analysis protocol from PART 17 feeds 45.6 + 45.13.6 directly) |
+| `Prompt_To_Json.txt` | header v8.13 → v8.14; new v8.14 CHANGELOG entry; appended PART 45 (same content incl. 45.13 + 45.14 + 45.15; references the JSON/JS `meta.cs2Finish` / `meta.cs2Wear` / `meta.cs2WearRemap` / `meta.cs2WearMask` / `meta.cs2WearUserTunable` fields as the JSON/JS analog of the TS path) |
+| `Image_To_Json.txt`  | header v8.13 → v8.14; new v8.14 CHANGELOG entry; appended PART 45 (same content incl. 45.13 + 45.14 + 45.15) |
+| `Prompt_To_Js.txt`   | header v8.13 → v8.14; new v8.14 CHANGELOG entry; appended PART 45 (same content incl. 45.13 + 45.14 + 45.15) |
+| `Image_To_Js.txt`    | header v8.13 → v8.14; new v8.14 CHANGELOG entry; appended PART 45 (same content incl. 45.13 + 45.14 + 45.15) |
+| `index.html`         | `lblSpec.VERSION` bumped to `{ts:'v1.22', json:'v8.14'}`; LBL spec chip text + title updated; meta description + keywords updated; top-of-block comment updated to "RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13 / 14"; 1 new CS2-profile validator (E30 CS2 profile compliance) added to `ANTI_PATTERN_CHECKS`; 7 new MAT_DB entries (`brushedsteel`, `gunmetal`, `damascussteel`, `anodizedblue`, `anodizedred`, `anodizedgold`, `casehardened` — `polishedmetal` already existed from v6.4) added to the existing MAT_DB; `buildMaterial`'s `wantsPhysical` switch extended with `iridescence` / `iridescenceIOR` / `iridescenceThicknessRange` (strict additive change); 4 new MeshPhysicalMaterial properties wired through `buildMaterial` (`iridescence` / `iridescenceIOR` / `iridescenceThicknessRange` + `specularIntensity` / `specularColor` + `attenuationColor` / `attenuationDistance`); 5 new canonical helpers (`cs2PbrProfile`, `applyWear`, `cs2WearMaskTexture`, `wearSlider`, plus the documented extension point for `materialVariants` with a 7th `cs2-finish` family) added to the existing `__threeTriHelpers` bundle re-exported on `window.lblSpec.helpers` |
+| `CHANGES_SUMMARY.md` | this round added at the top (this section); prior v1.21 / v8.13 round preserved below |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` (still work
+  standalone; the new meta fields from 45.6.1 `cs2Finish`,
+  45.6.2 `cs2Wear`, 45.6.3 `cs2WearRemap`, 45.6.4 `cs2WearMask`,
+  45.6.5 `cs2WearUserTunable` are ALL OPTIONAL, so existing
+  models don't need any change to load)
+- `public/models/manifest.json` (still works as-is)
+- `.github/workflows/manifest.yml`
+- `public/rig/three-rig-helpers.js`
+- `public/rig/src/*.ts`
+- `public/rig/build.sh`
+
+## What PART 45 covers (12 sub-sections)
+
+- **45.0**  Central principle — CS2 PBR is an EXTRA
+            CAPABILITY, not a rule. The .ts factory uses
+            it WHEN the subject calls for it (knives,
+            guns, metal props, CS2 displays, or an
+            explicit user "CS2-style" / "anodized" /
+            "case hardened" / "Doppler" / "Fade" /
+            "Damascus" / "patina" request) and SKIPS it
+            otherwise. No existing rule is changed; no
+            existing material default is changed; no
+            model that doesn't opt in loads any
+            differently. Style-agnostic in scope; content-
+            specific in subject.
+  - **45.0.1** EXTENDS, not replaces. The .ts factory's
+              material contract from PART 3 is the
+              BASE; the new `cs2PbrProfile` helper
+              returns a property bundle the factory
+              spreads ON TOP.
+  - **45.0.2** WHEN TO OPT IN. The .ts factory requests
+              `cs2Finish` ONLY in the 5 use cases in
+              45.8; otherwise leaves it unset and the
+              model loads on the default PART 3 + PART
+              41 + PART 44 pipeline.
+  - **45.0.3** STYLE-AGNOSTIC IN SCOPE. PART 45 applies
+              regardless of `meta.style`.
+  - **45.0.4** LAYERING ON THE EXISTING STACK. PART 45
+              layers on top of, never replaces.
+- **45.1**  PBR property map — the 13 properties the
+            profile can drive (the 6 already covered by
+            PART 3 + PART 7 #7 PBR Extensions: color /
+            metalness / roughness / envMapIntensity /
+            clearcoat / sheen / anisotropy / transmission
+            / thickness / ior) PLUS the 7 new properties
+            the renderer now honours: iridescence /
+            iridescenceIOR / iridescenceThicknessRange /
+            specularIntensity / specularColor /
+            attenuationColor / attenuationDistance.
+- **45.2**  CS2 finish-style → PBR profile (9 styles)
+  - **45.2.1**  Anodized (metalness 1.0, roughness
+                0.05-0.15, clearcoat 0.3-0.5,
+                iridescence 0.0-0.2)
+  - **45.2.2**  Anodized Multicolored (metalness 1.0,
+                roughness 0.05-0.10, iridescence
+                0.3-0.5, iridescenceIOR 1.5-2.0,
+                iridescenceThicknessRange [100,500])
+  - **45.2.3**  Custom Paint Job (metalness 0.0,
+                roughness 0.3-0.5, clearcoat 0.2-0.4)
+  - **45.2.4**  Gunsmith (metalness 0.7-0.9, roughness
+                0.2-0.4, no clearcoat)
+  - **45.2.5**  Hydrographic (metalness 0.0, roughness
+                0.5-0.7, clearcoat 0.1-0.2)
+  - **45.2.6**  Patina (metalness 0.9-1.0, roughness
+                0.2-0.4, iridescence 0.3-0.6)
+  - **45.2.7**  Solid Color (metalness 0.0, roughness
+                0.3-0.5, clearcoat 0.2-0.3)
+  - **45.2.8**  Sprayed (metalness 0.0, roughness
+                0.6-0.8, no clearcoat)
+  - **45.2.9**  Damascus Steel (BONUS — separate from
+                Patina; metalness 1.0, roughness
+                0.25-0.40, iridescence 0.2-0.4 +
+                anisotropy 0.4-0.7; the "Damascus
+                wear inversion" — a unique case where
+                wear ENHANCES the visual signature).
+- **45.3**  Wear system bridge
+  - **45.3.1** Wear tiers (FN 0.00-0.07, MW 0.07-0.15,
+              FT 0.15-0.38, WW 0.38-0.45, BS 0.45-1.00)
+  - **45.3.2** Per-skin float clipping
+              (`wear_remap_min` / `wear_remap_max` in
+              CS2's items_game.txt; surfaced as
+              `meta.cs2WearRemap` in PART 45)
+  - **45.3.3** PBR parameter shift per wear unit
+              (roughness ramp 0.3 → 0.7, metalness
+              ramp toward `baseMetal`, color
+              desaturated 30% — SKIPS the color pass
+              for patina / casehardened / damascussteel)
+  - **45.3.4** Spatial wear (where on the part) —
+              content guide, not a runtime change; the
+              .ts factory picks the wear location
+              from the model's geometry
+  - **45.3.5** wearMap / wear mask (optional) — the
+              .ts factory authors a CanvasTexture
+              and the renderer multiplies it against
+              the wearAmount. The new
+              `cs2WearMaskTexture` helper
+              generates one procedurally.
+- **45.4**  Material preset recipes — 8 new MAT_DB
+            entries (7 new + 1 alias to the existing
+            v6.4 polishedmetal). The .ts factory uses
+            these via the existing PART 5
+            `material: '<name>'` field — no syntax
+            change.
+- **45.5**  Renderer-side extensions to buildMaterial
+  - **45.5.1** iridescence / iridescenceIOR /
+              iridescenceThicknessRange (NEW wire-
+              through; extends the wantsPhysical
+              switch)
+  - **45.5.2** specularIntensity / specularColor (NEW
+              wire-through; works on BOTH
+              MeshStandardMaterial and
+              MeshPhysicalMaterial since they're
+              dielectric F0 knobs)
+  - **45.5.3** attenuationColor / attenuationDistance
+              (NEW wire-through; only matters when
+              transmission > 0)
+  - **45.5.4** The wantsPhysical switch (UPDATED,
+              NOT CHANGED) — adds the 3 new
+              iridescence properties to the same
+              condition; the behavior is unchanged
+              for objects that don't set any of
+              these. Strict additive change: a new
+              condition makes MORE objects use
+              MeshPhysicalMaterial, never fewer.
+- **45.6**  .ts factory contract — the 4-step pattern
+            (set `meta.cs2Finish`, optionally
+            `meta.cs2Wear` / `meta.cs2WearRemap` /
+            `meta.cs2WearMask` / `meta.cs2WearUserTunable`).
+            Worked example: a CS2 Karambit with Case
+            Hardened finish at Field-Tested wear.
+- **45.7**  JSON / JS path (mirror) — same 5 meta keys
+            (`cs2Finish` / `cs2Wear` / `cs2WearRemap` /
+            `cs2WearMask` / `cs2WearUserTunable`).
+            Example JSON fragment for an
+            anodizedmulticolored butterfly knife at FT.
+- **45.8**  When to opt in (the 5 use cases) — knives
+            and blades (45.8.1), guns and weapon
+            hardware (45.8.2), polished / brushed /
+            gunmetal metal props (45.8.3), CS2 displays
+            / showcases (45.8.4), explicit user
+            requests (45.8.5). Plus an explicit list
+            of subjects where `cs2Finish` is almost
+            NEVER appropriate (fabric, skin, wood,
+            plants, glass, magic, vehicles-as-a-whole,
+            architecture, anything where a metal finish
+            would look wrong).
+- **45.9**  Renderer-side runtime contract — adds 1
+            new non-blocking validator E30 (CS2
+            profile compliance) to the existing 29.
+            E30 fires ONLY when `meta.cs2Finish` is
+            set; a model with NO `cs2Finish` and NO
+            `cs2Wear` field never triggers E30.
+            E30 checks (a) substrate match (a
+            "casehardened" finish on a metalness 0.0
+            material is a mismatch), (b) defining
+            feature (e.g. "anodizedblue" should set
+            clearcoat; "casehardened" should set
+            iridescence; "brushedsteel" should set
+            anisotropy; "damascussteel" should set
+            BOTH iridescence AND anisotropy), and
+            (c) wear-range check (when
+            `cs2WearRemap` is set). Non-blocking;
+            surfaces a single warning toast + a red
+            spec chip, exactly like E1-E29.
+- **45.10** Canonical helpers (re-exported on
+            `window.lblSpec.helpers`)
+  - `cs2PbrProfile(finish, opts)` (Appendix A) —
+    returns the property bundle for a given
+    finish string; the SINGLE SOURCE OF TRUTH
+    for the 9 finish profiles.
+  - `applyWear(mat, wearAmount, baseMetal,
+    baseColor)` (Appendix B) — mutates a
+    MeshPhysicalMaterial in place; detects
+    "skip desaturation" finishes (Patina,
+    Damascus) from `mat.userData.cs2Finish` and
+    skips the color pass for those.
+  - `cs2WearMaskTexture(size, opts)` (Appendix
+    C) — procedural wear mask generator;
+    4-octave fBm + edge-detection blend; returns
+    a CanvasTexture with repeat-wrapping;
+    deterministic for the same (size, seed) pair
+    via Mulberry32.
+  - `wearSlider(root, opts)` (Appendix D) —
+    publishes a user-tunable wear slider on
+    `root.userData.sculptRuntime.wearSlider`
+    when `meta.cs2WearUserTunable: true`; the
+    slider's `set(newValue)` method re-invokes
+    `applyWear` on every Mesh's material in the
+    tree.
+  - The `materialVariants` helper from PART 41.6
+    is documented as EXTENSIBLE with a 7th
+    `cs2-finish` family; the existing 4+2 = 6
+    families stay exactly as they were.
+- **45.11** What PART 45 does NOT introduce —
+            explicit list of "no new X" rules.
+            17 items, all "no change to existing",
+            including no change to PART 38.22's style
+            agnosticism, no change to PART 38.14's
+            GLB-first architecture, no change to
+            PART 39.5's factory + options pattern,
+            no change to PART 41.6's 4 default
+            material families, no change to PART
+            44.3's bone + magic families, no REMOVAL
+            of any existing finish or material
+            preset, no REMOVAL or WEAKENING of any
+            existing iridescence / clearcoat / sheen
+            / anisotropy / transmission path.
+- **45.12** Cross-references — explicit list of the
+            PARTs PART 45 layers on top of, never
+            replaces.
+
+## What PART 45 does NOT introduce
+
+- No new mandatory field on any existing userData
+  namespace (the new fields in 45.5.1 `iridescence` /
+  `iridescenceIOR` / `iridescenceThicknessRange`, 45.5.2
+  `specularIntensity` / `specularColor`, 45.5.3
+  `attenuationColor` / `attenuationDistance`, 45.6.1
+  `cs2Finish`, 45.6.2 `cs2Wear`, 45.6.3 `cs2WearRemap`,
+  45.6.4 `cs2WearMask`, 45.6.5 `cs2WearUserTunable` are
+  ALL OPTIONAL; the current renderer ignores unknown
+  keys safely)
+- No new export path (the existing GLB / OBJ / STL /
+  FBX / DAE / USDZ / .ts paths are unchanged)
+- No new dependency (iridescence and specularIntensity
+  are core MeshPhysicalMaterial / MeshStandardMaterial
+  properties that have existed in Three.js for years;
+  the renderer just hadn't been wiring them through)
+- No new validator that blocks the model from loading
+  (E30 is non-blocking, like E1-E29 before it)
+- No change to the existing PART 1-44 rules (PART 45
+  layers on top, never replaces — see 45.0.1)
+- No change to the existing E1-E29 validators (they
+  stay exactly as they were in v1.21 / v8.13)
+- No change to PART 38.22's style agnosticism (PART
+  45 is also style-agnostic in scope; see 45.0.3)
+- No change to PART 38.14's GLB-first architecture
+  (PART 45 extends it with the same viewer-adapter
+  pattern; the .ts factory still SHIPS THE GLB and
+  PART 45's opt-in is just an additional meta field)
+- No change to PART 39.5's factory + options pattern
+  (PART 45 reinforces it — the .ts factory uses the
+  same options + helper pattern from 45.6)
+- No change to PART 41.6's 4 default material
+  families (PART 45.10.3 documents the 7th family
+  extension point; the existing 4+2 = 6 stay
+  exactly as they were)
+- No change to PART 44.3's bone + magic families
+  (the 6 family hierarchy from PART 44.3 stays
+  exactly as it was)
+- No change to the project's "Low Poly 3D" name
+- No REMOVAL of any existing finish or material
+  preset (the existing 30+ MAT_DB entries stay
+  exactly as they were; the 7 new CS2 entries are
+  PURE ADDITIONS; `polishedmetal` already exists
+  from v6.4 and stays in place for backward
+  compatibility)
+- No REMOVAL or WEAKENING of any existing
+  iridescence / clearcoat / sheen / anisotropy /
+  transmission path (the existing 4 extensions
+  stay exactly as they were; the 7 new
+  MeshPhysicalMaterial / MeshStandardMaterial
+  properties are PURE ADDITIONS to the same
+  `wantsPhysical` switch)
+- No downgrade of the existing system — strict
+  upgrade, zero downgrades.
+
+---
+
 # v1.21 / v8.13 — Professional pipeline (PART 44)
 
 The spec now teaches the AI the 4 new pieces from the maintainer's

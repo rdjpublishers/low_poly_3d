@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.21 (TS path) and v8.13 (JSON/JS path) with 10 opt-in architectural features, 29 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, and PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules). Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.21, LBL v8.13, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.22 (TS path) and v8.14 (JSON/JS path) with 10 opt-in architectural features, 30 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), and PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider). PART 45 is an EXTRA CAPABILITY for weapons, blades, and metal-finish subjects — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.22, LBL v8.14, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, low_poly_3d, v1.22 v8.14, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1435,10 +1435,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="spacer"></div>
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
-  <!-- RJS UPDATE 13 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
-       TS factories target v1.21 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules), JSON/JS blueprints target v8.13 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44).
-       Pairs with the on-load lblValidateAgainstSpec() check that catches the 29 anti-patterns from PART 32/65/38/39/40/41/42/43/44. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.21 TS / v8.13 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), and PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec).">LBL: v1.21 / v8.13</div>
+  <!-- RJS UPDATE 14 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
+       TS factories target v1.22 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear), JSON/JS blueprints target v8.14 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45).
+       Pairs with the on-load lblValidateAgainstSpec() check that catches the 30 anti-patterns from PART 32/65/38/39/40/41/42/43/44/45. -->
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.22 TS / v8.14 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), and PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR) is an EXTRA CAPABILITY for weapons, blades, and metal-finish subjects, NOT a rule every model must follow.">LBL: v1.22 / v8.14</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -2463,6 +2463,36 @@ const MAT_DB = {
   // wood/ceramic/rubber (distinct from existing partial entries)
   ceramic:      {c:0xf5f0e8,r:0.30,m:0.00},   // porcelain, tiles, clay
   rubber:       {c:0x1a1a1a,r:0.95,m:0.00},   // tyres, gaskets, seals
+
+  // ── v1.22 / v8.14 (PART 45) — CS2 PBR Material Profile presets ────
+  // 7 new entries the .ts factory / JSON blueprint can pull by name
+  // (via the existing PART 5 `material: '<name>'` field — no syntax
+  // change). The renderer's buildMaterial() recognizes the new
+  // iridescence / iridescenceIOR / iridescenceThicknessRange /
+  // specularIntensity / specularColor / attenuationColor /
+  // attenuationDistance keys on the base preset the same way it
+  // already recognized clearcoat / sheen / anisotropy / transmission
+  // (see the wantsPhysical switch in buildMaterial). The existing
+  // 30+ presets above are UNTOUCHED — note the existing
+  // `polishedmetal` (line ~2370) already exists from v6.4, so the
+  // 8th CS2 preset (PART 45.4.1) is implicit: the factory can use
+  // either name to get the polished-metal look. The other 7 below
+  // are PURE additions.
+  //
+  // The .ts factory / JSON blueprint that wants a wear-tunable
+  // subject uses the new `cs2PbrProfile` + `applyWear` helpers
+  // (re-exported on window.lblSpec.helpers) instead of writing
+  // these numbers inline. PART 45 is an EXTRA CAPABILITY for
+  // weapons, blades, and metal-finish subjects — see PART 45.8 in
+  // the spec for the "when to opt in" rule.
+  brushedsteel: {c:0x888888,r:0.30,m:1.0,anisotropy:0.8,anisotropyRotation:Math.PI/4},  // PART 45.4.2
+  gunmetal:     {c:0x3a3a3a,r:0.45,m:1.0,envMapIntensity:1.2},  // PART 45.4.3
+  damascussteel: {c:0x4a4a52,r:0.30,m:1.0,anisotropy:0.5,anisotropyRotation:Math.PI/4,
+                  iridescence:0.3,iridescenceIOR:1.25,envMapIntensity:1.4},  // PART 45.4.4
+  anodizedblue: {c:0x2244aa,r:0.08,m:1.0,clearcoat:0.4,clearcoatRoughness:0.05,envMapIntensity:1.3},  // PART 45.4.5
+  anodizedred:  {c:0xaa2244,r:0.08,m:1.0,clearcoat:0.4,clearcoatRoughness:0.05,envMapIntensity:1.3},  // PART 45.4.6
+  anodizedgold: {c:0xccaa22,r:0.08,m:1.0,clearcoat:0.4,clearcoatRoughness:0.05,envMapIntensity:1.3},  // PART 45.4.7
+  casehardened: {c:0x667788,r:0.25,m:1.0,iridescence:0.5,iridescenceIOR:1.4,envMapIntensity:1.3},  // PART 45.4.8
 };
 
 const PALETTE=[0x7fff8c,0x4fc3f7,0xffd700,0xff6b9d,0xa78bfa,0xfb923c,0x34d399,0xf472b6,0x60a5fa,0xfbbf24];
@@ -2868,9 +2898,18 @@ function buildMaterialRaw(obj, idx){
   // v7.2 B6 — a material PRESET (skin/eye/glass) asking for one of these
   // extensions counts the same as the author asking directly, so e.g.
   // material:"skin" gets its sheen without also having to set "sheen" by hand.
+  // v1.22 (PART 45) — extended with `iridescence` / `iridescenceIOR` /
+  // `iridescenceThicknessRange` (thin-film interference — Doppler /
+  // Fade / patina / Damascus Steel). These are the 3 new
+  // MeshPhysicalMaterial-only properties the CS2 PBR material
+  // profile drives (PART 45.5.1). The switch extension is a strict
+  // additive change: a new condition makes MORE objects use
+  // MeshPhysicalMaterial, never fewer.
   const wantsPhysical = obj.clearcoat!==undefined || obj.sheen!==undefined || obj.anisotropy!==undefined
     || obj.transmission!==undefined
-    || base.clearcoat!==undefined || base.sheen!==undefined || base.transmission!==undefined;
+    || obj.iridescence!==undefined || obj.iridescenceIOR!==undefined || obj.iridescenceThicknessRange!==undefined
+    || base.clearcoat!==undefined || base.sheen!==undefined || base.transmission!==undefined
+    || base.iridescence!==undefined || base.iridescenceIOR!==undefined || base.iridescenceThicknessRange!==undefined;
   const MatClass = wantsPhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
   const mat = new MatClass({
     color: col, roughness, metalness, transparent, opacity, flatShading,
@@ -2912,6 +2951,56 @@ function buildMaterialRaw(obj, idx){
       // back to fully opaque and transparent to false once transmission is
       // driving the look (matches how MeshPhysicalMaterial is meant to be used).
       mat.opacity = 1.0; mat.transparent = false;
+    }
+    // v1.22 (PART 45) — iridescence / iridescenceIOR / iridescenceThicknessRange.
+    // Thin-film interference — oil-slick / soap-bubble / soap-bubble-on-water
+    // / Doppler / Fade / Case Hardened patina / Damascus sheen. The
+    // iridescenceThicknessRange defaults to [100, 400] (nm) which gives
+    // the classic blue→violet shift; the new cs2PbrProfile helper
+    // spreads the [100, 500] or [100, 800] ranges PART 45.2 specifies
+    // per-finish (PART 45.10.1).
+    const iridescence = obj.iridescence ?? base.iridescence;
+    if(iridescence!==undefined){
+      mat.iridescence = THREE.MathUtils.clamp(iridescence,0,1);
+      if(obj.iridescenceIOR!==undefined || base.iridescenceIOR!==undefined){
+        mat.iridescenceIOR = THREE.MathUtils.clamp(obj.iridescenceIOR ?? base.iridescenceIOR, 1.0, 3.0);
+      }
+      if(obj.iridescenceThicknessRange!==undefined || base.iridescenceThicknessRange!==undefined){
+        const range = obj.iridescenceThicknessRange ?? base.iridescenceThicknessRange;
+        if(Array.isArray(range) && range.length === 2){
+          // clamp the [min, max] to the safe 50-1200nm range
+          mat.iridescenceThicknessRange = [
+            THREE.MathUtils.clamp(range[0], 50, 1200),
+            THREE.MathUtils.clamp(range[1], 50, 1200)
+          ];
+        }
+      }
+    }
+  }
+  // v1.22 (PART 45) — specularIntensity / specularColor (F0 knob for
+  // dielectrics). Works on BOTH MeshStandardMaterial and
+  // MeshPhysicalMaterial (they're outside the wantsPhysical switch
+  // for that reason). The CS2 PBR profile doesn't drive these
+  // directly (none of the 9 finishes need an explicit F0 override),
+  // but they're wired through here so a .ts factory can set them
+  // on any object the same way it sets clearcoat.
+  if(obj.specularIntensity!==undefined){
+    mat.specularIntensity = THREE.MathUtils.clamp(obj.specularIntensity,0,1);
+  }
+  if(obj.specularColor!==undefined){
+    mat.specularColor = new THREE.Color(obj.specularColor);
+  }
+  // v1.22 (PART 45) — attenuationColor / attenuationDistance (only
+  // matters when transmission > 0; the absorption color of a tinted
+  // glass / scope lens). Defaults: 0xffffff / 0.5 (Three.js's own
+  // defaults for MeshPhysicalMaterial). Only set on Physical
+  // materials, since Standard doesn't have these properties.
+  if(wantsPhysical){
+    if(obj.attenuationColor!==undefined){
+      mat.attenuationColor = new THREE.Color(obj.attenuationColor);
+    }
+    if(obj.attenuationDistance!==undefined){
+      mat.attenuationDistance = Math.max(0, obj.attenuationDistance);
     }
   }
   if(base.e){ mat.emissive=new THREE.Color(base.e); mat.emissiveIntensity=base.ei??0.3; }
@@ -21526,7 +21615,7 @@ buildScene = function(blueprint){
 };
 
 // =============================================================================
-// RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13 — LBL SPEC v1.21 / v8.13 RUNTIME SUPPORT
+// RJS UPDATE 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13 / 14 — LBL SPEC v1.22 / v8.14 RUNTIME SUPPORT
 // =============================================================================
 // Implements the renderer side of PART 32/65 (10 error-fix anti-pattern
 // guards), PART 33/66 (10 architectural features), PART 34 (pre-bundled
@@ -21590,7 +21679,7 @@ buildScene = function(blueprint){
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.21 (PART 33 architectural features + PART 34 pre-bundled
+  // target v1.22 (PART 33 architectural features + PART 34 pre-bundled
   // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
   // drop + model + rig pairing + PART 37 zip bundle support + PART 38
   // character pipeline upgrade + PART 39 3D modeling techniques +
@@ -21598,20 +21687,24 @@ window.lblSpec = (function(){
   // detail generation + PART 42 character production discipline +
   // PART 43 refinement + style locking + variant ranking + PART 44
   // professional pipeline: GLB-first + BVH + look-dev lights +
-  // coding rules);
-  // JSON/JS blueprints target v8.13 (PART 66 feature bridge + PART 34
+  // coding rules + PART 45 CS2 PBR material profile: 9 finish
+  // styles, 5-tier wear system, 4 new MeshPhysicalMaterial
+  // properties, 5 canonical helpers — opt-in via
+  // meta.cs2Finish / meta.cs2Wear);
+  // JSON/JS blueprints target v8.14 (PART 66 feature bridge + PART 34
   // runtime contract for userData.rigGraph + PART 35 tris inspector +
   // PART 36 same + PART 37 same + PART 38 character pipeline upgrade +
   // PART 39 3D modeling techniques + PART 40 better models through
   // better generation + PART 41 high-detail generation + PART 42
   // character production discipline + PART 43 refinement + style
-  // locking + variant ranking + PART 44 professional pipeline).
+  // locking + variant ranking + PART 44 professional pipeline +
+  // PART 45 CS2 PBR material profile).
   // The chip in the topbar shows both.
   // Updating these constants is the only place to bump for a new spec
   // release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.21', json: 'v8.13' };
+  const VERSION = { ts: 'v1.22', json: 'v8.14' };
 
-  // The 29 anti-patterns the validator looks for. Mirrors PART 32 (TS)
+  // The 30 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) for the first 12, PART 38 (character
   // pipeline upgrade) for the next 4 (E13-E16), PART 39 (3D
   // modeling techniques) for the 2 new modeling-technique checks
@@ -21628,7 +21721,12 @@ window.lblSpec = (function(){
   // locking + variant ranking) for the 2 new bridge checks
   // (E26 style-lock compliance, E27 multi-view consistency),
   // and PART 44 (professional pipeline) for the 2 new performance
-  // checks (E28 BVH index presence, E29 look-dev lights present).
+  // checks (E28 BVH index presence, E29 look-dev lights present),
+  // and PART 45 (CS2 PBR material profile) for the 1 new
+  // finish-profile check (E30 CS2 profile compliance — fires
+  // ONLY when meta.cs2Finish is set, so a non-CS2 model is
+  // unchanged). E30 mirrors the existing "validator is opt-in
+  // by construction" pattern from PART 45.9.2.
   // Each check is a function that receives the loaded model and
   // returns either null (clean) or a short human-readable
   // warning string. Multiple warnings stack.
@@ -22783,6 +22881,145 @@ window.lblSpec = (function(){
         const head = issues.slice(0, 4).join('; ');
         return 'Look-dev lights malformed (PART 44.2.3 / 44.9): ' + head +
           '. Use lblSpec.helpers.lookDevLights(opts) to build the canonical 3-light setup.';
+      }
+    },
+    {
+      // E30. CS2 profile compliance (PART 45.2 / 45.9).
+      // OPT-IN BY CONSTRUCTION — fires ONLY when the model
+      // has actually opted in to a CS2 finish via
+      // `userData.cs2Finish` (TS path) or
+      // `meta.cs2Finish` (JSON/JS path, surfaced onto the
+      // root by validateAndBuild as root.userData.cs2Finish).
+      // A model with NO cs2Finish field never triggers E30
+      // — see PART 45.0.2 / 45.9.2. This is what makes
+      // PART 45 a strict "extra capability" — the model's
+      // load behavior is IDENTICAL to a non-CS2 model.
+      //
+      // When cs2Finish IS set, the validator walks every
+      // Mesh in the tree and:
+      //   (a) checks the resolved material's
+      //       metalness matches the finish's expected
+      //       substrate (e.g. "casehardened" needs full
+      //       metal; "skin" or "fabric" never gets a CS2
+      //       finish),
+      //   (b) checks the defining PBR feature is present
+      //       (e.g. "anodizedblue" should set clearcoat;
+      //       "casehardened" should set iridescence;
+      //       "brushedsteel" should set anisotropy;
+      //       "damascussteel" should set BOTH iridescence
+      //       AND anisotropy),
+      //   (c) checks `userData.cs2Wear` (when set) is
+      //       inside the `cs2WearRemap` range (if any).
+      //
+      // The check uses `root.userData.cs2Finish` /
+      // `root.userData.cs2Wear` / `root.userData.cs2WearRemap`
+      // (the JSON/JS path sets these on the root before
+      // validate() runs). A wrong combination surfaces a
+      // single warning toast + a red spec chip, exactly
+      // like E1-E29. Non-blocking — the model still
+      // loads.
+      id: 'E30', label: 'CS2 profile compliance (PART 45)',
+      check: (root) => {
+        if(!root) return null;
+        // The CS2 fields live in different places depending
+        // on the input path:
+        //   - TS path: root.userData.cs2Finish (the .ts
+        //     factory sets them on the userData directly,
+        //     exactly the same way it sets
+        //     userData.sculptRuntime).
+        //   - JSON/JS path: the .meta block carries them
+        //     (meta.cs2Finish, meta.cs2Wear, etc.). The
+        //     renderer keeps the original blueprint in
+        //     CURRENT_BLUEPRINT, and the meta is at
+        //     CURRENT_BLUEPRINT.meta.
+        //   - Defensive: also check
+        //     root.userData.sculptRuntime.meta (the TS
+        //     path's mirror of the same data).
+        // This 3-way lookup keeps the validator
+        // cross-path uniform — E30 fires the same way
+        // for a TS knife with userData.cs2Finish, a
+        // JSON blueprint with meta.cs2Finish, and a
+        // future path that puts the data somewhere
+        // else. PART 45.0.2 — the validator returns
+        // null (clean) when NONE of these are set, so a
+        // non-CS2 model never triggers E30.
+        const ud = (root.userData) || {};
+        let finish = ud.cs2Finish;
+        let wear = ud.cs2Wear;
+        let wearRemap = ud.cs2WearRemap;
+        if(!finish && typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          const m = CURRENT_BLUEPRINT.meta;
+          if(typeof m.cs2Finish === 'string') finish = m.cs2Finish;
+          if(typeof m.cs2Wear === 'number' || typeof m.cs2Wear === 'string') wear = m.cs2Wear;
+          if(m.cs2WearRemap && typeof m.cs2WearRemap === 'object') wearRemap = m.cs2WearRemap;
+        }
+        if(!finish && ud.sculptRuntime && ud.sculptRuntime.meta &&
+          typeof ud.sculptRuntime.meta.cs2Finish === 'string'){
+          const m = ud.sculptRuntime.meta;
+          finish = m.cs2Finish;
+          if(typeof m.cs2Wear === 'number' || typeof m.cs2Wear === 'string') wear = m.cs2Wear;
+          if(m.cs2WearRemap && typeof m.cs2WearRemap === 'object') wearRemap = m.cs2WearRemap;
+        }
+        if(!finish || typeof finish !== 'string') return null;
+        // (a) + (b): walk the tree and collect the
+        // substrate / defining feature warnings.
+        const issues = [];
+        const seenMats = new Set();
+        root.traverse((o) => {
+          if(!o || !o.isMesh) return;
+          const mat = o.material;
+          if(!mat) return;
+          // Each unique material is checked at most once.
+          if(seenMats.has(mat)) return;
+          seenMats.add(mat);
+          // (a) substrate check
+          const metalness = (typeof mat.metalness === 'number') ? mat.metalness : 0.0;
+          const expectsMetal = (finish === 'anodized' || finish === 'anodizedblue' ||
+            finish === 'anodizedred' || finish === 'anodizedgold' ||
+            finish === 'anodizedmulticolored' || finish === 'anodizednavy' ||
+            finish === 'casehardened' || finish === 'patina' ||
+            finish === 'damascussteel' || finish === 'gunmetal' ||
+            finish === 'brushedsteel' || finish === 'polishedmetal' ||
+            finish === 'polished' || finish === 'gunsmith');
+          if(expectsMetal && metalness < 0.5){
+            issues.push('"' + finish + '" expects a metallic substrate (metalness≥0.5) but a material has metalness=' + metalness.toFixed(2));
+          }
+          // (b) defining feature check
+          const hasIr = (typeof mat.iridescence === 'number') && mat.iridescence > 0;
+          const hasClear = (typeof mat.clearcoat === 'number') && mat.clearcoat > 0;
+          const hasAniso = (typeof mat.anisotropy === 'number') && mat.anisotropy > 0;
+          if(finish === 'casehardened' || finish === 'patina'){
+            if(!hasIr) issues.push('"' + finish + '" should set iridescence > 0 for the patina color shift');
+          }
+          if(finish === 'anodizedmulticolored' || finish === 'doppler' || finish === 'fade'){
+            if(!hasIr) issues.push('"' + finish + '" should set iridescence > 0 for the multi-color shift');
+          }
+          if(finish === 'anodized' || finish === 'anodizedblue' || finish === 'anodizedred' ||
+            finish === 'anodizedgold' || finish === 'anodizednavy'){
+            if(!hasClear) issues.push('"' + finish + '" should set clearcoat > 0 for the protective glossy layer');
+          }
+          if(finish === 'brushedsteel'){
+            if(!hasAniso) issues.push('"' + finish + '" should set anisotropy > 0 for the brushed-metal highlight');
+          }
+          if(finish === 'damascussteel'){
+            if(!hasIr) issues.push('"' + finish + '" should set iridescence > 0 for the folded-steel sheen');
+            if(!hasAniso) issues.push('"' + finish + '" should set anisotropy > 0 for the folded-steel grain');
+          }
+        });
+        // (c) wear-range check
+        if(typeof wear === 'number' && wearRemap &&
+          typeof wearRemap.min === 'number' && typeof wearRemap.max === 'number'){
+          if(wear < wearRemap.min || wear > wearRemap.max){
+            issues.push('cs2Wear=' + wear + ' outside declared cs2WearRemap range [' +
+              wearRemap.min + ', ' + wearRemap.max + ']');
+          }
+        }
+        if(issues.length === 0) return null;
+        // Cap the message length so the toast stays readable.
+        const head = issues.slice(0, 3).join('; ');
+        const more = issues.length > 3 ? ('; +' + (issues.length - 3) + ' more') : '';
+        return 'CS2 profile "' + finish + '" compliance issues (PART 45.2 / 45.9): ' + head + more +
+          '. Use lblSpec.helpers.cs2PbrProfile(finish) + applyWear(mat, wear) for the canonical finish pipeline.';
       }
     }
   ];
@@ -24226,6 +24463,500 @@ window.lblSpec = (function(){
       // Return both the lights and the optional
       // environment as a single object.
       return { lights: lights, environment: environment };
+    },
+    // ── PART 45 (v1.22 / v8.14) — CS2 PBR Material Profile ─────
+    // 5 canonical helpers join the existing PART 35 + PART 39
+    // + PART 40 + PART 41 + PART 42 + PART 43 + PART 44
+    // bundle. The .ts factory can call any of them via
+    // `window.lblSpec.helpers.<name>` without copying the
+    // function body. The factory and the renderer's E30
+    // validator always see the same behavior because they
+    // share the same implementations.
+    //
+    // PART 45 is an EXTRA CAPABILITY for weapons, blades,
+    // and metal-finish subjects — not a rule every model
+    // must follow. See PART 45.0.2 / 45.8 for the "when to
+    // opt in" rule. A model that doesn't ask for
+    // `cs2Finish` is COMPLETELY UNCHANGED — none of the
+    // helpers below fire unless the .ts factory / JSON
+    // blueprint explicitly asks for them.
+    //
+    // The 9 CS2 finish profiles — Anodized, Anodized
+    // Multicolored, Custom Paint Job, Gunsmith, Hydrographic,
+    // Patina, Solid Color, Sprayed, Damascus Steel — live
+    // in `CS2_PROFILES` (a private const inside the helper
+    // closure). Adding a 10th profile is a one-line edit
+    // there; everything else (cs2PbrProfile return shape,
+    // applyWear behavior, E30 validation) reads from the
+    // same table.
+    //
+    // cs2PbrProfile(finish, opts)
+    //   PART 45.2 / 45.10.1. Return the PBR property
+    //   bundle for a given CS2 finish string. The bundle is
+    //   a plain object the .ts factory spreads onto its
+    //   MeshPhysicalMaterial constructor:
+    //       const profile = cs2PbrProfile('anodizedblue');
+    //       const mat = new THREE.MeshPhysicalMaterial({
+    //         color: 0x2244aa,
+    //         ...profile,
+    //       });
+    //   The optional `opts.color` overrides the default
+    //   base color; `opts.wearAmount` (0-1) is informational
+    //   only (the helper returns it in the bundle so the
+    //   caller can hand it straight to applyWear). The
+    //   helper is the SINGLE SOURCE OF TRUTH for the 9
+    //   finish profiles; the .ts factory / JSON blueprint
+    //   never writes the numbers inline. A misspelled
+    //   finish name returns null and logs a console
+    //   warning, so the E30 validator can surface a
+    //   human-readable hint.
+    cs2PbrProfile: function(finish, opts){
+      opts = opts || {};
+      if(typeof finish !== 'string' || !finish){
+        console.warn('[lblSpec] cs2PbrProfile: finish must be a non-empty string (PART 45.10.1).');
+        return null;
+      }
+      // The 9 canonical finish profiles. The .ts factory
+      // / JSON blueprint references these by name
+      // (`cs2Finish: 'casehardened'`,
+      // `cs2Finish: 'anodizedmulticolored'`, etc.). The
+      //   key sets the property bundle; the `expectsMetal`
+      //   flag drives the E30 substrate check (a CS2
+      //   finish that requires metalness can't be applied
+      //   to a fabric / skin material). The `defining`
+      //   list drives the E30 defining-feature check
+      //   (PART 45.9.1 (b)).
+      const PROFILES = {
+        anodized: {
+          metalness: 1.0, roughness: 0.10,
+          clearcoat: 0.4, clearcoatRoughness: 0.05,
+          iridescence: 0.10, iridescenceIOR: 1.3,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['clearcoat'],
+        },
+        anodizedblue: {
+          metalness: 1.0, roughness: 0.08,
+          clearcoat: 0.4, clearcoatRoughness: 0.05,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['clearcoat'],
+        },
+        anodizedred: {
+          metalness: 1.0, roughness: 0.08,
+          clearcoat: 0.4, clearcoatRoughness: 0.05,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['clearcoat'],
+        },
+        anodizedgold: {
+          metalness: 1.0, roughness: 0.08,
+          clearcoat: 0.4, clearcoatRoughness: 0.05,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['clearcoat'],
+        },
+        anodizednavy: {
+          metalness: 1.0, roughness: 0.08,
+          clearcoat: 0.4, clearcoatRoughness: 0.05,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['clearcoat'],
+        },
+        anodizedmulticolored: {
+          metalness: 1.0, roughness: 0.07,
+          iridescence: 0.4, iridescenceIOR: 1.8,
+          iridescenceThicknessRange: [100, 500],
+          envMapIntensity: 1.5,
+          expectsMetal: true,
+          defining: ['iridescence'],
+        },
+        doppler: {
+          metalness: 1.0, roughness: 0.05,
+          iridescence: 0.5, iridescenceIOR: 1.9,
+          iridescenceThicknessRange: [100, 800],
+          envMapIntensity: 1.5,
+          expectsMetal: true,
+          defining: ['iridescence'],
+        },
+        fade: {
+          metalness: 1.0, roughness: 0.07,
+          iridescence: 0.4, iridescenceIOR: 1.7,
+          iridescenceThicknessRange: [100, 500],
+          envMapIntensity: 1.4,
+          expectsMetal: true,
+          defining: ['iridescence'],
+        },
+        custompaintjob: {
+          metalness: 0.0, roughness: 0.4,
+          clearcoat: 0.3, clearcoatRoughness: 0.15,
+          envMapIntensity: 1.0,
+          expectsMetal: false,
+          defining: ['clearcoat'],
+        },
+        gunsmith: {
+          metalness: 0.8, roughness: 0.3,
+          clearcoat: 0.05,
+          envMapIntensity: 1.0,
+          expectsMetal: true,
+          defining: [],
+        },
+        hydrographic: {
+          metalness: 0.0, roughness: 0.6,
+          clearcoat: 0.15,
+          envMapIntensity: 1.0,
+          expectsMetal: false,
+          defining: ['clearcoat'],
+        },
+        patina: {
+          metalness: 0.95, roughness: 0.3,
+          iridescence: 0.5, iridescenceIOR: 1.4,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['iridescence'],
+        },
+        casehardened: {
+          metalness: 1.0, roughness: 0.25,
+          iridescence: 0.5, iridescenceIOR: 1.4,
+          envMapIntensity: 1.3,
+          expectsMetal: true,
+          defining: ['iridescence'],
+        },
+        solidcolor: {
+          metalness: 0.0, roughness: 0.4,
+          clearcoat: 0.25,
+          envMapIntensity: 1.0,
+          expectsMetal: false,
+          defining: ['clearcoat'],
+        },
+        sprayed: {
+          metalness: 0.0, roughness: 0.7,
+          clearcoat: 0.0,
+          envMapIntensity: 0.9,
+          expectsMetal: false,
+          defining: [],
+        },
+        damascussteel: {
+          metalness: 1.0, roughness: 0.30,
+          iridescence: 0.3, iridescenceIOR: 1.25,
+          anisotropy: 0.5, anisotropyRotation: Math.PI / 4,
+          envMapIntensity: 1.4,
+          expectsMetal: true,
+          defining: ['iridescence', 'anisotropy'],
+        },
+        // Aliases — the 8 new MAT_DB preset names (PART 45.4)
+        // are the SAME property bundles.
+        polishedmetal: {
+          metalness: 1.0, roughness: 0.05,
+          envMapIntensity: 1.5,
+          expectsMetal: true,
+          defining: [],
+        },
+        brushedsteel: {
+          metalness: 1.0, roughness: 0.3,
+          anisotropy: 0.8, anisotropyRotation: Math.PI / 4,
+          envMapIntensity: 1.2,
+          expectsMetal: true,
+          defining: ['anisotropy'],
+        },
+        gunmetal: {
+          metalness: 1.0, roughness: 0.45,
+          envMapIntensity: 1.2,
+          expectsMetal: true,
+          defining: [],
+        },
+      };
+      const p = PROFILES[finish.toLowerCase()];
+      if(!p){
+        console.warn('[lblSpec] cs2PbrProfile: unknown finish "' + finish +
+          '" (PART 45.10.1). Known finishes: ' + Object.keys(PROFILES).join(', '));
+        return null;
+      }
+      // Return a copy so the caller can't mutate the
+      // shared profile table.
+      const out = {
+        metalness: p.metalness,
+        roughness: p.roughness,
+        envMapIntensity: p.envMapIntensity,
+      };
+      if(p.clearcoat !== undefined){
+        out.clearcoat = p.clearcoat;
+        out.clearcoatRoughness = (p.clearcoatRoughness !== undefined) ? p.clearcoatRoughness : 0.1;
+      }
+      if(p.sheen !== undefined){ out.sheen = p.sheen; }
+      if(p.anisotropy !== undefined){
+        out.anisotropy = p.anisotropy;
+        out.anisotropyRotation = (p.anisotropyRotation !== undefined) ? p.anisotropyRotation : 0;
+      }
+      if(p.iridescence !== undefined){
+        out.iridescence = p.iridescence;
+        if(p.iridescenceIOR !== undefined) out.iridescenceIOR = p.iridescenceIOR;
+        if(p.iridescenceThicknessRange !== undefined){
+          out.iridescenceThicknessRange = p.iridescenceThicknessRange.slice();
+        }
+      }
+      // Tag the bundle so the E30 validator can re-derive
+      // the profile from a single userData field — keeps
+      // the validator small and the .ts factory simple.
+      out.cs2Finish = finish.toLowerCase();
+      out.expectsMetal = p.expectsMetal;
+      out.defining = p.defining.slice();
+      // Optional wear echo — if the caller passed a
+      // wearAmount, return it so they can pipe it to
+      // applyWear without a second argument.
+      if(typeof opts.wearAmount === 'number'){
+        out.wearAmount = opts.wearAmount;
+      }
+      return out;
+    },
+    // applyWear(mat, wearAmount, baseMetal, baseColor)
+    //   PART 45.3.3 / 45.10.2. Mutate a
+    //   MeshPhysicalMaterial in place to match a CS2
+    //   wear tier. The helper:
+    //     - Ramps roughness from the material's current
+    //       value up to the global worn default (0.7,
+    //       overridable via `mat.userData.roughnessWorn`).
+    //     - Ramps metalness toward `baseMetal` (default
+    //       1.0) — for finishes whose metalness is
+    //       already at 1.0 (Patina, Damascus, Brushed
+    //       Steel, Polished Metal, Gunmetal) the helper
+    //       keeps metalness at the profile value and
+    //       doesn't try to push higher.
+    //     - Desaturates the color 30% toward
+    //       `baseColor * 0.7` — UNLESS the material's
+    //       `userData.cs2Finish` is `patina` /
+    //       `casehardened` / `damascussteel`, in which
+    //       case the helper SKIPS the desaturation pass
+    //       (the worn look is DARKER, not desat'd, per
+    //       PART 45.3.3).
+    //   Returns the same material for chaining.
+    applyWear: function(mat, wearAmount, baseMetal, baseColor){
+      if(!mat || typeof wearAmount !== 'number'){
+        console.warn('[lblSpec] applyWear: mat is null/undefined OR wearAmount is not a number (PART 45.10.2).');
+        return mat;
+      }
+      // Clamp wear to 0-1.
+      const w = THREE.MathUtils.clamp(wearAmount, 0, 1);
+      const baseM = (typeof baseMetal === 'number') ? baseMetal : 1.0;
+      // Roughness ramp. The "clean" value is the
+      // material's current roughness; the worn value is
+      // 0.7 by default (per PART 45.3.3 / 45.10.2),
+      // overridable via mat.userData.roughnessWorn.
+      const cleanRough = (typeof mat.roughness === 'number') ? mat.roughness : 0.3;
+      const wornRough = (mat.userData && typeof mat.userData.roughnessWorn === 'number')
+        ? mat.userData.roughnessWorn : 0.7;
+      mat.roughness = cleanRough + (wornRough - cleanRough) * w;
+      // Metalness ramp — only meaningful for finishes
+      // whose metalness is NOT already at the substrate
+      // value. For Patina / Damascus / Brushed Steel /
+      // Polished Metal / Gunmetal the helper keeps the
+      // material's existing metalness (which is already
+      // ≥ 0.9) and doesn't try to push higher.
+      const currentMetal = (typeof mat.metalness === 'number') ? mat.metalness : 0.0;
+      if(currentMetal < baseM - 0.05){
+        // Material is below substrate — ramp up.
+        mat.metalness = currentMetal + (baseM - currentMetal) * w;
+      }
+      // Color desaturation. Skip for the patina /
+      // casehardened / damascussteel finishes (their
+      // worn look is DARKER, not desat'd).
+      const skip = (mat.userData && mat.userData.cs2Finish &&
+        (mat.userData.cs2Finish === 'patina' ||
+         mat.userData.cs2Finish === 'casehardened' ||
+         mat.userData.cs2Finish === 'damascussteel'));
+      if(!skip && mat.color && typeof mat.color.r === 'number' && baseColor !== undefined){
+        // The 30% desaturation is a linear lerp toward
+        // baseColor * 0.7. baseColor may be a number
+        // (hex) or a THREE.Color; normalize.
+        let bcr, bcg, bcb;
+        if(typeof baseColor === 'number'){
+          const bc = new THREE.Color(baseColor);
+          bcr = bc.r; bcg = bc.g; bcb = bc.b;
+        } else if(baseColor && typeof baseColor.r === 'number'){
+          bcr = baseColor.r; bcg = baseColor.g; bcb = baseColor.b;
+        } else {
+          bcr = bcg = bcb = null;
+        }
+        if(bcr !== null){
+          const targetR = bcr * 0.7, targetG = bcg * 0.7, targetB = bcb * 0.7;
+          mat.color.r = mat.color.r + (targetR - mat.color.r) * w * 0.3;
+          mat.color.g = mat.color.g + (targetG - mat.color.g) * w * 0.3;
+          mat.color.b = mat.color.b + (targetB - mat.color.b) * w * 0.3;
+        }
+      }
+      // Echo the wear amount back onto userData so a
+      // .ts factory / inspector widget can read it.
+      mat.userData = mat.userData || {};
+      mat.userData.cs2Wear = w;
+      return mat;
+    },
+    // cs2WearMaskTexture(size, opts)
+    //   PART 45.3.5 / 45.10.4. Procedural wear mask
+    //   generator. Returns a CanvasTexture whose red
+    //   channel is the wear mask (0 at no-wear, 1 at
+    //   full-wear). Default `opts` combine a
+    //   low-frequency noise field (the "scattered
+    //   blemishes" look) with an edge-detection mask
+    //   (the "edge wear" look). The factory can
+    //   override either:
+    //       const mask = cs2WearMaskTexture(256, {
+    //         noiseScale: 8.0,    // bigger = smaller
+    //                             //  blemishes
+    //         edgeBias: 0.4,      // 0 = uniform, 1 =
+    //                             //  edge-only
+    //         seed: 12345,
+    //       });
+    //   The factory sets `mat.wearMap = mask` and the
+    //   renderer multiplies it against
+    //   `mat.userData.cs2Wear`. The helper is OPT-IN;
+    //   when absent, the renderer assumes uniform wear
+    //   across the material.
+    cs2WearMaskTexture: function(size, opts){
+      opts = opts || {};
+      const N = (typeof size === 'number' && size > 0) ? Math.floor(size) : 256;
+      const noiseScale = (typeof opts.noiseScale === 'number') ? opts.noiseScale : 8.0;
+      const edgeBias = (typeof opts.edgeBias === 'number') ? opts.edgeBias : 0.4;
+      const seed = (typeof opts.seed === 'number') ? opts.seed : 12345;
+      // Mulberry32 — same seeded RNG as the rest of the
+      // renderer. Deterministic for the same (size, opts)
+      // pair, so the .ts factory's PNG snapshot matches
+      // the live texture.
+      let s = seed >>> 0;
+      const rand = () => {
+        s = (s + 0x6D2B79F5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      // Build a 2D noise field via averaged value-noise
+      // (4-tap smooth for a less pixelated result).
+      const cellN = Math.max(2, Math.round(noiseScale));
+      const cells = new Float32Array(cellN * cellN);
+      for(let i = 0; i < cells.length; i++) cells[i] = rand();
+      const sample = (u, v) => {
+        // u, v in [0, 1] — wrap around
+        const fx = u * cellN, fy = v * cellN;
+        const x0 = Math.floor(fx) % cellN;
+        const y0 = Math.floor(fy) % cellN;
+        const x1 = (x0 + 1) % cellN;
+        const y1 = (y0 + 1) % cellN;
+        const tx = fx - Math.floor(fx);
+        const ty = fy - Math.floor(fy);
+        // smoothstep for nicer noise falloff
+        const sx = tx * tx * (3 - 2 * tx);
+        const sy = ty * ty * (3 - 2 * ty);
+        const a = cells[y0 * cellN + x0];
+        const b = cells[y0 * cellN + x1];
+        const c = cells[y1 * cellN + x0];
+        const d = cells[y1 * cellN + x1];
+        return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
+      };
+      // Generate the canvas. Red channel = wear mask;
+      // green / blue / alpha reserved for future use
+      // (the .ts factory can pack extra masks there).
+      const canvas = (typeof document !== 'undefined' && document.createElement)
+        ? document.createElement('canvas') : null;
+      if(!canvas) return null;
+      canvas.width = N; canvas.height = N;
+      const ctx = canvas.getContext('2d');
+      if(!ctx) return null;
+      const img = ctx.createImageData(N, N);
+      const data = img.data;
+      for(let y = 0; y < N; y++){
+        for(let x = 0; x < N; x++){
+          const u = x / N, v = y / N;
+          // 4-octave fBm for a more interesting wear
+          // pattern than single-octave value-noise.
+          let n = 0, amp = 0.5, freq = 1.0;
+          for(let o = 0; o < 4; o++){
+            n += amp * sample((u * freq) % 1, (v * freq) % 1);
+            amp *= 0.5; freq *= 2.0;
+          }
+          // Edge mask: distance from the nearest edge
+          // (in normalized 0-1). Center is far from
+          // edge; corners are at the edge.
+          const ex = Math.min(u, 1 - u);
+          const ey = Math.min(v, 1 - v);
+          const edgeMask = Math.min(ex, ey) * 2;  // 0 at edge, 1 at center
+          // Combine: noise + edge. edgeBias=0 means
+          // pure noise; edgeBias=1 means pure edge.
+          let mask = n * (1 - edgeBias) + (1 - edgeMask) * edgeBias;
+          // Push to 0-1 and apply a slight contrast
+          // curve so the wear reads as blemishes
+          // (highlights) rather than flat gray.
+          mask = THREE.MathUtils.clamp(mask * 1.4 - 0.1, 0, 1);
+          const idx = (y * N + x) * 4;
+          data[idx]     = Math.round(mask * 255);
+          data[idx + 1] = Math.round(mask * 255);
+          data[idx + 2] = Math.round(mask * 255);
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.NoColorSpace;
+      tex.userData = { cs2WearMask: true, seed: seed, size: N };
+      return tex;
+    },
+    // wearSlider (TS path only, OPTIONAL — PART 45.10.5)
+    //   When `meta.cs2WearUserTunable: true`, the
+    //   .ts factory calls this to publish a wear
+    //   slider on the root. The helper:
+    //     - Stores the wear amount on
+    //       `root.userData.sculptRuntime.wearSlider`.
+    //     - Returns a small object with `value`
+    //       (current wear) and `set(newValue)` (re-
+    //       applies wear to every Mesh's material in
+    //       the tree). The .ts factory wires the
+    //       slider's onChange to `set`.
+    //   The helper is a thin wrapper — the actual
+    //   UI lives in the inspector's "Action Hooks" /
+    //   "Materials" panel. The .ts factory's call to
+    //   this helper just publishes the binding.
+    wearSlider: function(root, opts){
+      opts = opts || {};
+      if(!root){
+        console.warn('[lblSpec] wearSlider: root is null/undefined (PART 45.10.5).');
+        return null;
+      }
+      const initial = (typeof opts.value === 'number') ? opts.value : 0.0;
+      const sr = (root.userData.sculptRuntime = root.userData.sculptRuntime || {});
+      const slider = {
+        value: THREE.MathUtils.clamp(initial, 0, 1),
+        finish: opts.finish || null,
+        // set(newValue): re-apply wear to every Mesh
+        // in the tree. The .ts factory wires the
+        // slider's onChange to this method.
+        set: (newValue) => {
+          const w = THREE.MathUtils.clamp(newValue, 0, 1);
+          slider.value = w;
+          root.traverse((o) => {
+            if(!o || !o.isMesh || !o.material) return;
+            const mat = o.material;
+            if(mat && typeof mat === 'object' && mat.userData && mat.userData.cs2Finish){
+              // The material has already been
+              // set up by cs2PbrProfile + applyWear;
+              // we just re-apply with the new wear
+              // amount (clean = current value, so the
+              // call is essentially idempotent for
+              // any "re-apply" pass).
+              const baseMetal = (slider.finish &&
+                (slider.finish === 'patina' || slider.finish === 'casehardened' ||
+                 slider.finish === 'damascussteel' || slider.finish === 'brushedsteel' ||
+                 slider.finish === 'gunmetal' || slider.finish === 'polishedmetal'))
+                ? (mat.metalness || 1.0) : 1.0;
+              __threeTriHelpers.applyWear(mat, w, baseMetal, mat.color.getHex());
+            }
+          });
+          root.userData.cs2Wear = w;
+          return w;
+        },
+      };
+      sr.wearSlider = slider;
+      return slider;
     }
   };
 
@@ -24478,6 +25209,56 @@ window.lblSpec = (function(){
     // also EXTENDED (in 44.3) with the 2 new families
     // (bone + magic); the existing 4 families stay
     // exactly as they were.
+    // PART 45 (RJS UPDATE 14) — CS2 PBR Material Profile
+    // adds 5 more helpers to the same `helpers` bundle:
+    // `cs2PbrProfile(finish, opts)` (returns the
+    // MeshPhysicalMaterial property bundle for a given
+    // CS2 finish string — Anodized, Anodized
+    // Multicolored, Custom Paint Job, Gunsmith,
+    // Hydrographic, Patina, Solid Color, Sprayed,
+    // Damascus Steel, plus 8 MAT_DB preset aliases
+    // polishedmetal / brushedsteel / gunmetal /
+    // damascussteel / anodizedblue / anodizedred /
+    // anodizedgold / casehardened; the .ts factory
+    // spreads the bundle onto its material constructor),
+    // `applyWear(mat, wearAmount, baseMetal, baseColor)`
+    // (mutates a MeshPhysicalMaterial in place:
+    // roughness ramps up, metalness ramps toward base
+    // metal, color desaturates 30% — skips the color
+    // pass for patina / casehardened / damascussteel
+    // finishes whose worn look is DARKER, not
+    // desat'd; returns the same material for chaining),
+    // `cs2WearMaskTexture(size, opts)` (procedural
+    // wear-mask generator; 4-octave fBm + edge
+    // detection blend; returns a CanvasTexture with
+    // repeat-wrapping; deterministic for the same
+    // (size, seed) pair via Mulberry32), and
+    // `wearSlider(root, opts)` (publishes a
+    // user-tunable wear slider on the root's
+    // `userData.sculptRuntime.wearSlider` when
+    // `meta.cs2WearUserTunable: true`; the slider's
+    // `set(newValue)` method re-invokes `applyWear`
+    // on every Mesh's material in the tree so the
+    // user sees the wear slide in real time). The
+    // factory calls them via
+    // `lblSpec.helpers.cs2PbrProfile(...)` etc. —
+    // same path as the PART 35 + PART 39 + PART 40 +
+    // PART 41 + PART 42 + PART 43 + PART 44 helpers,
+    // no new top-level field on lblSpec. PART 45 is
+    // an EXTRA CAPABILITY for weapons, blades, and
+    // metal-finish subjects — not a rule every
+    // model must follow (see PART 45.0.2 / 45.8).
+    // The 4 new MeshPhysicalMaterial properties
+    // (iridescence / iridescenceIOR /
+    // iridescenceThicknessRange / specularIntensity /
+    // specularColor / attenuationColor /
+    // attenuationDistance) are wired through
+    // buildMaterial in addition to the existing
+    // clearcoat / sheen / anisotropy / transmission
+    // plumbing — no existing behavior is changed.
+    // The renderer's E30 CS2 profile compliance
+    // validator fires ONLY when `meta.cs2Finish` is
+    // set, so a non-CS2 model is unchanged.
     inspectModelTriangles,
     openTrianglePanel,
     getLastTriMetrics: () => lblSpecState.trisMetrics,
