@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.17 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.21 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
@@ -52,6 +52,527 @@ CHANGELOG
     userData field, no removed / weakened rule. Bumped from
     v1.15 to v1.16.
 
+
+
+
+
+  v1.21 (2026-09-04) — PROFESSIONAL PIPELINE (GLB-FIRST + BVH + LOOK-DEV
+    LIGHTS + CODING RULES).
+    Source: the maintainer's "Three.js / procedural 3D character
+    and asset systems engineer" brief (2026-08), a hands-on
+    implementation roadmap. The brief asks for the .ts factory
+    to become the VIEWER ADAPTER — the GLB is the primary
+    artifact, the .ts is the wrapper that loads it, attaches
+    the skeleton + animation mixer, exposes the sockets, and
+    wires the validation. PART 38.14 already established the
+    GLB-first architecture; PART 44 EXTENDS it with the 5-task
+    adapter pattern, the 4 new performance / look-dev /
+    material / house-style pieces, and the canonical helpers
+    for BVH-accelerated raycasting and per-model look-dev
+    lights. (44.0) central principle — SHIP THE GLB; the .ts
+    factory does FOUR things: LOADS the GLB, ATTACHES the
+    rigged skeleton + skin weights + animation mixer,
+    EXTRACTS the sockets + look-dev lights + BVH index +
+    validation surface, and VALIDATES the loaded model via
+    the E1-E29 chain; the .ts does NOT build the model; style-
+    agnostic; (44.1) three.js performance: three-mesh-bvh —
+    (44.1.1) BVH-accelerated raycasting (without BVH, a 35k-
+    triangle character is ~0.5ms per ray; with BVH it's
+    ~0.01ms — 50x faster; the BVH must be pre-computed via
+    the new `createBVHIndex` helper from 44.10; the
+    three-mesh-bvh import-map entry was already in place from
+    v0.6, this is the first use), (44.1.2) BVH-accelerated
+    culling (frustum-cull pass drops from ~3ms to ~0.3ms for
+    a 1000-mesh scene; the same `createBVHIndex` enables
+    BOTH), and (44.1.3) BVH-accelerated CSG (the existing
+    PART 10 boolean ops from three-bvh-csg are BVH-
+    accelerated by virtue of the library; no new code);
+    (44.2) look-dev lights per model — (44.2.1) the 3-light
+    canonical setup (key warm + casts shadow from upper-right
+    + fill cool no-shadow from lower-left + rim neutral no-
+    shadow from behind; intensity ratio 1.0:0.4:0.6),
+    (44.2.2) HDRI environment map (the fill light is often
+    replaced by an HDRI; the renderer's existing
+    `RoomEnvironment` is the canonical studio-HDRI fallback;
+    a model can supply a custom HDRI URL on
+    `meta.environmentMap`), and (44.2.3) per-model look-dev
+    override (the factory publishes the setup on
+    `userData.sculptRuntime.lookDevLights`; the renderer's
+    runtime uses the per-model setup when present or falls
+    back to global lights; the renderer's E29 look-dev lights
+    validator from 44.9 checks the structure when present);
+    (44.3) material hierarchy extending PART 41.6 — (44.3.1)
+    the 6 default material families (skin + cloth + leather +
+    metal from PART 41.6.1 + bone + magic new in 44.3, each
+    with 4 variants = 24 base materials; bone: ivory + brown
+    + cream + weathered; magic: cyan + dark cyan + light cyan
+    + bright cyan), (44.3.2) material assignment order
+    (skin first → cloth second → leather third → metal fourth
+    → bone fifth → magic sixth; the last renders on top with
+    the highest renderOrder), and (44.3.3) per-region material
+    override (the factory publishes on
+    `userData.sculptRuntime.materialOverrides = { partName:
+    variantName }`; runtime respects the override when
+    present); (44.4) fitted clothing/armor layers —
+    (44.4.1) the fit-over-body pattern (clothing is a LAYER
+    on top of the body part it covers, with a slight outward
+    offset of 0.005-0.02 units along the body part's surface
+    normal, a slight scale-up of 1.01-1.05x, and skin weights
+    that mirror the body part's skeleton), (44.4.2) edge
+    loops for clothing (the clothing needs edge loops at
+    the JOINT BOUNDARIES where it meets the next body part;
+    edge loop count matches the body part's joint-edge-loop
+    count from PART 38.7), and (44.4.3) clothing-specific
+    deformation (the clothing's vertices are weighted to the
+    closest underlying bone; for extreme elbow flexion, the
+    clothing may need a corrective blend shape from PART
+    38.13 to prevent poke-through); (44.5) animation clip
+    baking for hero characters — (44.5.1) the 4 canonical
+    clips (idle 60-120 frame loop + walk 30-60 frame loop +
+    attack 20-40 frame one-shot + hit 10-20 frame one-shot;
+    the factory publishes the clip set on
+    `userData.sculptRuntime.animations`; the renderer's
+    `triggerFsmState` from PART 33.1[5] uses the clip set to
+    wire the FSM), (44.5.2) bake from mocap or hand-key
+    (the factory declares the source on
+    `meta.animationSource: 'mocap' | 'hand-key' |
+    'procedural'`), and (44.5.3) multi-view validation per
+    clip (the PART 44.6 multi-view validation renders run
+    for EACH of the 4 canonical clips; the factory publishes
+    the per-clip render set on
+    `meta.validationClips: ['idle', 'walk', 'attack',
+    'hit']`); (44.6) multi-view validation renders —
+    (44.6.1) 6 canonical angles (front + 3/4-front + side +
+    3/4-back + back + top), (44.6.2) 3 canonical poses
+    (idle rest pose + walk-cycle contact pose + attack
+    wind-up-to-strike transition), and (44.6.3) the 18-
+    render grid (6 angles × 3 poses = 18 silhouette
+    renders per model; the factory publishes the grid on
+    `userData.sculptRuntime.validationGrid` with per-render
+    silhouette IoU vs the reference image; a model with
+    < 0.7 IoU on any render surfaces a warning); (44.7) the
+    TypeScript viewer adapter (5 tasks) — (44.7.1) load GLB
+    via `GLTFLoader` from `three/addons/loaders/GLTFLoader
+    .js`, (44.7.2) expose the 4 canonical Socket_*
+    attachment points on `root.userData.sockets`,
+    (44.7.3) wire the `AnimationMixer` with the 4 canonical
+    clips + an `animationFsm` object with a `trigger(state)`
+    method, (44.7.4) wire the look-dev lights via the new
+    `lookDevLights(opts)` helper from 44.10, and (44.7.5)
+    wire validation via `lblSpec.helpers.validateModel(root,
+    { maxGap: 0.02 })` and log the warnings; (44.8) practical
+    coding rules (the maintainer's house style) — (44.8.1)
+    no code on the same line after a `//` comment separator
+    (reinforces PART 39.1.1), (44.8.2) always leave a blank
+    line after section header comments, (44.8.3) prefer the
+    correct geometry primitive (reinforces PART 39.3),
+    (44.8.4) drive everything from a single `*_CONFIG`
+    object at the top of the file (reinforces PART 39.5.2),
+    (44.8.5) add runtime tweakable parameters (Tweakpane /
+    Leva / dat.gui) + a boot-time `validateModel` call, and
+    (44.8.6) include automatic multi-view validation renders
+    (the 18-render grid from 44.6.3); (44.9) renderer-side
+    runtime contract — adds 2 new non-blocking validators
+    to the existing 27: E28 (PART 44.1.1) BVH index presence
+    checks that the loaded model has a BVH index in place
+    (every Mesh's geometry has a `boundsTree` field, OR a
+    `MeshBVH` accelerator is attached; a model that says
+    "use BVH" but doesn't have the index in place is a
+    warning), and E29 (PART 44.2) look-dev lights present
+    checks that the structure is well-formed (key + fill +
+    rim, all with `intensity` and `position`); both non-
+    blocking; (44.10) canonical helpers — 2 new helpers
+    re-exported on `window.lblSpec.helpers` alongside the
+    PART 35 + PART 39 + PART 40 + PART 41 + PART 42 + PART
+    43 bundle: `createBVHIndex(root, opts)` (PART 44.1)
+    walks the model's mesh tree, imports `MeshBVH` from
+    `three-mesh-bvh` (already in the import map), attaches
+    a `MeshBVH` to every Mesh's geometry `boundsTree`
+    field, skips Mesh with `userData.skipBVH: true`, and
+    returns a summary `{ totalMeshes, indexedMeshes,
+    skippedMeshes, memoryEstimateBytes, csgReady: true }`;
+    the renderer's E28 validator uses the same function;
+    and `lookDevLights(opts)` (PART 44.2) returns the
+    canonical 3-light setup (key + fill + rim) with an
+    optional `opts.environmentMap` for HDRI replacement;
+    the renderer's E29 validator uses the same function.
+    The `materialVariants` helper from PART 41 is EXTENDED
+    (in 44.3) with the 2 new families (bone + magic); the
+    existing 4 families stay exactly as they were. PART 44
+    is style-agnostic and applies to every .ts factory,
+    every subject, every style. PART 44 reinforces PART
+    38-43 with cross-references for the 4 already-
+    covered categories and ADDS the 4 new pieces
+    (BVH-accelerated raycasting, look-dev lights, 6-family
+    material hierarchy, house style). No new dependency
+    (the three-mesh-bvh import-map entry was already in
+    place from v0.6). No new export path, no new mandatory
+    userData field, no removed / weakened rule. Bumped
+    from v1.20 to v1.21.
+  v1.20 (2026-09-04) — REFINEMENT + STYLE LOCKING + VARIANT RANKING.
+    Source: the maintainer's "Techniques to Update Your System
+    for Better 3D Models" (2026-08), which distills 7
+    categories of techniques the AI must apply when generating
+    3D models, with the explicit goal of closing the gap to
+    higher-end systems (Meshy 6 and Tripo's latest versions).
+    The 7 categories are: (1) input quality & prompt
+    engineering, (2) multi-stage / coarse-to-fine generation,
+    (3) topology & mesh quality, (4) texture & material
+    generation, (5) geometry refinement, (6) style & consistency
+    controls, and (7) evaluation & feedback loop. Categories
+    (1)-(4) are already covered by PART 40 (40.1 better prompt
+    & input handling, 40.2 multi-stage generation pipeline,
+    40.3 mesh quality & topology, 40.5 texture & material
+    system); PART 43 reinforces them with cross-references
+    in 43.4. New PART 43 layers onto PARTs 1-42 and captures
+    the 3 NEW categories (refinement, style & consistency,
+    variant ranking) as 7 sub-sections of a single bridge
+    principle: REFINEMENT is the bridge from "good enough" to
+    "Meshy 6 / Tripo level"; CONSISTENCY is the discipline
+    that makes a model family look like it belongs together;
+    RANKING is the discipline that gives the user the best
+    of N, not the first of N. (43.0) central principle — 4
+    categories already covered by PART 40, 3 NEW categories
+    added by PART 43; style-agnostic; (43.1) geometry
+    refinement techniques — (43.1.1) normal-guided refinement
+    (predict normals from a high-frequency normal map, shift
+    vertex positions along the predicted normal, re-bake the
+    normal map, repeat until convergence; preserves silhouette
+    while adding high-frequency detail; runs in Stage 4 of
+    PART 41.2 and Step 7 of PART 42.3; factory publishes the
+    pass count on `meta.normalRefinementPasses`), (43.1.2)
+    view-by-view iterative refinement (alternate between N
+    camera views, identify failure modes per view, refine per
+    view, combine at the end; consumes the PART 40.1.3
+    multi-view image support; factory publishes the pass count
+    on `meta.viewRefinementPasses` and the per-view refinement
+    log on `meta.viewRefinementLog`), (43.1.3) detail
+    enhancement networks (specialized models that take a
+    low-poly mesh + a reference image and add high-frequency
+    detail WITHOUT changing the silhouette; runs in Stage 3
+    of PART 41.2 and Step 4 of PART 42.3; factory publishes
+    the network used on `meta.detailEnhancer`), and (43.1.4)
+    segmentation + part-aware generation (auto-split the model
+    into logical parts so each part gets the right technique;
+    EXTENDS the PART 41.1 detail inventory with a
+    `meta.segmentation` array of part names); (43.2) style &
+    consistency controls — (43.2.1) strong style locking
+    (`meta.styleLock` declaration that constrains the material
+    kind + density + texture density to a single style;
+    EXTENDS PART 38.22 with an explicit lock field; without
+    the lock, the model is still style-agnostic), (43.2.2)
+    consistent polygon density and edge flow across model
+    families (`meta.familyDensity` + `meta.familyEdgeFlow`
+    for N-model scenes like "a medieval village" with 12
+    buildings + 30 villagers + 15 props; the renderer does
+    NOT enforce cross-model consistency but the AI's
+    authoring-time audit from PART 39.6 gets a new line
+    "is this model consistent with the family-wide density
+    and edge flow?"), (43.2.3) silhouette-first optimization
+    (`meta.silhouettePriority` declaration of the priority
+    order of camera angles — default ['front', '3/4-front',
+    'side', '3/4-back', 'back', 'top']; the AI optimizes
+    the silhouette from the most important angles first then
+    fills in the rest from the remaining budget), and (43.2.4)
+    hard-surface vs organic topology (`meta.topologyPreference`
+    declaration of 'hard-surface' | 'organic' | 'mixed' |
+    'auto-detect'; hard-surface has edge loops at every sharp
+    edge + planar surfaces; organic has edge loops following
+    the muscle / bone structure + smooth shading; authoring-
+    time decision, not enforced at runtime); (43.3) variant
+    generation + automatic ranking — (43.3.1) generate N
+    variants (default N=3, override via `meta.variantCount`;
+    N variants from the same detail inventory from PART 41.1
+    but with different `meta.seed` values via the seededRandom
+    helper from PART 40.6.2; deterministic — the user can
+    regenerate the exact N variants on reload), (43.3.2) rank
+    by quality metrics (the new `rankVariants` helper from
+    43.6 scores each variant on the E1-E27 warnings +
+    silhouette accuracy + poly count + mesh count + poly
+    distribution + style lock + production completeness; the
+    user sees the top-ranked variant by default; clicking
+    through to a lower-ranked variant is one click away),
+    and (43.3.3) user feedback loop (EXTENDS PART 40.7.4 with
+    a `meta.favoriteSeed` field that records the user's
+    favorite variant's seed and a `meta.averageRating` field
+    that records the average 1-5 rating; both feed back into
+    the next session's prompt defaults; the renderer does NOT
+    have to implement the favorite / rating UI in v1.20 /
+    v8.12 — that's a future round); (43.4) what PART 43
+    reinforces from PART 40-42 — 4 cross-reference tables
+    for the already-covered categories (1)-(4); (43.5)
+    renderer-side runtime contract — adds 2 new non-blocking
+    validators to the existing 25: E26 (PART 43.2.1) style-
+    lock compliance checks that the material kind + density +
+    texture density match the declared `meta.styleLock`
+    (a model that locks 'pure-low-poly' but uses a 4k normal
+    map is a STYLE LOCK VIOLATION; models without
+    `meta.styleLock` are exempt per PART 38.22), and E27
+    (PART 40.1.3 / 43.1.2 / 43.2.3) multi-view consistency
+    checks that the actual model has at least N named parts
+    (N = `meta.referenceViews.length`), the
+    `meta.silhouettePriority` (when declared) is consistent
+    with the `meta.referenceViews` order, and the
+    `meta.viewRefinementPasses` (when declared) is at least
+    1; models without `meta.referenceViews` are exempt; both
+    non-blocking; (43.6) canonical helpers — 2 new helpers
+    re-exported on `window.lblSpec.helpers` alongside the
+    PART 35 + PART 39 + PART 40 + PART 41 + PART 42 bundle:
+    `viewRefinePass(views, opts)` (PART 43.1.2) returns a
+    structured refinement plan with the per-view pass count
+    and the 0-1 completeness score (a STUB for the AI's
+    authoring-time loop; the renderer's E27 validator uses
+    the same function), and `rankVariants(variants, opts)`
+    (PART 43.3.2) scores and ranks N variants by the E1-E27
+    quality metrics and returns the sorted list with a
+    0-1 `confidence` field per variant. PART 43 is style-
+    agnostic and applies to every .ts factory, every
+    subject, every style. PART 43 reinforces PART 40-42
+    with cross-references for the 4 already-covered
+    categories and ADDS the 3 new categories. No new
+    dependency, no new export path, no new mandatory
+    userData field, no removed / weakened rule. Bumped
+    from v1.19 to v1.20.
+  v1.19 (2026-09-04) — CHARACTER PRODUCTION DISCIPLINE.
+    Source: the maintainer's "3D Character Production Plan — Lead
+    3D Technical Director" (2026-08), a worked example for a
+    stylized action hero with armor, cape, and hair. The plan
+    distills the 7 production techniques, the 60/25/15 polygon
+    distribution rule, the 11-step production pipeline
+    (blockout → sculpt primary → sculpt secondary → retopo → UV
+    → bake → texture → hair/cloth → LODs → rig → export), the
+    85-bone skeleton reference, the 5-LOD chain LOD0-LOD4, the
+    half-budget cut list, the film-quality upgrade list, the 7
+    deformation risk register, and the 30+ blend shapes for
+    facial expression. New PART 42 layers onto PARTs 1-41 and
+    captures the character-specific production discipline. (42.0)
+    central principle — a character is NOT a single-shot prompt-
+    to-geometry call; it's the output of 7 production techniques
+    + an 11-step pipeline + a 5-LOD chain + an 85-bone skeleton
+    + a 7-deformation-risk register + a performance budget;
+    style-agnostic; (42.1) the 7 production techniques — (42.1.1)
+    UV + image textures (focal areas, hand-painted control),
+    (42.1.2) PBR texturing (default for ALL surfaces, 5 maps:
+    albedo, normal, metallic, roughness, AO; height optional),
+    (42.1.3) procedural textures (infinite tiling, free of
+    seams, scales to LOD0..LOD3 — skin pores, fabric weave,
+    metal micro-scratch, leather grain, dirt/wear masks),
+    (42.1.4) vertex colors (zero texture cost, drives material
+    blends without extra channels — damage tint, dirt in
+    crevices, per-region masks, cape tip darkening, low-poly
+    AO back-up), (42.1.5) triplanar mapping (no UV seams, no
+    axial stretching, projected XYZ blended by normal — cape
+    back, large planar armor panels, terrain-crawling rock,
+    hair cap underside; 3 texture samples so only deploy where
+    it pays for itself), (42.1.6) baking (high-poly sculpt to
+    low-poly normal/AO/curvature/ID/position via xNormal /
+    Marmoset Toolbag; one bake pass replaces hundreds of
+    hand-painted hours), (42.1.7) texture atlasing (small props,
+    shared materials, modular armor kit — one draw call, one
+    material slot per atlas = huge batching win on mobile/WebGL);
+    (42.2) the 60/25/15 polygon distribution rule — silhouette
+    60% (parts that contribute to the 256x256 silhouette test,
+    21k tris at 35k budget), deformation 25% (parts that bend
+    with animation, 8.75k), detail 15% (parts that ONLY exist
+    at close-up, 5.25k); the rule has style-specific variants
+    (low-poly 80/15/5, high-poly 50/30/20, photoreal 45/30/25,
+    voxel 95/5/0, hand-painted 70/20/10); the 60/25/15 default
+    is for stylized realism; (42.3) the 11-step production
+    pipeline — blockout (4k tris, T-pose) → sculpt primary
+    (~150k tris) → sculpt secondary (1-2M tris) → retopo
+    (target 35k) → UV layout → bake → texture (Substance
+    Painter) → hair + cloth setup → LODs → rig + skin → final
+    export; each step has a QC gate; the 11 steps are the
+    CHARACTER-SPECIFIC superset of PART 41's 5-stage pipeline
+    (non-character subjects still use PART 41); (42.4) rig and
+    animation prep — the 85-bone skeleton reference (Root +
+    Pelvis + 3-spine + Neck + Head + 2-Eyes + Jaw + 3-Tongue +
+    2-Clavicle + 2-UpperArm + 2-Elbow + 2-Forearm + 2-Wrist +
+    2-Hand + 30-fingers + 2-UpperLeg + 2-Knee + 2-LowerLeg +
+    2-Ankle + 2-Ball + 2-Toe + Cape_Root + 3-Cape +
+    2-Cape_Hem = ~85), the 7 deformation risk areas (shoulder
+    collapse, hip pinch, knee pole deform, elbow crease pinch,
+    cape intersection with legs, head rotation, belt folds),
+    the 30+ blend shapes for facial expression (3 brows, 5
+    eyes, 10 mouth, 2 cheeks, 2 nose, 10 phonemes), and the 6+
+    custom rig controls (Aim_Eye_L/R, Aim_Weapon, Foot_L/R,
+    Hand_L/R, Spine_IK, Cape_Strength, Hair_Physics_Strength,
+    Voice_Mouth_Open/Smile/Brow); (42.5) the 5-LOD chain —
+    LOD0 35k (close-up, 2k face, 1k body), LOD1 18k (mid-range,
+    1k face), LOD2 7.5k (far, 512 face), LOD3 2.5k (background,
+    256 atlas, no normal map, mitts, single quad cape), LOD4
+    100 + 1k billboard (crowd, quat-camera-facing plane baked
+    from 8 viewing angles); published on
+    `userData.sculptRuntime.lodChain`; (42.6) performance budget
+    — ~1.4 ms / character at 60 fps / 1080p (vertex 0.6ms +
+    fragment 0.8ms + 3 draw calls + 8MB texture bandwidth);
+    WebGL fallback caps at LOD2 7.5k with single atlas, no
+    per-pixel cloth sim; mobile is a separate build at 12k
+    LOD0 / 5k LOD1 / 2k LOD2 with no cape and no card hair;
+    (42.7) the half-budget cut list — if the budget is cut
+    from 35k to 17.5k, cut in this priority order: cape 920→
+    280, hair 240→120, hand fingers 1.4k×2→800×2, vambrace
+    400×2→200×2, greave 350×2→200×2, boot detail 600×2→200×2,
+    belt+pouches 900→300, weapon 1.8k→1k, torso 2.8k→1.8k,
+    pauldrons 700→500, head 4.2k→2.4k, body silhouette
+    3.2k→1.8k; the never-cut list: mouth+eye topology, hip
+    + knee loops, cape attachment ring; (42.8) the film-quality
+    upgrade list — going from 35k to ~2M tris, add: 50k-150k
+    hair groom curves, full 3-layer SSS skin shader, real
+    cornea with refraction + parallax iris + eyelash groom,
+    full Marvelous Designer cloth with 30+ pose library,
+    micro-scratch + fingerprint oil + dust accumulation on
+    armor, full mechanical detail on weapon, 50k tris face
+    subdivision, 4k px/m face texel density, 30+ AOV render
+    passes, full mocap cleanup + hand-keyed fingers + breath
+    + micro-expression layers; (42.9) renderer-side runtime
+    contract — adds 2 new non-blocking validators to the
+    existing 23: E24 (PART 42.3 / 42.4.1 / 42.8) production-
+    completeness checks that the factory's `meta` includes
+    the 11 production steps AND the 7 deformation fixes AND
+    the 10 film-quality items (if `meta.targetQuality:
+    "film"`); character subjects only; non-character
+    subjects exempt; E25 (PART 42.2 / 42.5) polygon-
+    distribution compliance checks the actual
+    silhouette/deformation/detail split (computed by
+    `polyDistribution(root)`) against the declared
+    `meta.polyDistribution` percentages within ±10% per
+    axis; both non-blocking; (42.10) canonical helpers — 2
+    new helpers re-exported on `window.lblSpec.helpers`
+    alongside the PART 35 + PART 39 + PART 40 + PART 41
+    bundle: `polyDistribution(root)` (PART 42.2) returns
+    `{ silhouette, deformation, detail, total, ok }` based
+    on the actual castShadow / isSkinnedMesh / neither
+    flags, with the 60/25/15 stylized-realism default
+    encoded, and `productionChecklist(meta)` (PART 42.3 /
+    42.4 / 42.5 / 42.7 / 42.8) returns the structured
+    `{ steps, deformationFixes, lodChain,
+    halfBudgetCutList, filmQualityItems, targetQuality,
+    completeness }` shape with the 0-1 completeness score.
+    PART 42 is style-agnostic and applies to every .ts
+    factory, every subject, every style (the 7 techniques +
+    11 steps + 5 LODs are style-agnostic; only the numeric
+    budgets change with style). No new dependency, no new
+    export path, no new mandatory userData field, no
+    removed / weakened rule. Bumped from v1.18 to v1.19.
+  v1.18 (2026-09-04) — HIGH-DETAIL GENERATION.
+    Source: the maintainer's "System High-Detail Update Plan"
+    (2026-08), which targets the gap between current ~20 KB
+    models and higher-end >60 KB models. The gap is not
+    geometry size — it's GEOMETRIC DENSITY, the count of
+    secondary and tertiary forms, and the discipline of
+    authoring detail BEFORE writing code. New PART 41 layers
+    onto PARTs 1-40 and captures the rules, validators, and
+    helpers that close the gap. (41.0) central principle —
+    one rule drives the rest: PREFER GEOMETRIC DENSITY OVER
+    CODE BREVITY; the 3 anti-patterns the AI has fallen
+    into (single-pass generation, overly DRY code, no
+    detail inventory before code) are diagnosed and replaced
+    with 5-stage + detail-inventory + density-first
+    discipline; style-agnostic; (41.1) detail inventory
+    before any geometry — the AI MUST produce a structured
+    inventory with 4 categories (identity-defining details,
+    secondary forms, tertiary micro-details, material zones)
+    BEFORE writing the first `BoxGeometry`; the inventory
+    is published on `userData.meta.detailInventory` and
+    becomes the factory's checklist; (41.2) the 5-stage
+    pipeline — Blockout (silhouette + proportions, < 200
+    tris / < 10 meshes) → Structure (major plates + primary
+    separations, 30-50% of final mesh count) → Form Density
+    (layered plates, overlapping pieces, bevels, thickness,
+    50-70%) → Surface Detail (rivets, engravings, straps,
+    seams, battle damage as real geometry, cloth folds,
+    micro-chips, 80-100%) → Materials & Polish (full PBR set
+    + material variants + final hierarchy cleanup, 100%);
+    each stage is INDEPENDENT and ADDS to the previous
+    stage's output; a mistake in Stage 4 does NOT require
+    redoing Stage 2; this is a strict superset of PART 40's
+    4-stage pipeline (PART 40's Stage 2 becomes PART 41's
+    Stages 2+3, and a new Stage 4 "Surface Detail" is
+    added between Form Density and Materials); (41.3) force
+    higher component count — minimum mesh count targets per
+    subject class (character / mascot / creature / humanoid
+    = 200, target 250-400; vehicle = 150, target 200-350;
+    weapon = 80, target 100-200; prop = 40, target 60-150;
+    architecture = 100, target 150-300; scene = 300 base);
+    required repeated micro-elements (at least 3 of: rivet
+    rows, plate layers, damage chips, seam lines, strap
+    loops, bolt heads, panel gap shadow boxes); prefer
+    many small forms over few large ones (when in doubt,
+    add a layer); explicitly ask for "secondary" and
+    "tertiary" detail layers; (41.4) stronger geometry
+    vocabulary — 6 patterns: (41.4.1) overlapping boxes for
+    layered armor (5 thin boxes stacked = 1 chest plate),
+    (41.4.2) multiple thin cylinders for rings / straps
+    (3 stacked rings = 1 buckle), (41.4.3) small spheres
+    for rivets / bolts (InstancedMesh of 200 instances =
+    1 mesh, 200 tertiary details), (41.4.4) thin boxes for
+    seams / engravings / scratches (0.005 thick shadow
+    lines), (41.4.5) slightly rotated / offset pieces for
+    organic feel (rotation.y = 0.02 breaks the grid), and
+    (41.4.6) multi-layer cloth (3 layered planes with
+    slight X offsets and shared Y folds = 1 cape, not 1
+    flag); (41.5) silhouette & proportion pass — promoted
+    from PART 39.4's heuristic to a first-class pass with
+    4 explicit checks (41.5.1 multi-angle readability at
+    6 canonical angles front/3-4-front/side/3-4-back/back/
+    top at 256x256 black-on-white, 41.5.2 limb thickness
+    and joint hierarchy enforced at the blockout stage
+    not just at the final stage, 41.5.3 weight distribution
+    and grounded stance with center-of-mass check at the
+    blockout stage, 41.5.4 prop scale relative to body
+    for character-with-prop models); (41.6) material system
+    upgrade — 4 default families (plate, cloth, leather,
+    stone) × 4 variants each = 16 base materials; the
+    `materialVariants(family, opts)` helper (41.10) returns
+    the right variant; dedicated secondary palette of
+    `M.scratch` / `M.damage` / `M.engrave` (41.6.2) for
+    the tertiary detail from Stage 4; clear metal vs
+    cloth vs leather vs stone separation (41.6.3, authoring-
+    time audit); optional simple procedural variation
+    (41.6.4) via the seededRandom helper from PART 40.6.2;
+    (41.7) hierarchy & runtime quality — 4 tightening rules
+    (41.7.1 named nodes for every major part, camelCase +
+    no spaces, 41.7.2 at least 2 of the 4 canonical
+    Socket_* attachment points exposed, 41.7.3 clean
+    parent-child structure enforced BEFORE Stage 5 so
+    a broken tree doesn't get textured, 41.7.4 complete
+    `userData.sculptRuntime` with nodes / sockets /
+    detailInventory / minMeshes / pipelineStage /
+    exportReady); (41.8) the 7 prompt rules — "prefer
+    geometric density over code brevity" + "every major
+    surface must have at least one layer of secondary
+    detail" + "battle damage, rivets, seams and folds
+    must be real geometry, not just color" + "target
+    minimum 200-400 meshes for a full character" + "build
+    in clear passes: Blockout → Structure → Density →
+    Surface → Polish" + "never leave large flat surfaces
+    unbroken" + "use overlapping plates and thickness to
+    create readable form" — the author-time checklist;
+    (41.9) renderer-side runtime contract — adds 2 new
+    non-blocking validators to the existing 21: E22
+    (PART 41.1 / 41.9) checks the actual mesh count
+    against the inventory's secondary + tertiary totals
+    (models without `meta.detailInventory` are exempt),
+    and E23 (PART 41.3.1 / 41.9) checks the actual mesh
+    count against `meta.minMeshes` (or the PART 41.3.1
+    floor for the declared `meta.subjectClass`); both
+    non-blocking; (41.10) canonical helpers — 2 new
+    helpers re-exported on `window.lblSpec.helpers`
+    alongside the PART 35 + PART 39 + PART 40 bundle:
+    `materialVariants(family, opts)` (PART 41.6) returns
+    a configured MeshStandardMaterial for a family
+    variant (plate / cloth / leather / stone × 4 variants
+    each, with optional `opts.noise` for procedural color
+    jitter from PART 41.6.4), and `detailInventory(meta)`
+    (PART 41.1) returns a structured inventory object
+    (identity / secondary / tertiary / materialZones) and
+    is the same function the renderer's E22 validator
+    uses. PART 41 is style-agnostic and applies to every
+    .ts factory, every subject, every style. No new
+    dependency, no new export path, no new mandatory
+    userData field, no removed / weakened rule. Bumped
+    from v1.17 to v1.18.
   v1.17 (2026-09-04) — BETTER MODELS THROUGH BETTER GENERATION.
     Source: the maintainer's "System Update Details for Better
     TypeScript Low-Poly 3D Models" (2026-08), which distills 8
@@ -10645,4 +11166,3541 @@ tris bundle and the PART 39 curvedPart / validateModel / snapshotToPng
 bundle. Style-agnostic, applies to every .ts factory, every JSON/JS
 blueprint, every subject. No new dependency, no new export path, no
 new mandatory field, no removed / weakened rule.
+================================================================================
+
+================================================================================
+PART 41 — v1.18 / v8.10 ADDITIONS: HIGH-DETAIL GENERATION
+================================================================================
+Source: the maintainer's "System High-Detail Update Plan" (2026-08).
+The plan targets a specific gap: current models ship in the ~20 KB
+range, while higher-end systems (img2threejs and similar) ship in
+the >60 KB range. The gap is not about geometry size — it's about
+GEOMETRIC DENSITY, the count of secondary and tertiary forms, and
+the discipline of authoring detail BEFORE writing code. PART 41
+adds the rules, validators, and helpers that close this gap.
+
+PART 41 layers on top of — never replaces — PART 1, PART 2, PART 3,
+PART 4, PART 17, PART 27, PART 30, PART 31, PART 32, PART 34, PART 35,
+PART 36, PART 37, PART 38, PART 38.22, PART 39, PART 40, PART 64,
+PART 65, and PART 66. PART 41 reinforces PART 40's production-grade
+pipeline framing with a stronger density-first discipline and a
+5-stage pipeline (PART 40's 4 stages become the first 4 of PART 41's
+5, with Stage 4 "Surface Detail" promoted from a Stage 2 sub-bullet
+to its own stage).
+
+  41.0  CENTRAL PRINCIPLE
+  -----------------------
+
+    ONE rule drives the rest of PART 41:
+
+      PREFER GEOMETRIC DENSITY OVER CODE BREVITY.
+
+    The current models stay low-detail because of three
+    anti-patterns the AI has fallen into:
+
+      1. Single-pass generation — the AI tries to ship
+         a complete factory in one shot, which caps the
+         component count at "what fits in one mental
+         pass". PART 41 splits the work into 5 STAGES
+         (41.2) so each stage can focus on one concern.
+      2. Overly DRY / compact code style — the AI tries
+         to minimize line count, which minimizes
+         secondary and tertiary forms. PART 41 inverts
+         this: when in doubt, add a layer. The
+         `prefer many small forms over few large ones`
+         rule (41.3.3) is the explicit instruction.
+      3. No detail inventory before code — the AI
+         jumps into geometry without listing what
+         identity / secondary / tertiary details the
+         subject MUST have. PART 41 requires a
+         DETAIL INVENTORY (41.1) before any geometry
+         is written, and the inventory becomes the
+         factory's checklist.
+
+    The 7 PROMPT RULES (41.8) capture the same idea as
+    7 sentences the AI can paste into its own system
+    prompt. They are the "I will" half of the contract;
+    41.1-41.7 are the "I will" half spelled out in
+    detail.
+
+    PART 41 is style-agnostic. The density rules
+    apply to low-poly, mid-poly, high-poly,
+    smooth-shaded, stylized, photoreal, voxel,
+    hand-painted, toon / cel, retro-PSX, hologram,
+    wireframe, and any combination. A dense low-poly
+    model is still low-poly (it's the per-form triangle
+    count that stays low); a dense photoreal model is
+    still photoreal (it just has more PBR detail
+    layers). PART 41's density rules do not change
+    the style axis from PART 38.22; they add a
+    DENSITY axis on top of it.
+
+  41.1  DETAIL INVENTORY (before writing any geometry)
+  ---------------------------------------------------
+
+    Before the AI writes a single line of geometry, it
+    MUST produce a DETAIL INVENTORY. The inventory is a
+    structured list of what the model needs to ship with,
+    broken into 4 categories.
+
+      1. Identity-defining details (what makes it a
+         knight, an AKM, a teapot, a tree).
+      2. Secondary forms (the layers, plates, and
+         props that frame the identity).
+      3. Tertiary micro-details (rivets, seams,
+         damage, folds).
+      4. Material zones (which surfaces get which
+         material family).
+
+    The inventory is published on the model's metadata
+    so the renderer can read it and the AI can audit
+    it.
+
+    On the TS path, the factory publishes the inventory
+    on `userData.meta.detailInventory`:
+
+      meta.detailInventory = {
+        identity: [
+          'plasma canister with glowing rune',
+          'two-pronged claw grip'
+        ],
+        secondary: [
+          'left pauldron with 3 angled plates',
+          'right pauldron with matching 3 plates',
+          'chest plate with central power core inset',
+          'back-mounted exhaust vents (4)'
+        ],
+        tertiary: [
+          'rivet rows on every pauldron plate (8 per row)',
+          'seam lines between chest and abdomen plate',
+          'battle damage chips on left pauldron (3)',
+          'tattered cape hem with 7 micro-tears'
+        ],
+        materialZones: [
+          'plate (dark steel) for all armor plates',
+          'plateDark (burnished) for inset channels',
+          'plateCold (blue-tinted) for the power core',
+          'cloth (faded crimson) for the cape',
+          'leather (dark brown) for the belt and straps',
+          'emissive (cyan, intensity 1.4) for the rune'
+        ]
+      }
+
+    On the JSON/JS path, the blueprint publishes the
+    same shape on `meta.detailInventory`. The
+    renderer's E22 validator (41.9) checks the actual
+    mesh count against the inventory's secondary +
+    tertiary totals.
+
+    The inventory is OPTIONAL. When omitted, the
+    renderer's E22 check is a no-op; the E23 minimum
+    mesh count check (41.9) still applies if
+    `meta.minMeshes` is declared.
+
+  41.2  THE 5-STAGE PIPELINE
+  -------------------------
+
+    PART 41 promotes PART 40's 4-stage pipeline to a
+    5-stage pipeline, with one explicit change:
+    PART 40's Stage 2 (Geometry refinement) becomes
+    PART 41's Stages 2 + 3 (Structure + Form Density),
+    and a new Stage 4 (Surface Detail) is added
+    between Form Density and Materials. The 5 stages
+    are:
+
+      Stage 1 — Blockout (silhouette + proportions)
+      Stage 2 — Structure (major plates, primary
+                separations, large secondary forms)
+      Stage 3 — Form Density (layered plates,
+                overlapping pieces, bevels, thickness)
+      Stage 4 — Surface Detail (rivets, engravings,
+                straps, seams, battle damage as
+                geometry; cloth folds; micro-chips)
+      Stage 5 — Materials & Polish (multiple material
+                variants per part, roughness /
+                metalness variation, final hierarchy
+                cleanup)
+
+    Each stage is INDEPENDENT — the AI can re-run a
+    single stage without redoing the others, and each
+    stage ADDS to the previous stage's output. A
+    mistake in Stage 4 (forgot to add rivets) does NOT
+    require redoing Stage 2.
+
+  41.2.1  Stage 1 — Blockout.
+
+    Goal: lock in the SILHOUETTE and the PROPORTIONS
+    using the lowest possible component count (often
+    < 200 tris and < 10 meshes for the whole model).
+    The blockout may look crude — it doesn't need
+    textures, materials, secondary forms, or detail;
+    it needs to be RECOGNIZABLE at 256x256
+    black-on-white (PART 39.4.1 silhouette test) and
+    to pass the PART 41.5 silhouette & proportion
+    pass.
+
+    This is the same as PART 40.2.1, with one
+    tightening: the blockout's component count is now
+    an UPPER BOUND for Stages 2-5, not a target.
+    A blockout that ships 30 meshes will not
+    magically grow to 300 meshes in Stage 3; the
+    blockout is the seed, and Stages 2-5 add to it.
+
+  41.2.2  Stage 2 — Structure.
+
+    Goal: add the MAJOR plates, primary separations,
+    and large secondary forms. This is the stage
+    where the model's secondary forms (41.1) start
+    to appear. For a character, this is the stage
+    where the chest plate, pauldrons, and back
+    vents are placed. For a prop, this is where
+    the major sub-assemblies (barrel + receiver +
+    stock) are placed.
+
+    Output target: 30-50% of the model's final mesh
+    count. If the final target is 250 meshes (41.3.1),
+    Stage 2 should ship 75-125 meshes.
+
+  41.2.3  Stage 3 — Form Density.
+
+    Goal: add LAYERED plates, OVERLAPPING pieces,
+    BEVELS, and THICKNESS. This is the stage where
+    flat boxes become armor (overlapping thinner
+    boxes), where flat surfaces become faceted
+    (bevels), and where single pieces become
+    stacks (thickness via a thin box on top of a
+    box). The output target is 50-70% of the
+    final mesh count.
+
+    The `prefer many small forms over few large
+    ones` rule (41.3.3) starts to dominate here.
+
+  41.2.4  Stage 4 — Surface Detail.
+
+    Goal: add the TERTIARY micro-details. Rivets,
+    engravings, straps, seams, battle damage, cloth
+    folds, tattered edges, micro-chips — all as
+    REAL GEOMETRY, not just color. The output
+    target is 80-100% of the final mesh count.
+    This is the stage where the model earns the
+    "denser than 50 KB" tag.
+
+    The `use InstancedMesh for repeated detail`
+    rule (PART 39.3.4 / 40.6.4) is the canonical
+    way to ship the rivet rows, plate layers, and
+    damage chips without blowing the mesh count
+    past the renderer's E18 500-mesh sanity check.
+
+  41.2.5  Stage 5 — Materials & Polish.
+
+    Goal: apply a full PBR texture set (PART 40.5)
+    with style-specific texturing (PART 40.5.2)
+    AND the material variants from 41.6. The
+    output target is 100% of the final mesh count
+    + the material zones are mapped correctly.
+    The hierarchy is final; the runtime is
+    complete (`userData.sculptRuntime` is set,
+    every named node has a part library entry,
+    every part library entry has a socket where
+    applicable — see 41.7).
+
+  41.3  FORCE HIGHER COMPONENT COUNT
+  ---------------------------------
+
+    PART 41 adds hard rules in the system prompt
+    that push the AI toward denser models. These
+    are NOT style-dependent — a 200-mesh low-poly
+    character is denser than a 50-mesh mid-poly
+    character, and the rules apply to both.
+
+  41.3.1  Minimum mesh count targets.
+
+    PART 41 declares the following floor targets.
+    The AI MUST meet or exceed them; the renderer's
+    E23 minimum-mesh-count validator (41.9)
+    surfaces a non-blocking warning when a model
+    falls below.
+
+      - Character / mascot / creature / humanoid:
+        200 meshes minimum (target 250-400).
+      - Vehicle (car, truck, tank, ship, plane):
+        150 meshes minimum (target 200-350).
+      - Weapon (rifle, pistol, sword, bow):
+        80 meshes minimum (target 100-200).
+      - Prop (crate, barrel, furniture, tool):
+        40 meshes minimum (target 60-150).
+      - Architecture (building, wall, bridge, tower):
+        100 meshes minimum (target 150-300).
+      - Scene (forest, village, city, planet):
+        300 meshes minimum for the base
+        (the scene's individual objects follow
+        their own floor; InstancedMesh counts as 1
+        mesh from the perspective of this rule).
+
+    When a model declares `meta.subjectClass` from
+    PART 38, the E23 check uses that class. When
+    omitted, E23 falls back to `meta.subject` string
+    matching (the legacy heuristic).
+
+  41.3.2  Required repeated micro-elements.
+
+    The AI MUST include at least 3 of the following
+    repeated micro-element patterns in every
+    character / vehicle / architecture model:
+
+      - Rivet rows on every armor plate (8+ per row).
+      - Plate layers with overlapping thinner boxes.
+      - Damage chips on at least one major surface
+        (3+ chips for characters, 5+ for vehicles).
+      - Seam lines between every two adjacent plates.
+      - Strap loops on every back-mounted prop.
+      - Bolt heads on every major fastener (4+ per
+        joint).
+      - Panel gap shadow boxes (thin black boxes
+        behind every panel seam).
+
+    For low-density styles (voxel, hand-painted),
+    the AI substitutes blockier equivalents (chamfer
+    edges, painted highlights) — the pattern is
+    preserved, the per-element complexity drops.
+
+  41.3.3  Prefer many small forms over few large
+          ones.
+
+    When the AI is about to write a factory call
+    for a `BoxGeometry(2, 1, 1)`, the AI should
+    pause and consider: would 4 smaller boxes
+    (`BoxGeometry(1, 1, 1)` + `BoxGeometry(1, 0.5,
+    1)` + `BoxGeometry(0.5, 0.5, 1)` + `BoxGeometry(1,
+    0.25, 1)`) stacked with slight offsets produce
+    a more readable form? If yes, the AI writes the
+    4-box factory, not the 1-box factory.
+
+    The tradeoff: more lines of code, more mesh
+    count, but a denser, more readable model. The
+    `prefer geometric density over code brevity`
+    central principle (41.0) is the explicit
+    instruction. Code brevity is a soft preference
+    that yields to density.
+
+  41.3.4  Explicitly ask for "secondary" and
+          "tertiary" detail layers.
+
+    The AI's authoring-time checklist (PART 39.6)
+    gets a new line: "does this model have a
+    secondary detail layer? A tertiary one?" If
+    the answer to either is no, the AI adds the
+    layer before shipping.
+
+  41.4  STRONGER GEOMETRY VOCABULARY
+  ----------------------------------
+
+    PART 41 teaches the system to freely use the
+    following 6 patterns. The patterns are the
+    vocabulary of density — every pattern ships
+    with a code snippet and a use-case list.
+
+  41.4.1  Overlapping boxes for layered armor.
+
+    A single `BoxGeometry(1.0, 0.5, 0.8)` chest
+    plate becomes 5 overlapping thinner boxes:
+
+      - Main plate: `BoxGeometry(1.0, 0.40, 0.75)`.
+      - Top inset: `BoxGeometry(0.9, 0.05, 0.70)`,
+        offset Y +0.20.
+      - Bottom inset: `BoxGeometry(0.9, 0.05, 0.70)`,
+        offset Y -0.20.
+      - Left bevel: `BoxGeometry(0.05, 0.45, 0.78)`,
+        offset X -0.50.
+      - Right bevel: `BoxGeometry(0.05, 0.45, 0.78)`,
+        offset X +0.50.
+
+    The 5 boxes share the same material (the
+    `plate` material variant from 41.6.1) and
+    are merged into a single mesh for draw-call
+    efficiency. The visual effect: the chest
+    plate reads as LAYERED, not flat.
+
+  41.4.2  Multiple thin cylinders for rings /
+          straps.
+
+    A single thick `CylinderGeometry(0.10, 0.10,
+    0.50, 16)` belt buckle ring becomes 3 thin
+    rings:
+
+      - Outer ring: `CylinderGeometry(0.10, 0.10,
+        0.02, 16)`.
+      - Inner ring: `CylinderGeometry(0.08, 0.08,
+        0.025, 16)`, offset Y +0.001.
+      - Decorative ring: `CylinderGeometry(0.06,
+        0.06, 0.03, 16)`, offset Y +0.002 with
+        a different material variant.
+
+    The 3 rings share the same XZ center but
+    have different Y heights; they read as a
+    STACK, not a single solid ring. The
+    `materialVariants(family, opts)` helper
+    (41.10) is the canonical way to assign the
+    right material to each ring.
+
+  41.4.3  Small spheres for rivets / bolts.
+
+    A `SphereGeometry(0.01, 8, 6)` rivet becomes
+    the canonical unit of tertiary detail. The AI
+    places it via `InstancedMesh` (PART 39.3.4) at
+    the corner of every armor plate, every strap
+    junction, and every bolt hole. A single
+    `InstancedMesh` of 200 rivet instances
+    contributes 1 mesh to the E18 500-mesh sanity
+    check and 200 instances of tertiary detail to
+    the model's density score.
+
+  41.4.4  Thin boxes for seams, engravings,
+          scratches.
+
+    A `BoxGeometry(0.05, 0.005, 0.30)` seam line
+    is the canonical secondary detail. The AI
+    places it along every plate boundary, every
+    panel joint, and every visible scratch. The
+    seam is 0.005 units thick (just thick enough
+    to render without z-fighting) and uses a
+    `plateDark` material variant (41.6.1) so it
+    reads as a SHADOW LINE, not a panel.
+
+  41.4.5  Slightly rotated / offset pieces for
+          organic feel.
+
+    A perfectly axis-aligned `BoxGeometry(1, 1, 1)`
+    is a robotic feel. A `BoxGeometry(1, 1, 1)`
+    with `rotation.y = 0.02` and `position.y = 0.005`
+    is an ORGANIC feel. The AI applies tiny
+    rotations and offsets to every secondary
+    form to break the grid. The rotation is
+    deterministic (seededRandom from PART 40.6.2
+    / 41.10) so the model is reproducible.
+
+  41.4.6  Multi-layer cloth (cape, cloak, banner).
+
+    A single `PlaneGeometry(1, 1)` cape is a flag.
+    A cape made of 3 layered `PlaneGeometry` with
+    slight X offsets and shared Y folds is a
+    CAPE. The 3 layers are:
+
+      - Outer cape: full-size, with a `cloth`
+        material variant (41.6.2).
+      - Middle cape: 0.95 scale, 0.05 X offset,
+        with a `clothDark` material variant.
+      - Inner cape: 0.90 scale, -0.05 X offset,
+        with a `cloth` material variant (matches
+        the outer for symmetry).
+
+    The 3 layers are placed on the SAME vertex
+    group but with different transform matrices,
+    so the cape can be animated (Part 30's
+    bone-based animation can swing all 3 layers
+    together while the inner one lags slightly).
+
+  41.5  SILHOUETTE & PROPORTION PASS
+  ----------------------------------
+
+    PART 41 promotes the PART 39.4 silhouette
+    test from a heuristic to a FIRST-CLASS PASS
+    with explicit checks. The pass runs AFTER
+    Stage 1 (blockout) and AFTER Stage 2
+    (structure), before any tertiary detail is
+    added — a model with broken proportions at
+    Stage 1 will still have broken proportions
+    at Stage 5 if the pass doesn't catch it.
+
+  41.5.1  Multi-angle readability.
+
+    The AI renders the blockout at 6 canonical
+    angles (front, 3/4 front, side, 3/4 back,
+    back, top) at 256x256 black-on-white. A
+    model that reads as "knight" from front
+    but as "blob" from top is a Stage 1 FAIL
+    that needs proportion adjustment before
+    Stage 2 can start.
+
+    The renderer's PART 39.4.1 silhouette test
+    fires on the front view; PART 41 adds the
+    5 additional angles as authoring-time
+    requirements (the renderer's runtime
+    surface does not enforce them — the AI
+    enforces them at authoring time).
+
+  41.5.2  Limb thickness and joint hierarchy.
+
+    For character subjects, the AI checks the
+    PART 38.16 bounding-box proportions
+    (E16 validator) at the blockout stage, not
+    just at the final stage. A leg that is
+    60% of the torso's height at the blockout
+    stage is correct; a leg that is 60% of
+    the torso's height at the final stage is
+    also correct, but the AI would have
+    shipped 300 meshes of the wrong model.
+    Catching it at Stage 1 saves work.
+
+  41.5.3  Weight distribution and grounded stance.
+
+    The AI checks the model's center of mass at
+    the blockout stage. A character whose center
+    of mass is 0.05 units off the XZ origin
+    needs a stance adjustment; the AI adds a
+    subtle counterweight (a hip pack, an offset
+    boot, a shifted pauldron) to bring the
+    center of mass back to the origin. The
+    adjustment is part of the blockout; the
+    detail inventory (41.1) gets a new entry
+    for it.
+
+  41.5.4  Prop scale relative to body.
+
+    For character-with-prop models (a knight
+    holding a sword, a mage holding a staff),
+    the AI checks the prop's scale against the
+    body at the blockout stage. A sword that
+    is as tall as the knight is a Stage 1
+    FAIL; the AI resizes the prop before Stage 2
+    can start. The PART 38.16 E16 validator's
+    `expectedProportions` field is the
+    authoring-time surface for this check.
+
+  41.6  MATERIAL SYSTEM UPGRADE
+  ----------------------------
+
+    PART 41 expands the PART 40.5 material
+    system with VARIANTS PER FAMILY. The base
+    family is a single material; the variants
+    are tuned copies that read as different
+    surface treatments.
+
+  41.6.1  Material family variants.
+
+    A "plate" material family has at least 4
+    variants:
+
+      - `plate` — base dark steel.
+        (color: 0x4a4a4a, roughness: 0.7,
+         metalness: 0.8)
+      - `plateDark` — burnished, slightly darker.
+        (color: 0x2a2a2a, roughness: 0.5,
+         metalness: 0.9)
+      - `plateLight` — polished, slightly lighter.
+        (color: 0x6a6a6a, roughness: 0.3,
+         metalness: 0.9)
+      - `plateCold` — blue-tinted, weathered.
+        (color: 0x4a5560, roughness: 0.8,
+         metalness: 0.6)
+
+    The `materialVariants(family, opts)` helper
+    (41.10) returns a configured
+    MeshStandardMaterial for each variant in the
+    family, so the AI can call
+    `M.plate`, `M.plateDark`, `M.plateLight`,
+    `M.plateCold` without re-deriving the
+    parameters.
+
+    The 4 default families are:
+
+      - `plate` (armor, vehicle hull, weapon
+        receiver) — 4 variants.
+      - `cloth` (cape, cloak, banner, tabard) —
+        4 variants: `cloth`, `clothDark`,
+        `clothLight`, `clothFaded`.
+      - `leather` (belt, strap, glove, boot) —
+        4 variants: `leather`, `leatherDark`,
+        `leatherLight`, `leatherWorn`.
+      - `stone` (architecture, ruin, statue) —
+        4 variants: `stone`, `stoneDark`,
+        `stoneLight`, `stoneWeathered`.
+
+    Custom families (e.g. `energy`, `organic`,
+    `crystal`) are added by passing a custom
+    variant list to `materialVariants`.
+
+  41.6.2  Dedicated scratch / damage / engrave
+          materials.
+
+    Three named material slots are reserved for
+    the model's tertiary detail:
+
+      - `M.scratch` — thin lines along armor
+        plates (color: 0x888888, roughness:
+        0.4, metalness: 0.7). Applied to the
+        thin boxes from 41.4.4.
+      - `M.damage` — chipped edges on damaged
+        plates (color: 0x2a1a1a, roughness:
+        0.9, metalness: 0.2). Applied to the
+        damage chips from 41.4.3.
+      - `M.engrave` — recessed rune / symbol /
+        panel-line detail (color: 0x1a1a1a,
+        roughness: 0.6, metalness: 0.3).
+        Applied to the engravings from 41.4.4.
+
+    These three materials are the SECONDARY
+    palette of the model; the four family
+    palettes (41.6.1) are the PRIMARY. A
+    model that uses only the primary palette
+    is a Stage 3 model; a model that also
+    uses the secondary palette is a Stage 4
+    model.
+
+  41.6.3  Clear metal vs cloth vs leather vs
+          stone separation.
+
+    A model that uses `plate` for a leather
+    strap or `cloth` for a metal pauldron is
+    a Stage 2 FAIL. The AI's authoring-time
+    audit (PART 39.6's checklist) gets a
+    new line: "does every surface use the
+    RIGHT family?" The renderer's runtime
+    surface does not enforce this — it's an
+    authoring-time check, like 41.5.3.
+
+  41.6.4  Optional simple procedural variation.
+
+    The AI can add procedural variation to
+    any of the family variants by passing
+    an `opts.noise` parameter to
+    `materialVariants`. The helper applies
+    a deterministic Perlin-noise color jitter
+    (using the seededRandom from PART 40.6.2
+    / 41.10) and returns a `MeshStandardMaterial`
+    with the color baked into a `map` (a
+    procedurally generated `CanvasTexture`).
+    The effect: every instance of `M.plate`
+    is slightly different, breaking the
+    "robotic feel" without breaking
+    reproducibility.
+
+  41.7  HIERARCHY & RUNTIME QUALITY
+  ---------------------------------
+
+    PART 41 reinforces PART 40.4.3's
+    4-child hierarchy (parts / bones / sockets
+    / meta) with two tighter rules.
+
+  41.7.1  Named nodes for every major part.
+
+    Every part in the factory's Group MUST
+    have a `.name` property. The
+    `lblSpec.helpers.validateModel` walker
+    (PART 39.1.2) and the renderer's E17
+    bbox-overlap gap detector use the names
+    in their warning messages; a part
+    without a name produces a "node_7" warning
+    that the user cannot act on.
+
+    The AI enforces the rule by always passing
+    a `name` argument to the part-library
+    factory:
+
+      const leftPauldron = createBox({
+        name: 'leftPauldron',
+        size: [1.0, 0.3, 0.8],
+        ...
+      });
+
+    The convention: camelCase, no spaces, no
+    underscores, matches the part-library
+    primitive name where possible.
+
+  41.7.2  Sockets for weapons / attachments.
+
+    Every character / vehicle model MUST
+    expose at least 2 of the 4 canonical
+    Socket_* attachment points (PART 33.1[7]):
+
+      - `Socket_Weapon_Primary` — right hand
+        or main weapon mount.
+      - `Socket_Weapon_Secondary` — left hand
+        or off-hand weapon mount.
+      - `Socket_Back` — back-mounted prop
+        (cape, quiver, backpack).
+      - `Socket_Head` — head-mounted prop
+        (helmet plume, crown, halo).
+
+    A character with no sockets cannot accept
+    the renderer's PART 33.1[7] kitbash
+    attachments. The AI's authoring-time
+    audit (PART 39.6) gets a new line:
+    "does this model expose the canonical
+    sockets?"
+
+  41.7.3  Clean parent-child structure.
+
+    The factory's Group tree MUST be
+    well-formed: every Mesh has a parent
+    Group, every Group has a parent Group or
+    is the root, no floating Meshes. The
+    renderer's E17 bbox-overlap gap detector
+    (PART 39.7.1) already surfaces floating
+    parts; PART 41 reinforces the rule with
+    an authoring-time audit that runs BEFORE
+    Stage 5 (Materials & Polish) so a
+    broken tree doesn't get textured.
+
+  41.7.4  Complete `userData.sculptRuntime`.
+
+    The factory MUST publish a complete
+    `userData.sculptRuntime` object before
+    returning the Group. The complete shape:
+
+      userData.sculptRuntime = {
+        // PART 5.6 contract
+        nodes: {
+          'leftPauldron': leftPauldronMesh,
+          'rightPauldron': rightPauldronMesh,
+          'chestPlate': chestPlateMesh,
+          // ... every named part from 41.7.1
+        },
+        // PART 33.1[7] sockets
+        sockets: {
+          'Socket_Weapon_Primary': weaponPrimarySocket,
+          'Socket_Weapon_Secondary': weaponSecondarySocket,
+          'Socket_Back': backSocket,
+          'Socket_Head': headSocket,
+        },
+        // PART 41.1 detail inventory
+        detailInventory: meta.detailInventory,
+        // PART 41.3 component count target
+        minMeshes: meta.minMeshes,
+        // PART 41.2 stage progress
+        pipelineStage: 5,  // last completed stage
+        // PART 40.2.4 export readiness
+        exportReady: true
+      }
+
+    A factory that returns the Group without
+    populating `userData.sculptRuntime` is
+    a Stage 5 FAIL — the renderer's runtime
+    cannot attach animations, sockets, or
+    inspector UI to a model that hasn't
+    published its hooks.
+
+  41.8  THE 7 PROMPT RULES
+  -----------------------
+
+    The maintainer's update plan distills 7
+    rules the AI can paste into its own
+    system prompt. They are the "I will" half
+    of the PART 41 contract.
+
+      1. "Prefer geometric density over code
+         brevity."
+      2. "Every major surface must have at
+         least one layer of secondary detail."
+      3. "Battle damage, rivets, seams and
+         folds must be real geometry, not
+         just color."
+      4. "Target minimum 200-400 meshes for
+         a full character." (And the
+         subject-class-specific floors from
+         41.3.1.)
+      5. "Build in clear passes: Blockout →
+         Structure → Density → Surface →
+         Polish." (The 5 stages from 41.2.)
+      6. "Never leave large flat surfaces
+         unbroken." (The seam-line rule
+         from 41.4.4 + the bevel rule from
+         41.4.1.)
+      7. "Use overlapping plates and
+         thickness to create readable form."
+         (The vocabulary from 41.4.)
+
+    These 7 rules are the AUTHOR-TIME
+    checklist. The renderer's E22 + E23
+    validators (41.9) are the RUN-TIME
+    check; the AI's authoring loop is the
+    MID-TIME check.
+
+  41.9  RENDERER-SIDE RUNTIME CONTRACT
+  ------------------------------------
+
+    PART 41 adds 2 new non-blocking validators
+    to the existing 21:
+
+      - E22 — Detail inventory compliance
+        (PART 41.1 / 41.9). If the model
+        declares `meta.detailInventory`, the
+        actual mesh count should meet or
+        exceed the sum of (identity.length +
+        secondary.length + tertiary.length).
+        The renderer surfaces the actual vs
+        declared gap in the warning.
+        Models without `meta.detailInventory`
+        are exempt.
+
+      - E23 — Minimum mesh count target
+        (PART 41.3.1 / 41.9). If the model
+        declares `meta.minMeshes`, the actual
+        mesh count should meet or exceed the
+        target. When `meta.subjectClass` is
+        also declared, the renderer falls
+        back to the PART 41.3.1 floor for
+        that class when `meta.minMeshes` is
+        missing. Non-blocking; the model
+        still loads.
+
+    All 2 are non-blocking; the model still
+    loads, the user sees a toast + a red
+    spec chip. They mirror the E1-E21
+    pattern and integrate into the existing
+    `validate()` / `applyToUI()` / `revalidate()`
+    pipeline without any caller-side
+    changes.
+
+    What PART 41 does NOT change in the
+    renderer runtime:
+
+      - No change to E1-E21 (they stay
+        exactly as they were in v1.17 / v8.9).
+      - No change to the GLB / OBJ / STL /
+        FBX / DAE / USDZ / .ts export
+        pipeline.
+      - No change to the import map.
+      - No change to the loader.
+      - No change to the file-picker UI.
+      - No change to the scene tree or
+        the Rig / Tris / Sockets buttons.
+      - No new mandatory field on any
+        existing userData namespace — the
+        new fields from 41.1
+        (`detailInventory`) and 41.3.1
+        (`minMeshes`) are OPTIONAL.
+      - No new dependency.
+
+  41.10 CANONICAL HELPERS
+  -----------------------
+
+    PART 41 adds 2 new canonical helpers to
+    the existing `__threeTriHelpers` bundle
+    (PART 35 + PART 39 + PART 40). The .ts
+    factory can call any of them via
+    `window.lblSpec.helpers.<name>` without
+    copying the function body.
+
+    - `materialVariants(family, opts)`
+        PART 41.6.1 / 41.6.2 / 41.6.4 /
+        Appendix A. Build a configured
+        MeshStandardMaterial for a family
+        variant. `family` is one of
+        `'plate' | 'cloth' | 'leather' |
+        'stone'` (or a custom family name
+        when `opts.variants` is provided).
+        `opts.variant` is the variant name
+        within the family (e.g.
+        `'plateDark'`, `'clothFaded'`); the
+        default is the family's base variant
+        (e.g. `'plate'`, `'cloth'`).
+        `opts.noise` (number 0-1) enables
+        the procedural color jitter from
+        41.6.4. Returns a configured
+        MeshStandardMaterial ready to
+        attach to a Mesh. The 4 default
+        families (plate, cloth, leather,
+        stone) ship with the 4 default
+        variants each (16 materials
+        total) — see 41.6.1.
+
+    - `detailInventory(meta)`
+        PART 41.1 / Appendix C. Returns a
+        structured detail-inventory object
+        from a `meta` object. The shape
+        is:
+
+          {
+            identity: string[],
+            secondary: string[],
+            tertiary: string[],
+            materialZones: string[]
+          }
+
+        When `meta.detailInventory` is
+        already present, the helper
+        validates the shape and returns
+        it (or a synthesized empty
+        inventory when the input is
+        missing). When the input has no
+        `detailInventory`, the helper
+        returns an empty inventory
+        (`{ identity: [], secondary: [],
+        tertiary: [], materialZones: [] }`).
+        The renderer's E22 validator uses
+        the same function so the
+        factory's authoring-time call and
+        the renderer's runtime call see
+        the same shape.
+
+    These are pure additions to the
+    existing `__threeTriHelpers` bundle —
+    the existing 5 PART 35 helpers, the
+    3 PART 39 helpers, and the 3 PART 40
+    helpers stay untouched. The
+    renderer's runtime contract update is
+    `lblSpec.helpers.materialVariants`
+    and `lblSpec.helpers.detailInventory`
+    become the canonical way to do these
+    two things in a .ts factory; the
+    factory does NOT need to copy the
+    function bodies.
+
+  WHAT PART 41 DOES NOT INTRODUCE
+  --------------------------------
+
+    - No new mandatory field on any existing
+      userData namespace (the new fields in
+      41.1 `detailInventory` and 41.3.1
+      `minMeshes` are OPTIONAL; the current
+      renderer ignores unknown keys safely)
+    - No new export path (the existing GLB /
+      OBJ / STL / FBX / DAE / USDZ / .ts
+      paths are unchanged)
+    - No new dependency (the new helpers use
+      only Three.js APIs that are already
+      imported; no import-map change)
+    - No new validator that blocks the model
+      from loading (E22, E23 are non-blocking,
+      like E1-E21 before them)
+    - No change to the existing PART 1-40
+      rules (PART 41 reinforces them — see
+      the 41.0 + 41.10 cross-references)
+    - No change to the existing E1-E21
+      validators (they stay exactly as they
+      were in v1.17 / v8.9)
+    - No change to PART 38.22's style
+      agnosticism (PART 41 is also style-
+      agnostic; the density rules apply to
+      every style)
+    - No change to PART 40.6.2's seeded
+      random pattern (PART 41.6.4 uses the
+      same helper)
+    - No change to PART 40.2's 4-stage
+      pipeline (PART 41 promotes it to 5
+      stages by adding "Surface Detail" as
+      a new stage between Form Density and
+      Materials)
+    - No change to the project's "Low Poly 3D"
+      name
+
+  CROSS-REFERENCES
+  -----------------
+
+    PART 41 layers on top of, never replaces:
+      - PART 1  (factory contract)        — TS path
+      - PART 2  (primitives)              — TS path
+      - PART 3  (materials)               — TS path
+      - PART 4  (single-file rule)        — TS path
+      - PART 17 (image-to-3D analysis)    — TS image path
+      - PART 27 (image-to-3D analysis)    — JSON/JS image path
+      - PART 30 (rigging & animation)     — both paths
+      - PART 31 (character sculpt)        — character subjects
+      - PART 32 (anti-pattern guards)     — E1-E12
+      - PART 34 (rig helpers)             — pre-bundled helpers
+      - PART 35 (triangle-first geometry) — E12, the 🔺 Tris panel
+      - PART 36 (multi-file drop)         — both paths
+      - PART 37 (zip bundle)              — both paths
+      - PART 38 (character pipeline)      — E13-E16
+      - PART 38.22 (style agnosticism)    — both paths
+      - PART 39 (3D modeling techniques)  — E17-E18
+      - PART 39.4 (silhouette test)       — 41.5.1
+      - PART 40 (better models)           — E19-E21
+      - PART 40.2 (4-stage pipeline)      — promoted to 5 stages in 41.2
+      - PART 40.4.3 (4-child hierarchy)   — 41.7
+      - PART 40.5 (PBR material system)   — 41.6
+      - PART 40.6.2 (seededRandom)        — 41.6.4
+      - PART 40.6.3 (LOD support)         — 41.4
+      - PART 64 (character sculpt enrich) — JSON/JS only
+      - PART 65 (JSON/JS anti-patterns)   — E1-E12 on JSON/JS
+      - PART 66 (architectural bridge)    — JSON/JS only
+
+    The maintainer's "System High-Detail Update
+    Plan" (2026-08) is the source doc. The plan
+    distills 7 prompt rules (41.8) and 6
+    vocabulary patterns (41.4) that close the
+    density gap between current ~20 KB models
+    and higher-end >60 KB models.
+
+================================================================================
+END OF PART 41 — v1.18 / v8.10 ADDITIONS: HIGH-DETAIL GENERATION
+Prefer geometric density over code brevity. A 5-stage pipeline
+(Blockout → Structure → Density → Surface → Polish) that promotes
+PART 40's 4-stage to a finer 5-stage. A detail inventory before any
+geometry is written (identity / secondary / tertiary / material zones).
+Minimum mesh count targets (200-400 for characters, 150-350 for
+vehicles, 100-200 for weapons, 60-150 for props, 150-300 for
+architecture). Stronger geometry vocabulary (overlapping boxes for
+layered armor, multiple thin cylinders for rings, small spheres for
+rivets, thin boxes for seams, slightly rotated pieces for organic
+feel, multi-layer cloth for capes). A first-class silhouette and
+proportion pass with multi-angle readability + limb thickness +
+weight distribution + prop scale. Material variants per family
+(plate / cloth / leather / stone × 4 variants each = 16 materials)
+plus 3 dedicated scratch / damage / engrave materials. A 4-child
+hierarchy with named nodes + canonical sockets + complete
+`userData.sculptRuntime`. Adds E22 detail-inventory compliance
+and E23 minimum-mesh-count target to the existing 21 non-blocking
+validators. Re-exports `materialVariants` and `detailInventory` on
+`window.lblSpec.helpers` alongside the PART 35 + PART 39 + PART 40
+bundle. Style-agnostic, applies to every .ts factory, every JSON/JS
+blueprint, every subject. No new dependency, no new export path, no
+new mandatory field, no removed / weakened rule.
+================================================================================
+
+================================================================================
+PART 42 — v1.19 / v8.11 ADDITIONS: CHARACTER PRODUCTION DISCIPLINE
+================================================================================
+Source: the maintainer's "3D Character Production Plan — Lead 3D
+Technical Director" (2026-08). The plan is a worked example for a
+stylized action hero with armor, cape, and hair, distilling the 7
+production techniques, the 60/25/15 polygon distribution rule, the
+11-step production pipeline (blockout → sculpt → retopo → UV →
+bake → texture → hair/cloth → LODs → rig → export), the 85-bone
+skeleton reference, the LOD chain LOD0-LOD4, the half-budget cut
+list, the film-quality upgrade list, and the 7-risk register.
+
+PART 42 layers on top of — never replaces — PART 1, PART 2, PART 3,
+PART 4, PART 17, PART 27, PART 30, PART 31, PART 32, PART 34, PART 35,
+PART 36, PART 37, PART 38, PART 38.22, PART 39, PART 40, PART 41,
+PART 64, PART 65, and PART 66. PART 42 reinforces PART 41's
+density-first discipline with a CHARACTER-SPECIFIC framing — a
+character is a 7-technique + 11-step + 5-LOD discipline, not a
+single-shot block of geometry. PART 42 also reinforces PART 31's
+character sculpt (it provides the per-region discipline that
+PART 31 left to the AI's authoring loop) and PART 38's character
+pipeline upgrade (it provides the production-time framing that
+PART 38 left to the AI's authoring loop).
+
+  42.0  CENTRAL PRINCIPLE
+  -----------------------
+
+    A character is NOT a single-shot prompt-to-geometry call.
+    A character is the OUTPUT of 7 production techniques +
+    an 11-step production pipeline + a 5-LOD chain + an
+    85-bone skeleton + a deformation-risk register + a
+    performance budget.
+
+    The 7 PRODUCTION TECHNIQUES (42.1) are the building
+    blocks: every character surface gets exactly one
+    primary technique and 0-2 secondary techniques, picked
+    by region and surface type:
+
+      1. UV mapping + image textures
+      2. PBR texturing
+      3. Procedural textures
+      4. Vertex colors
+      5. Triplanar mapping
+      6. Baking (high-poly → low-poly)
+      7. Texture atlasing
+
+    The 11-STEP PIPELINE (42.3) is the production order:
+    blockout → sculpt primary → sculpt secondary → retopo
+    → UV → bake → texture → hair/cloth → LODs → rig → export.
+    Each step has a QC gate before the next step starts.
+
+    The 5-LOD CHAIN (42.5) is the runtime discipline: LOD0
+    (35k tris) for close-up, LOD1 (18k) for mid-range, LOD2
+    (7.5k) for far, LOD3 (2.5k) for background, LOD4 (100
+    tris + 1k billboard) for crowd.
+
+    The 60/25/15 polygon DISTRIBUTION (42.2) is the
+    allocation rule: silhouette gets 60% of the budget,
+    deformation gets 25%, detail gets 15%. A model that
+    ships with 50% on detail has 20% stolen from silhouette
+    and reads worse at 10m distance.
+
+    PART 42 is style-agnostic. The 7 techniques, the 11
+    steps, and the 5 LODs apply to low-poly, mid-poly,
+    high-poly, smooth-shaded, stylized, photoreal, voxel,
+    hand-painted, toon / cel, retro-PSX, hologram,
+    wireframe, and any combination. The numeric budgets
+    (35k LOD0, 18k LOD1, 7.5k LOD2, 2.5k LOD3, 100 LOD4)
+    are the STYLIZED-REALISM defaults; the AI scales them
+    up for film quality (PART 42.8) or down for mobile
+    (PART 42.7).
+
+  42.1  THE 7 PRODUCTION TECHNIQUES
+  ---------------------------------
+
+    Every character surface gets exactly one PRIMARY
+    technique from this list, picked by the surface's role
+    in the production. A surface that needs more than one
+    gets a SECONDARY technique (always fewer than the
+    primary). The 7 techniques are:
+
+  42.1.1  UV mapping + image textures (primary for face,
+          skin, hair cards, logo decals, fabric base colors).
+
+    Use when: the surface is a FOCAL AREA (the face), needs
+    hand-painted control (the insignia), or has high
+    per-pixel detail (the hair alpha). The baked maps give
+    the highest control over a focal area at minimal cost.
+
+    Don't use when: the surface is a large flat panel with
+    no focal point (use triplanar from 42.1.5 instead) or
+    the surface is procedurally infinite (use procedural
+    from 42.1.3 instead).
+
+  42.1.2  PBR texturing (primary for ALL surfaces — the
+          default).
+
+    Use when: in doubt, PBR. The physically based shading
+    reads correctly under any lighting condition and
+    matches the rest of the scene's lights without per-
+    material hacks. Author the 5 PBR maps (albedo, normal,
+    metallic, roughness, AO; height is optional) via
+    Substance Painter or the equivalent.
+
+    Don't use when: the surface is voxel-style (use flat
+    color) or hand-painted (use UV + image with no
+    metallic/roughness).
+
+  42.1.3  Procedural textures (primary for skin pores,
+          fabric weave, metal micro-scratch, leather grain,
+          dirt/wear masks).
+
+    Use when: the surface needs INFINITELY TILEABLE, FREE-
+    OF-SEAMS detail. Procedural scales to LOD0..LOD3
+    without re-painting; baked UV textures need re-baking
+    for each LOD.
+
+    Don't use when: the surface needs a focal hand-painted
+    detail (use UV + image from 42.1.1 instead).
+
+  42.1.4  Vertex colors (primary for damage/weathering
+          tint, dirt accumulation in crevices, per-region
+          masks on the face, cape tip darkening, decal
+          blend weights; secondary for low-poly AO back-up
+          when no AO map exists).
+
+    Use when: the per-region mask is needed for material
+    blending (cloth vs skin vs metal) without sampling
+    extra texture channels, OR when the surface is low-
+    poly and an AO map would be too expensive.
+
+    Don't use when: the surface is dense (vertex colors
+    interpolate across many verts and lose the focal
+    detail) or the surface needs the per-pixel control of
+    a texture.
+
+  42.1.5  Triplanar mapping (primary for cape back, large
+          planar armor panels where UV stretching would
+          show at grazing angles, terrain-crawling
+          rock/ground contact points, hair cap underside).
+
+    Use when: the surface is LARGE + FLAT-ISH + HERO
+    CAMERA EXPOSURE. Triplanar projects XYZ blended by
+    normal, so there are no UV seams and no axial
+    stretching.
+
+    Don't use when: the surface is small (3 texture
+    samples is too expensive for a rivet) or the surface
+    is on a curved part where the 3-axis blend would
+    create visible discontinuities (use UV unwrap from
+    42.1.1 instead).
+
+  42.1.6  Baking (high-poly → low-poly normal/AO/curvature/
+          ID/position bake, via xNormal or Marmoset
+          Toolbag).
+
+    Use when: the character has a HIGH-POLY SCULPT
+    (1-2M tris) that captures micro-detail (rivets,
+    fabric weave, leather grain, skin pores, hair strand
+    direction cues, dust in crevices) and a LOW-POLY
+    GAME MESH (35k target) that needs the same detail
+    via normal/AO maps. One bake pass replaces hundreds
+    of hand-painted hours.
+
+    Don't use when: the character has no high-poly sculpt
+    (a poly-only model) — there's nothing to bake from.
+
+  42.1.7  Texture atlasing (primary for small props: belt
+          buckles, rivets, buckles, pouches, buttons,
+          insignia, gear; shared materials across identical
+          gear pieces; modular armor kit).
+
+    Use when: the surface is SMALL (rivets, buckles,
+    insignia) OR the same material is used on N distinct
+    meshes (modular armor kit, weapon parts). One draw
+    call, one material slot per atlas = huge batching win
+    on mobile/WebGL where draw calls dominate frame time.
+
+    Don't use when: the surface is a hero zone (face,
+    cape) that needs a dedicated texture set.
+
+  42.2  THE 60/25/15 POLYGON DISTRIBUTION
+  --------------------------------------
+
+    For a stylized-realism character at LOD0 (35k tris),
+    the AI allocates the budget by ROLE:
+
+      - 60% (21k tris) — SILHOUETTE
+        The parts of the model that contribute to the
+        256x256 black-on-white silhouette test (PART
+        39.4.1 / 41.5.1). On the worked example, this
+        includes the hair cards, cape, boots, legs, arms,
+        torso, pauldrons, cape hem, and weapon.
+      - 25% (8.75k tris) — DEFORMATION
+        The parts of the model that bend with animation
+        (face, neck, hands, joint caps). The 25% covers
+        the high-density face (4,200 tris), the hands
+        (1,400 x 2 = 2,800), and the joint caps (1,470).
+      - 15% (5.25k tris) — DETAIL
+        The parts of the model that ONLY exist at close-up
+        (belt segments, pouches, vambrace segments,
+        greaves, boot buckles, insignia, chest inset, cape
+        clasp, sash). At 10m distance the detail is below
+        the 1-pixel threshold and contributes to the
+        silhouette instead.
+
+    The 60/25/15 split is the STYLIZED-REALISM default.
+    For other styles:
+
+      - LOW-POLY: 80/15/5 (silhouette dominates; detail
+        is silhouette + a tiny amount of additional form).
+      - HIGH-POLY: 50/30/20 (deformation gets more head-
+        room for the 50k+ vertex targets from PART 38.13).
+      - PHOTOREAL: 45/30/25 (deformation + detail both
+        expand; silhouette shrinks to 45%).
+      - VOXEL: 95/5/0 (silhouette is everything; no
+        smooth deformation; no detail).
+      - HAND-PAINTED: 70/20/10 (silhouette + deformation
+        with hand-painted focal detail).
+
+    The renderer's E25 polygon distribution validator
+    (42.9) checks the actual silhouette/deformation/detail
+    split against the declared `meta.polyDistribution`
+    field; a model that ships with 30% on detail has
+    stolen 15% from silhouette and reads worse at
+    distance.
+
+  42.3  THE 11-STEP PRODUCTION PIPELINE
+  ------------------------------------
+
+    A character goes through 11 STEPS, each with a QC
+    gate before the next step starts. The 11 steps
+    supersede the 5-stage pipeline from PART 41.2 for
+    CHARACTER subjects; the 5-stage still applies to
+    non-character subjects (props, vehicles, architecture).
+
+    Step 1 — BLOCKOUT (T-pose, 4k tris total)
+    Step 2 — SCULPT, PRIMARY FORMS (ZBrush, ~150k tris)
+    Step 3 — SCULPT, SECONDARY DETAIL (ZBrush, 1-2M tris)
+    Step 4 — RETOPOLOGY (Blender, target 35k tris)
+    Step 5 — UV LAYOUT (Blender/RizomUV)
+    Step 6 — BAKE (Marmoset Toolbag or xNormal)
+    Step 7 — TEXTURE (Substance Painter)
+    Step 8 — HAIR + CLOTH SETUP
+    Step 9 — LODS (Simplygon or manual)
+    Step 10 — RIG + SKIN
+    Step 11 — FINAL EXPORT + ENGINE IMPORT
+
+    Each step has a QC gate. The most important:
+
+      - Step 1 QC: orthographic side view shows hero-
+        proportion head (7.5-heads tall). Front view
+        shows symmetry (max 2% deviation left vs right).
+      - Step 2 QC: silhouette test — black silhouette
+        render matches concept at 90%+ accuracy.
+      - Step 3 QC: turn off Albedo, only AO + normal —
+        does it still read?
+      - Step 4 QC: no n-gons, no non-manifold edges, all
+        quads except poles at anatomical landmarks.
+      - Step 5 QC: checkered test render with seams
+        hidden, no stretching.
+      - Step 6 QC: bake compare in Marmoset, "difference"
+        view < 5% error.
+      - Step 7 QC: shader ball test under 3 lighting
+        conditions (HDRI, point light raking, flat
+        ambient).
+      - Step 8 QC: hair doesn't intersect face from any
+        standard camera, cape has no Z-fighting with body.
+      - Step 9 QC: silhouette test at each LOD — does it
+        still read?
+      - Step 10 QC: deformation test (extreme poses)
+        shows no collapse at shoulder, no poke-through
+        at hip.
+      - Step 11 QC: import in-engine, check normals
+        direction, material assignment, LOD swap distance,
+        draw call count.
+
+    The 11 steps map to the 5-stage pipeline from
+    PART 41.2 as:
+
+      PART 41 Stage 1 (Blockout)        = 42.3 Step 1
+      PART 41 Stage 2 (Structure)        = 42.3 Step 4
+                                            (retopo)
+      PART 41 Stage 3 (Form Density)     = 42.3 Step 4
+                                            (retopo)
+                                            + Step 6 (bake)
+      PART 41 Stage 4 (Surface Detail)   = 42.3 Step 3
+                                            (sculpt
+                                            secondary)
+      PART 41 Stage 5 (Materials &
+                       Polish)          = 42.3 Step 7
+                                            (texture)
+                                            + Step 8 (hair/
+                                            cloth)
+                                            + Step 11 (export)
+
+  42.4  RIG AND ANIMATION PREP
+  ----------------------------
+
+    The 85-bone skeleton is the production reference for
+    hero characters. The 85-bone count is a healthy middle
+    ground: AAA push is 120+ bones (more fingers, more
+    face controls), mobile is 50-60 bones (no fingers,
+    no face). The 85-bone skeleton is structured as:
+
+      Root (1)
+        Pelvis (1)
+          Spine_01-03 (3)
+            Neck (1)
+              Head (1)
+                Eye_L, Eye_R (2)
+                Jaw (1)
+                Tongue_01-03 (3)
+            Clavicle_L, Clavicle_R (2)
+              UpperArm_L, UpperArm_R (2)
+                Elbow_L, Elbow_R (2)
+                  Forearm_L, Forearm_R (2)
+                    Wrist_L, Wrist_R (2)
+                      Hand_L, Hand_R (2)
+                        Thumb_01-03 x 2 (6)
+                        Index_01-03 x 2 (6)
+                        Middle_01-03 x 2 (6)
+                        Ring_01-03 x 2 (6)
+                        Pinky_01-03 x 2 (6)
+            UpperLeg_L, UpperLeg_R (2)
+              Knee_L, Knee_R (2)
+                LowerLeg_L, LowerLeg_R (2)
+                  Ankle_L, Ankle_R (2)
+                    Ball_L, Ball_R (2)
+                      Toe_L, Toe_R (2)
+        Cape_Root (1)
+          Cape_01-03 (3)
+            Cape_Hem_L, Cape_Hem_R (2)
+
+    Total: ~85 bones. The factory publishes the bone
+    hierarchy on `userData.sculptRuntime.bones` and
+    `userData.sculptRuntime.boneCount` so the renderer
+    can attach the rig inspector and the E25 validator
+    (42.9) can check the bone count against the
+    subject-class floor (PART 41.3.1 / 42.5).
+
+  42.4.1  The 7 deformation risk areas.
+
+    Characters have 7 KNOWN deformation risk areas that
+    fail in extreme poses. The AI's authoring-time audit
+    (PART 39.6) checks all 7:
+
+      1) SHOULDER/AXILLA COLLAPSE — fix with 3-loop fan
+         at shoulder + stretchy helper bone + corrective
+         blend shape for >120 deg arm raise.
+      2) HIP/LEG PINCH — fix with clean radial loops at
+         hip joint (10-12 quads meeting at crotch pole)
+         + thigh-stretch bone.
+      3) KNEE POLE DEFORM — fix with 8-sided radial loop
+         around knee, pole at FRONT of knee (out of
+         compression zone).
+      4) ELBOW CREASE PINCH — fix with 3 loops tightly
+         packed at elbow, pole at INNER elbow (compression
+         side).
+      5) CAPE INTERSECTION WITH LEGS — fix with 3 cape
+         segments + progressive collider ignore distance
+         (top vs spine, middle vs upper legs, bottom vs
+         lower legs) + 5cm separation.
+      6) HEAD ROTATION — fix with neck loops wrapping
+         fully (8 sides) + 2 extra loops around the base
+         to absorb the twist.
+      7) BELT FOLDS IN HIP ROTATION — fix with 1-2 extra
+         edge loops + weight-painted 70% pelvis + 30%
+         upper leg.
+
+    The renderer's E24 production-completeness validator
+    (42.9) checks the factory's `meta.deformationFixes`
+    array against the 7 risks; a model that ships without
+    a `meta.deformationFixes` entry is exempt (the AI
+    ran no audit), a model that ships with an entry
+    surfaces the missing risks as warnings.
+
+  42.4.2  Facial expressions and special controls.
+
+    Hero characters need 30+ BLEND SHAPES for facial
+    expression:
+
+      - Brows: 3 (inner-up, outer-up, furrow)
+      - Eyes: 5 (blink-L, blink-R, blink-both, squint,
+        wide)
+      - Mouth: 10 (smile, frown, open, pucker, sneer-L,
+        sneer-R, corner-up-L, corner-up-R, jaw-open,
+        lips-back)
+      - Cheeks: 2 (puff, suck)
+      - Nose: 2 (flare, sneer-nose)
+      - Phonemes: 10 (A, E, I, O, U, M-B-P, F-V, L, S-T,
+        W-OO; this list can be larger for non-English
+        languages)
+
+    Plus 6 PROCEDURAL CORRECTIVE shapes (arm-raise,
+    knee-bend, hand-fist, finger-curl, lean-F, lean-B,
+    lean-L, lean-R — 8 actually) and 6 CUSTOM RIG
+    CONTROLS (Aim_Eye_L, Aim_Eye_R, Aim_Weapon, Foot_L,
+    Foot_R, Hand_L, Hand_R, Spine_IK, Cape_Strength,
+    Hair_Physics_Strength, Voice_Mouth_Open,
+    Voice_Smile, Voice_Brow).
+
+    The factory publishes the blend shape list on
+    `userData.sculptRuntime.blendShapes` and the
+    custom rig controls on
+    `userData.sculptRuntime.rigControls`. Both are
+    OPTIONAL — non-character subjects don't need them.
+
+  42.5  THE 5-LOD CHAIN
+  ---------------------
+
+    The 5-LOD chain is the runtime discipline for hero
+    characters. Each LOD is named, has a tri count, and
+    has a use-case. The 5 LODs are:
+
+      - LOD0 — 35,000 tris
+        Full detail, all hero textures (2k face, 1k
+        body). Used 0-15m from camera, close dialogue,
+        cinematics.
+      - LOD1 — 18,000 tris (49% reduction)
+        Drop cape hem detail, drop vambrace segmenting,
+        simplify buckle, drop hand fingers to 3-segment
+        stubs. Keep all hero textures, swap 2k face for
+        1k face. Used 15-30m, mid-range gameplay.
+      - LOD2 — 7,500 tris (78% reduction)
+        Drop cape to 1-segment strip, drop insignia,
+        simplify hair to 2 cards, drop boot buckles.
+        Drop face to 512 px, body to 512 px. Used
+        30-60m, far view in crowd, vehicles.
+      - LOD3 — 2,500 tris (93% reduction)
+        Merged silhouette only. Single 256 px atlas, no
+        normal map. Cape = single quad. Hair = single
+        texture on scalp cap. Hands = mitts (no fingers).
+        Used 60m+, background, impostor swap candidate.
+      - LOD4 (impostor) — 100 tris + 1k billboard texture
+        Single quat-camera-facing plane, baked from 8
+        viewing angles. Used 100m+, crowd scenes.
+
+    The factory publishes the LOD chain on
+    `userData.sculptRuntime.lodChain`:
+
+      meta.lodChain = [
+        { level: 0, triangles: 35000, textureDensity: '2k+1k', use: 'close-up' },
+        { level: 1, triangles: 18000, textureDensity: '1k+1k', use: 'mid-range' },
+        { level: 2, triangles:  7500, textureDensity: '512',   use: 'far' },
+        { level: 3, triangles:  2500, textureDensity: '256',   use: 'background' },
+        { level: 4, triangles:   100, textureDensity: '1k-billboard', use: 'crowd' }
+      ]
+
+    The factory's PART 40.6.3 LOD support is the
+    implementation hook; PART 42 adds the 5-LOD chain
+    as the standard shape.
+
+    The renderer's E25 polygon distribution validator
+    (42.9) checks the LOD chain against the 60/25/15
+    silhouette/deformation/detail split at LOD0.
+
+  42.6  PERFORMANCE BUDGET
+  -----------------------
+
+    For a hero character on the AAA / PC + console
+    target (60 fps, 1080p), the per-frame budget is
+    ~1.4 ms / character:
+
+      - Vertex shader:     0.6 ms
+      - Fragment shader:   0.8 ms
+      - Draw calls:        3 (one per active LOD)
+      - Texture bandwidth: ~8 MB / frame
+      - Triangles:         35k x 1 = 35k
+      - TOTAL:             ~1.4 ms / character
+
+    Headroom for 4 characters visible: ~5.6 ms (out
+    of 16.67). Reasonable for an action scene with
+    4 heroes on-screen.
+
+    The WebGL fallback budget caps at LOD2 (7.5k tris)
+    with a single atlas and no per-pixel cloth sim;
+    targets 30 fps on integrated GPUs. The mobile
+    budget is a separate build at 12k tris LOD0 / 5k
+    LOD1 / 2k LOD2 with no cape (painted-on) and no
+    card hair (scalp + cap only).
+
+    The renderer's PART 38.16 / E16 bounding-box
+    proportions check is the runtime equivalent of
+    the performance budget's "per-frame ms" check;
+    a model that ships outside the 0.5-20 X-size
+    range (PART 39.1.2) will perform outside the
+    1.4 ms budget on a single hero.
+
+  42.7  THE HALF-BUDGET CUT LIST
+  -----------------------------
+
+    If the polygon budget is cut in half (35k → 17.5k),
+    the AI cuts in this priority order:
+
+      1) Cape: 920 → 280 (single 8-quad strip, no hem
+         detail). Saves 640.
+      2) Hair cards: 240 → 120 (drop 1 of 3 side
+         cards). Saves 120.
+      3) Hand fingers: 1,400 x 2 → 800 x 2 (drop
+         pinky to stub). Saves 1,200.
+      4) Vambrace segments: 400 x 2 → 200 x 2 (1
+         plate instead of 3). Saves 400.
+      5) Greave segments: 350 x 2 → 200 x 2. Saves
+         300.
+      6) Boot detail: 600 x 2 → 200 x 2. Saves 800.
+      7) Belt buckle + pouches: 900 → 300. Saves
+         600.
+      8) Weapon parts: 1,800 → 1,000 (drop scope,
+         sling). Saves 800.
+      9) Torso simplification: 2,800 → 1,800 (drop
+         chest inset bevel). Saves 1,000.
+      10) Pauldrons: 700 each → 500 each. Saves 400.
+      11) Head: 4,200 → 2,400 (sacrifice cheek
+          topology density, keep mouth and eyes).
+          Saves 1,800.
+      12) Body silhouette: 3,200 → 1,800. Saves
+          1,400.
+
+    Subtotal cut: ~9,460. Brings to ~25,540. The AI
+    stops here for stylized-realism; further cuts
+    drop into mid-poly territory (PART 41.3.1's
+    character floor of 200 meshes still applies but
+    the per-region budget shifts).
+
+    The factory publishes the cut list on
+    `meta.halfBudgetCutList` (a string array, OPTIONAL)
+    so the renderer's E24 production-completeness
+    validator (42.9) can audit which cuts the AI
+    actually took vs which the user requested.
+
+    The NEVER CUT list (mandatory at any budget):
+
+      - Mouth and eye topology (must deform).
+      - Hip and knee loops (must deform for walk).
+      - Cape attachment ring (must stay attached to
+        body).
+
+  42.8  FILM-QUALITY UPGRADE LIST
+  ------------------------------
+
+    Going from 35k (game) to ~2M (film), the AI adds
+    10 items:
+
+      1) Hair: groom with 50k-150k strand curves, real
+         simulation with wind, body collision, environment
+         collision. Replaces cards. Adds ~30 min of sim
+         time per shot.
+      2) Skin: full subsurface scattering (3-layer SSS),
+         pore normal at 0.1 mm scale, micro-vessels,
+         freckle procedural layer, separate head skin and
+         body skin (different pore density).
+      3) Eyes: real cornea with refraction, iris with
+         parallax depth, moisture layer, vein procedural,
+         eyelash groom.
+      4) Cloth: full Marvelous Designer simulation, 30+
+         poses baked into a pose library, swapped per
+         shot.
+      5) Armor: micro-scratch detail at 0.01 mm scale,
+         fingerprint oils on grip, dust accumulation
+         shader.
+      6) Weapon: full mechanical detail, internal gears,
+         scratches that follow ejection pattern, oil
+         sheen.
+      7) Topology: subdivide face to 50k tris for film
+         renders.
+      8) Texel density: face goes to 4096 px/m, body to
+         2048.
+      9) AOVs: 30+ render passes for compositing
+         (diffuse, specular, SSS, coat, sheen, AO,
+         contact shadow, transmission, emission, etc.).
+      10) Animation polish: full mocap cleanup, hand-
+          keyed fingers for close-ups, breath layer,
+          micro-expression layer, weight shift for each
+          pose.
+
+    The factory publishes the film-quality items on
+    `meta.filmQualityItems` (a string array, OPTIONAL).
+    The renderer's E24 production-completeness validator
+    checks the AI's authoring-time audit against the
+    10 items; a model that ships with
+    `meta.targetQuality: "film"` but without a
+    `meta.filmQualityItems` entry surfaces a warning.
+
+  42.9  RENDERER-SIDE RUNTIME CONTRACT
+  ------------------------------------
+
+    PART 42 adds 2 new non-blocking validators to the
+    existing 23:
+
+      - E24 — Production completeness (PART 42.3 / 42.4.1
+        / 42.8). For character subjects (per PART 41.1's
+        identity category), the factory's `meta` should
+        include at least one of the 11 production steps
+        (PART 42.3) AND the 7 deformation fixes (PART
+        42.4.1) AND the 10 film-quality items (PART 42.8
+        if `meta.targetQuality: "film"`). The validator
+        surfaces missing items as warnings. Non-character
+        subjects are exempt; models without
+        `meta.subjectClass === "character"` are also
+        exempt.
+
+      - E25 — Polygon distribution compliance (PART
+        42.2 / 42.5). If the model declares
+        `meta.polyDistribution = { silhouette, deformation,
+        detail }` (percentages summing to 100), the
+        actual silhouette/deformation/detail split
+        (computed by `polyDistribution(root)` from the
+        actual vertex positions) should match within
+        ±10% on each axis. Non-blocking; the model
+        still loads.
+
+    All 2 are non-blocking; the model still loads, the
+    user sees a toast + a red spec chip.
+
+    What PART 42 does NOT change in the renderer
+    runtime:
+
+      - No change to E1-E23 (they stay exactly as they
+        were in v1.18 / v8.10).
+      - No change to the GLB / OBJ / STL / FBX / DAE /
+        USDZ / .ts export pipeline.
+      - No change to the import map.
+      - No change to the loader.
+      - No change to the file-picker UI.
+      - No change to the scene tree or the Rig / Tris /
+        Sockets buttons.
+      - No new mandatory field on any existing userData
+        namespace — the new fields from 42.3
+        (`productionStep`), 42.4.1 (`deformationFixes`),
+        42.5 (`lodChain`), 42.7 (`halfBudgetCutList`),
+        42.8 (`filmQualityItems`), 42.4.2
+        (`blendShapes`, `rigControls`), 42.2
+        (`polyDistribution`), 42.6 (`targetQuality`) are
+        ALL OPTIONAL.
+      - No new dependency.
+
+  42.10 CANONICAL HELPERS
+  -----------------------
+
+    PART 42 adds 2 new canonical helpers to the existing
+    `__threeTriHelpers` bundle (PART 35 + PART 39 +
+    PART 40 + PART 41). The .ts factory can call any of
+    them via `window.lblSpec.helpers.<name>` without
+    copying the function body.
+
+    - `polyDistribution(root)`
+        PART 42.2 / Appendix A. Compute the actual
+        silhouette / deformation / detail split of a
+        loaded model. The heuristic:
+
+          - SILHOUETTE: meshes with `castShadow: true`
+            AND no skeletal animation (i.e. not bound
+            to a bone). Default: 60%.
+          - DEFORMATION: meshes that ARE bound to a
+            bone (`mesh.isSkinnedMesh === true` or
+            `mesh.userData.sculptBoundTo !== null`).
+            Default: 25%.
+          - DETAIL: meshes with neither flag. Default:
+            15%.
+
+        Returns
+        `{ silhouette, deformation, detail, total, ok }`
+        where each axis is a percentage (0-100) and
+        `ok` is true when all three sum to 100 within
+        ±0.5. The renderer's E25 validator uses the
+        same function.
+
+    - `productionChecklist(meta)`
+        PART 42.3 / 42.4 / 42.5 / 42.7 / 42.8 /
+        Appendix C. Build a structured production
+        checklist from a `meta` object. The shape:
+
+          {
+            steps: { blockout, sculptPrimary, sculptSecondary, retopo, uv, bake, texture, hairCloth, lods, rig, export },
+            deformationFixes: { shoulder, hip, knee, elbow, cape, head, belt },
+            lodChain: [ { level, triangles, ... } ],
+            halfBudgetCutList: string[],
+            filmQualityItems: string[],
+            targetQuality: 'game' | 'film' | 'mobile',
+            completeness: 0..1
+          }
+
+        The helper reads from `meta.productionStep`
+        (which is the current Step 1-11 the AI is
+        on), `meta.deformationFixes`, `meta.lodChain`,
+        `meta.halfBudgetCutList`, `meta.filmQualityItems`,
+        and `meta.targetQuality`, normalizes them, and
+        returns the structured shape. The `completeness`
+        field is a 0-1 score: 1.0 means all 11 steps
+        are checked, all 7 deformation fixes are
+        documented, the LOD chain has 5 entries, and
+        (if `targetQuality === 'film'`) all 10 film-
+        quality items are listed. The renderer's E24
+        production-completeness validator uses the
+        same function so the factory's authoring-time
+        call and the renderer's runtime call see the
+        same score.
+
+    These are pure additions to the existing
+    `__threeTriHelpers` bundle — the existing 5 PART
+    35 helpers, the 3 PART 39 helpers, the 3 PART 40
+    helpers, and the 2 PART 41 helpers stay untouched.
+    The renderer's runtime contract update is
+    `lblSpec.helpers.polyDistribution` and
+    `lblSpec.helpers.productionChecklist` become the
+    canonical way to do these two things in a .ts
+    factory; the factory does NOT need to copy the
+    function bodies.
+
+  WHAT PART 42 DOES NOT INTRODUCE
+  --------------------------------
+
+    - No new mandatory field on any existing userData
+      namespace (the new fields in 42.3
+      `productionStep`, 42.4.1 `deformationFixes`,
+      42.4.2 `blendShapes` / `rigControls`, 42.5
+      `lodChain`, 42.7 `halfBudgetCutList`, 42.8
+      `filmQualityItems`, 42.2 `polyDistribution`,
+      42.6 `targetQuality` are ALL OPTIONAL; the
+      current renderer ignores unknown keys safely)
+    - No new export path (the existing GLB / OBJ /
+      STL / FBX / DAE / USDZ / .ts paths are
+      unchanged)
+    - No new dependency (the new helpers use only
+      Three.js APIs that are already imported; no
+      import-map change)
+    - No new validator that blocks the model from
+      loading (E24, E25 are non-blocking, like E1-E23
+      before them)
+    - No change to the existing PART 1-41 rules
+      (PART 42 reinforces them — see the 42.0 +
+      42.10 cross-references)
+    - No change to the existing E1-E23 validators
+      (they stay exactly as they were in v1.18 / v8.10)
+    - No change to PART 38.22's style agnosticism
+      (PART 42 is also style-agnostic — applies to
+      every subject, every style, every path; the
+      7-technique + 11-step + 5-LOD framing is style-
+      agnostic; only the numeric budgets change with
+      style)
+    - No change to PART 41's 5-stage pipeline
+      (PART 42's 11-step pipeline is the
+      CHARACTER-SPECIFIC superset; non-character
+      subjects still use PART 41's 5-stage)
+    - No change to the project's "Low Poly 3D" name
+
+  CROSS-REFERENCES
+  -----------------
+
+    PART 42 layers on top of, never replaces:
+      - PART 1  (factory contract)         — TS path
+      - PART 2  (primitives)               — TS path
+      - PART 3  (materials)                — TS path
+      - PART 4  (single-file rule)         — TS path
+      - PART 17 (image-to-3D analysis)     — TS image path
+      - PART 27 (image-to-3D analysis)     — JSON/JS image path
+      - PART 30 (rigging & animation)      — both paths
+      - PART 31 (character sculpt)         — character subjects
+      - PART 32 (anti-pattern guards)      — E1-E12
+      - PART 34 (rig helpers)              — pre-bundled helpers
+      - PART 35 (triangle-first geometry)  — E12, the 🔺 Tris panel
+      - PART 36 (multi-file drop)          — both paths
+      - PART 37 (zip bundle)               — both paths
+      - PART 38 (character pipeline)       — E13-E16
+      - PART 38.13 (vertex budgeting)      — 42.2
+      - PART 38.16 (bounding-box props)    — 42.6
+      - PART 38.22 (style agnosticism)     — both paths
+      - PART 39 (3D modeling techniques)   — E17-E18
+      - PART 39.4 (silhouette test)        — 42.1, 42.5
+      - PART 40 (better models)            — E19-E21
+      - PART 40.6.3 (LOD support)          — 42.5
+      - PART 41 (high-detail generation)   — E22-E23
+      - PART 41.2 (5-stage pipeline)       — 42.3 (11-step is the character-specific superset)
+      - PART 41.3.1 (min mesh targets)     — 42.7
+      - PART 41.5 (silhouette pass)        — 42.3 Step 1 QC
+      - PART 64 (character sculpt enrich)  — JSON/JS only
+      - PART 65 (JSON/JS anti-patterns)    — E1-E12 on JSON/JS
+      - PART 66 (architectural bridge)     — JSON/JS only
+
+    The maintainer's "3D Character Production Plan"
+    (2026-08) is the source doc. The plan distills
+    7 production techniques (42.1), 60/25/15 polygon
+    distribution (42.2), 11-step pipeline (42.3),
+    85-bone skeleton (42.4), 5-LOD chain (42.5),
+    half-budget cut list (42.7), and film-quality
+    upgrade list (42.8) as a single character-specific
+    discipline that closes the gap between the existing
+    PART 31 character sculpt (which provides the
+    authoring-time framing) and a production-ready
+    hero character.
+
+================================================================================
+END OF PART 42 — v1.19 / v8.11 ADDITIONS: CHARACTER PRODUCTION DISCIPLINE
+A character is a 7-technique + 11-step + 5-LOD + 85-bone + 7-deformation-
+risk + half-budget-cut-list + film-quality-upgrade-list discipline, not
+a single-shot prompt-to-geometry call. The 7 production techniques:
+UV + image textures, PBR texturing, procedural textures, vertex colors,
+triplanar mapping, baking, texture atlasing. The 60/25/15 polygon
+distribution rule: silhouette 60% / deformation 25% / detail 15%
+(stylized-realism default). The 11-step pipeline: blockout → sculpt
+primary → sculpt secondary → retopo → UV → bake → texture → hair/cloth
+→ LODs → rig → export, each with a QC gate. The 85-bone skeleton
+reference for hero characters. The 5-LOD chain: LOD0 35k / LOD1 18k /
+LOD2 7.5k / LOD3 2.5k / LOD4 100 + billboard. The 7 deformation risk
+areas (shoulder, hip, knee, elbow, cape, head, belt) and their fixes.
+The 30+ blend shapes for facial expression. The performance budget of
+~1.4 ms / character at 60 fps. The half-budget cut list (12 cuts in
+priority order). The film-quality upgrade list (10 additions for going
+to ~2M tris). The never-cut list (mouth / eye topology, hip / knee
+loops, cape attachment). Adds E24 production-completeness (steps +
+deformation fixes + film-quality items) and E25 polygon-distribution
+compliance (60/25/15 split) to the existing 23 non-blocking
+validators. Re-exports `polyDistribution(root)` and
+`productionChecklist(meta)` on `window.lblSpec.helpers` alongside the
+PART 35 + PART 39 + PART 40 + PART 41 bundle. Character-specific
+extension of PART 41's 5-stage pipeline; non-character subjects still
+use the PART 41 5-stage. Style-agnostic, applies to every .ts factory
++ JSON/JS blueprint, every subject, every style. No new dependency, no
+new export path, no new mandatory field, no removed / weakened rule.
+================================================================================
+
+================================================================================
+PART 43 — v1.20 / v8.12 ADDITIONS: REFINEMENT + STYLE LOCKING + VARIANT
+RANKING
+================================================================================
+Source: the maintainer's "Techniques to Update Your System for
+Better 3D Models" (2026-08). The doc distills 7 categories of
+techniques the AI must apply when generating 3D models, with the
+explicit goal of closing the gap to higher-end systems (Meshy 6
+and Tripo's latest versions). The 7 categories are: (1) input
+quality & prompt engineering, (2) multi-stage / coarse-to-fine
+generation, (3) topology & mesh quality, (4) texture & material
+generation, (5) geometry refinement, (6) style & consistency
+controls, and (7) evaluation & feedback loop.
+
+PART 43 layers on top of — never replaces — PART 1, PART 2, PART 3,
+PART 4, PART 17, PART 27, PART 30, PART 31, PART 32, PART 34, PART 35,
+PART 36, PART 37, PART 38, PART 38.22, PART 39, PART 40, PART 41,
+PART 42, PART 64, PART 65, and PART 66.
+
+Categories (1) through (4) are already covered by PART 40
+(40.1 better prompt & input handling, 40.2 multi-stage generation
+pipeline, 40.3 mesh quality & topology, 40.5 texture & material
+system). PART 43 reinforces them with cross-references and adds
+the 4 geometry refinement techniques (43.1), the 4 style &
+consistency controls (43.2), and the variant ranking discipline
+(43.3) that the source doc lists but the prior PARTs did not
+fully cover. PART 43 is the BRIDGE between "good enough" and
+"Meshy 6 / Tripo level".
+
+  43.0  CENTRAL PRINCIPLE
+  -----------------------
+
+    PART 43 layers the 3 NEW categories from the source doc
+    on top of the 4 ALREADY-COVERED categories:
+
+      - (1) Input quality & prompt engineering
+        ALREADY COVERED by PART 40.1 (40.1.1 structured
+        prompts, 40.1.2 image preprocessing, 40.1.3 multi-
+        view image support, 40.1.4 negative prompts and
+        hard constraints). PART 43 reinforces with cross-
+        references in 43.4.
+
+      - (2) Multi-stage / coarse-to-fine generation
+        ALREADY COVERED by PART 40.2 (4-stage pipeline)
+        and EXTENDED by PART 41.2 (5-stage pipeline) and
+        PART 42.3 (11-step character pipeline). PART 43
+        reinforces with cross-references in 43.4.
+
+      - (3) Topology & mesh quality improvements
+        ALREADY COVERED by PART 40.3 (mesh cleanup, smart
+        low-poly mode, feature-preserving simplification,
+        watertight guarantee). PART 43 reinforces with
+        cross-references in 43.4.
+
+      - (4) Better texture & material generation
+        ALREADY COVERED by PART 40.5 (PBR texture sets,
+        style-specific texturing, texture refinement
+        stage, automatic UV handling). PART 43 reinforces
+        with cross-references in 43.4.
+
+      - (5) Geometry refinement techniques
+        NEW in PART 43 (43.1). 4 techniques the prior
+        PARTs did not cover: normal-guided refinement
+        (43.1.1), view-by-view iterative refinement
+        (43.1.2), detail enhancement networks (43.1.3),
+        and segmentation + part-aware generation (43.1.4).
+
+      - (6) Style & consistency controls
+        NEW in PART 43 (43.2). 4 controls the prior
+        PARTs touched but did not centralize: strong
+        style locking (43.2.1), consistent polygon
+        density and edge flow (43.2.2), silhouette-
+        first optimization (43.2.3), and hard-surface
+        vs organic topology (43.2.4).
+
+      - (7) Evaluation & feedback loop
+        PARTIALLY COVERED by PART 40.7 (post-processing,
+        validation, feedback). PART 43 EXTENDS it with
+        the 3 variant-ranking techniques (43.3): generate
+        N variants (43.3.1), rank by quality metrics
+        (43.3.2), and a tighter feedback loop (43.3.3
+        that supersedes PART 40.7.4).
+
+    The central principle of PART 43:
+
+      REFINEMENT is the bridge from "good enough" to
+      "Meshy 6 / Tripo level". CONSISTENCY is the
+      discipline that makes a model family look like it
+      belongs together. RANKING is the discipline that
+      gives the user the best of N, not the first of N.
+
+    PART 43 is style-agnostic. The techniques apply to
+    low-poly, mid-poly, high-poly, smooth-shaded,
+    stylized, photoreal, voxel, hand-painted, toon /
+    cel, retro-PSX, hologram, wireframe, and any
+    combination.
+
+  43.1  GEOMETRY REFINEMENT TECHNIQUES
+  ------------------------------------
+
+    The 4 geometry refinement techniques from the source
+    doc's Section 5. Each technique is a separate
+    authoring-time pass; the AI applies them in addition
+    to the multi-stage pipeline from PART 40.2 / 41.2 /
+    42.3.
+
+  43.1.1  Normal-guided refinement.
+
+    A normal map predicts the SURFACE DIRECTION of a
+    region; geometry refinement uses that prediction to
+    SHIFT THE VERTEX POSITIONS so the actual surface
+    matches the predicted normal. The result: a model
+    that LOOKS like it has more polygons than it does
+    (the normal map fakes the high-frequency detail, the
+    geometry carries the low-frequency form).
+
+    The AI applies normal-guided refinement in Stage 4
+    of PART 41.2 (Surface Detail) and Step 7 of PART
+    42.3 (Texture). The pass:
+
+      1. Generate a high-frequency normal map from a
+         high-poly sculpt (PART 42.1.6) or a procedural
+         noise source.
+      2. For each vertex, compute the predicted normal
+         direction (the average of the 3 adjacent face
+         normals after the normal map is applied).
+      3. Shift the vertex along the predicted normal by
+         a small amount (typically 0.001-0.01 units, in
+         the direction of the predicted normal).
+      4. Re-bake the normal map from the updated vertex
+         positions.
+      5. Repeat steps 2-4 until the predicted normals
+         match the target normal map within tolerance.
+
+    The technique is "normal-guided" because the
+    REFINEMENT DIRECTION is determined by the normal
+    map, not by the AI's authoring choice. A model
+    with a strong horizontal grain (like a wood plank)
+    gets shifted along the grain; a model with a strong
+    vertical grain (like a column) gets shifted along
+    the column.
+
+    PART 43 introduces `meta.normalRefinementPasses`
+    (number, default 0, OPTIONAL) to declare how many
+    passes the AI ran. The renderer's E26 style-lock
+    compliance check (43.5) doesn't enforce this — it's
+    an authoring-time decision.
+
+  43.1.2  View-by-view iterative refinement.
+
+    A model that looks great from the front may look
+    bad from the back. View-by-view iterative
+    refinement alternates between:
+
+      - View 1 (front): render silhouette + texture,
+        identify failure modes (silhouette breaks,
+        texture is wrong, color is off).
+      - Refine 1: adjust geometry, texture, or color
+        to fix the failure modes.
+      - View 2 (side): render silhouette + texture,
+        identify failure modes.
+      - Refine 2: same as Refine 1.
+      - ... (continue for N views)
+      - Final: combine the N refinements into a single
+        mesh + texture set.
+
+    The technique is "view-by-view" because each
+    refinement is TARGETED at one view; the AI doesn't
+    try to fix all views at once. The combination step
+    at the end is the LEAST BAD compromise across all
+    views, not the BEST for any single view.
+
+    The PART 40.1.3 multi-view image support feeds
+    this: when the user supplies 2-4 reference views,
+    the AI's authoring loop is "iterate view-by-view
+    until all N views pass the silhouette test". The
+    factory publishes the view-by-view pass count on
+    `meta.viewRefinementPasses` (number, default 0,
+    OPTIONAL) and the per-view refinement log on
+    `meta.viewRefinementLog` (array of { view,
+    passCount, lastFailures }, OPTIONAL).
+
+    The renderer's E27 multi-view consistency check
+    (43.5) verifies the model has the declared number
+    of view passes; a model with
+    `meta.referenceViews.length === 4` but
+    `viewRefinementPasses === 0` surfaces a warning.
+
+  43.1.3  Detail enhancement networks.
+
+    A specialized model that takes a low-poly mesh and
+    a reference image, and adds HIGH-FREQUENCY DETAIL
+    to the geometry without changing the silhouette.
+    The technique is "detail enhancement" because it
+    PRESERVES the silhouette (low-frequency form) and
+    ADDS the detail (high-frequency form). The output
+    is the same low-poly topology with shifted vertex
+    positions, ready for normal-map baking (PART
+    42.1.6) or direct rendering.
+
+    The AI applies detail enhancement in Stage 3 of
+    PART 41.2 (Form Density) and Step 4 of PART 42.3
+    (Retopology). The pass:
+
+      1. Take the low-poly mesh from Stage 2 / Step 2.
+      2. Render a high-frequency detail target from the
+         reference image (a depth map, a normal map,
+         or a height map).
+      3. Run a detail enhancement network that maps
+         (low-poly mesh, high-frequency target) →
+         (refined low-poly mesh).
+      4. Verify the refined mesh still passes the
+         PART 39.4.1 silhouette test (the silhouette
+         should be UNCHANGED).
+      5. Re-bake the normal map from the refined
+         mesh.
+
+    The factory publishes the network used (or the
+    "manual" / "noise-based" alternative) on
+    `meta.detailEnhancer` (string, OPTIONAL). The
+    renderer's E26 style-lock check (43.5) doesn't
+    enforce this — it's an authoring-time decision.
+
+  43.1.4  Segmentation + part-aware generation.
+
+    Auto-split the model into LOGICAL PARTS (head,
+    body, weapon, etc.) BEFORE the geometry refinement
+    passes. The segmentation lets the AI apply
+    different techniques to different parts: a wood
+    handle gets procedural grain (PART 42.1.3), a
+    metal blade gets baked normal + procedural
+    scratch (PART 42.1.6 + 42.1.3), a leather grip
+    gets vertex-color wear (PART 42.1.4).
+
+    The PART 41.1 detail inventory's `identity`,
+    `secondary`, `tertiary`, and `materialZones`
+    categories are the EXPLICIT form of segmentation
+    — the AI names the parts before any geometry is
+    written, and the parts map to the right
+    techniques. PART 43.1.4 EXTENDS PART 41.1 with
+    a SEGMENTATION HINT field that the AI publishes
+    on `meta.segmentation` (array of part names,
+    OPTIONAL) so the renderer can read the parts
+    without parsing the detail inventory.
+
+    The renderer's E26 style-lock check (43.5)
+    verifies that all segments share the same style
+    lock; a model with 3 segments using 3 different
+    styles surfaces a warning.
+
+  43.2  STYLE & CONSISTENCY CONTROLS
+  ----------------------------------
+
+    The 4 style & consistency controls from the source
+    doc's Section 6. Each control is a DECLARATION
+    on `meta.styleLock` that the renderer enforces.
+
+  43.2.1  Strong style locking.
+
+    The model declares a SINGLE style on
+    `meta.styleLock` (string, one of 'pure-low-poly' |
+    'stylized' | 'semi-realistic' | 'realistic' |
+    'voxel' | 'hand-painted' | 'toon-cel' |
+    'retro-psx' | 'hologram' | 'wireframe'). The
+    renderer checks that all materials and the
+    overall density / style usage match the locked
+    style. A model that locks 'pure-low-poly' but
+    uses a `MeshPhysicalMaterial` with a 4k normal
+    map is a STYLE LOCK VIOLATION.
+
+    PART 38.22 already establishes that the system
+    supports any style and that low-poly is the
+    default for short prompts. PART 43.2.1 EXTENDS
+    PART 38.22 with an EXPLICIT LOCK field that
+    the AI publishes when the user wants to
+    commit to a single style; without the lock,
+    the model can use mixed styles (PART 38.22's
+    style-agnosticism).
+
+    The renderer's E26 style-lock compliance check
+    (43.5) reads `meta.styleLock` and verifies:
+
+      - All materials match the locked style's
+        material kind ('pure-low-poly' → MeshLambert
+        or flat MeshStandard, no normal maps;
+        'realistic' → MeshPhysical with full PBR
+        set; etc.).
+      - The triangle density matches the locked
+        style's range (PART 42.2 — pure-low-poly
+        is 80/15/5, realistic is 45/30/25).
+      - The texture density matches the locked
+        style's density ('pure-low-poly' is
+        'low', 'realistic' is 'high').
+
+    Models without `meta.styleLock` are exempt
+    (the AI chose to be style-agnostic on purpose).
+
+  43.2.2  Consistent polygon density and edge flow.
+
+    When the AI is generating N models for a single
+    scene (e.g. "a medieval village" with 12
+    buildings, 30 villagers, 15 props), every model
+    should share the SAME polygon density and edge
+    flow rules. A medieval village with 12
+    buildings at 2k tris each + 30 villagers at
+    20k tris each is INCONSISTENT; the villagers
+    would dwarf the buildings visually.
+
+    The AI declares the family-wide density on
+    `meta.familyDensity` (number, OPTIONAL) and the
+    family-wide edge flow on `meta.familyEdgeFlow`
+    (string, one of 'organic' | 'hard-surface' |
+    'mixed', OPTIONAL). The renderer does NOT
+    enforce cross-model consistency (the renderer
+    sees one model at a time); the AI enforces it
+    at authoring time.
+
+    The renderer's E26 style-lock check (43.5)
+    doesn't enforce family-wide density either —
+    this is a discipline the AI follows when
+    generating N models, not a check the renderer
+    runs on a single model. The AI's authoring-time
+    audit (PART 39.6) gets a new line: "is this
+    model consistent with the family-wide density
+    and edge flow?"
+
+  43.2.3  Silhouette-first optimization.
+
+    The PART 39.4.1 silhouette test (256x256 black-
+    on-white, 90%+ accuracy vs reference) is the
+    AUTHORING-TIME check; the PART 42.2 60%
+    silhouette budget is the ALLOCATION rule.
+    PART 43.2.3 EXTENDS both with a SILHOUETTE-
+    PRIORITY view selection: the AI optimizes the
+    silhouette from the MOST IMPORTANT camera angles
+    first (typically front + 3/4 + side), then
+    fills in the back / top / bottom from the
+    remaining budget.
+
+    The AI declares the priority order on
+    `meta.silhouettePriority` (array of camera
+    angle names, default
+    ['front', '3/4-front', 'side', '3/4-back',
+    'back', 'top'], OPTIONAL). The renderer's E27
+    multi-view consistency check (43.5) verifies
+    the declared priority order matches the actual
+    `meta.referenceViews` order (when both are
+    declared); a model with
+    `silhouettePriority: ['front', 'side']` but
+    `referenceViews: ['front', 'side', 'top']`
+    surfaces a warning.
+
+  43.2.4  Hard-surface vs organic topology.
+
+    A hard-surface model (a robot, a vehicle, a
+    weapon) has SHARP EDGES and PLANAR SURFACES.
+    An organic model (a character, a creature, a
+    plant) has SMOOTH EDGES and CURVED SURFACES.
+    The two require different topology rules:
+
+      - Hard-surface: edge loops at every sharp
+        edge, planar surfaces on every face, no
+        smooth shading unless explicitly requested.
+      - Organic: edge loops following the muscle /
+        bone structure, smooth shading on every
+        face, no sharp edges unless explicitly
+        requested.
+
+    The AI declares the topology preference on
+    `meta.topologyPreference` (string, one of
+    'hard-surface' | 'organic' | 'mixed' |
+    'auto-detect', OPTIONAL). The renderer does
+    NOT enforce this — it's an authoring-time
+    decision. The PART 38.16 / E16 bounding-box
+    proportions check is the only topology check
+    the renderer runs.
+
+  43.3  VARIANT GENERATION + AUTOMATIC RANKING
+  --------------------------------------------
+
+    The 3 variant-ranking techniques from the source
+    doc's Section 7. PART 40.7.4 introduced the
+    user rating feedback loop; PART 43.3 EXTENDS
+    it with a fuller variant ranking discipline.
+
+  43.3.1  Generate N variants.
+
+    When the user asks for a model without an exact
+    reference (e.g. "a knight", "a medieval
+    village", "a fantasy tree"), the AI generates
+    N variants (default N=3, OPTIONAL override via
+    `meta.variantCount`) and ships all N. Each
+    variant is a complete .ts factory (or JSON
+    blueprint); the user picks the best one or the
+    renderer auto-ranks them.
+
+    The N variants are generated from the same
+    detail inventory (PART 41.1) and the same
+    pipeline (PART 42.3) but with different
+    `meta.seed` values (PART 40.6.2). The seeded
+    RNG (PART 40.6.2 / 40.10) ensures the N
+    variants are DETERMINISTIC — the user can
+    regenerate the exact N variants on reload.
+
+    The factory publishes the N variants as a
+    `meta.variants` array (array of factory
+    references or blueprint references, OPTIONAL).
+    On the TS path, the variants are siblings
+    inside the same file; on the JSON/JS path,
+    the variants are separate top-level keys
+    (`variants: [bp1, bp2, bp3]`).
+
+  43.3.2  Rank by quality metrics.
+
+    The renderer's E26 + E27 + the existing E1-E25
+    provide the QUALITY METRICS for ranking. The
+    ranking function is `lblSpec.helpers.rankVariants`
+    (43.6), which scores each variant on:
+
+      - Silhouette accuracy (PART 39.4.1, IoU vs
+        reference).
+      - Poly count vs target (PART 40.3.2 / E21).
+      - Mesh count vs target (PART 41.3.1 / E23).
+      - Density over brevity (PART 41.3 — 60/25/15
+        / E25).
+      - Production completeness (PART 42.3 / E24).
+      - Style lock compliance (PART 43.2.1 / E26).
+      - Multi-view consistency (PART 43.1.2 / E27).
+
+    The function returns the N variants sorted by
+    score (highest first). The user sees the
+    top-ranked variant by default; clicking
+    through to a lower-ranked variant is one click
+    away.
+
+  43.3.3  User feedback loop.
+
+    The PART 40.7.4 user rating feedback loop is
+    EXTENDED by PART 43.3.3 with TWO additional
+    hooks:
+
+      - The user can mark a variant as "favorite";
+        the favorite becomes the seed for the next
+        round of variant generation. The factory
+        records the favorite's `meta.seed` on
+        `meta.favoriteSeed` (number, OPTIONAL).
+      - The user can rate a variant on a 1-5 scale
+        (1 = worst, 5 = best); the rating feeds
+        back into the AI's prompt defaults for the
+        next session. The factory records the
+        average rating on `meta.averageRating`
+        (number 1-5, OPTIONAL).
+
+    The renderer does NOT have to implement the
+    favorite / rating UI in v1.20 / v8.12 — that's
+    a future round. PART 43.3.3 documents the
+    INTENT and the metadata fields so the AI's
+    authoring-time defaults can be tuned from the
+    rating data when the UI ships.
+
+  43.4  WHAT PART 43 REINFORCES FROM PART 40-42
+  --------------------------------------------
+
+    PART 43 is layered on top of — never replaces —
+    PART 40 (production-grade pipeline), PART 41
+    (high-detail density), and PART 42 (character
+    production discipline). The 4 categories the
+    source doc lists that PART 40-42 already
+    covered are reinforced with cross-references:
+
+      - (1) Input quality & prompt engineering
+        → PART 40.1 (structured prompts, image
+        preprocessing, multi-view, negative
+        prompts). PART 43 reinforces 43.1.2
+        view-by-view iterative refinement (which
+        consumes the PART 40.1.3 multi-view image
+        support) and 43.1.4 segmentation (which
+        consumes the PART 41.1 detail inventory).
+
+      - (2) Multi-stage / coarse-to-fine
+        generation
+        → PART 40.2 (4-stage), PART 41.2
+        (5-stage), PART 42.3 (11-step character).
+        PART 43 reinforces 43.1.1 normal-guided
+        refinement (which runs in Stage 4 of PART
+        41.2) and 43.1.2 view-by-view iterative
+        refinement (which runs across Stages 2-5).
+
+      - (3) Topology & mesh quality improvements
+        → PART 40.3 (cleanup, smart low-poly,
+        feature-preserving, watertight). PART 43
+        reinforces 43.1.3 detail enhancement
+        networks (which preserve the low-poly
+        topology from PART 40.3.2) and 43.2.2
+        consistent polygon density (which extends
+        PART 40.3.2's per-model target to the
+        family-wide level).
+
+      - (4) Better texture & material generation
+        → PART 40.5 (PBR set, style-specific
+        texturing, texture refinement stage,
+        automatic UV handling). PART 43
+        reinforces 43.1.1 normal-guided refinement
+        (which consumes the normal map from PART
+        40.5.1) and 43.2.1 strong style locking
+        (which constrains the material kind from
+        PART 40.5.1 to a single style).
+
+    The 3 NEW categories from PART 43 (geometry
+    refinement, style & consistency, variant
+    ranking) are documented in 43.1 / 43.2 / 43.3
+    above.
+
+  43.5  RENDERER-SIDE RUNTIME CONTRACT
+  ------------------------------------
+
+    PART 43 adds 2 new non-blocking validators to
+    the existing 25:
+
+      - E26 — Style lock compliance (PART 43.2.1).
+        If the model declares `meta.styleLock`,
+        the renderer's runtime check verifies:
+
+          - Material kind matches the locked style
+            ('pure-low-poly' → no normal maps;
+            'realistic' → MeshPhysical with full
+            PBR; 'voxel' → flat colors only; etc.).
+          - Triangle density matches the locked
+            style's expected range (PART 42.2).
+          - Texture density matches the locked
+            style's expected density.
+
+        A model that declares `styleLock: 'pure-
+        low-poly'` but uses a 4k normal map is a
+        STYLE LOCK VIOLATION. The renderer surfaces
+        the violation in the warning. Models without
+        `meta.styleLock` are exempt (the AI chose
+        to be style-agnostic on purpose — PART
+        38.22). Non-blocking.
+
+      - E27 — Multi-view consistency (PART 40.1.3
+        / 43.1.2 / 43.2.3). If the model declares
+        `meta.referenceViews` (an array of view
+        names from PART 40.1.3), the renderer's
+        runtime check verifies:
+
+          - The actual model has at least N named
+            parts (one per view, N = the array
+            length).
+          - The model's `meta.silhouettePriority`
+            (when declared) is consistent with the
+            `meta.referenceViews` order.
+          - The model's `meta.viewRefinementPasses`
+            (when declared) is at least 1 (a model
+            that says "I have 4 reference views"
+            but "I ran 0 refinement passes" is a
+            sign the AI skipped 43.1.2).
+
+        Models without `meta.referenceViews` are
+        exempt. Non-blocking.
+
+    All 2 are non-blocking; the model still loads,
+    the user sees a toast + a red spec chip. They
+    mirror the E1-E25 pattern and integrate into
+    the existing `validate()` / `applyToUI()` /
+    `revalidate()` pipeline without any caller-side
+    changes.
+
+    What PART 43 does NOT change in the renderer
+    runtime:
+
+      - No change to E1-E25 (they stay exactly
+        as they were in v1.19 / v8.11).
+      - No change to the GLB / OBJ / STL / FBX /
+        DAE / USDZ / .ts export pipeline.
+      - No change to the import map.
+      - No change to the loader.
+      - No change to the file-picker UI.
+      - No change to the scene tree or the Rig /
+        Tris / Sockets buttons.
+      - No new mandatory field on any existing
+        userData namespace — the new fields from
+        43.1.1 `normalRefinementPasses`, 43.1.2
+        `viewRefinementPasses` /
+        `viewRefinementLog`, 43.1.3
+        `detailEnhancer`, 43.1.4 `segmentation`,
+        43.2.1 `styleLock`, 43.2.2
+        `familyDensity` / `familyEdgeFlow`,
+        43.2.3 `silhouettePriority`, 43.2.4
+        `topologyPreference`, 43.3.1 `variantCount`
+        / `variants`, 43.3.3 `favoriteSeed` /
+        `averageRating` are ALL OPTIONAL.
+      - No new dependency.
+
+  43.6  CANONICAL HELPERS
+  ----------------------
+
+    PART 43 adds 2 new canonical helpers to the
+    existing `__threeTriHelpers` bundle (PART 35
+    + PART 39 + PART 40 + PART 41 + PART 42). The
+    .ts factory can call any of them via
+    `window.lblSpec.helpers.<name>` without copying
+    the function body.
+
+    - `viewRefinePass(views, opts)`
+        PART 43.1.2 / Appendix A. Run a view-by-
+        view refinement pass on a model's
+        silhouette. The helper is a STUB — the
+        actual refinement runs in the AI's
+        authoring-time loop, not at runtime. What
+        the helper does:
+
+          - Returns a structured plan
+            `{ views: [...], passesPerView:
+            opts.passesPerView || 1, log: [] }`
+            that the AI's authoring loop can use
+            to track the per-view pass count and
+            the last-known failure modes.
+
+          - Validates the `views` array against
+            the PART 40.1.3 canonical view names
+            (front / 3/4-front / side / 3/4-back
+            / back / top / 3/4-top / bottom).
+            Unknown view names surface a console
+            warning.
+
+          - Returns the plan with a 0-1
+            `completeness` score: 1.0 means the
+            plan has at least 2 views AND at
+            least 1 pass per view; lower scores
+            surface as a console hint that the
+            AI should run more passes.
+
+        The renderer's E27 multi-view consistency
+        validator uses the same function.
+
+    - `rankVariants(variants, opts)`
+        PART 43.3.2 / Appendix C. Score and rank
+        N variants by quality metrics. The
+        function:
+
+          - For each variant, calls the existing
+            `validate(root)` (E1-E27) to gather
+            warnings.
+          - Computes a score for each variant
+            based on:
+              - Number of warnings (lower is
+                better; -1 per warning).
+              - Silhouette accuracy vs the
+                variant's `meta.referenceViews`
+                (when declared; PART 40.1.3 / 43.1.2).
+              - Poly count vs `meta.targetTris`
+                (PART 40.3.2 / E21).
+              - Mesh count vs `meta.minMeshes` or
+                `meta.subjectClass` floor (PART
+                41.3.1 / E23).
+              - Poly distribution vs
+                `meta.polyDistribution` (PART 42.2
+                / E25).
+              - Style lock compliance (PART
+                43.2.1 / E26).
+              - Production completeness (PART
+                42.3 / E24).
+          - Returns the N variants sorted by
+            score (highest first) with a 0-1
+            `confidence` field per variant
+            (1.0 = no warnings, 0.0 = many
+            warnings).
+
+        The function does NOT actually render
+        the variants (the rendering is the
+        renderer's job); it returns a SORTED
+        LIST that the AI / renderer uses to
+        pick the top variant. The user can
+        click through to a lower-ranked variant
+        via the model store.
+
+    These are pure additions to the existing
+    `__threeTriHelpers` bundle — the existing
+    5 PART 35 helpers, the 3 PART 39 helpers,
+    the 3 PART 40 helpers, the 2 PART 41
+    helpers, and the 2 PART 42 helpers stay
+    untouched. The renderer's runtime contract
+    update is `lblSpec.helpers.viewRefinePass`
+    and `lblSpec.helpers.rankVariants` become
+    the canonical way to do these two things
+    in a .ts factory; the factory does NOT
+    need to copy the function bodies.
+
+  WHAT PART 43 DOES NOT INTRODUCE
+  --------------------------------
+
+    - No new mandatory field on any existing
+      userData namespace (the new fields in
+      43.1.1 `normalRefinementPasses`, 43.1.2
+      `viewRefinementPasses` / `viewRefinementLog`,
+      43.1.3 `detailEnhancer`, 43.1.4
+      `segmentation`, 43.2.1 `styleLock`, 43.2.2
+      `familyDensity` / `familyEdgeFlow`, 43.2.3
+      `silhouettePriority`, 43.2.4
+      `topologyPreference`, 43.3.1 `variantCount` /
+      `variants`, 43.3.3 `favoriteSeed` /
+      `averageRating` are ALL OPTIONAL; the
+      current renderer ignores unknown keys
+      safely)
+    - No new export path (the existing GLB / OBJ
+      / STL / FBX / DAE / USDZ / .ts paths are
+      unchanged)
+    - No new dependency (the new helpers use only
+      Three.js APIs that are already imported; no
+      import-map change)
+    - No new validator that blocks the model from
+      loading (E26, E27 are non-blocking, like
+      E1-E25 before them)
+    - No change to the existing PART 1-42 rules
+      (PART 43 reinforces them — see the 43.0 +
+      43.4 + 43.6 cross-references)
+    - No change to the existing E1-E25 validators
+      (they stay exactly as they were in v1.19 /
+      v8.11)
+    - No change to PART 38.22's style agnosticism
+      (PART 43.2.1 style-lock is OPTIONAL; without
+      it, the model is still style-agnostic)
+    - No change to PART 41's 5-stage pipeline
+      (PART 43's geometry refinement techniques
+      run INSIDE the existing stages, not as new
+      stages)
+    - No change to PART 42's 11-step pipeline
+      (PART 43's style & consistency controls are
+      meta-declarations, not pipeline steps)
+    - No change to the project's "Low Poly 3D"
+      name
+
+  CROSS-REFERENCES
+  -----------------
+
+    PART 43 layers on top of, never replaces:
+      - PART 1  (factory contract)         — TS path
+      - PART 2  (primitives)               — TS path
+      - PART 3  (materials)                — TS path
+      - PART 4  (single-file rule)         — TS path
+      - PART 17 (image-to-3D analysis)     — TS image path
+      - PART 27 (image-to-3D analysis)     — JSON/JS image path
+      - PART 30 (rigging & animation)      — both paths
+      - PART 31 (character sculpt)         — character subjects
+      - PART 32 (anti-pattern guards)      — E1-E12
+      - PART 34 (rig helpers)              — pre-bundled helpers
+      - PART 35 (triangle-first geometry)  — E12, the 🔺 Tris panel
+      - PART 36 (multi-file drop)          — both paths
+      - PART 37 (zip bundle)               — both paths
+      - PART 38 (character pipeline)       — E13-E16
+      - PART 38.22 (style agnosticism)     — 43.2.1 (style lock is the OPT-IN counterpart)
+      - PART 39 (3D modeling techniques)   — E17-E18
+      - PART 39.4 (silhouette test)        — 43.1.2 view-by-view, 43.2.3 silhouette-first
+      - PART 40 (better models)            — E19-E21
+      - PART 40.1 (better prompt)          — 43.0 + 43.4
+      - PART 40.1.3 (multi-view)           — 43.1.2 + 43.2.3
+      - PART 40.2 (multi-stage pipeline)   — 43.0 + 43.4
+      - PART 40.3 (mesh quality)           — 43.0 + 43.4
+      - PART 40.5 (PBR materials)          — 43.0 + 43.4
+      - PART 40.6.2 (seeded random)        — 43.3.1 variant generation
+      - PART 40.7.4 (user rating loop)     — 43.3.3 (extends)
+      - PART 41 (high-detail generation)   — E22-E23
+      - PART 41.1 (detail inventory)       — 43.1.4 segmentation
+      - PART 41.2 (5-stage pipeline)       — 43.1.1 + 43.1.2 run inside the stages
+      - PART 42 (character production)     — E24-E25
+      - PART 42.2 (60/25/15 distribution)  — 43.2.1 style lock, 43.2.2 family density
+      - PART 42.3 (11-step pipeline)       — 43.0 + 43.4
+      - PART 64 (character sculpt enrich)  — JSON/JS only
+      - PART 65 (JSON/JS anti-patterns)    — E1-E12 on JSON/JS
+      - PART 66 (architectural bridge)     — JSON/JS only
+
+    The maintainer's "Techniques to Update Your
+    System for Better 3D Models" (2026-08) is the
+    source doc. The doc distills 7 categories that
+    close the gap between basic generators and
+    higher-end tools like Meshy 6 and Tripo. PART
+    43 layers the 3 NEW categories (geometry
+    refinement, style & consistency, variant
+    ranking) on top of the 4 ALREADY-COVERED ones
+    (input quality, multi-stage, topology, textures)
+    that PART 40-42 already addressed.
+
+================================================================================
+END OF PART 43 — v1.20 / v8.12 ADDITIONS: REFINEMENT + STYLE LOCKING +
+VARIANT RANKING
+The bridge from "good enough" to "Meshy 6 / Tripo level". 4 geometry
+refinement techniques: normal-guided refinement (43.1.1, predict normals
+and shift vertices to match), view-by-view iterative refinement
+(43.1.2, alternate texture and geometry from N views), detail
+enhancement networks (43.1.3, preserve silhouette + add high-frequency
+detail), segmentation + part-aware generation (43.1.4, split the model
+into logical parts so each part gets the right technique). 4 style &
+consistency controls: strong style locking (43.2.1, `meta.styleLock`
+declaration that constrains the material kind + density + texture
+density to a single style), consistent polygon density and edge flow
+across model families (43.2.2, `meta.familyDensity` + `meta.familyEdgeFlow`
+for N-model scenes), silhouette-first optimization (43.2.3,
+`meta.silhouettePriority` declaration that the AI optimizes from
+important angles first), hard-surface vs organic topology
+(43.2.4, `meta.topologyPreference` for sharp-edge vs smooth-edge
+rules). 3 variant-ranking techniques: generate N variants from the
+same detail inventory + different `meta.seed` (43.3.1), rank by
+quality metrics via the E1-E27 validators (43.3.2), user feedback
+loop with favorite + 1-5 rating that feeds back into the next
+session's prompt defaults (43.3.3, EXTENDS PART 40.7.4). Adds E26
+style-lock compliance (material kind + density + texture density
+match the locked style) and E27 multi-view consistency (named parts
+>= reference views, viewRefinementPasses >= 1) to the existing 25
+non-blocking validators. Re-exports `viewRefinePass(views, opts)` and
+`rankVariants(variants, opts)` on `window.lblSpec.helpers` alongside
+the PART 35 + PART 39 + PART 40 + PART 41 + PART 42 bundle. PART 43
+is style-agnostic, applies to every .ts factory + JSON/JS blueprint,
+every subject, every style. PART 43 reinforces PART 40-42 with
+cross-references for the 4 already-covered categories (input
+quality, multi-stage, topology, textures) and ADDS the 3 new
+categories (refinement, style & consistency, variant ranking). No
+new dependency, no new export path, no new mandatory field, no
+removed / weakened rule.
+================================================================================
+
+================================================================================
+PART 44 — v1.21 / v8.13 ADDITIONS: PROFESSIONAL PIPELINE (GLB-FIRST +
+BVH + LOOK-DEV LIGHTS + CODING RULES)
+================================================================================
+Source: the maintainer's "Three.js / procedural 3D character and
+asset systems engineer" upgrade brief (2026-08). The brief is a
+hands-on implementation roadmap: move from primitive-assembly to a
+continuous-topology + GLB-first pipeline with BVH-accelerated
+raycasting, per-model look-dev lights, fitted clothing/armor
+layers, baked animation clips, multi-view validation renders, and
+a strict house style for the .ts factory code. PART 44 layers onto
+PARTs 1-43; most of the architecture is already covered by PART 38
+(character pipeline upgrade, GLB-first), PART 39 (3D modeling
+techniques, boot-time validator), PART 40 (production-grade
+pipeline, parametric / procedural techniques), PART 41 (high-
+detail generation, 5-stage pipeline, material variants), PART 42
+(character production discipline, 11-step pipeline, 5-LOD chain,
+deformation risks, 30+ blend shapes), and PART 43 (refinement +
+style locking + variant ranking). PART 44 adds the 4 specific
+gaps the brief calls out: (1) BVH-accelerated raycasting via
+three-mesh-bvh (the import-map entry was already in place from
+v0.6 — PART 44 ADDS the helper that uses it), (2) per-model
+look-dev lights, (3) the 6-family material hierarchy with bone +
+magic, and (4) the maintainer's house style for .ts factory code
+(6 practical coding rules). The fitted clothing pattern and the
+animation clip baking are already partially covered by PART 38
+and PART 42; PART 44 EXTENDS them with the implementation
+patterns the brief calls out.
+
+PART 44 layers on top of — never replaces — PART 1, PART 2, PART 3,
+PART 4, PART 17, PART 27, PART 30, PART 31, PART 32, PART 34, PART 35,
+PART 36, PART 37, PART 38, PART 38.22, PART 39, PART 40, PART 41,
+PART 42, PART 43, PART 64, PART 65, and PART 66.
+
+  44.0  CENTRAL PRINCIPLE
+  -----------------------
+
+    The maintainer's brief asks for ONE architectural shift:
+    the .ts factory is no longer the primary artifact — the
+    GLB file is.
+
+    A "primitive-assembly" .ts factory that builds a model
+    from 200 individual `BoxGeometry` + `SphereGeometry` +
+    `CylinderGeometry` calls in a deep Group hierarchy is a
+    valid RUNTIME artifact (the renderer can load it,
+    display it, animate it), but it is a POOR SHIPPING
+    artifact (it can't be exported as a clean GLB, it has
+    no skeletal skinning, it has no real materials, it
+    can't be imported into Blender, it doesn't have a
+    proper UV layout). PART 38.14 already established the
+    GLB-first architecture; PART 44 EXTENDS it with the
+    implementation patterns the brief calls out.
+
+    The new central principle:
+
+      SHIP THE GLB. THE .ts FACTORY IS THE VIEWER ADAPTER.
+
+    The .ts factory does FOUR things:
+      1. LOADS the GLB (via `GLTFLoader` from `three/addons/`).
+      2. ATTACHES the rigged skeleton, skin weights, and
+         animation mixer.
+      3. EXTRACTS the sockets, the look-dev lights, the
+         BVH index, and the validation surface.
+      4. VALIDATES the loaded model (E1-E29) and exposes
+         the warnings via `lblSpec.helpers.validate(root)`.
+
+    The .ts factory does NOT build the model. The model
+    is the GLB; the .ts is the wrapper.
+
+    PART 44 is style-agnostic. The architecture applies
+    to low-poly, mid-poly, high-poly, smooth-shaded,
+    stylized, photoreal, voxel, hand-painted, toon / cel,
+    retro-PSX, hologram, wireframe, and any combination.
+
+  44.1  THREE.JS PERFORMANCE: three-mesh-bvh
+  -----------------------------------------
+
+    The `three-mesh-bvh` library (already in the
+    import map from v0.6) provides BVH-accelerated
+    raycasting, culling, and CSG. The renderer
+    currently doesn't USE it — the import-map entry
+    was added for future use. PART 44 ADDS the
+    helper that uses it.
+
+  44.1.1  BVH-accelerated raycasting (picking, collision).
+
+    Without BVH, Three.js's `Raycaster.intersectObject`
+    walks every triangle in the geometry to find
+    intersections. For a 35k-triangle hero character
+    (PART 42.5), this is ~0.5ms per ray — fine for
+    60 fps mouse picking (one ray per frame) but
+    too slow for collision queries that need N
+    rays per frame (N particles, N physics bodies).
+
+    With BVH, the same `Raycaster.intersectObject`
+    call uses a pre-computed bounding-volume
+    hierarchy to skip whole subtrees. The result is
+    ~0.01ms per ray — 50x faster. The trade-off: the
+    BVH must be PRE-COMPUTED before the first ray
+    query, and it costs ~5MB of memory for a 35k-
+    triangle character.
+
+    The `lblSpec.helpers.createBVHIndex(root, opts)`
+    helper (44.10) walks the loaded model, finds
+    every Mesh, and attaches a `MeshBVH` to the
+    geometry's `boundsTree` field. The raycaster
+    then auto-uses the BVH when present (the
+    three-mesh-bvh library extends the default
+    `Raycaster` behavior).
+
+  44.1.2  BVH-accelerated culling.
+
+    BVH also accelerates FRUSTUM CULLING. Without
+    BVH, Three.js's frustum-cull pass uses the
+    mesh's `boundingSphere` (a single sphere test);
+    with BVH, the cull pass uses the pre-computed
+    hierarchy to skip whole subtrees that are
+    clearly outside the frustum. For a scene with
+    1000+ meshes (PART 41.3.1's scene floor), the
+    cull pass drops from ~3ms to ~0.3ms.
+
+    The `createBVHIndex` helper enables BOTH
+    raycasting AND culling.
+
+  44.1.3  BVH-accelerated CSG (with three-bvh-csg).
+
+    The renderer already imports `three-bvh-csg`
+    (from v6.5) for CSG booleans. The BVH integration
+    is automatic: the CSG brushes use BVH internally
+    for triangle-triangle intersection. PART 44
+    doesn't add new code here — the existing CSG
+    support from PART 10 is BVH-accelerated by
+    virtue of using `three-bvh-csg`.
+
+    The `createBVHIndex` helper's return value
+    includes a `csgReady: true` flag so the CSG
+    code can confirm the BVH is in place.
+
+  44.2  LOOK-DEV LIGHTS PER MODEL
+  -------------------------------
+
+    The renderer currently has a global lighting
+    setup (the renderer's `lblSpec` exports a
+    `setShadingMode` function for changing the
+    shading style — PART 33.1[4]). The brief asks
+    for a PER-MODEL look-dev light setup so each
+    model can preview with its own lighting.
+
+  44.2.1  The 3-light canonical setup.
+
+    A look-dev rig is a 3-light setup:
+      - KEY light: bright, warm, casts shadows. From
+        upper-right.
+      - FILL light: soft, cool, no shadow. From
+        lower-left.
+      - RIM light: bright, neutral, no shadow. From
+        behind the model.
+
+    The 3 lights give the model a clear sense of
+    form without harsh shadows. The intensity
+    ratio (key:fill:rim) is 1.0 : 0.4 : 0.6 by
+    default.
+
+  44.2.2  HDRI environment map.
+
+    The fill light is often REPLACED by an HDRI
+    environment map. The renderer's existing
+    `RoomEnvironment` (imported in the module
+    script) is the canonical studio-HDRI fallback.
+    A model that wants a different environment
+    (e.g. an outdoor scene) can supply a custom
+    HDRI URL on `meta.environmentMap`.
+
+  44.2.3  Per-model look-dev override.
+
+    The factory publishes the look-dev setup on
+    `userData.sculptRuntime.lookDevLights`:
+      {
+        key: { color, intensity, position, castShadow },
+        fill: { color, intensity, position, castShadow },
+        rim: { color, intensity, position, castShadow },
+        environmentMap: 'studio' | 'outdoor' | 'night' | null,
+        enabled: true
+      }
+    The renderer's runtime either USES the per-
+    model setup (when enabled) or falls back to
+    the global lights. The renderer's E29 look-
+    dev lights validator (44.9) checks that the
+    setup is well-formed when present.
+
+  44.3  MATERIAL HIERARCHY (EXTENDING PART 41.6)
+  --------------------------------------------
+
+    PART 41.6.1 added 4 material families (plate,
+    cloth, leather, stone). The brief asks for 6
+    families — add bone + magic. The full
+    hierarchy:
+
+      1. skin    — the character's body (face, hands,
+                   exposed skin). PBR with subsurface
+                   tint.
+      2. cloth   — cape, cloak, undershirt, sash.
+                   PBR with high roughness.
+      3. leather — belt, pouches, boots, gloves.
+                   PBR with anisotropy.
+      4. metal   — armor plates, weapon receiver,
+                   buckles, rivets. PBR with high
+                   metalness.
+      5. bone    — exposed bone, fangs, claws,
+                   horns. PBR with high roughness
+                   and a yellowed tint.
+      6. magic   — runes, glow effects, energy
+                   fields. PBR with emissive.
+
+    PART 44 extends the PART 41.6 `materialVariants`
+    helper with the 2 new families. The 6 default
+    families now have 4 variants each = 24 base
+    materials (up from 16). The 3 dedicated
+    secondary materials (scratch / damage /
+    engrave) stay.
+
+  44.3.1  The 6 default material families.
+
+    Each family ships with 4 variants. The full
+    table is in `lblSpec.helpers.materialVariants`
+    (44.10) — the table is the same as PART 41.6.1
+    with the bone + magic families added:
+
+      bone:      { bone, boneDark, boneLight, boneWorn }
+      magic:     { magic, magicDark, magicLight, magicStrong }
+
+    The 4 default colors per family are:
+      - bone: ivory (0xe8dcc0), brown (0x9c7a5a),
+        cream (0xf2e8d8), weathered (0x7a6a55).
+      - magic: cyan (0x4dd2ff), dark cyan (0x2a8fb3),
+        light cyan (0x80e6ff), bright cyan (0x00b8e6).
+
+  44.3.2  Material assignment order.
+
+    The factory assigns materials in a specific
+    order to ensure Z-ORDER + RENDER-ORDER are
+    correct:
+
+      1. SKIN first (the body underneath).
+      2. CLOTH second (cape, undershirt).
+      3. LEATHER third (belt, pouches).
+      4. METAL fourth (armor, weapons).
+      5. BONE fifth (claws, horns).
+      6. MAGIC sixth (the glow effects, last so
+         they render on top with the highest
+         renderOrder).
+
+    The factory's `setStyle(newStyle)` function
+    (PART 40.5.3) re-applies the materials in
+    this order when the style changes.
+
+  44.3.3  Per-region material override.
+
+    A model can override the family-level variant
+    on a per-region basis. The factory publishes
+    the overrides on `userData.sculptRuntime
+    .materialOverrides`:
+      {
+        'leftPauldron': 'plateDark',
+        'rightPauldron': 'plateDark',
+        'cape': 'clothFaded',
+        'rune': 'magicStrong'
+      }
+    The renderer's runtime respects the override
+    when present, falling back to the family
+    default otherwise.
+
+  44.4  FITTED CLOTHING / ARMOR LAYERS
+  ----------------------------------
+
+    PART 41.4.1 added overlapping boxes for
+    layered armor; PART 44 EXTENDS the pattern
+    with the FIT-OVER-BODY pattern for fitted
+    clothing (capes, tabards, vambraces, greaves).
+
+  44.4.1  The fit-over-body pattern.
+
+    A fitted clothing piece (a cape, a vambrace,
+    a greave) is NOT a stand-alone box. It is a
+    LAYER on top of the body part it covers. The
+    canonical pattern:
+
+      1. Start with the body part (the upper arm
+         cylinder, the torso tapered box, the
+         shoulder sphere).
+      2. Compute the clothing's transform: same
+         position, slight outward offset (0.005-
+         0.02 units) along the body part's surface
+         normal, slight scale-up (1.01-1.05x).
+      3. Build the clothing's geometry: a SLIGHTLY
+         LARGER, SLIGHTLY OFFSETTED version of
+         the body part, with edge loops at the
+         joint boundaries (PART 38.12).
+      4. The clothing has its OWN material (from
+         the cloth / leather / metal family per
+         44.3) and its OWN skin weights (painted
+         to follow the body part's skeleton).
+
+    The key insight: a fitted clothing piece's
+    skeleton MIRRORS the body part's skeleton. A
+    vambrace's skeleton is the upper arm's
+    skeleton + the elbow joint + the wrist joint;
+    the vambrace's skin weights are painted so
+    each vertex follows the closest underlying
+    bone.
+
+  44.4.2  Edge loops for clothing.
+
+    The clothing needs edge loops at the JOINT
+    BOUNDARIES where it meets the next body part
+    (e.g. the vambrace's lower edge at the wrist
+    needs an edge loop that follows the wrist
+    joint's rotation). The edge loop count
+    matches the body part's joint-edge-loop
+    count (PART 38.7 — 3 loops at the elbow, 3-4
+    at the wrist, etc.).
+
+  44.4.3  Clothing-specific deformation.
+
+    When the body part bends (the elbow flexes),
+    the clothing follows the bend. The
+    deformation is HANDLED by the skin weights
+    (PART 38.12) — the clothing's vertices are
+    weighted to the elbow joint, so the
+    flex naturally deforms the clothing. For
+    high-stress poses (extreme elbow flexion),
+    the clothing may need a CORRECTIVE BLEND
+    SHAPE (PART 38.13's procedural corrective
+    shapes) to prevent poke-through.
+
+  44.5  ANIMATION CLIP BAKING FOR HERO CHARACTERS
+  ---------------------------------------------
+
+    PART 38.13 enumerated 8 animation quality
+    checks (idle / walk / attack / hit minimum
+    set + extras). PART 42.4.2 listed 30+ blend
+    shapes for facial expression. PART 44
+    EXTENDS the animation set with the
+    IMPLEMENTATION PATTERN for baking the 4
+    canonical animation clips.
+
+  44.5.1  The 4 canonical clips.
+
+    A hero character ships with 4 animation
+    clips:
+      - IDLE: a 60-120 frame loop where the
+        character breathes, sways, and looks
+        around. Loopable.
+      - WALK: a 30-60 frame cycle (one step every
+        30 frames) where the character walks in
+        place. Loopable.
+      - ATTACK: a 20-40 frame one-shot where the
+        character swings a weapon. Plays once,
+        returns to idle.
+      - HIT: a 10-20 frame one-shot where the
+        character reacts to damage. Plays once,
+        returns to idle.
+
+    The factory publishes the clip set on
+    `userData.sculptRuntime.animations`:
+      {
+        idle: AnimationClip { name: 'idle', duration: 2.0, loop: true },
+        walk: AnimationClip { name: 'walk', duration: 1.0, loop: true },
+        attack: AnimationClip { name: 'attack', duration: 0.7, loop: false },
+        hit: AnimationClip { name: 'hit', duration: 0.4, loop: false }
+      }
+    The renderer's `lblSpec.triggerFsmState` (PART
+    33.1[5]) uses the clip set to wire the FSM.
+
+  44.5.2  Bake from mocap or hand-key.
+
+    The 4 clips can be baked from mocap data
+    (BVH / FBX import) or hand-keyed in Blender /
+    Maya. PART 44 doesn't specify a source — the
+    factory declares the source on
+    `meta.animationSource: 'mocap' | 'hand-key' |
+    'procedural'`. The renderer's runtime
+    respects the source for the BVH-index
+    optimization (mocap clips are usually
+    smoother and benefit more from BVH
+    raycasting).
+
+  44.5.3  Multi-view validation per clip.
+
+    The PART 44.6 multi-view validation renders
+    run for EACH of the 4 canonical clips, not
+    just the rest pose. The factory publishes
+    the per-clip render set on
+    `meta.validationClips: ['idle', 'walk',
+    'attack', 'hit']` so the renderer knows
+    which clips to render for validation.
+
+  44.6  MULTI-VIEW VALIDATION RENDERS
+  ----------------------------------
+
+    PART 39.4.1 introduced the 256x256 black-on-
+    white silhouette test from the front view;
+    PART 43.1.2 introduced view-by-view iterative
+    refinement with N camera views. PART 44
+    EXTENDS the multi-view pattern with the
+    18-RENDER GRID.
+
+  44.6.1  6 canonical angles.
+
+    The 6 canonical camera angles for multi-view
+    validation (from PART 40.1.3 / 41.5.1):
+      - FRONT (0° azimuth, 0° elevation)
+      - 3/4-FRONT (45° azimuth, 0° elevation)
+      - SIDE (90° azimuth, 0° elevation)
+      - 3/4-BACK (135° azimuth, 0° elevation)
+      - BACK (180° azimuth, 0° elevation)
+      - TOP (0° azimuth, 90° elevation)
+
+  44.6.2  3 canonical poses.
+
+    The 3 canonical POSES for multi-view
+    validation (from PART 38.13 / 42.4):
+      - IDLE: the rest pose (T-pose or A-pose).
+      - WALK: the walk-cycle frame at 50% (the
+        contact pose).
+      - ATTACK: the attack frame at 50% (the
+        wind-up + strike transition).
+
+  44.6.3  The 18-render grid.
+
+    The 18-RENDER GRID is 6 angles × 3 poses =
+    18 silhouette renders per model. The
+    factory publishes the grid on
+    `userData.sculptRuntime.validationGrid`:
+      {
+        angles: ['front', '3/4-front', 'side',
+                  '3/4-back', 'back', 'top'],
+        poses: ['idle', 'walk', 'attack'],
+        renders: [ { angle, pose, imageDataUrl,
+                     silhouetteIoU: 0.85 }, ... ]
+      }
+    The IoU (Intersection over Union) vs the
+    reference image is computed for each render;
+    a model with < 0.7 IoU on any render
+    surfaces a warning in the renderer's
+    runtime.
+
+    The renderer's E28 BVH index validator
+    (44.9) does NOT enforce this — it's an
+    authoring-time audit. The runtime E28 only
+    checks that the BVH index is in place; the
+    18-render grid is for the AI's authoring
+    loop.
+
+  44.7  THE TYPESCRIPT VIEWER ADAPTER
+  ----------------------------------
+
+    PART 38.14 established the GLB-first
+    architecture: the .ts factory becomes the
+    viewer adapter. PART 44 EXTENDS the adapter
+    pattern with the 5 specific tasks the brief
+    calls out.
+
+  44.7.1  Load GLB.
+
+    The adapter uses `GLTFLoader` from
+    `three/addons/loaders/GLTFLoader.js` to load
+    the GLB. The adapter's `create*Model()`
+    function does NOT build the model — it
+    dispatches the GLB load and returns a Promise:
+
+      export async function create*Model() {
+        const loader = new GLTFLoader();
+        const gltf = await loader.loadAsync(
+          'path/to/model.glb'
+        );
+        return gltf.scene;  // The loaded Group.
+      }
+
+  44.7.2  Expose sockets.
+
+    The adapter extracts the 4 canonical Socket_*
+    attachment points from the GLB's
+    userData.sculptRuntime.sockets (set by the
+    GLB exporter) and exposes them on the Group:
+
+      root.userData.sockets = {
+        'Socket_Weapon_Primary': socketMesh,
+        'Socket_Weapon_Secondary': socketMesh2,
+        'Socket_Back': socketMesh3,
+        'Socket_Head': socketMesh4
+      };
+
+  44.7.3  Wire animation mixer.
+
+    The adapter creates an `AnimationMixer` and
+    registers the 4 canonical clips:
+
+      const mixer = new AnimationMixer(root);
+      const clips = gltf.animations;
+      const actions = {
+        idle: mixer.clipAction(
+          AnimationClip.findByName(clips, 'idle')
+        ),
+        walk: mixer.clipAction(...),
+        attack: mixer.clipAction(...),
+        hit: mixer.clipAction(...)
+      };
+      root.userData.animationFsm = {
+        mixer, actions,
+        trigger: (state) => { actions[state].play(); }
+      };
+
+  44.7.4  Wire look-dev lights.
+
+    The adapter instantiates the 3-light setup
+    (key + fill + rim) from PART 44.2.1 and
+    adds them to the scene:
+
+      const lights = lblSpec.helpers.lookDevLights({
+        keyIntensity: 1.0,
+        fillIntensity: 0.4,
+        rimIntensity: 0.6,
+        castShadow: true
+      });
+      lights.forEach(l => root.add(l));
+
+  44.7.5  Wire validation.
+
+    The adapter calls `lblSpec.helpers.validateModel`
+    (PART 39.1.2) on the loaded root and logs the
+    warnings:
+
+      const v = lblSpec.helpers.validateModel(root, {
+        maxGap: 0.02
+      });
+      if(!v.ok){
+        console.warn('[create*Model]',
+          v.errors.length, 'issue(s):', v.errors);
+      }
+
+    The renderer's E1-E29 validators run on
+    every model load (PART 32 / 65 / 38 / 39 /
+    40 / 41 / 42 / 43 / 44); the adapter's
+    `validateModel` call catches authoring-time
+    issues before the runtime does.
+
+  44.8  PRACTICAL CODING RULES (THE MAINTAINER'S HOUSE STYLE)
+  ---------------------------------------------------------
+
+    The brief lists 6 PRACTICAL CODING RULES for
+    .ts factory code. PART 44 documents them as
+    house style — every .ts factory in the
+    project should follow them.
+
+  44.8.1  No code on the same line after a `//`
+          comment separator.
+
+    BAD:
+      // ------- section header
+      // -------const COL = { ... };
+
+    GOOD:
+      // ------- section header
+      // -----------------------------------------------------
+      const COL = { ... };
+
+    This is the same rule as PART 39.1.1; PART
+    44 reinforces it for the new factories
+    written under the GLB-first architecture.
+
+  44.8.2  Always leave a blank line after section
+          header comments.
+
+    BAD:
+      // -----------------------------------------------------
+      const COL = { ... };
+      const M = { ... };
+      // -----------------------------------------------------
+      const create = () => { ... };
+
+    GOOD:
+      // -----------------------------------------------------
+      const COL = { ... };
+      const M = { ... };
+
+      // -----------------------------------------------------
+      const create = () => { ... };
+
+  44.8.3  Prefer the correct geometry primitive.
+
+    This is the same rule as PART 39.3 — use
+    ExtrudeGeometry + CatmullRomCurve3 for
+    curved surfaces, LatheGeometry for round
+    profiles, InstancedMesh for repeated
+    detail, BufferGeometry merge for one-off
+    detail. The PART 44 reinforcement is that
+    the new `curvedPart` helper (PART 39.8) is
+    the canonical answer for "stop stacking
+    boxes to fake curves".
+
+  44.8.4  Drive everything from a single config
+          object at the top of the file.
+
+    Every .ts factory has a single `*_CONFIG`
+    object at the top of the file that drives
+    ALL dimensions, colors, curve points,
+    recoil numbers. The factory's `create*Model()`
+    function reads from `*_CONFIG` and passes
+    the relevant slice to each sub-factory. The
+    same pattern as PART 39.5.2 + 40.4.2 +
+    42.0.
+
+  44.8.5  Add runtime tweakable parameters
+          (Tweakpane / Leva style) and a boot-
+          time model validator.
+
+    The factory includes a Tweakpane (or Leva
+    or dat.gui) panel that exposes the most
+    important `*_CONFIG` values as sliders /
+    dropdowns. The panel is for the AI's
+    authoring-time iteration (PART 39.2.1) and
+    is NOT shipped in the final emission. The
+    factory ALSO calls `validateModel(root)`
+    at the end of `create*Model()` (PART
+    39.1.2) and logs warnings.
+
+  44.8.6  Include automatic multi-view validation
+          renders (front, side, back, three-
+          quarter, idle, walk, attack poses).
+
+    The factory's authoring-time harness
+    renders the 18-render grid (PART 44.6.3)
+    and writes the renders to disk + a
+    `meta.validationGrid` JSON file. The
+    harness is for the AI's authoring loop and
+    is NOT shipped in the final emission.
+
+  44.9  RENDERER-SIDE RUNTIME CONTRACT
+  ------------------------------------
+
+    PART 44 adds 2 new non-blocking validators to
+    the existing 27:
+
+      - E28 — BVH index presence (PART 44.1.1).
+        If the loaded model declares
+        `userData.sculptRuntime.bvhIndex` (or
+        `userData.useBVH: true`), the renderer
+        checks that the BVH index is in place
+        (i.e. every Mesh's geometry has a
+        `boundsTree` field, OR the
+        `MeshBVH` accelerator is attached). A
+        model that says "use BVH" but doesn't
+        have the index in place is a warning.
+        Non-blocking; the model still loads.
+
+      - E29 — Look-dev lights present (PART
+        44.2). If the model declares
+        `userData.sculptRuntime.lookDevLights`,
+        the renderer checks that the structure
+        is well-formed (key + fill + rim, all
+        with `intensity` and `position`). A
+        model with malformed look-dev lights
+        surfaces a warning. Non-blocking.
+
+    All 2 are non-blocking; the model still
+    loads, the user sees a toast + a red spec
+    chip. They mirror the E1-E27 pattern and
+    integrate into the existing
+    `validate()` / `applyToUI()` / `revalidate()`
+    pipeline without any caller-side changes.
+
+    What PART 44 does NOT change in the renderer
+    runtime:
+
+      - No change to E1-E27 (they stay exactly
+        as they were in v1.20 / v8.12).
+      - No change to the GLB / OBJ / STL / FBX /
+        DAE / USDZ / .ts export pipeline.
+      - No change to the import map (the
+        three-mesh-bvh entry was already in
+        place from v0.6).
+      - No change to the loader.
+      - No change to the file-picker UI.
+      - No change to the scene tree or the Rig /
+        Tris / Sockets buttons.
+      - No new mandatory field on any existing
+        userData namespace — the new fields from
+        44.2.3 `lookDevLights`, 44.5.1
+        `animations`, 44.5.2 `animationSource`,
+        44.5.3 `validationClips`, 44.6.3
+        `validationGrid`, 44.1.1 `bvhIndex` /
+        `useBVH` are ALL OPTIONAL.
+      - No new dependency.
+
+  44.10 CANONICAL HELPERS
+  ----------------------
+
+    PART 44 adds 2 new canonical helpers to the
+    existing `__threeTriHelpers` bundle (PART
+    35 + PART 39 + PART 40 + PART 41 + PART 42 +
+    PART 43). The .ts factory can call any of
+    them via `window.lblSpec.helpers.<name>`
+    without copying the function body.
+
+    - `createBVHIndex(root, opts)`
+        PART 44.1 / Appendix A. Build a
+        BVH-accelerated raycast structure for
+        a loaded model. The helper:
+          - Walks the model's mesh tree.
+          - For each Mesh, imports
+            `MeshBVH` from `three-mesh-bvh`
+            (already in the import map) and
+            attaches a `MeshBVH` to the
+            geometry's `boundsTree` field.
+          - Skips Mesh with `userData
+            .skipBVH: true` (the AI can opt
+            out per-mesh for tiny detail that
+            doesn't need BVH acceleration).
+          - Returns a summary:
+            `{ totalMeshes, indexedMeshes,
+            skippedMeshes, memoryEstimateBytes,
+            csgReady: true }`.
+
+        The `Raycaster.intersectObject` call
+        auto-uses the BVH when the geometry has
+        a `boundsTree` (three-mesh-bvh extends
+        the default behavior). The renderer's
+        E28 BVH index validator uses the same
+        helper.
+
+    - `lookDevLights(opts)`
+        PART 44.2 / Appendix B. Return the
+        canonical 3-light setup (key + fill +
+        rim) for a model. The helper:
+          - Creates a `DirectionalLight` for
+            the key (warm color, casts shadow,
+            from upper-right).
+          - Creates a `DirectionalLight` for
+            the fill (cool color, no shadow,
+            from lower-left).
+          - Creates a `DirectionalLight` for
+            the rim (neutral color, no shadow,
+            from behind).
+          - Returns an array of 3 lights (or
+            a Group containing the 3 lights)
+            that the factory adds to the
+            scene.
+
+        The optional `opts.environmentMap`
+        ('studio' | 'outdoor' | 'night' | null)
+        adds a `RoomEnvironment` (or a custom
+        HDRI) as a 4th element. The renderer's
+        E29 look-dev lights validator uses the
+        same helper.
+
+    These are pure additions to the existing
+    `__threeTriHelpers` bundle — the existing
+    5 PART 35 helpers, the 3 PART 39 helpers,
+    the 3 PART 40 helpers, the 2 PART 41
+    helpers, the 2 PART 42 helpers, and the 2
+    PART 43 helpers stay untouched. The
+    `materialVariants` helper from PART 41 is
+    EXTENDED (in 44.3) with the 2 new families
+    (bone + magic) — the existing 4 families
+    stay exactly as they were.
+
+  WHAT PART 44 DOES NOT INTRODUCE
+  --------------------------------
+
+    - No new mandatory field on any existing
+      userData namespace (the new fields in
+      44.1.1 `bvhIndex` / `useBVH`, 44.2.3
+      `lookDevLights`, 44.3.3
+      `materialOverrides`, 44.4 `*` (the
+      fit-over-body pattern is a runtime
+      behavior, not a meta field), 44.5.1
+      `animations`, 44.5.2 `animationSource`,
+      44.5.3 `validationClips`, 44.6.3
+      `validationGrid` are ALL OPTIONAL; the
+      current renderer ignores unknown keys
+      safely)
+    - No new export path (the existing GLB /
+      OBJ / STL / FBX / DAE / USDZ / .ts paths
+      are unchanged)
+    - No new dependency (the three-mesh-bvh
+      import-map entry was already in place
+      from v0.6; the new helper just uses it;
+      the lookDevLights helper uses only
+      Three.js core APIs that are already
+      imported; no import-map change)
+    - No new validator that blocks the model
+      from loading (E28, E29 are non-blocking,
+      like E1-E27 before them)
+    - No change to the existing PART 1-43
+      rules (PART 44 reinforces them — see the
+      44.0 + 44.7 + 44.8 cross-references)
+    - No change to the existing E1-E27
+      validators (they stay exactly as they
+      were in v1.20 / v8.12)
+    - No change to PART 38.22's style
+      agnosticism (PART 44 is also style-
+      agnostic)
+    - No change to PART 38.14's GLB-first
+      architecture (PART 44 extends it with
+      the 5-task viewer adapter pattern)
+    - No change to PART 39.5's factory +
+      options pattern (PART 44 reinforces it
+      as 44.8.4 + 44.8.5)
+    - No change to PART 41.6's 4 default
+      material families (PART 44.3 extends
+      them with bone + magic; the existing 4
+      families stay exactly as they were)
+    - No change to the project's "Low Poly 3D"
+      name
+
+  CROSS-REFERENCES
+  -----------------
+
+    PART 44 layers on top of, never replaces:
+      - PART 1  (factory contract)         — TS path
+      - PART 2  (primitives)               — TS path
+      - PART 3  (materials)                — TS path
+      - PART 4  (single-file rule)         — TS path
+      - PART 10 (CSG booleans)             — TS path
+      - PART 17 (image-to-3D analysis)     — TS image path
+      - PART 27 (image-to-3D analysis)     — JSON/JS image path
+      - PART 30 (rigging & animation)      — both paths
+      - PART 31 (character sculpt)         — character subjects
+      - PART 32 (anti-pattern guards)      — E1-E12
+      - PART 34 (rig helpers)              — pre-bundled helpers
+      - PART 35 (triangle-first geometry)  — E12, the 🔺 Tris panel
+      - PART 36 (multi-file drop)          — both paths
+      - PART 37 (zip bundle)               — both paths
+      - PART 38 (character pipeline)       — E13-E16
+      - PART 38.7 (edge loops)             — 44.4.2
+      - PART 38.12 (skeletal rigging)      — 44.4.1 + 44.4.3
+      - PART 38.13 (animation)             — 44.5
+      - PART 38.14 (GLB-first arch)        — 44.0 + 44.7
+      - PART 38.22 (style agnosticism)     — both paths
+      - PART 39 (3D modeling techniques)   — E17-E18
+      - PART 39.1.1 (no code after //)      — 44.8.1
+      - PART 39.2.1 (Tweakpane)            — 44.8.5
+      - PART 39.3 (right geometry primitive)— 44.8.3
+      - PART 39.4 (silhouette test)        — 44.6
+      - PART 39.5 (factory + options)      — 44.8.4
+      - PART 40 (better models)            — E19-E21
+      - PART 40.5.3 (texture refinement)   — 44.3.2
+      - PART 41 (high-detail generation)   — E22-E23
+      - PART 41.4.1 (overlapping armor)    — 44.4
+      - PART 41.6 (material variants)      — 44.3
+      - PART 42 (character production)     — E24-E25
+      - PART 42.4.2 (blend shapes)         — 44.5.1 (animation clips)
+      - PART 42.5 (5-LOD chain)            — 44.7.1
+      - PART 43 (refinement + style lock)  — E26-E27
+      - PART 43.1.2 (view-by-view)         — 44.6
+      - PART 64 (character sculpt enrich)  — JSON/JS only
+      - PART 65 (JSON/JS anti-patterns)    — E1-E12 on JSON/JS
+      - PART 66 (architectural bridge)     — JSON/JS only
+
+    The maintainer's "Three.js / procedural 3D
+    character and asset systems engineer" brief
+    (2026-08) is the source doc. The brief asks
+    for a hands-on implementation roadmap;
+    PART 44 layers the 4 specific new pieces
+    (BVH-accelerated raycasting, look-dev
+    lights, 6-family material hierarchy, house
+    style) on top of the 8 categories already
+    covered by PART 38-43.
+
+================================================================================
+END OF PART 44 — v1.21 / v8.13 ADDITIONS: PROFESSIONAL PIPELINE
+(GLB-FIRST + BVH + LOOK-DEV LIGHTS + CODING RULES)
+Ship the GLB; the .ts factory is the viewer adapter. 5-task adapter
+pattern: load GLB (44.7.1) + expose sockets (44.7.2) + wire animation
+mixer (44.7.3) + wire look-dev lights (44.7.4) + wire validation
+(44.7.5). 3-tier performance: BVH-accelerated raycasting (44.1.1) for
+picking/collision, BVH-accelerated culling (44.1.2) for large scenes,
+BVH-accelerated CSG (44.1.3) for the existing PART 10 boolean ops
+(uses the already-imported three-bvh-csg). 6-family material
+hierarchy: skin + cloth + leather + metal (existing from PART 41.6)
++ bone + magic (new in 44.3), each with 4 variants = 24 base
+materials. The material assignment order: skin → cloth → leather →
+metal → bone → magic (44.3.2) so the render-order is correct. Fitted
+clothing/armor layers (44.4): fit-over-body pattern with skin weights
+that mirror the body part's skeleton, edge loops at joint boundaries,
+corrective blend shapes for extreme poses. Animation clip baking
+(44.5): 4 canonical clips (idle 2s loop, walk 1s loop, attack 0.7s
+one-shot, hit 0.4s one-shot) with `meta.animationSource: 'mocap' |
+'hand-key' | 'procedural'`. Multi-view validation renders (44.6): 6
+canonical angles × 3 canonical poses = 18-render grid, with IoU
+(Intersection over Union) vs reference image per render; a model
+with <0.7 IoU on any render surfaces a warning. The 6 practical
+coding rules (44.8) — no code on the same line after a `//`
+comment separator, blank line after section header comments, prefer
+the correct geometry primitive, drive everything from a single
+config object at the top of the file, add runtime tweakable
+parameters (Tweakpane / Leva style) + a boot-time model validator,
+include automatic multi-view validation renders. Adds E28 BVH
+index presence (checks `userData.sculptRuntime.bvhIndex`) and E29
+look-dev lights present (checks the key + fill + rim structure) to
+the existing 27 non-blocking validators. Re-exports `createBVHIndex
+(root, opts)` and `lookDevLights(opts)` on `window.lblSpec.helpers`
+alongside the PART 35 + PART 39 + PART 40 + PART 41 + PART 42 +
+PART 43 bundle. The `materialVariants` helper from PART 41 is
+EXTENDED (44.3) with the 2 new families (bone + magic); the existing
+4 families stay exactly as they were. No new dependency (the
+three-mesh-bvh import-map entry was already in place from v0.6; the
+new helpers use it). No new export path, no new mandatory field,
+no removed / weakened rule. Style-agnostic, applies to every .ts
+factory + JSON/JS blueprint, every subject, every style.
 ================================================================================
