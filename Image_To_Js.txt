@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.14 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.15 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -170,6 +170,116 @@ author. PART 66 reinforces — never replaces — PARTs 5, 28, 30, 64,
     were. No new dependency, no new export path, no new
     mandatory blueprint field, no removed / weakened
     rule. (45.13) Component Recipe Database for weapons (knife blade types + handle construction, pistol components, rifle components, boolean operations, edge treatment) preserved verbatim from the source notebook as a content guide; (45.14) bilingual EN/VI Vocabulary Glossary (5 core terms + 5 spatial modifiers + the 4-way damage-type × PBR-map rubric) preserved as a reference resource for the AI; (45.15) updated cross-references. Bumped from v8.13 to v8.14.
+
+  v8.15 (2026-09-05) — IMG2THREEJS ALIGNMENT (PART 72) + MEASURED
+    PLACEMENT (PART 73) + OPT-IN CAPABILITY BUNDLES (PART 67,
+    PART 68-71). Mirrors the v1.23 update in Prompt_To_Ts.txt
+    and the v8.15 update in Prompt_To_Js.txt. Three layered
+    opt-in additions, all STRICTLY ADDITIVE on top of
+    PARTs 1-66: (a) PART 67 (from maintainer's "Reference-Repo
+    Analysis for low_poly_3d" notebook, 2026-09-04) — 23 new
+    opt-in helpers; (b) PART 68-71 (from maintainer's
+    "two-repo analysis" notebook, 2026-09-05) — 50+ new
+    opt-in helpers; (c) PART 72 (from maintainer's
+    "GHOSTPOLY / LOW_POLY_3D — WHAT TO PULL FROM
+    img2threejs" notebook, 2026-09-05) — 14 sub-sections
+    translating img2threejs's structural-fidelity patterns
+    into the existing lblSpec / Three.js contract: (72.1)
+    the distinct-Z test that catches 2.5D "cardboard"
+    extrusions the silhouette IoU cannot see; (72.2) the
+    variable-thickness loft (the actual fix for 72.1) with
+    4 trap-warnings (E42) on cap interior vertices, cap
+    normal computation, roll sizing, and slope-vs-depth
+    sanity; (72.3) the cavity axis rule (hole vs missing-
+    wall); (72.4) the chirality gate (mirror vs rotation) —
+    a HARD spec-time validator E44 that catches the "both
+    hands modelled thumb-out" bug; (72.5) the assembly /
+    explode contract (4 naming rules) + explode scaling
+    that grows gaps instead of sliding the whole layout +
+    `explodeAssembly` helper + `checkPartCoverage` cross-
+    check + E45 missing-component rules; (72.6) the 14-item
+    closed detail-inventory taxonomy with explicit `mapsTo`
+    Three.js calls per kind + sizing rule + E46 unlinked-
+    detail gate; (72.7) the 8-axis quality-contract /
+    complexity-scoring system + tier gates + strong-vs-weak
+    quality bar rewrite + E47 tier compliance; (72.8) the
+    diagnostic discipline (4 cheap tests: flat-material
+    render, axis raycast, git-stash re-render, parameter
+    bracketing) as the first move instead of free-form
+    guessing; (72.9) the tube-network vs single-sweep rule
+    for frames, grips, handles + `buildTubeNetwork` helper
+    + E49 single-sweep warning; (72.10) the implicit-SDF
+    descriptor schema (5 primitive kinds: sphere/capsule/
+    box/cone/ellipsoid ≤64 entries, 3 operation kinds:
+    smooth-union/subtract/intersect ≤128 entries, resolution
+    4-64, optional bounds) + E50 validation rules; (72.11)
+    the material-identity resolution pipeline (5-step
+    resolve order); (72.12) the interior-difference metric
+    that splits PART 39.4's silhouette IoU into an outline
+    score and an interior score (the original IoU is
+    computed from ~11% of the figure and is structurally
+    blind to a deleted face) + `compareRender` helper;
+    (72.13) geodesic skinning for rigged characters
+    (replaces straight-line bone-to-vertex distance with
+    through-solid geodesic to fix the "candy-wrapper"
+    artifact at elbows/armpits/fingers); (72.14) updated
+    cross-references. Adds 10 new non-blocking validators
+    E41-E50 and 7 new canonical helpers; (d) PART 73
+    (same notebook) — the user-flagged bug-fix layer:
+    "models come out with parts in the wrong position /
+    not in the perfect place." PART 73 layers 5 new
+    spec-authoring disciplines: (73.1) STOP EYEBALLING
+    COORDINATES — use a FIXED image-to-world mapping
+    function `imageToWorld(nx, ny) = { x: (nx - 0.5) *
+    SX, y: (CY - ny) * SY }` for every part's position,
+    joint, and socket, plus spline tracing for curved
+    outlines, plus a mandatory `meta.placementSource`
+    declaration. This is the SINGLE HIGHEST-LEVERAGE FIX
+    for the user-flagged "parts not in the right place"
+    problem — if only one sub-section of PART 73 is
+    implemented, implement THIS one; (73.2) character /
+    creature proportions measured in head-units (HU),
+    with style-axis picked FROM the image (not defaulted);
+    (73.3) facial / feature landmarks normalized to the
+    HEAD box (not the full image) via `meta.faceLandmarks`;
+    (73.4) joints / skeleton measured off the silhouette
+    with priority order (stance → limb angles at
+    shoulders/hips → hand/foot orientation); (73.5) the
+    "rigid-looking parts placed near a joint" fix +
+    `rigidityClass` declaration; (73.6) updated cross-
+    references.
+    The image-to-JS analysis protocol (PART 27 of this
+    file) feeds 73.1 directly — when the reference image
+    is used, the AI extracts the image-to-world mapping
+    constants (SX, SY, CY) from the image dimensions and
+    the model's target size, and routes every part's
+    position through `imageToWorld` so parts placed from
+    the same reference photo stay mutually consistent
+    even if any one measurement is slightly off. The
+    73.1.4 spline-traced outlines go into the existing
+    `outline` / `localStart` / `localEnd` arrays. The
+    73.2 head-unit system feeds 39.4.2's reference-first
+    discipline — measurements are in HU, the world-unit
+    conversion happens AFTER the HU measurement is
+    captured. The 73.3 faceLandmarks are normalized to
+    the HEAD box, so they survive scale / crop changes.
+    Adds 10 new non-blocking validators E41-E50
+    (PART 72) and 4 new E37-E40 (PART 68-71) and 6 new
+    E31-E36 (PART 67) to the existing 30, and 7+50+23 =
+    80+ new canonical helpers re-exported on
+    `window.lblSpec.helpers` alongside the PART 35 + PART
+    39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44
+    + PART 45 + PART 66 bundle. The 47.3 tier system
+    from PART 72.7 is enforced by E47 (non-blocking) on
+    the image-JS path the same way as on the .ts path.
+    PART 72 is style-agnostic in scope (72.0.3) and
+    content-specific in subject for the structural-
+    fidelity helpers (72.2 / 72.5 / 72.9 / 72.10). PART
+    73 is a spec-authoring discipline and adds no new
+    validator. No new dependency, no new export path, no
+    new mandatory blueprint field, no removed / weakened
+    rule. Strict upgrade, zero downgrades. Bumped from
+    v8.14 to v8.15.
 
   v8.13 (2026-09-04) — PROFESSIONAL PIPELINE (GLB-FIRST + BVH + LOOK-DEV
     LIGHTS + CODING RULES).
@@ -19241,4 +19351,1403 @@ LinearAbilityExtThreeJS)
   subjects — see CHANGES_SUMMARY.md for the worked example
   (Karambit knife that uses mat_ramp_fire for the blade glow
   + bone segments for hand-anchored ember particles).
+================================================================================
+
+================================================================================
+PART 72 — v1.23 / v8.15 ADDITIONS: IMG2THREEJS ALIGNMENT
+— STRUCTURAL FIDELITY, ASSEMBLY, CHIRALITY, MATERIAL
+RESOLUTION (from img2threejs)
+================================================================================
+
+OVERVIEW
+--------
+
+  PART 72 layers onto PARTs 1-71 as a STRICTLY ADDITIVE
+  capability bundle. The source is the maintainer's
+  "GHOSTPOLY / LOW_POLY_3D — WHAT TO PULL FROM img2threejs"
+  working notebook (compiled 2026-09-05), which catalogues
+  the architecture-level patterns from the external
+  img2threejs reference repo and translates them into the
+  existing `lblSpec` / Three.js contract.
+
+  PART 72 covers FOURTEEN sub-sections distilled from a
+  postmortem on three rebuild rounds of a single pistol
+  model. Several of these are NEW VALIDATION GATES that
+  catch failure modes the existing silhouette-IoU + colour-
+  zone fidelity score literally cannot see (e.g. a "2.5D"
+  extrusion that scores 0.986 IoU but renders as a flat
+  cutout; a left/right pair that are both the same hand
+  rendered twice; a fully-fused mesh that passes every
+  visual gate because it wears a projected photo). A model
+  that uses NONE of the new opt-in features loads
+  identically to v1.22 / v8.14.
+
+  CRITICAL RULES:
+    - PART 72 is a STRUCTURAL FIDELITY UPGRADE BUNDLE,
+      not a new rendering paradigm.
+    - A model that doesn't set any of the new meta.*
+      fields loads identically to v1.22 / v8.14.
+    - All new helpers (PART 72.2 loft, PART 72.5 explode
+      scaling, PART 72.10 SDF descriptor, PART 72.11
+      material resolution) are OPT-IN by construction.
+    - All 10 new validators (E41-E50) are non-blocking
+      and fire ONLY when the corresponding opt-in flag is
+      set, OR when the existing PART 21 / PART 39.4
+      fidelity gate is active.
+    - Style-agnostic in scope; especially useful for
+      characters, creatures, weapons, blades, organic
+      subjects, and any model whose existing PART 39.4
+      silhouette IoU + colour-zone score is being used to
+      decide "done."
+
+72.1 — THE DISTINCT-Z TEST (catch 2.5D models before
+       they ship)
+------------------------------------------------------
+
+  img2threejs shipped a model (a pistol) that scored
+  0.986 silhouette IoU, matched 6/8 colour zones, held
+  across five orbit angles — and still looked like a
+  flat cutout to the user. Silhouette IoU is computed
+  from the broadside view, which is exactly the view a
+  flat extrusion nails perfectly. The fix is cheap and
+  worth adding as a mandatory self-check before the
+  PART 21 / PART 39.4 validation checklist declares a
+  part done.
+
+  72.1.1  THE TEST. For each mesh, count the distinct
+          Z values its vertices take (rounded to ~1e-3):
+
+              zs = new Set();
+              for (let i = 0; i < pos.count; i++) {
+                zs.add(Math.round(pos.getZ(i) * 1000) / 1000);
+              }
+              const planeCount = zs.size;
+
+          A planar extrusion with a bevel lands on 6-10
+          distinct planes NO MATTER HOW MANY TRIANGLES
+          IT HAS. A genuinely revolved/lofted/swept
+          part lands on 11+. Triangle count is not
+          evidence of form; plane count is.
+
+  72.1.2  TRIGGER. Any part described as "3D" in the
+          spec that resolves to an ExtrudeGeometry +
+          bevel should be flagged by E41
+          (distinct-Z test) and either rebuilt as a
+          loft (see 72.2) or explicitly downgraded to
+          "stylized flat panel" in the spec so nobody
+          is surprised later.
+
+  72.1.3  SECONDARY TELLS. The renderer's PART 21
+          self-check also includes (E41 follows up on
+          these automatically):
+            - top-down / end-on render is a plain
+              rectangle with no interior modelling
+            - an axis-aligned cross-section render
+              shows constant width top to bottom
+            - looks right at 0 degrees, progressively
+              more like cardboard as it rotates
+
+  72.1.4  WHY IOU IS BLIND HERE. PART 39.4's silhouette
+          IoU is computed from the broadside view; a
+          flat extrusion nails that view perfectly.
+          PART 72.12 (interior-difference) layers on
+          top to catch the orthogonal blind spot.
+
+72.2 — VARIABLE-THICKNESS LOFT (the actual fix for
+       72.1)
+-----------------------------------------
+
+  72.2.1  THE PROBLEM. ExtrudeGeometry has uniform
+          thickness along Z, which produces a 2.5D
+          "cardboard" look no matter how many bevel
+          segments it has.
+
+  72.2.2  THE FIX. Replace ExtrudeGeometry with a
+          loft: sweep the traced/authored outline
+          through ~11 rings whose local half-width is
+          `t * halfWidth(x, y)`, where halfWidth is a
+          hand-authored field naming each
+          anatomical/mechanical feature (e.g. "dust
+          cover thinner than receiver", "palm swell",
+          "raised panel plateau"). Groups come back as
+          +Z cap / -Z cap / walls so each broad face
+          keeps its own reference projection or
+          material.
+
+  72.2.3  HELPER. `lblSpec.helpers.buildLoft(opts)`:
+
+              buildLoft({
+                outline:   Vector2[],     // closed outline
+                rings:     11,             // number of cross-section rings
+                t:         0.05,           // nominal half-thickness
+                halfWidth: (x, y) => 1.0,  // per-point half-width multiplier
+                groups:    { cap: true, walls: true }
+              })
+
+          Returns a `THREE.BufferGeometry` with three
+          named groups ("+Z cap", "-Z cap", "walls")
+          for per-face material / projection control.
+
+  72.2.4  FOUR TRAPS (encoded as E42 warnings, since
+          each cost img2threejs a debugging cycle):
+
+          (a) The cap has no interior vertices by
+              default (triangulateShape only puts
+              vertices on the outline), so a swell in
+              the MIDDLE of a part collapses to flat
+              facets unless you subdivide cap triangles
+              and re-sample the field at each new
+              interior vertex. Midpoints landing on a
+              boundary edge must keep the straight-
+              line interpolation of their parents.
+
+          (b) Never take cap normals from the
+              triangulation — ear-clipping gives
+              slivers whose averaged normal swings
+              wildly, producing a fan of hard creases.
+              Compute the normal analytically from the
+              field gradient:
+              normalize(-f_x, -f_y, 1) * sign(t),
+              for interior vertices only. Laplacian
+              relaxation is NOT a substitute — it made
+              it worse.
+
+          (c) Roll must be per-vertex, off the LOCAL
+              half-width, not nominal thickness —
+              sizing it off nominal thickness turns a
+              locally slim section almost entirely into
+              roll and it renders as a white tube.
+
+          (d) A sloped cap surface is read by SLOPE,
+              not depth, by any comparison-render gate
+              (PART 39.4). Sanity-check every new
+              bevel/slope against the reference before
+              keeping it, and measure baseline
+              photometrics before claiming a regression
+              (see 72.8).
+
+  72.2.5  MEASURED RESULT. On img2threejs's own
+          rebuild: distinct-Z per shell went
+          10 -> 693 / 363 / 231 across three parts,
+          silhouette IoU held at 0.985 (i.e. this fix
+          costs nothing on the metric you were already
+          passing, it just also fixes the thing that
+          metric couldn't see).
+
+72.3 — CAVITY AXIS RULE (hole vs missing-wall)
+----------------------------------------------
+
+  72.3.1  THE RULE. A loft swept along Z has caps at
+          +-Z and walls around the XY silhouette.
+          That decides which mechanism a cavity needs:
+
+          - cavity opens along +-Z -> it is a HOLE IN
+            THE OUTLINE (cut the cap)
+          - cavity opens along any OTHER axis -> it is
+            a MISSING WALL, a different operation
+            (skip wall generation across that arc,
+            don't try to punch a hole through it)
+
+          Modelling a side-opening cavity as an
+          outline hole cuts on the wrong axis and this
+          is usually what "it looks solid / can't be
+          assembled" complaints are actually
+          describing.
+
+  72.3.2  E43 SANITY. The E43 validator fires when a
+          spec declares a cavity on a part whose cap
+          normal is NOT aligned with the cavity
+          opening direction. Non-blocking.
+
+  72.3.3  NEGATIVE RESULT (encoded as a DON'T): a
+          cavity whose inner surface is a back-faces-
+          only mesh does NOT work inside a translucent
+          shell of varying thickness — it ghosts
+          through as a grey slab. The cavity needs a
+          surface that stays contained; a simple
+          inverted box is not enough.
+
+  72.3.4  TRACE-STEP INTERACTION. If a photo-trace /
+          mask absorbs an adjacent opaque part (e.g.
+          a trigger sitting inside a guard-hole
+          trace), part A's traced hole will carry
+          part B's shape as a solid tongue at full
+          thickness. Fix at the trace step — punch
+          B's footprint out of the mask BEFORE
+          tracing A's holes — never downstream.
+
+  72.3.5  AUDIT METHOD. Render each shell alone with
+          a flat, mapless material (PART 72.8.1's
+          "flat-material render" test). A real hole
+          shows through; a false tongue does not.
+
+72.4 — CHIRALITY GATE (mirror vs rotation; HARD
+       gate, spec time)
+--------------------------------------
+
+  72.4.1  THE PROBLEM. Every -l/-r pair in a spec
+          (arms, wheels, fins, ear, blade guards) must
+          be a true SAGITTAL MIRROR of each other, not
+          a rotated copy. Negating X and Z together is
+          a 180-degree rotation about Y, and rotation
+          preserves handedness — so a pair built that
+          way comes out as the SAME hand twice, which
+          is invisible in a symmetric silhouette check
+          and only shows up as "this looks subtly
+          wrong" once someone looks closely (a left
+          glove seam ends up on the wrong side, etc.).
+
+  72.4.2  THE CHECK. `checkPair(leftVerts,
+          rightVerts)` is a renderer-side helper
+          (E44, HARD gate at spec time, runs on raw
+          coordinates and costs nothing to run):
+
+              // mirror: flip exactly one axis
+              // rotation: flip two axes
+              const dx = (Math.abs(leftX) - Math.abs(rightX)) > 1e-3;
+              const dy = (Math.abs(leftY) - Math.abs(rightY)) > 1e-3;
+              const dz = (Math.abs(leftZ) - Math.abs(rightZ)) > 1e-3;
+              const flipCount = [dx, dy, dz].filter(Boolean).length;
+              return flipCount === 1; // mirror
+
+          A pair that is wrong the SAME way on both
+          sides (e.g. both hands modelled thumb-out)
+          is still a perfect mirror of itself. That
+          needs a `medialLateralBias` check against
+          the reference image (PART 72.4.3), not just
+          internal consistency.
+
+  72.4.3  MEDIAL / LATERAL BIAS. The reference image
+          has a medial-lateral bias that the model
+          must match (e.g. the reference's left side
+          shows a thumb sticking out -> the model's
+          -l mesh must show a thumb sticking out).
+          E44 is extended to compare each pair's
+          silhouette centroid offset against the
+          reference's corresponding side. Non-
+          blocking when no reference is provided.
+
+  72.4.4  SPEC-TIME, NOT RENDER-TIME. E44 is a spec-
+          time gate (run BEFORE codegen, like the
+          existing PART 21 checklist) — it's
+          checkable on raw coordinates and costs
+          nothing to run, so the renderer doesn't
+          need to re-do the check at load time.
+
+72.5 — ASSEMBLY / EXPLODE CONTRACT (every model
+       ships explodable AND clickable)
+----------------------------------------
+
+  img2threejs treats this as a BUILD REQUIREMENT, not
+  an optional demo feature, because it's the only
+  STRUCTURAL check in a pipeline where every other
+  gate scores pixels — a single fused mesh wearing a
+  projected photo passes every visual gate there is.
+  Four naming rules are the whole contract.
+
+  72.5.1  THE FOUR NAMING RULES.
+
+          (1) Name every mesh. An unnamed mesh can't
+              be selected, can't be reported, and
+              explodes on its own as a stray fragment.
+
+          (2) Flag surface detail that belongs TO a
+              part (serrations, ridges, panel seams,
+              muzzle faces) with
+              `mesh.userData.explodeWithParent = true`
+              so it rides its parent shell during an
+              explode, instead of a disassembly
+              shattering into a comb of loose slivers.
+
+          (3) A named Group means one of two things,
+              told apart by what's inside: a group
+              holding other NAMED parts is a
+              container/pivot and gets descended
+              through on explode/click; a group
+              holding only ANONYMOUS meshes IS the
+              part and travels/explodes as one whole.
+              (A bracket set authored as eight
+              unnamed meshes under "corner-brackets"
+              explodes as one bracket set, not twenty
+              slivers.)
+
+          (4) Publish a
+              `sculptRuntime.destructionGroups`
+              list when the object has real sub-
+              assemblies (e.g. trigger + safety lever
+              + bar), so the part list groups them
+              for free.
+
+  72.5.2  EXPLODE SCALING. Separation on explode
+          should SCALE each part's distance from the
+          model centre (roughly 2x), not push every
+          part the same fixed distance outward — a
+          uniform push slides the whole arrangement
+          without opening gaps between neighbours
+          that were already touching, so nothing
+          becomes readable or clickable. Give parts
+          near the centre a base clearance (the
+          scaling term vanishes there), fan
+          concentric stacks (e.g. a barrel inside a
+          housing) along the model's THINNEST axis
+          in alternating growing steps, and dolly
+          the camera by how much the layout actually
+          grew rather than a fixed guess.
+
+  72.5.3  HELPER. `lblSpec.helpers.explodeAssembly
+          (root, opts)`:
+
+              explodeAssembly(root, {
+                scale: 2.0,                // distance multiplier
+                baseClearance: 0.05,       // near-centre floor
+                fanAxis: 'auto',           // 'X'|'Y'|'Z'|'auto' = thinnest
+                cameraDolly: 'auto'        // 'auto' or metres
+              })
+
+          Returns the same root with each named part
+          translated outward. Read existing
+          `userData.destructionGroups` for grouping.
+
+  72.5.4  CROSS-CHECK. The renderer also publishes a
+          `checkPartCoverage(root, spec)` helper
+          (PART 72.5.5) that compares the built
+          mesh/part tree against the spec's component
+          tree, and the spec against its own detail
+          inventory. Catches: a specified component
+          never built, two components fused onto one
+          mesh, an inventoried detail that never
+          reached the spec.
+
+  72.5.5  TWO RULES WORTH KEEPING (encoded as E45
+          non-blocking warnings):
+
+          - a missing component whose PARENT is
+            built is usually fine (a bevel or notch
+            is relief cut into its parent, not a
+            separate part — don't fail on it);
+          - "has children" does not mean "is a
+            container" — a blade that is both real
+            geometry AND parent to its own relief
+            features is not a container, only the
+            parentless tree root is.
+
+72.6 — DETAIL INVENTORY (a formal taxonomy with real
+       Three.js mappings; closed list of 14)
+-------------------------------------------------
+
+  The existing PART 20 / PART 40 already mentions
+  `detailInventory` (the spec already has 47+ hits
+  for it). img2threejs's version is a 14-item CLOSED
+  TAXONOMY where every entry is FORCED to map onto a
+  real generator field — a detail described only in
+  prose is treated as a gate failure. PART 72.6
+  adopts the same closed list plus the "must set
+  mapsTo" rule, since it's what prevents small
+  identifying marks (a bevel highlight, a rivet row)
+  getting skipped on a single eyeball pass.
+
+  72.6.1  THE 14 TAXONOMY ENTRIES AND THEIR
+          CONCRETE MAPPING. Every entry below has
+          an explicit, code-callable `mapsTo` field.
+          A detail that has no `mapsTo` is a gate
+          failure (E46, non-blocking).
+
+          1.  gloss
+              -> low-roughness (0.05-0.2)
+                 `material.localOverrides.roughness`,
+                 or clearcoat+clearcoatRoughness on
+                 MeshPhysicalMaterial for lacquer/
+                 wet; anisotropy+anisotropyRotation
+                 for streaked/brushed highlights.
+                 Record hotspot position relative to
+                 the key light — a gloss detail with
+                 no matching light direction won't
+                 render visibly.
+
+          2.  bevel
+              -> REAL geometry
+                 (`edgeTreatment.type = 'chamfer'`,
+                 `bevelRadius` 0.02-0.08 object-
+                 relative, `segments` 2-4 soft / 1
+                 hard), never a normal-map trick, if
+                 the reference shows a crisp bright
+                 rim line under grazing light.
+
+          3.  fastener
+              -> always `InstancedMesh` (never one-
+                 off meshes): `count`, `spacing`
+                 (linear/radial/grid), `headShape`
+                 (hemisphere/flat/hex), `recess`
+                 (raised vs countersunk), low-
+                 roughness metal at the head crown.
+
+          4.  linework
+              -> pick ONE of three based on
+                 evidence, they read differently:
+                   - engraved groove: real recessed
+                     geometry, casts shadow
+                   - painted line / decal: canvas-
+                     texture, colour contrast only,
+                     no relief
+                   - panel-line: soft dark AO/
+                     roughness seam, no depth
+                 Don't default to decal for
+                 something that visibly casts a
+                 shadow.
+
+          5.  contour
+              -> rim-light or inverted-hull/shader
+                 outline pass; record which
+                 silhouette edges carry it (partial
+                 outlines are common).
+
+          6.  seam
+              -> thin recessed groove OR raised
+                 ridge (match reference) + darker
+                 AO in the crevice.
+
+          7.  stitch
+              -> small repeated bumps or dashed
+                 groove along a seam path, usually
+                 paired with a painted-line linework
+                 detail for thread colour contrast.
+
+          8.  stain
+              -> `material.localOverrides` with:
+                   dirtAmount      (0-1)
+                   cavityBias       (concentrate
+                                     in crevices)
+                   streak           (directional,
+                                     gravity-down
+                                     for dirt)
+                   patinaColor      (oxidation
+                                     hue shift)
+                   fadedMask        (lighter/
+                                     desaturated,
+                                     the inverse
+                                     of dirt)
+
+          9.  scratch
+              -> localized roughness / normal
+                 perturbation, oriented (usually
+                 radial/directional from handling),
+                 optionally exposing a different
+                 base colour underneath.
+
+          10. chip
+              -> geometry effect (a notch) if it
+                 changes silhouette; otherwise a
+                 localOverride exposing underlayer
+                 colour/roughness at an edge/corner.
+
+          11. decal
+              -> canvas-texture localOverride, flat,
+                 no geometry UNLESS it has real
+                 physical thickness (a sticker edge),
+                 in which case add a thin raised
+                 plate.
+
+          12. emissive
+              -> `emissive` colour + `emissive
+                 Intensity`, note whether it should
+                 bloom under your tone mapping, and
+                 whether it needs a matching point/
+                 area light for nearby surfaces.
+
+          13. hole
+              -> a REAL cut/socket changing
+                 silhouette/topology, never a dark
+                 texture patch; record depth and
+                 whether the interior needs its own
+                 material.
+
+          14. groove/ridge
+              -> negative/positive relief along a
+                 path, width/depth object-relative,
+                 ridge catches a highlight along its
+                 crest (pair with gloss/bevel note
+                 if reference shows a highlight line
+                 there).
+
+  72.6.2  SIZING RULE (`targetMinDetails`,
+          tunable, validated by E46):
+
+          simple   ->  3
+          moderate ->  6
+          complex  -> 10
+          ultra    -> 16
+
+          Confidence per detail (0-1) is LOWERED
+          for occluded regions, symmetry-inferred
+          marks, or ambiguous classification (e.g.
+          scratch vs panel-line), but low
+          confidence never excuses skipping the
+          `mapsTo` link — an unlinked detail still
+          blocks the gate.
+
+  72.6.3  DECLARATION SHAPE. The .ts factory / JSON
+          / JS blueprint declares details as:
+
+              meta.detailInventory = [
+                {
+                  id: 'trigger-guard-bevel',
+                  kind: 'bevel',
+                  mapsTo: { edgeTreatment: { type: 'chamfer',
+                    radius: 0.04, segments: 2 } },
+                  confidence: 0.9,
+                  region: { part: 'trigger-guard' }
+                },
+                // ...
+              ];
+
+          The tier is implicit from
+          `meta.qualityContract.tier` (PART 72.7).
+
+72.7 — QUALITY CONTRACT / COMPLEXITY SCORING (decide
+       "done" before generating code)
+-------------------------------------
+
+  72.7.1  THE 8-AXIS SCORING SYSTEM. Before
+          authoring a spec, the AI scores the object
+          on 8 axes (0-3 each):
+
+            1.  silhouette complexity
+            2.  component count
+            3.  hierarchy depth
+            4.  repetition density
+            5.  material layer count
+            6.  local detail density
+            7.  occlusion risk
+            8.  action-readiness need
+
+          The total (0-24) maps to a tier:
+            0-5   -> simple
+            6-10  -> moderate
+            11-15 -> complex
+            16-24 -> ultra-complex
+
+  72.7.2  TIER GATES. The tier sets the
+          `targetMinDetails` (PART 72.6.2) and how
+          deep the component tree is required to be:
+
+            simple   -> 1-2 levels, 3+ details
+            moderate -> 2-3 levels, 6+ details
+            complex  -> 3-4 levels, 10+ details
+            ultra    -> 4+ levels,  16+ details
+
+          E47 (PART 72.7.3) blocks emission when
+          the spec is below the required tier for
+          the declared subject category.
+
+  72.7.3  STRONG vs WEAK QUALITY CONTRACT. The
+          quality contract is rewritten as a
+          WEAK / STRONG pair, with E47 only
+          accepting the STRONG form:
+
+            weak:   "make leaves look good"
+            strong: "leaf clusters must form
+                     irregular overlapping canopy
+                     masses, with varied card size/
+                     orientation/colour and gaps
+                     exposing secondary branches"
+
+          A quality bar this vague — the "weak"
+          line — is the thing to catch and rewrite
+          before generation, not after.
+
+72.8 — DIAGNOSTIC DISCIPLINE (name the symptom, not
+       the guessed cause)
+-------------------------------------
+
+  72.8.0  PRINCIPLE. Across three review rounds on
+          one build, every REPORTED symptom was real
+          but the STATED cause was wrong more often
+          than right, and acting on the wrong cause
+          made the model worse twice. Two failed
+          attributions in a row is the signal to
+          stop guessing and run a discriminating test
+          instead of a third guess.
+
+  72.8.1  THE FOUR CHEAP TESTS (E48's "first
+          moves" library; all are non-blocking, all
+          return structured diagnostic info):
+
+          (1) Flat-material render. Hide everything
+              but the suspect part, swap in a flat/
+              basic material with no maps, re-render.
+              Anything still visible is GEOMETRY, not
+              texture.
+
+          (2) Axis raycast. For "the hole/cavity is
+              blocked", cast a ray down the relevant
+              axis from outside and print the
+              ordered hit list by name — it names
+              the actual blocker instead of
+              guessing.
+
+          (3) git-stash the rewrite, re-render.
+              Before conceding a photometric
+              regression, measure the ACTUAL
+              baseline. Some "regressions" are pre-
+              existing and the new work already
+              improved them.
+
+          (4) Bracket the parameter. Change the
+              suspect value the WRONG way on
+              purpose. If the symptom doesn't get
+              worse, it isn't the cause.
+
+          `lblSpec.helpers.runDiagnostic(root,
+          testName, opts)` runs any of the four
+          against a built model and returns a
+          structured report. E48 prefers
+          `runDiagnostic` over a free-form
+          description.
+
+72.9 — TUBE-NETWORK vs SINGLE-SWEEP (for frames,
+       grips, handles)
+-------------------------------------
+
+  72.9.1  THE RULE. A bike frame, a knife-handle
+          grip, a fork, a handlebar are NETWORKS OF
+          STRAIGHT MEMBERS, not one continuous
+          curve. Model each member as its own
+          component with
+          `attachment.localStart` / `localEnd` (+
+          `baseRadius`); the generator then emits
+          an oriented cylinder per member
+          (quaternion rotation from local Y to the
+          member direction).
+
+  72.9.2  THE BUG. A single closed curve-sweep
+          through the same points CatmullRom-
+          smooths into a teardrop blob instead of
+          a frame — this was a real bug (a bike
+          frame that stayed a "teardrop" until
+          rebuilt as a tube-network). E49 warns
+          when a spec declares a `frame`, `grip`,
+          `handlebar`, `fork`, or similar network
+          with a single-sweep `tube` primitive.
+
+  72.9.3  HELPER. `lblSpec.helpers.buildTubeNetwork
+          (members)`:
+
+              buildTubeNetwork([
+                { localStart: [0, 0, 0],
+                  localEnd:   [1, 0, 0],
+                  baseRadius: 0.02 },
+                // ...
+              ])
+
+          Returns a `THREE.BufferGeometry` of
+          oriented cylinders, one per member,
+          merged into a single mesh with named
+          groups per member (so per-member
+          materials / explode are still possible).
+
+  72.9.4  KNURLED GRIPS. A knurled or wrapped grip
+          is GEOMETRIC ridge segments, not a texture
+          trick — a thin core cylinder plus N short
+          attachment-tube segments barely proud of
+          the core (small groove gaps between them).
+          Oversized segments read as a coil/spring
+          instead of a grip; material texture alone
+          reads as uniformly smooth and coarse at
+          once, never as individual ridges. E49
+          also covers this case (a grip with
+          `detailInventory[].kind === 'fastener'`
+          or 'stitch' AND a single material
+          texture without matching geometry).
+
+  72.9.5  ORGANIC REPEATED DETAILS. Curve small
+          repeated details (serrations / scallops /
+          teeth) instead of using straight boxes —
+          slightly canted primitives (alternating
+          +/- angle) read as hand-ground edges;
+          perfectly straight repeats read as
+          machine-stamped even when the reference
+          shows worn/organic edges. E49 surfaces a
+          hint when a `fastener`-type detail has
+          perfectly uniform orientation.
+
+72.10 — IMPLICIT SDF PRIMITIVES (for organic,
+        welded, blended forms)
+------------------------------------
+
+  72.10.1  DECLARATION. For a form that needs one
+            welded organic body instead of a stack
+            of separate primitives (smooth unions,
+            blended limbs, soft transitions), the
+            .ts factory / JSON / JS blueprint
+            declares an implicit-SDF block on a
+            component:
+
+              component.topologyClass = 'implicit';
+              component.geometryDescriptor = {
+                sdf: {
+                  primitives: [
+                    { id: 'p1', kind: 'sphere',  pos: [0, 0, 0],    r: 0.5 },
+                    { id: 'p2', kind: 'capsule', pos: [0.6, 0, 0], r: 0.3, length: 0.4 }
+                    // ...up to 64
+                  ],
+                  operations: [
+                    { id: 'o1', kind: 'smooth-union',
+                      a: 'p1', b: 'p2', blend: 0.1 }
+                    // ...up to 128
+                  ],
+                  resolution: 32,        // 4-64
+                  bounds: {              // optional
+                    min: [-1, -1, -1], max: [1, 1, 1]
+                  }
+                }
+              };
+
+            The generator samples the SDF,
+            polygonizes it, and recomputes normals
+            — output is still procedural code, not
+            an imported mesh.
+
+  72.10.2  PRIMITIVE KINDS. `sphere` | `capsule`
+            | `box` | `cone` | `ellipsoid` (5
+            kinds, ≤64 entries per SDF block).
+
+  72.10.3  OPERATION KINDS. `smooth-union` |
+            `subtract` | `intersect` (3 kinds, ≤128
+            operations per SDF block; the
+            `smooth-union` blend radius is what
+            actually produces "blended limbs"
+            rather than just "one lumpy body").
+
+  72.10.4  VALIDATION RULES (E50, non-blocking):
+            - `sdf` and `visualHull` can't live on
+              the same component (a single component
+              has one topology);
+            - `sdf` and `subdivide` can't combine
+              on the implicit path (marching cubes
+              already produces a regular grid;
+              further subdivision is wasted);
+            - primitive / operation ids must be
+              unique within the block (catches
+              typos that would silently drop a
+              primitive or op).
+
+72.11 — MATERIAL IDENTITY AS A RESOLUTION PIPELINE,
+        NOT A GUESS
+---------------------------------------
+
+  72.11.1  HYPOTHESIS SHAPE. Instead of an AI
+            eyeballing "this looks like brushed
+            steel," the material identity is
+            declared as a structured hypothesis:
+
+              {
+                componentId: 'blade',
+                regionId:     'edge',
+                family:       'metal',
+                subtype:      'stainless',
+                finish:       'brushed',
+                confidence:   0.7,
+                alternatives: ['damascus', 'anodized']
+              }
+
+  72.11.2  RESOLUTION ORDER. The renderer resolves
+            the hypothesis in this order:
+              (1) an explicit canonical `materialId`
+                  if metadata/spec already states one,
+              (2) exact family+subtype+finish match
+                  against a reference table,
+              (3) alias match keeping ALL matching
+                  candidates rather than silently
+                  picking one,
+              (4) family fallback at reduced
+                  confidence,
+              (5) "unknown" / request-input when the
+                  distinction actually matters for a
+                  visible region.
+
+            User-supplied material identity always
+            outranks a visual guess; conversely a
+            stated material NAME supplies identity
+            but not the actual colour/wear/roughness
+            — those still come from image evidence,
+            never from a stock preset.
+
+  72.11.3  HARD LIMITS (encoded as honest
+            documentation, not silent defaults):
+
+            - A single RGB image cannot uniquely
+              separate illumination, reflectance,
+              roughness and geometry — steel vs
+              aluminium, real vs synthetic leather,
+              gold vs metallic paint can all stay
+              genuinely ambiguous without more views
+              or controlled lighting. The AI says
+              "unknown" rather than picking silently.
+
+            - Colour maps stay in sRGB colour space
+              (THREE.SRGBColorSpace), but roughness /
+              metalness / normal / AO / thickness /
+              anisotropy maps stay in linear
+              (THREE.NoColorSpace) — this is the
+              single most common invisible material
+              bug (correct-looking colour, wrong-
+              looking shading) and is cheap to just
+              always assert. PART 3.7 / PART 7
+              already document this; PART 72.11.3
+              makes it a hard rule (the renderer
+              auto-asserts sRGB / NoColorSpace on the
+              new builders).
+
+72.12 — INTERIOR-DIFFERENCE (silhouette IoU is
+        blind to ~89% of the model)
+---------------------------------------
+
+  72.12.1  THE BLIND SPOT. Silhouette IoU is
+            computed from roughly the outline cells
+            only (~11% of a figure). Measured proof:
+            a finished face and the SAME model with
+            its face fully deleted scored identically
+            to four decimal places on IoU, and
+            adding an entire mouth moved the outline
+            metric in the WRONG direction.
+
+  72.12.2  THE FIX. PART 39.4's comparison step is
+            extended to report TWO numbers: the
+            existing outline score and a NEW
+            interior score (banded by height/region
+            and refusing to score when the foreground
+            mask degrades to whole-frame coverage).
+            E41 / E47 (existing) gate on BOTH.
+
+  72.12.3  HELPER. `lblSpec.helpers.compareRender
+            (renderedCanvas, referenceCanvas,
+            opts)`:
+
+              compareRender(c1, c2, {
+                outlineWeight: 0.5,    // PART 39.4
+                interiorWeight: 0.5,   // PART 72.12
+                bands: ['head', 'torso', 'limbs', 'ground']
+              })
+
+            Returns:
+              { outlineIoU: 0.93,
+                interiorIoU: 0.71,
+                combined:    0.82,
+                perBand: { head: 0.85, torso: 0.78, ... } }
+
+72.13 — GEODESIC SKINNING (for rigged/articulated
+        characters)
+---------------------------------------
+
+  72.13.1  THE RULE. If the renderer ever binds
+            vertex weights for a skeleton, measure
+            bone-to-vertex distance THROUGH THE
+            SOLID (geodesic), not straight-line
+            nearest-neighbour distance. Straight-
+            line distance lets a vertex on one side
+            of a thin gap (e.g. across a closed
+            fist, or between two limbs pressed
+            together) get influenced by a bone on
+            the OTHER side of that gap, because
+            it's physically close even though no
+            solid path connects them — this is the
+            classic "candy-wrapper" skinning
+            artifact at elbows / armpits / fingers.
+
+  72.13.2  IMPLEMENTATION. Replace
+            `nearestBoneIndex(vertex)` with
+            `geodesicNearestBoneIndex(vertex,
+            meshBVH)`. The mesh BVH from PART 44.2
+            is reused for the geodesic query
+            (raycast from vertex toward each bone
+            and use the un-occluded one).
+
+  72.13.3  PARTITION. Rigid roles (fingers, jaw)
+            should be partitioned OUT of smooth
+            skinning where possible rather than
+            blended everything. PART 38's existing
+            bone-anchored rule still applies; the
+            geodesic distance is the new
+            measurement for the remaining soft-
+            skinned parts.
+
+  72.13.4  RIGID-PLACED-NEAR-JOINT (PART 73.5
+            cross-reference). The geodesic fix
+            alone does NOT solve the rigid-part-
+            at-joint problem (a cuff right at the
+            wrist still picks up a blend of two
+            bones and squashes). PART 73.5 is the
+            classification rule that covers that
+            case.
+
+72.14 — UPDATED CROSS-REFERENCES
+---------------------------------
+
+  PART 72 layers on top of, never replaces:
+    - PART 1  (factory contract)        — TS path
+    - PART 3  (geometry vocabulary)     — TS / JSON / JS
+    - PART 3.7 (sRGB / linear discipline) — all paths
+    - PART 7  (materials)               — TS path
+    - PART 8  (textures / UV)           — TS path
+    - PART 11 (extrude + lathe)         — TS path (72.2)
+    - PART 12 (SDF / metaballs)         — TS path (72.10)
+    - PART 19 (nested tree)             — all paths
+    - PART 20 (modeling guidance)       — all paths
+    - PART 21 (validation checklist)    — all paths
+    - PART 27 (image analysis)          — image paths
+    - PART 30 (performance + IBL)       — all paths
+    - PART 30.6 (BVH)                   — all paths (72.13)
+    - PART 38 (character pipeline)      — character paths
+    - PART 39 (3D modeling techniques)  — all paths
+    - PART 39.4 (silhouette IoU)        — all paths (72.12)
+    - PART 40 (better models)           — all paths
+    - PART 41 (high-detail generation)  — all paths (72.6)
+    - PART 42 (character production)    — character paths
+    - PART 44 (professional pipeline)   — all paths
+    - PART 45 (CS2 PBR)                 — all paths
+    - PART 64 (character sculpt)        — character paths
+    - PART 67 (modifier stack)          — TS path
+    - PART 68-71 (geometry + VFX)       — all paths
+    - PART 33 / 34 / 35 / 36 / 37 / 38 / 39 / 40 / 41 /
+      42 / 43 / 44 / 45 / 67 / 68-71 (all unchanged)
+
+  PART 72 is style-agnostic in scope (72.0.3) and
+  content-specific in subject for the structural-
+  fidelity helpers (72.2 / 72.5 / 72.9 / 72.10).
+  The 10 new validators E41-E50 are non-blocking
+  and follow the "opt-in by construction" pattern
+  from PART 45.9.2 and PART 67-71.0. No new
+  dependency (the new helpers use only existing
+  Three.js primitives: BufferGeometry, Buffer
+  Attribute math, marching-cubes via PART 12's
+  existing pipeline, BVH via PART 44.2's existing
+  three-mesh-bvh). No new export path, no new
+  mandatory field, no removed / weakened rule, no
+  removed / weakened existing extension, no
+  removed / weakened existing PART 45 / 67 / 68-71
+  helper. Strict upgrade, zero downgrades.
+
+  The maintainer's "GHOSTPOLY / LOW_POLY_3D — WHAT TO
+  PULL FROM img2threejs" notebook (compiled
+  2026-09-05) is the source doc. PART 72 keeps only
+  the patterns that are directly useful for the
+  existing system (the rest are documented in the
+  notebook for future reference).
+================================================================================
+
+
+================================================================================
+PART 73 — v1.23 / v8.15 ADDITIONS: MEASURED PLACEMENT
+— IMAGE-TO-WORLD MAPPING, PROPORTION/LANDMARK
+MEASUREMENT, JOINT-CROSSING CLASSIFICATION
+================================================================================
+
+OVERVIEW
+--------
+
+  PART 73 is the user-flagged bug-fix layer: "models
+  come out with parts in the wrong position / not in
+  the perfect place." The existing spec already has
+  strong ATTACHMENT coverage (PART 11's floating-
+  parts rule, PART 39.4's bbox-overlap boot-time
+  validator E17, minimum-overlap-at-seams 0.02
+  world units, `attachment.parentSocket` /
+  localStart / localEnd / contactType / embedDepth /
+  gapTolerance, "pivot at" placement language) — the
+  CONTRACT is fine. The bug is that the NUMBERS that
+  fill that contract are usually eyeballed / guessed
+  rather than MEASURED, and the spec has no formal
+  discipline for measuring them.
+
+  PART 73 layers onto PARTs 1-72 as a STRICTLY
+  ADDITIVE spec-authoring discipline (no new
+  renderer behaviour, no new mandatory field, no
+  new validator — the existing PART 21 / PART 39
+  validators pick up the new declarations
+  automatically). The single highest-leverage fix
+  for "parts not in the right place" is PART 73.1
+  (the fixed image-to-world mapping function), which
+  directly replaces "does this look about right"
+  with "this is the number the image actually
+  gives," for every part in the same coordinate
+  system.
+
+  CRITICAL RULES:
+    - PART 73 is a SPEC-AUTHORING DISCIPLINE, not a
+      new rendering paradigm.
+    - A model that doesn't use any of the new
+      declarations loads identically to v1.22 /
+      v8.14.
+    - The fixed image-to-world mapping (73.1) is
+      the most important part — if only one
+      sub-section is implemented, do THIS one.
+    - PART 73 is style-agnostic; especially
+      important for characters, creatures, and any
+      model whose image-to-spec pipeline is
+      involved.
+
+73.1 — STOP EYEBALLING COORDINATES — USE A FIXED
+       IMAGE-TO-WORLD MAPPING FUNCTION
+-------------------------------------------
+
+  73.1.1  THE BUG. img2threejs's own postmortem:
+          "Do NOT eyeball proportions — extract
+          1-to-1 from reference. Eyeballed shapes
+          (guard, pommel, curves) are consistently
+          wrong." Eyeballed shapes are wrong because
+          per-part guessing is inconsistent — part A
+          might come out at the right X, but part B
+          then comes out at the wrong X because
+          nothing is anchoring them to the same
+          reference.
+
+  73.1.2  THE FIX. A FIXED image-to-world mapping
+          function, applied to EVERY part's
+          position, joint, and socket:
+
+              // X = (nx - 0.5) * SX
+              // Y = (CY - ny) * SY
+              function imageToWorld(nx, ny) {
+                return {
+                  x: (nx - 0.5) * SX,
+                  y: (CY  - ny) * SY
+                };
+              }
+
+          where:
+            - `nx`, `ny` = normalized image pixel
+              coords (0-1)
+            - `SX`, `SY` = the model's target width
+              and height in world units
+            - `CY` = a FIXED vertical reference line
+              (e.g. the image's vertical centre, or
+              the ground line)
+
+          Every part's position, joint, and socket
+          gets run through this SAME function, so
+          parts placed from the same reference photo
+          stay mutually consistent even if any one
+          measurement is slightly off.
+
+  73.1.3  MANDATORY DECLARATION. Specs that
+          involve an image input declare:
+
+              meta.placementSource = {
+                kind: 'image',
+                imageRef: 'reference.png',  // the reference file
+                sx: 1.0,                    // target width
+                sy: 1.0,                    // target height
+                cy: 0.5,                    // vertical reference
+                useSpline: true             // PART 73.1.4
+              };
+
+          The renderer doesn't enforce the
+          declaration directly (it's a spec-time
+          discipline), but the existing PART 21
+          checklist now lists it as item 19:
+          "If the spec was image-driven, every
+          part's position passes through the
+          declared `imageToWorld` function — not
+          eyeballed."
+
+  73.1.4  SPLINE TRACING. For smooth / curved
+          outlines (a curved blade, an organic
+          character silhouette, a winding handle),
+          run the traced points through a spline
+          (e.g. Catmull-Rom / `splineThru`) rather
+          than hand-tuning control points — hand-
+          tuned control points are exactly where
+          "close but not quite right" placement
+          creeps back in.
+
+              // Trace 20 points along the outline
+              const points = traceOutline(imageMask, 20);
+              // Spline-smooth
+              const curve = new THREE.CatmullRomCurve3(
+                points.map(p => new THREE.Vector3(
+                  imageToWorld(p.nx, p.ny).x,
+                  0,
+                  imageToWorld(p.nx, p.ny).y
+                ))
+              );
+              curve.closed = true;
+
+  73.1.5  STORED, NOT RE-DERIVED. Store the
+          traced points as coordinate arrays and
+          use them directly; don't re-derive a
+          "close enough" position by eye once you
+          have the traced value. The existing
+          `localStart` / `localEnd` / `outline`
+          arrays are the right place.
+
+73.2 — CHARACTER / CREATURE PROPORTIONS: MEASURE IN
+       HEAD-UNITS, DON'T ASSUME
+-------------------------------------------
+
+  73.2.1  HEAD-UNIT SYSTEM. If any of the models
+          are characters, creatures, or humanoid-
+          adjacent, adopt a formal head-unit (HU)
+          system rather than assumed default
+          proportions:
+
+              meta.anatomy = {
+                headUnit: 0.10,    // head height as a
+                                   // fraction of total
+                                   // image height
+                style: 'stylized', // see 73.2.2
+                measurements: {
+                  headHeight:  1.00,  // 1 HU = head
+                  torso:       1.30,  // crown-to-hip
+                  legs:        1.50,  // hip-to-floor
+                  shoulderWidth: 0.60,
+                  hipWidth:    0.45
+                }
+              };
+
+          `headUnit` is the measured head height as
+          a fraction of total image height (NOT
+          assumed). Every other measurement is
+          given in head-units (HU), not in pixels
+          and not in world units (the world-unit
+          conversion happens through PART 73.1's
+          imageToWorld AFTER the HU measurement
+          is captured).
+
+  73.2.2  STYLE AXIS. Pick the style FROM the
+          image, not defaulted:
+
+            ~7.5 HU  realistic
+            ~5-6 HU  stylized / anime-adjacent
+            ~2-3 HU  chibi / figurine
+
+          E47 (PART 72.7.3) treats an inconsistent
+          style-axis declaration (e.g. "realistic"
+          with 2 HU proportions) as a quality-
+          contract failure.
+
+  73.2.3  MEASURED, NOT DEFAULTED. `torso`
+          (crown-to-hip), `legs` (hip-to-floor),
+          `shoulderWidth`, `hipWidth` — all in HU,
+          all measured off the actual reference,
+          never a stock adult ratio. If the image
+          crops legs / feet, mark those specific
+          values as `inferred: true` + lower
+          `confidence` rather than silently
+          guessing a default ratio.
+
+  73.2.4  WHY THIS FIXES "LIMBS WRONG LENGTH."
+          This single change fixes the extremely
+          common "limbs are the wrong length
+          relative to the torso" class of placement
+          error, because it forces every proportion
+          to come from one consistent measured unit
+          instead of independent per-part guesses.
+
+73.3 — FACIAL / FEATURE LANDMARKS: NORMALIZED TO THE
+       HEAD BOX, NOT THE FULL IMAGE
+-------------------------------------------
+
+  73.3.1  HEAD-BOX NORMALIZATION. For faces
+          specifically, store landmarks as 0-1
+          coordinates relative to the HEAD bounding
+          box (not the whole image), so they
+          survive scale / crop changes:
+
+              meta.faceLandmarks = {
+                headBox: { x: 0.35, y: 0.70,
+                           w: 0.30, h: 0.20 },
+                hairline:   { y: 0.05 },
+                eyeLine:    { y: 0.50 },
+                noseBase:   { y: 0.65 },
+                mouthLine:  { y: 0.80 },
+                earTop:     { y: 0.45 },
+                earBottom:  { y: 0.70 },
+                eyeSpacing: { x: 0.28 },  // 0.2-0.35 of head width
+                mouthWidth: { x: 0.25 }
+              };
+
+  73.3.2  DEFAULT RANGES (match what's actually
+          observed in the image, not the typical
+          numbers — a stylized face with huge eyes
+          will LEGITIMATELY violate the "realistic"
+          ratios above on purpose):
+
+            hairline ~0.0-0.15 from crown
+            eyeLine  ~0.45-0.55
+            eyeSpacing ~0.2-0.35 of head width
+            noseBase ~0.6-0.7
+            mouthLine ~0.75-0.85
+            earTop / earBottom bracket
+                eyeLine-noseBase
+
+  73.3.3  REJECTED APPROACH. Position eyes /
+          brows / nose / mouth using freehand
+          placement is the exact failure mode
+          PART 73.3 is replacing. Use the
+          normalized values from the reference;
+          E47 (PART 72.7.3) flags specs that
+          declared faceLandmarks but then used
+          freehand values anyway.
+
+73.4 — JOINTS / SKELETON: MEASURE ANGLES OFF THE
+       SILHOUETTE, PRIORITIZE IN THIS ORDER
+-------------------------------------------
+
+  73.4.1  POSE-MATCHED SKELETON. Define joints
+          as a minimal skeleton MATCHED to the
+          reference pose, not a default T-pose.
+          When something can't be seen, don't
+          invent an angle for it — mark it
+          `confidence: 'low'` and default that ONE
+          joint to neutral rather than guessing.
+
+              meta.skeleton = {
+                joints: [
+                  { id: 'root',          pos: [0.50, 0.05], conf: 1.0 },
+                  { id: 'spine',         pos: [0.50, 0.45], conf: 1.0 },
+                  { id: 'neck',          pos: [0.50, 0.75], conf: 0.9 },
+                  { id: 'l_shoulder',    pos: [0.32, 0.78], conf: 0.8 },
+                  { id: 'r_shoulder',    pos: [0.68, 0.78], conf: 0.8 },
+                  { id: 'l_hip',         pos: [0.42, 0.50], conf: 1.0 },
+                  { id: 'r_hip',         pos: [0.58, 0.50], conf: 1.0 },
+                  { id: 'l_knee',        pos: [0.40, 0.20], conf: 0.6,
+                    note: 'occluded by foreground prop' },
+                  { id: 'r_knee',        pos: [0.60, 0.20], conf: 0.6 }
+                ]
+              };
+
+  73.4.2  PRIORITY ORDER. Priority order for
+          what to get right first (this is what a
+          viewer's eye actually checks, in order):
+
+            1. overall stance (weight distribution,
+               contrapposto vs symmetric) —
+               dominates whether a pose "reads"
+               correctly at a glance
+            2. limb angles at shoulders / hips —
+               the second most visible thing
+            3. hand / foot orientation — only
+               bother if clearly visible in the
+               reference
+
+          This ordering matters for placement
+          bugs specifically because it's common
+          to spend effort getting hand / foot
+          rotation exact while the shoulder angle
+          (which is what everyone notices first)
+          is still a default-pose guess.
+
+73.5 — RIGID-LOOKING PARTS PLACED NEAR A JOINT
+       CLIP / SQUASH — CLASSIFY BY "DOES IT CROSS A
+       JOINT?", NOT BY "IS IT HARD OR SOFT?"
+-------------------------------------------
+
+  73.5.1  THE BUG. If the renderer skins any
+          parts to a skeleton (rings, cuffs,
+          straps, armor plates, held props near a
+          joint), the classic placement bug is a
+          rigid-looking object that squashes or
+          clips right at the joint boundary
+          because it inherited a BLENDED weight
+          from two nearby bones.
+
+  73.5.2  THE FIX (CLASSIFICATION RULE, NOT A
+          MATERIAL RULE). The real test is whether
+          the part's geometry crosses a joint
+          boundary:
+
+            - a rigid part placed entirely within
+              ONE bone's region (e.g. a cuff mid-
+              forearm) is fine automatically — it
+              naturally gets a clean single-bone
+              weight and moves rigidly
+
+            - a rigid part placed AT a joint (e.g.
+              a cuff right at the wrist) will pick
+              up a blend of both bones and visibly
+              squash / stretch there UNLESS you
+              explicitly override every one of its
+              vertices to weight 1.0 on the single
+              nearest bone, bypassing the normal
+              distance-based falloff
+
+            - do NOT "fix" this by making the
+              part deformable / skinned normally
+              instead — that just trades a
+              clipping bug for a stretching-metal
+              bug
+
+  73.5.3  DECLARATION. The .ts factory / JSON /
+          JS blueprint declares a rigid part's
+          joint-crossing status as:
+
+              part.rigidityClass = 'rigid-at-joint';
+              // values: 'rigid-single-bone' |
+              //         'rigid-at-joint' |
+              //         'deformable'
+
+          The renderer (E48) checks for a
+          `rigid-at-joint` part that has the
+          default distance-based weight assignment
+          and emits a non-blocking warning: "this
+          part's geometry crosses a joint boundary;
+          override every vertex to weight 1.0 on
+          the single nearest bone, OR reclassify
+          as `deformable`."
+
+  73.5.4  CLOSELY-SPACED PARTS. The same
+          distance-based weighting is also why
+          closely-spaced parts (inner thighs on a
+          short / thick character, fingers pressed
+          together) can visibly move each other —
+          the fix there is the GEODESIC
+          (through-solid) distance from PART 72.13
+          above, not more segments.
+
+73.6 — UPDATED CROSS-REFERENCES
+---------------------------------
+
+  PART 73 layers on top of, never replaces:
+    - PART 7  (placement system)         — all paths
+    - PART 11 (floating-parts rule)      — all paths
+    - PART 19 (nested tree)              — all paths
+    - PART 21 (validation checklist)     — all paths
+    - PART 27 (image analysis)           — image paths
+    - PART 38 (character pipeline)       — character paths
+    - PART 38.22 (style agnosticism)     — all paths
+    - PART 39 (3D modeling techniques)   — all paths
+    - PART 39.4 (silhouette IoU + bbox)  — all paths
+    - PART 42 (character production)     — character paths
+    - PART 64 (character sculpt)         — character paths
+    - PART 72 (img2threejs alignment)    — all paths
+    - PART 33 / 34 / 35 / 36 / 37 / 38 / 39 / 40 / 41 /
+      42 / 43 / 44 / 45 / 67 / 68-71 / 72 (all unchanged)
+
+  PART 73 is a SPEC-AUTHORING DISCIPLINE, not a
+  new rendering paradigm. It introduces NO new
+  validator, NO new mandatory field, NO new
+  renderer behaviour, NO new export path. The
+  existing PART 21 validation checklist is
+  EXTENDED with one new item ("every image-
+  driven spec declares `meta.placementSource` and
+  routes positions through `imageToWorld`"); the
+  existing PART 47.3 (PART 72.7's tier system) is
+  the place where the per-tier detail count is
+  enforced.
+
+  The maintainer's "GHOSTPOLY / LOW_POLY_3D — WHAT TO
+  PULL FROM img2threejs" notebook (compiled
+  2026-09-05) is the source doc. PART 73 keeps
+  only the patterns that are directly useful for
+  the existing system. Strict upgrade, zero
+  downgrades.
+
+  If only ONE sub-section of PART 73 is
+  implemented, implement 73.1 (the fixed
+  image-to-world mapping function) — it is the
+  single highest-leverage fix for the user-
+  flagged "parts not in the right place" problem
+  and costs nothing to add since it's a
+  spec-authoring discipline, not a renderer
+  change.
 ================================================================================

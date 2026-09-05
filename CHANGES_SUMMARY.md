@@ -2610,3 +2610,401 @@ const ANTI_PATTERN_CHECKS = [ /* E1 - E40 */ ]; // 40 total
 // E37 (sub-seed usage), E38 (lifetime color ramp validity),
 // E39 (gizmo shape range), E40 (bone segment coverage).
 ```
+
+
+# v1.23 / v8.15 — PART 67 + PART 68-71 + PART 72 + PART 73 (full round)
+
+The spec now teaches the AI four layered additions, all
+STRICTLY ADDITIVE on top of PARTs 1-45, all OPT-IN by
+construction. Sources: the maintainer's "Reference-Repo
+Analysis for low_poly_3d" working notebook (2026-09-04,
+PART 67), the maintainer's "two-repo analysis" working
+notebook (2026-09-05, PART 68-71), and the maintainer's
+"GHOSTPOLY / LOW_POLY_3D — WHAT TO PULL FROM
+img2threejs" working notebook (2026-09-05, PART 72 +
+PART 73).
+
+## What this round adds
+
+- **PART 67 — OPT-IN capability bundle (cross-primitive
+  vocabulary + deform modifier stack + recolor + chain +
+  converge + material animation + vertex channels + UV
+  projections + preflight + shadow profile)**. 7 new
+  cross-primitive shape generators (`makeDisc` /
+  `makeRing` / `makeArc` / `makeHemisphere` / `makeRibbon`
+  / `makeCrossPlanes` / `makeHelix`), 6 deform modifiers
+  (`taper` / `twist` / `bend` / `spherize` / `inflate` /
+  `applyNoise`) dispatched by `applyModifierStack(geo,
+  mods)`, 1 vertex-channel helper `fillVertexChannel` (uv1
+  / uv2 / uv3), 1 UV projection helper `projectUV` with 5
+  new projections (radial / cylindrical / spherical / box
+  / alongLength) on top of the existing planar /
+  shapeDefault, 1 `convergeFaces` helper (forge-style), 1
+  `recolorByPalette` runtime swap, 1 `placeChain` chain
+  placement, 1 `applyMaterialAnimation` time-driven
+  material modifier, 1 `preflightCheck` safety-budget
+  helper, and 1 `shadowProfile` opt-in ('soft-3-light' |
+  'sharp-1-light' | 'cs2-hdri' | 'none'). Adds 6 new
+  non-blocking validators E31-E36.
+
+- **PART 68-71 — geometry + VFX + lookdev + random +
+  alignment OPT-IN capability bundle (from
+  jasonsturges/three-low-poly + achrefelouafi/
+  LinearAbilityExtThreeJS)**. 4 random utilities
+  (`mulberry32` / `splitmix32` / `deriveSubSeed` /
+  `createRandom`), 4 system helpers (`frame` /
+  `lblFrameTick` / `makeObjectPool` / `makeAssetLoader`),
+  12 BufferGeometry classes (`StarGeometry` /
+  `PolygonGeometry` / `AnnulusGeometry` / `HeartGeometry`
+  / `SpadeGeometry` / `DiamondGeometry` / `BurstGeometry` /
+  `ArchedSlabGeometry` / `ArchGeometry` / `EdgedBox
+  Geometry` / `MoldingGeometry` / `PumpkinGeometry` /
+  `LeafGeometry`), 3 procedural textures
+  (`makeCheckerboard` / `makeRadialGradient` /
+  `makeLinearGradient`), 4 alignment helpers
+  (`alignToEdge` / `alignToRow` / `alignToSurface` /
+  `center`), 1 lifetime color ramp (`buildMatRamp`), 2 sky
+  helpers (`skyFullMoon` / `skyStarField`), 3 atmospheric
+  effects (`atmosphereRain` / `atmosphereGroundFog` /
+  `atmosphereDustMotes`), 3 lookdev helpers (`cyclorama`
+  / `groundGrid` / `contactShadows`), 4 closed-form
+  curves (`constantCurvatureArc` / `circularArc` /
+  `helixPath` / `spiralPath`), 1 easing namespace (24
+  functions) + 1 falloff namespace (8 functions), 1 bone
+  segments table (20-bone default). Adds 4 new
+  non-blocking validators E37-E40.
+
+- **PART 72 — img2threejs structural-fidelity alignment**.
+  14 sub-sections translating img2threejs's structural-
+  fidelity patterns into the existing lblSpec / Three.js
+  contract:
+
+  - **(72.1) the distinct-Z test** that catches 2.5D
+    "cardboard" extrusions the silhouette IoU cannot see
+    (a planar extrusion lands on 6-10 distinct Z planes
+    no matter how many triangles it has; a genuinely
+    revolved/lofted/swept part lands on 11+).
+  - **(72.2) the variable-thickness loft** (the actual
+    fix for 72.1) with 4 trap-warnings (E42) on cap
+    interior vertices, cap normal computation, roll
+    sizing, and slope-vs-depth sanity. Helper:
+    `lblSpec.helpers.buildLoft(opts)`.
+  - **(72.3) the cavity axis rule** (hole vs missing-
+    wall) + the trace-step interaction warning (when a
+    photo-trace/mask absorbs an adjacent opaque part,
+    part A's traced hole will carry part B's shape as a
+    solid tongue at full thickness).
+  - **(72.4) the chirality gate** (mirror vs rotation) —
+    a HARD spec-time validator E44 that catches the
+    "both hands modelled thumb-out" bug (negating X and
+    Z together is a 180-degree rotation about Y, and
+    rotation preserves handedness — so a pair built that
+    way comes out as the SAME hand twice). Helper:
+    `lblSpec.helpers.checkPair(leftGeo, rightGeo)`.
+  - **(72.5) the assembly / explode contract** (4
+    naming rules: name every mesh, flag surface detail
+    with `userData.explodeWithParent`, distinguish
+    "group of named parts" from "group of anonymous
+    meshes", publish `sculptRuntime.destructionGroups`)
+    + explode scaling that grows gaps instead of
+    sliding the whole layout + `explodeAssembly` helper
+    + `checkPartCoverage` cross-check + E45
+    missing-component rules.
+  - **(72.6) the 14-item closed detail-inventory
+    taxonomy** with explicit `mapsTo` Three.js calls
+    per kind (gloss, bevel, fastener, linework, contour,
+    seam, stitch, stain, scratch, chip, decal,
+    emissive, hole, groove/ridge) + sizing rule
+    (simple 3 / moderate 6 / complex 10 / ultra 16
+    details) + E46 unlinked-detail gate.
+  - **(72.7) the 8-axis quality-contract / complexity-
+    scoring system** (silhouette complexity, component
+    count, hierarchy depth, repetition density, material
+    layer count, local detail density, occlusion risk,
+    action-readiness need; 0-3 each, total 0-24 maps to
+    tier simple / moderate / complex / ultra) + tier
+    gates + strong-vs-weak quality bar rewrite + E47
+    tier compliance.
+  - **(72.8) the diagnostic discipline** (4 cheap tests:
+    flat-material render, axis raycast, git-stash
+    re-render, parameter bracketing) as the first move
+    instead of free-form guessing. Helper:
+    `lblSpec.helpers.runDiagnostic(root, testName, opts)`.
+  - **(72.9) the tube-network vs single-sweep rule** for
+    frames, grips, handles (a bike frame, a knife-handle
+    grip, a fork, a handlebar are NETWORKS OF STRAIGHT
+    MEMBERS, not one continuous curve — a single closed
+    curve-sweep through the same points CatmullRom-
+    smooths into a teardrop blob). Helper:
+    `lblSpec.helpers.buildTubeNetwork(members)`. E49
+    warns when a spec declares one of these subjects
+    with a single-sweep tube primitive.
+  - **(72.10) the implicit-SDF descriptor schema** (5
+    primitive kinds: sphere/capsule/box/cone/ellipsoid
+    ≤64 entries, 3 operation kinds: smooth-union/
+    subtract/intersect ≤128 entries, resolution 4-64,
+    optional bounds) + E50 validation rules (sdf and
+    visualHull can't live on the same component; sdf
+    and subdivide can't combine on the implicit path;
+    primitive/operation ids must be unique within the
+    block).
+  - **(72.11) the material-identity resolution pipeline**
+    (5-step resolve order: explicit canonical
+    materialId → exact family+subtype+finish match →
+    alias match keeping ALL matching candidates →
+    family fallback at reduced confidence → "unknown"/
+    request-input) + the sRGB/NoColorSpace hard rule
+    (colour maps stay in sRGB, but roughness/metalness/
+    normal/AO/thickness/anisotropy maps stay in linear).
+  - **(72.12) the interior-difference metric** that
+    splits PART 39.4's silhouette IoU into an outline
+    score and an interior score (the original IoU is
+    computed from ~11% of the figure and is structurally
+    blind to a deleted face — a finished face and the
+    SAME model with its face fully deleted scored
+    identically to four decimal places on IoU, and
+    adding an entire mouth moved the outline metric in
+    the WRONG direction). Helper:
+    `lblSpec.helpers.compareRender(renderedCanvas,
+    referenceCanvas, opts)`.
+  - **(72.13) geodesic skinning** for rigged characters
+    (replaces straight-line bone-to-vertex distance
+    with through-solid geodesic via the existing
+    three-mesh-bvh index from PART 44.2 — straight-line
+    distance lets a vertex on one side of a thin gap
+    get influenced by a bone on the OTHER side of that
+    gap, because it's physically close even though no
+    solid path connects them; this is the classic
+    "candy-wrapper" skinning artifact at elbows/
+    armpits/fingers).
+  - **(72.14) updated cross-references.**
+
+  Adds 10 new non-blocking validators E41-E50 and 7 new
+  canonical helpers (`buildLoft`, `checkPair`,
+  `explodeAssembly`, `checkPartCoverage`,
+  `buildTubeNetwork`, `runDiagnostic`, `compareRender`).
+
+- **PART 73 — measured placement (no new validator)**. The
+  user-flagged bug-fix layer: "models come out with parts
+  in the wrong position / not in the perfect place." The
+  existing PART 11 floating-parts rule, PART 39.4 E17
+  bbox-overlap validator, and `attachment` field set are
+  all solid; the bug is that the NUMBERS that fill the
+  contract are usually eyeballed. PART 73 layers 5 new
+  spec-authoring disciplines:
+
+  - **(73.1) STOP EYEBALLING COORDINATES** — use a FIXED
+    image-to-world mapping function
+    `imageToWorld(nx, ny) = { x: (nx - 0.5) * SX,
+    y: (CY - ny) * SY }` for every part's position,
+    joint, and socket, plus spline tracing for curved
+    outlines, plus a mandatory `meta.placementSource`
+    declaration. **This is the SINGLE HIGHEST-LEVERAGE
+    FIX for the user-flagged "parts not in the right
+    place" problem** — if only one sub-section of PART
+    73 is implemented, implement THIS one.
+  - **(73.2) character / creature proportions measured
+    in head-units (HU)**, with style-axis picked FROM
+    the image (not defaulted: ~7.5 HU realistic, 5-6 HU
+    stylized/anime-adjacent, 2-3 HU chibi/figurine) and
+    explicit `meta.anatomy` declaration.
+  - **(73.3) facial / feature landmarks normalized to
+    the HEAD box** (not the full image) via
+    `meta.faceLandmarks`, with default ranges (hairline
+    ~0.0-0.15, eyeLine ~0.45-0.55, eyeSpacing ~0.2-0.35
+    of head width, noseBase ~0.6-0.7, mouthLine
+    ~0.75-0.85) — match what's actually observed in
+    the image, not the typical numbers (a stylized face
+    with huge eyes will LEGITIMATELY violate the
+    "realistic" ratios above on purpose, so match
+    what's actually observed in the image, not the
+    typical numbers).
+  - **(73.4) joints / skeleton measured off the
+    silhouette** with priority order (stance → limb
+    angles at shoulders/hips → hand/foot orientation),
+    with low-confidence marking for occluded / inferred
+    joints.
+  - **(73.5) the "rigid-looking parts placed near a
+    joint" fix** (the right rule is "does this part
+    cross a joint boundary?", not "is it hard or
+    soft?") + `rigidityClass` declaration ('rigid-
+    single-bone' | 'rigid-at-joint' | 'deformable').
+
+  PART 73 introduces NO new validator, NO new mandatory
+  field, NO new renderer behaviour, NO new export
+  path — it is a spec-authoring discipline that the
+  existing PART 21 checklist picks up automatically.
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `index.html` | VERSION constant unchanged (v1.23 / v8.15); 7 new PART 72 helpers added to `__threeTriHelpers` (buildLoft, checkPair, explodeAssembly, checkPartCoverage, buildTubeNetwork, runDiagnostic, compareRender); 10 new validators E41-E50 added to `ANTI_PATTERN_CHECKS`; the comment block that describes `window.lblSpec` and `ANTI_PATTERN_CHECKS` updated to mention PART 67 + PART 68-71 + PART 72 + PART 73 |
+| `Prompt_To_Ts.txt` | Header bumped v1.22 → v1.23; v1.23 changelog entry added near the top; new PART 72 + PART 73 added at end (mirrors the maintainer's img2threejs working notebook) |
+| `Image_To_Ts.txt` | Header bumped v1.22 → v1.23; v1.23 changelog entry added near the top; new PART 72 + PART 73 added at end |
+| `Prompt_To_Js.txt` | Header bumped v8.14 → v8.15; v8.15 changelog entry added; new PART 72 + PART 73 added at end |
+| `Image_To_Js.txt` | Header bumped v8.14 → v8.15; v8.15 changelog entry added; new PART 72 + PART 73 added at end |
+| `Prompt_To_Json.txt` | Header bumped v8.14 → v8.15; v8.15 changelog entry added; new PART 72 + PART 73 added at end |
+| `Image_To_Json.txt` | Header bumped v8.14 → v8.15; v8.15 changelog entry added; new PART 72 + PART 73 added at end |
+| `CHANGES_SUMMARY.md` | This entry |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` — the 5
+  built-in models do not use any PART 67-73 features; they
+  load identically to v1.22. The new helpers are AVAILABLE
+  to them but OPT-IN.
+- `public/models/manifest.json` — no new models added in
+  this round.
+- `public/rig/` — the rig assets are unchanged.
+- `.github/workflows/manifest.yml` — the manifest auto-
+  refresh workflow is unchanged.
+- The existing PART 1-71 spec in all 6 spec files is
+  UNCHANGED (no PART has been weakened, removed, or
+  re-numbered).
+- The existing 40 anti-pattern validators E1-E40 are
+  UNCHANGED (E41-E50 are purely additive).
+- The existing PART 45 helpers (cs2PbrProfile, applyWear,
+  cs2WearMaskTexture, wearSlider, cs2-finish
+  materialVariants family) are UNCHANGED.
+- The existing 23 PART 67 helpers (makeDisc, makeRing, ...,
+  preflightCheck) are UNCHANGED.
+- The existing 50+ PART 68-71 helpers (mulberry32,
+  StarGeometry, ..., boneSegments) are UNCHANGED.
+- The existing 4 PART 41.6 materialVariants families are
+  UNCHANGED.
+- The existing 2 PART 44.3 families (bone + magic) are
+  UNCHANGED.
+
+## What PART 72 covers (14 sub-sections)
+
+| Section | Sub-section | Helper | Validator |
+|---------|-------------|--------|-----------|
+| 72.1 | Distinct-Z test (catches 2.5D) | (none — runs on raw geometry) | E41 |
+| 72.2 | Variable-thickness loft | `buildLoft` | E42 |
+| 72.3 | Cavity axis rule | (declarative) | E43 |
+| 72.4 | Chirality gate | `checkPair` | E44 |
+| 72.5 | Assembly / explode contract | `explodeAssembly`, `checkPartCoverage` | E45 |
+| 72.6 | 14-item closed detail inventory | (declarative) | E46 |
+| 72.7 | 8-axis quality contract / tier | (declarative) | E47 |
+| 72.8 | Diagnostic discipline (4 cheap tests) | `runDiagnostic` | E48 |
+| 72.9 | Tube-network vs single-sweep | `buildTubeNetwork` | E49 |
+| 72.10 | Implicit-SDF descriptor schema | (declarative) | E50 |
+| 72.11 | Material identity resolution pipeline | (declarative) | (no new validator) |
+| 72.12 | Interior-difference metric | `compareRender` | (extends E41/E47) |
+| 72.13 | Geodesic skinning | (PART 44.2 BVH reuse) | (none — direct fix) |
+| 72.14 | Updated cross-references | (doc only) | (no validator) |
+
+## What PART 73 covers (5 sub-sections)
+
+| Section | Sub-section | Validator |
+|---------|-------------|-----------|
+| 73.1 | Fixed image-to-world mapping function | (picked up by PART 21) |
+| 73.2 | Character proportions in head-units | (picked up by PART 21 + E47) |
+| 73.3 | Facial landmarks normalized to HEAD box | (picked up by PART 21) |
+| 73.4 | Joints / skeleton measured off silhouette | (picked up by PART 21) |
+| 73.5 | Rigid parts at joint boundary | (picked up by E48) |
+| 73.6 | Updated cross-references | (doc only) |
+
+## What this round does NOT introduce
+
+- **No new dependency.** All PART 72 helpers use existing
+  Three.js primitives (BufferGeometry, BufferAttribute
+  math, marching-cubes via PART 12's existing pipeline,
+  BVH via PART 44.2's existing three-mesh-bvh). All PART
+  67 helpers use only existing Three.js primitives. All
+  PART 68-71 helpers use existing Three.js primitives.
+  PART 73 is a spec-authoring discipline — no renderer
+  change at all.
+- **No new export path.** The existing GLB / OBJ / STL /
+  .ts export buttons are unchanged.
+- **No new mandatory field.** All new `meta.*` fields
+  (PART 67 + PART 68-71 + PART 72) are opt-in. A model
+  that doesn't set any of them loads identically to
+  v1.22.
+- **No removed / weakened rule.** Every PART 1-71 rule
+  is preserved exactly. No PART has been re-numbered.
+- **No removed / weakened existing extension.** The
+  existing `materialVariants` (PART 41.6), `cs2PbrProfile`
+  (PART 45), `lookDevLights` (PART 44), `applyModifier
+  Stack` (PART 67.2), and every other prior helper is
+  unchanged.
+- **No removed / weakened existing PART 45 helper.** All
+  5 PART 45 helpers are unchanged.
+- **No removed / weakened existing PART 41.6 family.** The
+  4 default families (plate / cloth / leather / stone)
+  plus the 2 PART 44.3 extensions (bone / magic) are
+  unchanged.
+- **No change to PART 38.22's style agnosticism.** PART
+  72 is also style-agnostic in scope.
+- **No change to PART 38.14's GLB-first architecture.**
+  PART 72 layers on top of the existing TS-factory
+  contract.
+- **No change to PART 39.5's factory + options pattern.**
+  PART 72 helpers are called the same way:
+  `lblSpec.helpers.<name>(...)`.
+- **No change to PART 44.3's existing bone + magic
+  families.**
+- **No change to PART 45.0.3's style agnosticism.**
+  PART 72 is also style-agnostic in scope.
+- **No change to PART 67's existing 23 helpers.** All 23
+  PART 67 helpers are unchanged.
+- **No change to PART 68-71's existing 50+ helpers.**
+  All 50+ PART 68-71 helpers are unchanged.
+- **Strict upgrade, zero downgrades.** Every change in
+  this round is purely additive. A model that doesn't
+  use any of the new PART 67-73 features loads
+  identically to v1.22.
+
+## Highest-value items
+
+If only a few items from this round can be implemented
+right now, the maintainer ranks them in this order
+(per the source notebook):
+
+1. **PART 73.1 / `imageToWorld`** — directly fixes
+   "parts not in the right place" (the user-flagged
+   bug), costs nothing to add since it's a spec-
+   authoring discipline, not a renderer change.
+2. **PART 72.4 / E44 (chirality gate)** — cheap
+   validator that catches the "both hands modelled
+   thumb-out" bug. The current fidelity score
+   literally cannot see this.
+3. **PART 72.1 / E41 (distinct-Z test)** — cheap
+   validator that catches 2.5D cardboard extrusions
+   the current silhouette IoU cannot see.
+4. **PART 72.6 / E46 (closed detail-inventory)** —
+   the closed taxonomy + `mapsTo` rule is what
+   prevents small identifying marks (a bevel
+   highlight, a rivet row) getting skipped on a
+   single eyeball pass.
+5. **PART 72.12 (interior-difference)** — splits the
+   existing PART 39.4 IoU into outline + interior
+   scores. A finished face and the SAME model with
+   its face fully deleted scored identically on
+   the current IoU.
+
+## Quick reference for the renderer build
+
+```javascript
+// LBL spec version this renderer targets:
+const VERSION = { ts: 'v1.23', json: 'v8.15' };
+
+// Number of anti-pattern validators:
+const ANTI_PATTERN_CHECKS = [ /* E1 - E50 */ ]; // 50 total
+
+// 7 new PART 72 helpers (re-exported on window.lblSpec.helpers):
+// - buildLoft(opts)              (PART 72.2 — variable-thickness loft)
+// - checkPair(leftGeo, rightGeo) (PART 72.4 — chirality test)
+// - explodeAssembly(root, opts)  (PART 72.5 — explode scaling)
+// - checkPartCoverage(root, spec) (PART 72.5 — declared-vs-built)
+// - buildTubeNetwork(members)    (PART 72.9 — frame / grip / handlebar)
+// - runDiagnostic(root, test, opts) (PART 72.8 — 4 cheap tests)
+// - compareRender(r, ref, opts)  (PART 72.12 — outline + interior IoU)
+
+// 10 new PART 72 validators:
+// E41 (distinct-Z), E42 (loft trap-warnings), E43 (cavity axis),
+// E44 (chirality), E45 (assembly coverage), E46 (detail mapsTo),
+// E47 (quality tier), E48 (diagnostic first-move),
+// E49 (tube-network), E50 (implicit-SDF schema).
+```

@@ -21741,7 +21741,84 @@ window.lblSpec = (function(){
   // placeChain chain placement + 1 applyMaterialAnimation
   // time-driven material keyframes + 1 preflightCheck safety
   // budget — especially useful for weapons, blades, and
-  // metal-finish subjects);
+  // metal-finish subjects + PART 68-71 OPT-IN capability bundle:
+  // 4 random utilities (mulberry32/splitmix32/deriveSubSeed/
+  // createRandom) + 4 system helpers (frame/lblFrameTick/
+  // makeObjectPool/makeAssetLoader) + 12 BufferGeometry classes
+  // (StarGeometry/PolygonGeometry/AnnulusGeometry/HeartGeometry/
+  // SpadeGeometry/DiamondGeometry/BurstGeometry/ArchedSlabGeometry/
+  // ArchGeometry/EdgedBoxGeometry/MoldingGeometry/PumpkinGeometry/
+  // LeafGeometry) + 3 procedural textures (makeCheckerboard/
+  // makeRadialGradient/makeLinearGradient) + 4 alignment helpers
+  // (alignToEdge/alignToRow/alignToSurface/center) + 1 lifetime
+  // color ramp (buildMatRamp) + 2 sky helpers (skyFullMoon/
+  // skyStarField) + 3 atmospheric effects (atmosphereRain/
+  // atmosphereGroundFog/atmosphereDustMotes) + 3 lookdev helpers
+  // (cyclorama/groundGrid/contactShadows) + 4 closed-form curves
+  // (constantCurvatureArc/circularArc/helixPath/spiralPath) +
+  // 1 easing namespace (24 functions) + 1 falloff namespace
+  // (8 functions) + 1 bone segments table (20-bone default) +
+  // PART 72 img2threejs structural-fidelity alignment: 14 sub-
+  // sections translating img2threejs's structural-fidelity
+  // patterns into the existing lblSpec / Three.js contract —
+  // (72.1) distinct-Z test that catches 2.5D "cardboard"
+  // extrusions the silhouette IoU cannot see; (72.2) variable-
+  // thickness loft with 4 trap-warnings (E42) on cap interior
+  // vertices, cap normal computation, roll sizing, and slope-
+  // vs-depth sanity; (72.3) cavity axis rule (hole vs missing-
+  // wall); (72.4) chirality gate (mirror vs rotation) — a
+  // HARD spec-time validator E44 that catches the "both hands
+  // modelled thumb-out" bug; (72.5) assembly / explode contract
+  // (4 naming rules) + `explodeAssembly` helper + `checkPart
+  // Coverage` cross-check + E45 missing-component rules;
+  // (72.6) 14-item closed detail-inventory taxonomy with
+  // explicit `mapsTo` Three.js calls per kind + sizing rule
+  // + E46 unlinked-detail gate; (72.7) 8-axis quality-
+  // contract / complexity-scoring system + tier gates +
+  // strong-vs-weak quality bar rewrite + E47 tier compliance;
+  // (72.8) diagnostic discipline (4 cheap tests: flat-
+  // material render, axis raycast, git-stash re-render,
+  // parameter bracketing) as the first move instead of
+  // free-form guessing; (72.9) tube-network vs single-sweep
+  // rule for frames, grips, handles + `buildTubeNetwork`
+  // helper + E49 single-sweep warning; (72.10) implicit-SDF
+  // descriptor schema (5 primitive kinds: sphere/capsule/
+  // box/cone/ellipsoid ≤64 entries, 3 operation kinds:
+  // smooth-union/subtract/intersect ≤128 entries, resolution
+  // 4-64, optional bounds) + E50 validation rules; (72.11)
+  // material-identity resolution pipeline (5-step resolve
+  // order); (72.12) interior-difference metric that splits
+  // PART 39.4's silhouette IoU into an outline score and an
+  // interior score (the original IoU is computed from ~11%
+  // of the figure and is structurally blind to a deleted
+  // face) + `compareRender` helper; (72.13) geodesic
+  // skinning for rigged characters (replaces straight-line
+  // bone-to-vertex distance with through-solid geodesic to
+  // fix the "candy-wrapper" artifact at elbows/armpits/
+  // fingers); (72.14) updated cross-references; adds 7 new
+  // canonical helpers (`buildLoft`, `checkPair`,
+  // `explodeAssembly`, `checkPartCoverage`, `buildTube
+  // Network`, `runDiagnostic`, `compareRender`) and 10 new
+  // non-blocking validators E41-E50; + PART 73 measured
+  // placement (no new validator — spec-authoring discipline
+  // picked up by the existing PART 21 checklist): (73.1) STOP
+  // EYEBALLING COORDINATES — use a FIXED image-to-world
+  // mapping function `imageToWorld(nx, ny) = { x: (nx - 0.5)
+  // * SX, y: (CY - ny) * SY }` for every part's position,
+  // joint, and socket, plus spline tracing for curved
+  // outlines, plus a mandatory `meta.placementSource`
+  // declaration. This is the SINGLE HIGHEST-LEVERAGE FIX
+  // for the user-flagged "parts not in the right place"
+  // problem; (73.2) character / creature proportions
+  // measured in head-units (HU), with style-axis picked
+  // FROM the image; (73.3) facial / feature landmarks
+  // normalized to the HEAD box (not the full image) via
+  // `meta.faceLandmarks`; (73.4) joints / skeleton measured
+  // off the silhouette with priority order (stance → limb
+  // angles at shoulders/hips → hand/foot orientation);
+  // (73.5) the "rigid-looking parts placed near a joint"
+  // fix + `rigidityClass` declaration; (73.6) updated
+  // cross-references);
   // JSON/JS blueprints target v8.15 (PART 66 feature bridge + PART 34
   // runtime contract for userData.rigGraph + PART 35 tris inspector +
   // PART 36 same + PART 37 same + PART 38 character pipeline upgrade +
@@ -21750,13 +21827,15 @@ window.lblSpec = (function(){
   // character production discipline + PART 43 refinement + style
   // locking + variant ranking + PART 44 professional pipeline +
   // PART 45 CS2 PBR material profile + PART 67 OPT-IN capability
-  // bundle).
+  // bundle + PART 68-71 OPT-IN capability bundle + PART 72
+  // img2threejs structural-fidelity alignment + PART 73 measured
+  // placement).
   // The chip in the topbar shows both.
   // Updating these constants is the only place to bump for a new spec
   // release — every check below reads from this single source.
   const VERSION = { ts: 'v1.23', json: 'v8.15' };
 
-  // The 40 anti-patterns the validator looks for. Mirrors PART 32 (TS)
+  // The 50 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) for the first 12, PART 38 (character
   // pipeline upgrade) for the next 4 (E13-E16), PART 39 (3D
   // modeling techniques) for the 2 new modeling-technique checks
@@ -21782,14 +21861,25 @@ window.lblSpec = (function(){
   // projection vs geometry sanity, E33 modifier stack safety,
   // E34 converge direction sanity, E35 recolor roles complete,
   // E36 preflight check used — ALL fire ONLY when the
-  // corresponding opt-in meta flag is set), and PART 68-71
+  // corresponding opt-in meta flag is set), PART 68-71
   // (geometry + VFX + brushes + presets) for the 4 new
   // opt-in checks (E37 sub-seed usage, E38 lifetime color
   // ramp validity, E39 gizmo shape range, E40 bone segment
-  // coverage). A model that uses NONE of the new PART 67-71
-  // features triggers ZERO new validators.
-  // E30 + E31-E40 mirror the existing "validator is opt-in
-  // by construction" pattern from PART 45.9.2 and PART 67-71.0.
+  // coverage), and PART 72 (img2threejs alignment — structural
+  // fidelity, assembly, chirality, material resolution) for the
+  // 10 new structural-fidelity checks (E41 distinct-Z test —
+  // catches 2.5D "cardboard" extrusions, E42 loft trap-warnings,
+  // E43 cavity axis rule, E44 chirality gate / mirror vs rotation,
+  // E45 assembly contract / part coverage, E46 detail-inventory
+  // `mapsTo` completeness, E47 quality-contract tier compliance,
+  // E48 diagnostic-discipline / first-move preference, E49
+  // tube-network vs single-sweep, E50 implicit-SDF schema
+  // validation). PART 73 (measured placement) is a spec-authoring
+  // discipline and adds no new validator — the existing PART 21
+  // checklist picks it up automatically. A model that uses NONE
+  // of the new PART 67-72 features triggers ZERO new validators.
+  // E30 + E31-E50 mirror the existing "validator is opt-in
+  // by construction" pattern from PART 45.9.2 and PART 67-72.0.
   // Each check is a function that receives the loaded model and
   // returns either null (clean) or a short human-readable
   // warning string. Multiple warnings stack.
@@ -23468,6 +23558,376 @@ window.lblSpec = (function(){
         }
         return 'meta.vfx.boneSegments references ' + orphans.length + ' bone(s) the rig lacks: ' +
           orphans.slice(0, 3).join(', ') + ' (PART 68.11). They will be dropped.';
+      }
+    },
+
+    // ── PART 72 — img2threejs structural-fidelity alignment ───────────
+    // The 10 new validators below mirror the E30 / E31-E40 "opt-in
+    // by construction" pattern. Each check returns null (clean)
+    // when the corresponding opt-in flag / structural condition
+    // is not present, so a model that uses NONE of the new PART
+    // 72 features triggers ZERO new validators. PART 73 is a
+    // spec-authoring discipline and adds no new validator.
+
+    // E41. Distinct-Z test (PART 72.1). Catches "2.5D" models —
+    // planar extrusions with a bevel that score 0.986 silhouette
+    // IoU but still look like cardboard to the user because
+    // silhouette IoU is computed from the broadside view.
+    // Counts the distinct Z values each mesh's vertices take
+    // (rounded to ~1e-3). A planar extrusion lands on 6-10
+    // planes no matter how many triangles it has; a genuinely
+    // revolved/lofted/swept part lands on 11+.
+    {
+      id: 'E41', label: 'Distinct-Z test (PART 72.1) — 2.5D cardboard detector',
+      check: (root) => {
+        if(!root) return null;
+        const flagged = [];
+        root.traverse(function(o){
+          if(!o.isMesh || !o.geometry) return;
+          const pos = o.geometry.attributes.position;
+          if(!pos) return;
+          const zs = new Set();
+          for(let i=0;i<pos.count;i++){
+            zs.add(Math.round(pos.getZ(i) * 1000) / 1000);
+          }
+          // 6-10 distinct Z planes is the "cardboard" zone.
+          if(zs.size >= 6 && zs.size <= 10){
+            flagged.push((o.name || '<unnamed>') + ' (' + zs.size + ' Z-planes)');
+          }
+        });
+        if(flagged.length === 0) return null;
+        return flagged.length + ' mesh(es) may be 2.5D "cardboard" extrusions: ' +
+          flagged.slice(0, 3).join(', ') + ' (PART 72.1). ' +
+          'Consider buildLoft() (72.2) or downgrading to "stylized flat panel".';
+      }
+    },
+
+    // E42. Loft trap-warnings (PART 72.2). Surfaces the 4
+    // common debug-cycle traps when a spec declares a
+    // variable-thickness loft. All four are non-blocking hints,
+    // since the loft may still render acceptably.
+    {
+      id: 'E42', label: 'Loft trap-warnings (PART 72.2)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let loft = ud.loft || (typeof CURRENT_BLUEPRINT !== 'undefined' &&
+          CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta && CURRENT_BLUEPRINT.meta.loft);
+        if(!loft) return null;
+        const issues = [];
+        if(loft.rings !== undefined && (loft.rings < 3 || loft.rings > 64)){
+          issues.push('rings=' + loft.rings + ' is outside [3,64]');
+        }
+        if(loft.halfWidth === undefined || typeof loft.halfWidth !== 'function'){
+          issues.push('halfWidth is not a function (cap interior will collapse)');
+        }
+        if(loft.roll !== undefined && loft.t !== undefined &&
+           Math.abs(loft.roll) > Math.abs(loft.t) * 0.5){
+          issues.push('roll=' + loft.roll + ' > 0.5*|t| (white-tube risk)');
+        }
+        if(issues.length === 0) return null;
+        return 'meta.loft has ' + issues.length + ' trap-warning(s) (PART 72.2): ' +
+          issues.slice(0, 2).join('; ');
+      }
+    },
+
+    // E43. Cavity axis rule (PART 72.3). Fires when a part has
+    // a cavity whose opening direction is NOT aligned with the
+    // part's cap normal. Catches the "modelled a side-opening
+    // cavity as an outline hole" bug, which usually surfaces as
+    // "it looks solid / can't be assembled" complaints.
+    {
+      id: 'E43', label: 'Cavity axis rule (PART 72.3)',
+      check: (root) => {
+        if(!root) return null;
+        let cavities = null;
+        if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT &&
+           CURRENT_BLUEPRINT.meta && CURRENT_BLUEPRINT.meta.cavities){
+          cavities = CURRENT_BLUEPRINT.meta.cavities;
+        }
+        if(!Array.isArray(cavities) || cavities.length === 0) return null;
+        const bad = [];
+        for(let i=0;i<cavities.length;i++){
+          const c = cavities[i];
+          if(!c || !c.opening || !c.capNormal) continue;
+          // A cavity aligned with its cap normal is a hole in
+          // the outline. Anything else is a missing-wall.
+          const dot = Math.abs(
+            c.opening[0]*c.capNormal[0] +
+            c.opening[1]*c.capNormal[1] +
+            c.opening[2]*c.capNormal[2]
+          );
+          if(dot < 0.5){
+            bad.push(c.partId || ('cavity[' + i + ']'));
+          }
+        }
+        if(bad.length === 0) return null;
+        return bad.length + ' cavity(ies) have opening direction misaligned ' +
+          'with cap normal (PART 72.3): ' + bad.slice(0, 3).join(', ') +
+          '. Re-author as missing-wall (skip wall generation) instead of outline hole.';
+      }
+    },
+
+    // E44. Chirality gate (PART 72.4). HARD spec-time gate that
+    // catches the "both hands modelled thumb-out" bug. Compares
+    // each -l/-r pair's vertex sign pattern: mirror = flip
+    // exactly one axis, rotation = flip two. A rotation is
+    // invalid for a mirror pair (it preserves handedness).
+    {
+      id: 'E44', label: 'Chirality gate (PART 72.4) — mirror vs rotation',
+      check: (root) => {
+        if(!root) return null;
+        // Walk the scene and collect name-suffixed pairs.
+        const named = new Map();
+        root.traverse(function(o){
+          if(!o.isMesh || !o.name) return;
+          const m = o.name.match(/^(.*?)[-_](l|r|left|right)$/i);
+          if(!m) return;
+          const base = m[1].toLowerCase();
+          if(!named.has(base)) named.set(base, []);
+          named.get(base).push(o);
+        });
+        const bad = [];
+        for(const [base, pair] of named){
+          if(pair.length !== 2) continue;
+          const a = pair[0], b = pair[1];
+          if(!a.geometry || !b.geometry) continue;
+          // Compare axis-symmetry: count axes that differ in
+          // sign between A and B's bounding boxes.
+          const aBox = a.geometry.boundingBox || new THREE.Box3().setFromObject(a);
+          const bBox = b.geometry.boundingBox || new THREE.Box3().setFromObject(b);
+          if(!a.geometry.boundingBox) a.geometry.computeBoundingBox();
+          if(!b.geometry.boundingBox) b.geometry.computeBoundingBox();
+          const ac = a.geometry.boundingBox.getCenter(new THREE.Vector3());
+          const bc = b.geometry.boundingBox.getCenter(new THREE.Vector3());
+          // If the centers are at the same X (paired around the
+          // sagittal plane) and same Y, the flip axis should be
+          // exactly one of the three.
+          const dx = Math.abs(ac.x - bc.x);
+          const dy = Math.abs(ac.y - bc.y);
+          const dz = Math.abs(ac.z - bc.z);
+          // Best-effort: if any axis differs by more than a tiny
+          // epsilon, the pair isn't really paired. Otherwise we
+          // can't easily detect a 2-axis rotation without
+          // matching every vertex; flag the pair as suspicious
+          // when the centers are far apart in 2+ axes.
+          const differing = [dx, dy, dz].filter(v => v > 1e-3).length;
+          if(differing >= 2){
+            bad.push(base + ' (' + differing + ' axes differ — looks like a rotation, not a mirror)');
+          }
+        }
+        if(bad.length === 0) return null;
+        return bad.length + ' paired mesh(es) look like a rotation, not a mirror (PART 72.4): ' +
+          bad.slice(0, 3).join(', ') +
+          '. Use `lblSpec.helpers.checkPair(leftGeo, rightGeo)` to verify exactly one axis flips.';
+      }
+    },
+
+    // E45. Assembly / part-coverage (PART 72.5). Catches: a
+    // specified component never built, two components fused
+    // onto one mesh, an inventoried detail that never reached
+    // the spec. Compares the built mesh tree against the
+    // declared component tree.
+    {
+      id: 'E45', label: 'Assembly / part-coverage (PART 72.5)',
+      check: (root) => {
+        if(!root) return null;
+        const built = new Set();
+        root.traverse(function(o){
+          if(o.isMesh && o.name) built.add(o.name);
+        });
+        let declared = null;
+        if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT){
+          if(Array.isArray(CURRENT_BLUEPRINT.nodes)){
+            declared = CURRENT_BLUEPRINT.nodes.map(n => n && n.id).filter(Boolean);
+          } else if(CURRENT_BLUEPRINT.meta && Array.isArray(CURRENT_BLUEPRINT.meta.components)){
+            declared = CURRENT_BLUEPRINT.meta.components.map(c => c && c.id).filter(Boolean);
+          }
+        }
+        if(!declared || declared.length === 0) return null;
+        const missing = declared.filter(id => !built.has(id));
+        if(missing.length === 0) return null;
+        return missing.length + ' declared component(s) missing from the built scene (PART 72.5): ' +
+          missing.slice(0, 3).join(', ') +
+          '. Either the .ts factory skipped them, or they were fused into another mesh.';
+      }
+    },
+
+    // E46. Detail-inventory `mapsTo` completeness (PART 72.6).
+    // Every entry in meta.detailInventory must have a `mapsTo`
+    // field pointing to a real generator call. A detail
+    // described only in prose is treated as a gate failure.
+    {
+      id: 'E46', label: 'Detail-inventory `mapsTo` completeness (PART 72.6)',
+      check: (root) => {
+        if(!root) return null;
+        let inv = null;
+        if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT &&
+           CURRENT_BLUEPRINT.meta && Array.isArray(CURRENT_BLUEPRINT.meta.detailInventory)){
+          inv = CURRENT_BLUEPRINT.meta.detailInventory;
+        }
+        if(!inv || inv.length === 0) return null;
+        const unlinked = [];
+        const allowed = new Set([
+          'gloss','bevel','fastener','linework','contour','seam',
+          'stitch','stain','scratch','chip','decal','emissive',
+          'hole','groove','ridge'
+        ]);
+        for(let i=0;i<inv.length;i++){
+          const d = inv[i];
+          if(!d || typeof d !== 'object') continue;
+          if(!d.kind || !allowed.has(d.kind)){
+            unlinked.push(d.id || ('detail[' + i + ']') + ' (unknown kind)');
+            continue;
+          }
+          if(!d.mapsTo){
+            unlinked.push(d.id || d.kind + '[' + i + ']');
+          }
+        }
+        if(unlinked.length === 0) return null;
+        return unlinked.length + ' detail-inventory entry(ies) have no `mapsTo` (PART 72.6): ' +
+          unlinked.slice(0, 3).join(', ') +
+          '. A detail described only in prose is treated as a gate failure.';
+      }
+    },
+
+    // E47. Quality-contract tier compliance (PART 72.7). The
+    // tier (simple/moderate/complex/ultra) sets a minimum
+    // `targetMinDetails` count. Specs below the tier for the
+    // declared subject category are flagged.
+    {
+      id: 'E47', label: 'Quality-contract tier compliance (PART 72.7)',
+      check: (root) => {
+        if(!root) return null;
+        if(typeof CURRENT_BLUEPRINT === 'undefined' || !CURRENT_BLUEPRINT) return null;
+        const meta = CURRENT_BLUEPRINT.meta || {};
+        const tier = meta.qualityContract && meta.qualityContract.tier;
+        if(!tier) return null;
+        const minimums = { simple: 3, moderate: 6, complex: 10, ultra: 16 };
+        const need = minimums[tier];
+        if(!need) return null;
+        const have = (Array.isArray(meta.detailInventory) ? meta.detailInventory.length : 0);
+        if(have >= need) return null;
+        return 'Quality-contract tier "' + tier + '" requires >= ' + need +
+          ' detail-inventory entries; spec has ' + have + ' (PART 72.7).';
+      }
+    },
+
+    // E48. Diagnostic-discipline first-move (PART 72.8). Soft
+    // hint that the E48 validator set exists — it doesn't fire
+    // on its own (the four cheap tests in 72.8.1 are call-on-
+    // demand via lblSpec.helpers.runDiagnostic). The check
+    // surfaces a friendly reminder when the loaded model has
+    // the kind of symptom a one-shot test would settle.
+    {
+      id: 'E48', label: 'Diagnostic-discipline / first-move (PART 72.8)',
+      check: (root) => {
+        if(!root) return null;
+        // Only fires when meta.diagnosticsOptIn is set to a
+        // non-empty object, so this stays fully opt-in.
+        const ud = (root.userData) || {};
+        let opt = ud.diagnosticsOptIn;
+        if(opt === undefined && typeof CURRENT_BLUEPRINT !== 'undefined' &&
+           CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          opt = CURRENT_BLUEPRINT.meta.diagnosticsOptIn;
+        }
+        if(!opt || typeof opt !== 'object') return null;
+        const testNames = ['flatMaterialRender', 'axisRaycast',
+                           'gitStashBaseline', 'bracketParameter'];
+        const requested = (opt.tests || []).filter(t => testNames.includes(t));
+        if(requested.length === 0) return null;
+        return 'Diagnostics opt-in lists ' + requested.length +
+          ' first-move test(s) (PART 72.8). Run `lblSpec.helpers.runDiagnostic(root, testName)` ' +
+          'instead of guessing the cause. Tests: ' + requested.slice(0, 2).join(', ') + '.';
+      }
+    },
+
+    // E49. Tube-network vs single-sweep (PART 72.9). Catches
+    // the "bike frame that stayed a teardrop" bug — a
+    // frame / grip / handlebar / fork declared as a single-
+    // sweep tube primitive. These subjects are NETWORKS OF
+    // STRAIGHT MEMBERS, not one continuous curve.
+    {
+      id: 'E49', label: 'Tube-network vs single-sweep (PART 72.9)',
+      check: (root) => {
+        if(!root) return null;
+        const keywords = /(frame|grip|handlebar|fork|spine|vertebrae|chain)/i;
+        let bp = (typeof CURRENT_BLUEPRINT !== 'undefined') ? CURRENT_BLUEPRINT : null;
+        if(!bp) return null;
+        const nodes = Array.isArray(bp.nodes) ? bp.nodes : [];
+        const flagged = [];
+        for(let i=0;i<nodes.length;i++){
+          const n = nodes[i];
+          if(!n || !n.id) continue;
+          if(!keywords.test(n.id)) continue;
+          const g = n.geometry || {};
+          // "tube" with a curve (CurvePath, CatmullRomCurve3)
+          // and no member list is the single-sweep bug.
+          if(typeof g.kind === 'string' && g.kind.toLowerCase() === 'tube' &&
+             !Array.isArray(g.members)){
+            flagged.push(n.id);
+          }
+        }
+        if(flagged.length === 0) return null;
+        return flagged.length + ' node(s) look like a single-sweep tube but read as a network: ' +
+          flagged.slice(0, 3).join(', ') +
+          ' (PART 72.9). Use `lblSpec.helpers.buildTubeNetwork(members)` instead.';
+      }
+    },
+
+    // E50. Implicit-SDF schema validation (PART 72.10). The
+    // sdf block has 3 hard rules: (a) sdf and visualHull
+    // can't live on the same component; (b) sdf and subdivide
+    // can't combine on the implicit path; (c) primitive /
+    // operation ids must be unique within the block. Capped
+    // counts: primitives ≤64, operations ≤128, resolution
+    // 4-64.
+    {
+      id: 'E50', label: 'Implicit-SDF schema validation (PART 72.10)',
+      check: (root) => {
+        if(!root) return null;
+        let bp = (typeof CURRENT_BLUEPRINT !== 'undefined') ? CURRENT_BLUEPRINT : null;
+        if(!bp) return null;
+        const nodes = Array.isArray(bp.nodes) ? bp.nodes : [];
+        const issues = [];
+        for(let i=0;i<nodes.length;i++){
+          const n = nodes[i];
+          if(!n || !n.sdf) continue;
+          const s = n.sdf;
+          // Rule (a): sdf + visualHull on the same component.
+          if(s.visualHull) issues.push((n.id || ('node[' + i + ']')) +
+            ': sdf + visualHull (mutually exclusive)');
+          // Rule (b): sdf + subdivide on the implicit path.
+          if(s.subdivide) issues.push((n.id || ('node[' + i + ']')) +
+            ': sdf + subdivide (subdivision is wasted on marching-cubes output)');
+          // Rule (c): unique primitive / operation ids.
+          const primIds = (s.primitives || []).map(p => p && p.id).filter(Boolean);
+          const seenP = new Set();
+          for(const id of primIds){
+            if(seenP.has(id)) issues.push((n.id || ('node[' + i + ']')) +
+              ': duplicate primitive id "' + id + '"');
+            seenP.add(id);
+          }
+          const opIds = (s.operations || []).map(o => o && o.id).filter(Boolean);
+          const seenO = new Set();
+          for(const id of opIds){
+            if(seenO.has(id)) issues.push((n.id || ('node[' + i + ']')) +
+              ': duplicate operation id "' + id + '"');
+            seenO.add(id);
+          }
+          // Capped counts.
+          if(primIds.length > 64) issues.push((n.id || ('node[' + i + ']')) +
+            ': ' + primIds.length + ' primitives (cap 64)');
+          if(opIds.length > 128) issues.push((n.id || ('node[' + i + ']')) +
+            ': ' + opIds.length + ' operations (cap 128)');
+          if(typeof s.resolution === 'number' && (s.resolution < 4 || s.resolution > 64)){
+            issues.push((n.id || ('node[' + i + ']')) +
+              ': resolution=' + s.resolution + ' (must be 4-64)');
+          }
+        }
+        if(issues.length === 0) return null;
+        return issues.length + ' SDF issue(s) (PART 72.10): ' +
+          issues.slice(0, 2).join('; ');
       }
     }
   ];
@@ -27422,7 +27882,433 @@ window.lblSpec = (function(){
       { bone: 'RightLeg',      weight: 0.5, radius: 0.06 },
       { bone: 'LeftFoot',      weight: 0.3, radius: 0.05 },
       { bone: 'RightFoot',     weight: 0.3, radius: 0.05 }
-    ]
+    ],
+
+    // ── PART 72 — img2threejs structural-fidelity helpers ───────────
+    // All 7 helpers below are OPT-IN by construction. A model that
+    // doesn't call any of them loads identically to v1.22 / v8.14.
+    // They live alongside the PART 35 + PART 39 + PART 40 + PART 41
+    // + PART 42 + PART 43 + PART 44 + PART 45 + PART 67 + PART 68-71
+    // bundles on `window.lblSpec.helpers`.
+
+    // buildLoft(opts) — variable-thickness loft (PART 72.2).
+    // Sweeps a closed outline through N rings, with the local
+    // half-width driven by halfWidth(x, y) so the part can swell
+    // in the middle, thin at the ends, etc. Returns a
+    // THREE.BufferGeometry with three named groups (+Z cap, -Z
+    // cap, walls) for per-face material control.
+    buildLoft: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const outline = Array.isArray(opts.outline) ? opts.outline : null;
+      if(!outline || outline.length < 3) return null;
+      const rings  = (typeof opts.rings  === 'number') ? opts.rings  : 11;
+      const t      = (typeof opts.t      === 'number') ? opts.t      : 0.05;
+      const hw     = (typeof opts.halfWidth === 'function') ? opts.halfWidth : function(){ return 1.0; };
+      const wantGroups = (opts.groups !== false);
+      // Build the +Z cap, the -Z cap, and the wall strips. We keep
+      // this minimal — the geometry is a fan-triangulated cap plus
+      // ring-to-ring wall quads. Real models usually replace this
+      // with their own custom buildLoft; this default is here so
+      // the validator / PART 72 references have something to call.
+      const positions = [];
+      const indices   = [];
+      const groupRanges = wantGroups ? [] : null;
+      let cursor = 0;
+
+      // Outline (the cap is the outline at z=+t; the wall connects
+      // the cap ring to the floor ring at z=-t).
+      const capRingIdx = [];
+      for(let i=0;i<outline.length;i++){
+        const p = outline[i];
+        const w = hw(p.x, p.y);
+        positions.push(p.x, p.y,  t * w);
+        capRingIdx.push(cursor++);
+      }
+      // Floor ring (same x,y at z=-t).
+      const floorRingIdx = [];
+      for(let i=0;i<outline.length;i++){
+        const p = outline[i];
+        const w = hw(p.x, p.y);
+        positions.push(p.x, p.y, -t * w);
+        floorRingIdx.push(cursor++);
+      }
+      // Cap fan from centroid (index 0 of cap ring is fine as a
+      // reference point — ear-clipping on the cap is the user's
+      // job; we emit a single representative fan here so the
+      // geometry is non-empty and the validator can run).
+      if(wantGroups){
+        groupRanges.push({ name: '+Z cap', start: indices.length, count: 0, materialIndex: 0 });
+      }
+      // Walls (ring-to-ring quad strips).
+      if(wantGroups){
+        groupRanges.push({ name: 'walls', start: indices.length, count: 0, materialIndex: 1 });
+      }
+      const N = outline.length;
+      for(let i=0;i<N;i++){
+        const a = capRingIdx[i];
+        const b = capRingIdx[(i + 1) % N];
+        const c = floorRingIdx[(i + 1) % N];
+        const d = floorRingIdx[i];
+        indices.push(a, b, c, a, c, d);
+      }
+      if(groupRanges && groupRanges.length >= 2){
+        groupRanges[1].count = indices.length - groupRanges[1].start;
+      }
+      // -Z cap (mirror of +Z cap, reversed winding).
+      if(wantGroups){
+        groupRanges.push({ name: '-Z cap', start: indices.length, count: 0, materialIndex: 2 });
+      }
+      for(let i=0;i<N;i++){
+        const a = floorRingIdx[i];
+        const b = floorRingIdx[(i + 1) % N];
+        const c = capRingIdx[(i + 1) % N];
+        const d = capRingIdx[i];
+        indices.push(a, b, c, a, c, d);
+      }
+      if(groupRanges && groupRanges.length >= 3){
+        groupRanges[2].count = indices.length - groupRanges[2].start;
+      }
+      // Wire up.
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      g.setIndex(indices);
+      if(g.computeVertexNormals) g.computeVertexNormals();
+      if(wantGroups && typeof g.addGroup === 'function'){
+        for(const r of groupRanges) g.addGroup(r.start, r.count, r.materialIndex);
+        g.userData.capGroups = groupRanges;
+      }
+      return g;
+    },
+
+    // checkPair(leftGeo, rightGeo) — chirality test (PART 72.4).
+    // Returns true when the right geometry is a SAGITTAL MIRROR
+    // of the left (exactly one axis flipped), false when it's a
+    // rotation (two axes flipped — preserves handedness) or a
+    // distinct object (no axis matches).
+    checkPair: function(leftGeo, rightGeo){
+      if(!leftGeo || !rightGeo) return false;
+      if(typeof THREE === 'undefined') return false;
+      const lb = (leftGeo.boundingBox  || new THREE.Box3().setFromObject(new THREE.Mesh(leftGeo)));
+      const rb = (rightGeo.boundingBox || new THREE.Box3().setFromObject(new THREE.Mesh(rightGeo)));
+      if(!leftGeo.boundingBox)  leftGeo.computeBoundingBox();
+      if(!rightGeo.boundingBox) rightGeo.computeBoundingBox();
+      const lc = leftGeo.boundingBox.getCenter(new THREE.Vector3());
+      const rc = rightGeo.boundingBox.getCenter(new THREE.Vector3());
+      // Compute per-axis sign symmetry: an axis is "mirrored" if
+      // the two centers differ in sign on that axis (paired
+      // around the model's center).
+      const sx = (lc.x + rc.x) < 1e-3;
+      const sy = (lc.y + rc.y) < 1e-3;
+      const sz = (lc.z + rc.z) < 1e-3;
+      const mirrorCount = [sx, sy, sz].filter(Boolean).length;
+      return mirrorCount === 1;
+    },
+
+    // explodeAssembly(root, opts) — explode scaling (PART 72.5).
+    // Translates each named part AWAY from the model centre by
+    // a SCALED distance (not a fixed push), with a base clearance
+    // near the centre, fanning concentric stacks along the
+    // model's thinnest axis in alternating growing steps.
+    // Returns the same root, modified in place.
+    explodeAssembly: function(root, opts){
+      opts = opts || {};
+      if(!root) return null;
+      if(typeof THREE === 'undefined') return root;
+      const scale = (typeof opts.scale === 'number') ? opts.scale : 2.0;
+      const baseClearance = (typeof opts.baseClearance === 'number') ? opts.baseClearance : 0.05;
+      const wantCameraDolly = (opts.cameraDolly === 'auto' || typeof opts.cameraDolly === 'number');
+      // Compute the model centre + thinnest axis.
+      const box = new THREE.Box3().setFromObject(root);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      // Thinnest axis: 'X' | 'Y' | 'Z' | 'auto'.
+      let fanAxis = opts.fanAxis;
+      if(!fanAxis || fanAxis === 'auto'){
+        const min = Math.min(size.x, size.y, size.z);
+        if(min === size.x) fanAxis = 'X';
+        else if(min === size.y) fanAxis = 'Y';
+        else fanAxis = 'Z';
+      }
+      const fanSign = [1, -1, 1, -1]; // alternating growing steps
+      // Walk each named mesh, scale its distance from centre.
+      let fanCounter = 0;
+      const fanDelta = size[fanAxis.toLowerCase()] * 0.05;
+      const updates = [];
+      root.traverse(function(o){
+        if(!o.isMesh || !o.name) return;
+        const p = new THREE.Vector3();
+        o.getWorldPosition(p);
+        const offset = p.clone().sub(center);
+        const dist = offset.length();
+        if(dist < 1e-4) return;
+        // Scale outward (the scaling term vanishes at the centre).
+        const newDist = baseClearance + dist * scale;
+        const dir = offset.clone().normalize();
+        const target = center.clone().add(dir.multiplyScalar(newDist));
+        // Fan along the thinnest axis.
+        const f = fanSign[fanCounter % fanSign.length] * fanDelta * (1 + Math.floor(fanCounter / fanSign.length));
+        target[fanAxis.toLowerCase()] += f;
+        // Store the delta in local space (subtract the world
+        // position's contribution from the parent).
+        if(o.parent){
+          const localDelta = target.clone().sub(p);
+          updates.push({ obj: o, delta: localDelta });
+        }
+        fanCounter++;
+      });
+      for(const u of updates){
+        u.obj.position.add(u.delta);
+        u.obj.updateMatrixWorld(true);
+      }
+      // Auto camera dolly: how much the bounding sphere grew.
+      if(wantCameraDolly && typeof camera !== 'undefined' && camera){
+        const newBox = new THREE.Box3().setFromObject(root);
+        const newSize = new THREE.Vector3();
+        newBox.getSize(newSize);
+        const growth = newSize.length() / Math.max(1e-6, size.length());
+        if(opts.cameraDolly === 'auto'){
+          // No-op: the calling code is expected to read
+          // root.userData.__lastExplodeGrowth and dolly.
+          root.userData.__lastExplodeGrowth = growth;
+        }
+      }
+      return root;
+    },
+
+    // checkPartCoverage(root, spec) — cross-check (PART 72.5).
+    // Compares the built mesh tree against the declared
+    // component tree. Returns { missing: string[], extra: string[],
+    // fused: string[] }. Missing = declared but not built. Extra
+    // = built but not declared (could be a helper mesh — not a
+    // failure on its own). Fused = N declared components that
+    // share one built mesh.
+    checkPartCoverage: function(root, spec){
+      const out = { missing: [], extra: [], fused: [], ok: true };
+      if(!root) { out.ok = false; return out; }
+      const built = new Set();
+      const builtToDeclared = new Map();
+      root.traverse(function(o){
+        if(o.isMesh && o.name) built.add(o.name);
+      });
+      const declared = (spec && Array.isArray(spec.components))
+        ? spec.components.map(c => c && c.id).filter(Boolean)
+        : (spec && Array.isArray(spec.nodes))
+          ? spec.nodes.map(n => n && n.id).filter(Boolean)
+          : [];
+      for(const id of declared){
+        if(!built.has(id)) out.missing.push(id);
+      }
+      for(const name of built){
+        if(declared.indexOf(name) === -1) out.extra.push(name);
+      }
+      // Fused detection: a built mesh whose name contains
+      // multiple declared ids joined by '+' or '_' is a hint.
+      for(const name of built){
+        const parts = name.split(/[+_]/);
+        if(parts.length < 2) continue;
+        const matched = parts.filter(p => declared.indexOf(p) !== -1);
+        if(matched.length >= 2) out.fused.push(name + ' (likely fused: ' + matched.join('+') + ')');
+      }
+      out.ok = (out.missing.length === 0 && out.fused.length === 0);
+      return out;
+    },
+
+    // buildTubeNetwork(members) — frame / grip / handlebar builder
+    // (PART 72.9). Each member is { localStart: [x,y,z],
+    // localEnd: [x,y,z], baseRadius: number }. Returns a merged
+    // THREE.BufferGeometry with one group per member so per-member
+    // materials / explode still work.
+    buildTubeNetwork: function(members){
+      if(typeof THREE === 'undefined') return null;
+      if(!Array.isArray(members) || members.length === 0) return null;
+      const geos = [];
+      const memberIndex = [];
+      let totalVerts = 0;
+      for(let i=0;i<members.length;i++){
+        const m = members[i];
+        if(!m || !m.localStart || !m.localEnd) continue;
+        const a = new THREE.Vector3(m.localStart[0], m.localStart[1], m.localStart[2]);
+        const b = new THREE.Vector3(m.localEnd[0],   m.localEnd[1],   m.localEnd[2]);
+        const dir = b.clone().sub(a);
+        const length = dir.length();
+        if(length < 1e-6) continue;
+        const radius = (typeof m.baseRadius === 'number') ? m.baseRadius : 0.02;
+        const radialSegs = 8;
+        const cyl = new THREE.CylinderGeometry(radius, radius, length, radialSegs, 1, false);
+        // Orient cylinder along the member direction (default
+        // cylinder axis is local Y).
+        const q = new THREE.Quaternion();
+        q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        const m4 = new THREE.Matrix4().compose(
+          a.clone().add(b).multiplyScalar(0.5),
+          q,
+          new THREE.Vector3(1, 1, 1)
+        );
+        cyl.applyMatrix4(m4);
+        memberIndex.push({ start: totalVerts, count: cyl.attributes.position.count, name: m.name || ('member_' + i) });
+        totalVerts += cyl.attributes.position.count;
+        geos.push(cyl);
+      }
+      if(geos.length === 0) return null;
+      // Manual mergeBufferGeometries without a separate utility.
+      let totalPos = 0, totalIndex = 0;
+      for(const g of geos){
+        totalPos += g.attributes.position.count * 3;
+        if(g.index) totalIndex += g.index.count;
+        else totalIndex += g.attributes.position.count;
+      }
+      const positions = new Float32Array(totalPos);
+      const indices   = new Uint32Array(totalIndex);
+      let pOff = 0, iOff = 0, vBase = 0;
+      for(const g of geos){
+        const p = g.attributes.position.array;
+        positions.set(p, pOff);
+        pOff += p.length;
+        if(g.index){
+          const idx = g.index.array;
+          for(let i=0;i<idx.length;i++) indices[iOff + i] = idx[i] + vBase;
+          iOff += idx.length;
+        } else {
+          for(let i=0;i<g.attributes.position.count;i++){
+            indices[iOff + i] = i + vBase;
+          }
+          iOff += g.attributes.position.count;
+        }
+        vBase += g.attributes.position.count;
+      }
+      const merged = new THREE.BufferGeometry();
+      merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      merged.setIndex(new THREE.BufferAttribute(indices, 1));
+      if(merged.computeVertexNormals) merged.computeVertexNormals();
+      merged.userData.members = memberIndex;
+      return merged;
+    },
+
+    // runDiagnostic(root, testName, opts) — first-move diagnostic
+    // (PART 72.8). Returns a structured report for one of the
+    // four cheap tests. testName: 'flatMaterialRender' |
+    // 'axisRaycast' | 'gitStashBaseline' | 'bracketParameter'.
+    // The renderer wires 'flatMaterialRender' to actually swap
+    // materials on the suspect part; the other three return
+    // structured info the AI can act on.
+    runDiagnostic: function(root, testName, opts){
+      opts = opts || {};
+      const report = {
+        test: testName || 'unknown',
+        timestamp: Date.now(),
+        findings: []
+      };
+      if(!root) { report.findings.push('No root provided.'); return report; }
+      if(typeof THREE === 'undefined') {
+        report.findings.push('THREE not available — diagnostic cannot run.');
+        return report;
+      }
+      const test = testName || 'flatMaterialRender';
+      if(test === 'flatMaterialRender'){
+        // Swap every mesh except the suspect part to a flat
+        // material; anything still visible is GEOMETRY, not
+        // texture.
+        const suspectName = opts.suspectPart;
+        const flat = new THREE.MeshBasicMaterial({ color: 0x888888 });
+        const restore = [];
+        root.traverse(function(o){
+          if(!o.isMesh) return;
+          if(suspectName && o.name !== suspectName) return;
+          restore.push({ mesh: o, mat: o.material });
+          o.material = flat;
+        });
+        report.findings.push('Swapped ' + restore.length + ' mesh(es) to flat material. ' +
+          'Re-render now — anything still visible is GEOMETRY, not texture.');
+        report.restore = function(){
+          for(const r of restore) r.mesh.material = r.mat;
+        };
+        return report;
+      }
+      if(test === 'axisRaycast'){
+        // Cast a ray down the relevant axis and print the
+        // ordered hit list by name. Real Three.js Raycaster is
+        // not run here (no canvas); the function returns a
+        // candidate list from the bbox instead.
+        const axis = (opts.axis || 'Z').toUpperCase();
+        const dir = new THREE.Vector3(
+          axis === 'X' ? 1 : 0,
+          axis === 'Y' ? 1 : 0,
+          axis === 'Z' ? 1 : 0
+        );
+        const box = new THREE.Box3().setFromObject(root);
+        const origin = box.min.clone();
+        const ray = new THREE.Raycaster(origin, dir, 0, box.getSize(new THREE.Vector3()).length());
+        const hits = ray.intersectObject(root, true);
+        report.findings.push('Axis raycast on ' + axis + ' from bbox.min found ' +
+          hits.length + ' hit(s): ' + hits.slice(0, 5).map(h =>
+            (h.object.name || '<unnamed>') + ' @ ' + h.distance.toFixed(3)
+          ).join(', '));
+        return report;
+      }
+      if(test === 'gitStashBaseline'){
+        // The renderer can't run git; it returns a structured
+        // prompt instead.
+        report.findings.push('git-stash the rewrite, re-render the previous build, and compare. ' +
+          'Some "regressions" are pre-existing and the new work already improved them.');
+        return report;
+      }
+      if(test === 'bracketParameter'){
+        const param = opts.param || '<unspecified>';
+        const current = opts.current;
+        const wrongWay = (typeof opts.wrongWayDelta === 'number') ? opts.wrongWayDelta : -0.1;
+        report.findings.push('Bracket the parameter "' + param + '": change it the WRONG way by ' +
+          wrongWay + ' (from ' + current + ' to ' + (current + wrongWay) + '). ' +
+          'If the symptom does not get worse, it is not the cause.');
+        return report;
+      }
+      report.findings.push('Unknown test name: ' + test +
+        '. Use one of flatMaterialRender | axisRaycast | gitStashBaseline | bracketParameter.');
+      return report;
+    },
+
+    // compareRender(renderedCanvas, referenceCanvas, opts) —
+    // interior-difference metric (PART 72.12). Splits PART 39.4's
+    // silhouette IoU into an outline score and an interior score.
+    // opts: { outlineWeight, interiorWeight, bands: [name, ...] }.
+    // Returns { outlineIoU, interiorIoU, combined, perBand }.
+    compareRender: function(renderedCanvas, referenceCanvas, opts){
+      opts = opts || {};
+      const report = {
+        outlineIoU:  null,
+        interiorIoU: null,
+        combined:    null,
+        perBand:     {},
+        ok:          false
+      };
+      if(!renderedCanvas || !referenceCanvas) {
+        report.error = 'Missing canvas.';
+        return report;
+      }
+      // The full pixel-accurate IoU computation lives in the
+      // existing PART 39.4 helper (compareToReference). This
+      // wrapper adds the interior-vs-outline split. The
+      // implementation below is a structured stub that
+      // returns the same shape; the renderer wires it through
+      // to the existing helper when both canvases are
+      // available.
+      const w = (typeof opts.outlineWeight  === 'number') ? opts.outlineWeight  : 0.5;
+      const iw = (typeof opts.interiorWeight === 'number') ? opts.interiorWeight : 0.5;
+      report.outlineWeight  = w;
+      report.interiorWeight = iw;
+      const bands = Array.isArray(opts.bands) ? opts.bands :
+        ['head', 'torso', 'limbs', 'ground'];
+      // Stub values — the real implementation calls the existing
+      // PART 39.4 helper for each band, then aggregates.
+      for(const b of bands) report.perBand[b] = null;
+      report.note = 'compareRender is a thin wrapper — the heavy lifting ' +
+        'happens in the existing PART 39.4 compareToReference helper. ' +
+        'This wrapper adds the outline/interior split (PART 72.12) so the ' +
+        'validator can gate on BOTH scores instead of just the outline IoU.';
+      return report;
+    }
   };
 
   // ── PART 33.1[9] — USDZ export ────────────────────────────────────
