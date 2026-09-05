@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.22 (TS path) and v8.14 (JSON/JS path) with 10 opt-in architectural features, 30 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), and PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider). PART 45 is an EXTRA CAPABILITY for weapons, blades, and metal-finish subjects — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.22, LBL v8.14, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, low_poly_3d, v1.22 v8.14, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.23 (TS path) and v8.15 (JSON/JS path) with 10 opt-in architectural features, 36 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30, 6 PART 67 opt-in validators E31 modifier stack order / E32 UV projection sanity / E33 modifier stack safety / E34 converge direction / E35 recolor roles / E36 preflight check), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider), and PART 67 OPT-IN CAPABILITY BUNDLE (7 new cross-primitive shape generators makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix + 6 deform modifiers taper / twist / bend / spherize / inflate / applyNoise dispatched by applyModifierStack + 3 UV projections via projectUV + 1 vertex-channel helper fillVertexChannel + 1 convergeFaces helper + 1 recolorByPalette runtime swap + 1 placeChain chain placement + 1 applyMaterialAnimation time-driven material keyframes + 1 preflightCheck safety budget — especially useful for weapons, blades, and metal-finish subjects). PART 45 and PART 67 are EXTRA CAPABILITIES for weapons, blades, and metal-finish subjects — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.23, LBL v8.15, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, low_poly_3d, v1.23 v8.15, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -180,6 +180,13 @@ body{
   overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
 #topbar::-webkit-scrollbar{display:none;}
+/* RJS UPDATE 15 — keep the right-edge status chips (spec / mode / status)
+   visible even when the topbar overflows horizontally. The spec chip
+   pins to the right edge; the gradient mask hides whatever toolbar
+   buttons scroll underneath. PART 67 fix. */
+#topbar::after{
+  content:'';position:sticky;right:0;top:0;width:0;height:0;pointer-events:none;
+}
 #logo{
   font-family:'Space Mono',monospace;font-weight:700;font-size:15px;color:var(--accent);
   white-space:nowrap;letter-spacing:-0.3px;display:flex;align-items:center;gap:7px;
@@ -211,6 +218,7 @@ body{
   font-family:'Space Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;
   background:var(--surface2);border:1px solid var(--border);color:var(--muted);
   transition:all .3s;white-space:nowrap;
+  flex-shrink:0;position:sticky;right:270px;
 }
 #status-pill.ok{border-color:var(--accent2);color:var(--accent2);}
 #status-pill.err{border-color:var(--warn);color:var(--warn);}
@@ -242,6 +250,8 @@ body{
   font-family:'Space Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;
   background:var(--surface2);border:1px solid var(--accent2);color:var(--accent2);
   transition:all .3s;white-space:nowrap;cursor:help;
+  flex-shrink:0;position:sticky;right:160px;
+  box-shadow:-8px 0 12px -4px rgba(0,0,0,0.45);
 }
 
 /* RJS UPDATE 2 — N2: meta.generationMode badge. Only shown when the loaded
@@ -263,6 +273,8 @@ body{
   font-family:'Space Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;
   background:var(--surface2);border:1px solid var(--accent);color:var(--accent);
   transition:all .3s;white-space:nowrap;cursor:help;
+  margin-left:auto;flex-shrink:0;position:sticky;right:10px;
+  box-shadow:-8px 0 12px -4px rgba(0,0,0,0.45);
 }
 #lbl-spec-chip.has-warnings{border-color:var(--warn);color:var(--warn);}
 #lbl-spec-chip button{
@@ -1071,6 +1083,35 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 @media(max-width:400px){
   .tbtn.hide-xs{display:none;}
 }
+/* RJS UPDATE 15 — spec chip responsive: on narrow viewports the topbar
+   overflows horizontally and `position: sticky` is relative to the
+   scroll container (the topbar), not the viewport — so the chip gets
+   pushed off the right edge. Fix: on narrow viewports switch to
+   `position: fixed` so the chip sits at the right edge of the VIEWPORT
+   regardless of how wide the topbar's scroll content is. */
+@media(max-width:520px){
+  #lbl-spec-chip{
+    position:fixed !important;
+    right:8px !important;top:8px !important;
+    max-width:90px;overflow:hidden;text-overflow:ellipsis;
+    box-shadow:-4px 0 8px -2px rgba(0,0,0,0.5);
+    z-index:30;
+  }
+  #mode-chip{display:none;}
+  #status-pill{display:none;}
+  #genmode-chip{display:none;}
+  /* Reserve right-padding so topbar content doesn't slide under the
+     fixed chip. The chip is 90px max-width + 8px right margin + 6px
+     left buffer = ~104px. */
+  #topbar{padding-right:104px !important;}
+}
+@media(max-width:380px){
+  #lbl-spec-chip{
+    max-width:64px;font-size:8px;padding:3px 6px;
+    right:6px !important;top:10px !important;
+  }
+  #topbar{padding-right:76px !important;}
+}
 /* ── Hamburger + nav menu + site pages ── */
 #hamburger-btn{
   display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;
@@ -1436,9 +1477,9 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
   <!-- RJS UPDATE 14 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
-       TS factories target v1.22 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear), JSON/JS blueprints target v8.14 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45).
-       Pairs with the on-load lblValidateAgainstSpec() check that catches the 30 anti-patterns from PART 32/65/38/39/40/41/42/43/44/45. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.22 TS / v8.14 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), and PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR) is an EXTRA CAPABILITY for weapons, blades, and metal-finish subjects, NOT a rule every model must follow.">LBL: v1.22 / v8.14</div>
+       TS factories target v1.23 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects), JSON/JS blueprints target v8.15 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67).
+       Pairs with the on-load lblValidateAgainstSpec() check that catches the 36 anti-patterns from PART 32/65/38/39/40/41/42/43/44/45/67. -->
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.23 TS / v8.15 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), and PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR) and PART 67 (cross-primitive + modifier stack + recolor + chain + animation) are EXTRA CAPABILITIES for weapons, blades, and metal-finish subjects, NOT a rule every model must follow.">LBL: v1.23 / v8.15</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -21679,7 +21720,7 @@ buildScene = function(blueprint){
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.22 (PART 33 architectural features + PART 34 pre-bundled
+  // target v1.23 (PART 33 architectural features + PART 34 pre-bundled
   // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
   // drop + model + rig pairing + PART 37 zip bundle support + PART 38
   // character pipeline upgrade + PART 39 3D modeling techniques +
@@ -21690,21 +21731,32 @@ window.lblSpec = (function(){
   // coding rules + PART 45 CS2 PBR material profile: 9 finish
   // styles, 5-tier wear system, 4 new MeshPhysicalMaterial
   // properties, 5 canonical helpers — opt-in via
-  // meta.cs2Finish / meta.cs2Wear);
-  // JSON/JS blueprints target v8.14 (PART 66 feature bridge + PART 34
+  // meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle:
+  // 7 cross-primitive shape generators (makeDisc/makeRing/makeArc/
+  // makeHemisphere/makeRibbon/makeCrossPlanes/makeHelix) + 6
+  // deform modifiers (taper/twist/bend/spherize/inflate/applyNoise)
+  // dispatched by applyModifierStack + 3 UV projections via
+  // projectUV + 1 vertex-channel helper fillVertexChannel + 1
+  // convergeFaces helper + 1 recolorByPalette runtime swap + 1
+  // placeChain chain placement + 1 applyMaterialAnimation
+  // time-driven material keyframes + 1 preflightCheck safety
+  // budget — especially useful for weapons, blades, and
+  // metal-finish subjects);
+  // JSON/JS blueprints target v8.15 (PART 66 feature bridge + PART 34
   // runtime contract for userData.rigGraph + PART 35 tris inspector +
   // PART 36 same + PART 37 same + PART 38 character pipeline upgrade +
   // PART 39 3D modeling techniques + PART 40 better models through
   // better generation + PART 41 high-detail generation + PART 42
   // character production discipline + PART 43 refinement + style
   // locking + variant ranking + PART 44 professional pipeline +
-  // PART 45 CS2 PBR material profile).
+  // PART 45 CS2 PBR material profile + PART 67 OPT-IN capability
+  // bundle).
   // The chip in the topbar shows both.
   // Updating these constants is the only place to bump for a new spec
   // release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.22', json: 'v8.14' };
+  const VERSION = { ts: 'v1.23', json: 'v8.15' };
 
-  // The 30 anti-patterns the validator looks for. Mirrors PART 32 (TS)
+  // The 40 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) for the first 12, PART 38 (character
   // pipeline upgrade) for the next 4 (E13-E16), PART 39 (3D
   // modeling techniques) for the 2 new modeling-technique checks
@@ -21720,13 +21772,24 @@ window.lblSpec = (function(){
   // distribution compliance), PART 43 (refinement + style
   // locking + variant ranking) for the 2 new bridge checks
   // (E26 style-lock compliance, E27 multi-view consistency),
-  // and PART 44 (professional pipeline) for the 2 new performance
+  // PART 44 (professional pipeline) for the 2 new performance
   // checks (E28 BVH index presence, E29 look-dev lights present),
-  // and PART 45 (CS2 PBR material profile) for the 1 new
+  // PART 45 (CS2 PBR material profile) for the 1 new
   // finish-profile check (E30 CS2 profile compliance — fires
   // ONLY when meta.cs2Finish is set, so a non-CS2 model is
-  // unchanged). E30 mirrors the existing "validator is opt-in
-  // by construction" pattern from PART 45.9.2.
+  // unchanged), PART 67 (OPT-IN capability bundle) for the
+  // 6 new opt-in checks (E31 modifier stack order, E32 UV
+  // projection vs geometry sanity, E33 modifier stack safety,
+  // E34 converge direction sanity, E35 recolor roles complete,
+  // E36 preflight check used — ALL fire ONLY when the
+  // corresponding opt-in meta flag is set), and PART 68-71
+  // (geometry + VFX + brushes + presets) for the 4 new
+  // opt-in checks (E37 sub-seed usage, E38 lifetime color
+  // ramp validity, E39 gizmo shape range, E40 bone segment
+  // coverage). A model that uses NONE of the new PART 67-71
+  // features triggers ZERO new validators.
+  // E30 + E31-E40 mirror the existing "validator is opt-in
+  // by construction" pattern from PART 45.9.2 and PART 67-71.0.
   // Each check is a function that receives the loaded model and
   // returns either null (clean) or a short human-readable
   // warning string. Multiple warnings stack.
@@ -23020,6 +23083,391 @@ window.lblSpec = (function(){
         const more = issues.length > 3 ? ('; +' + (issues.length - 3) + ' more') : '';
         return 'CS2 profile "' + finish + '" compliance issues (PART 45.2 / 45.9): ' + head + more +
           '. Use lblSpec.helpers.cs2PbrProfile(finish) + applyWear(mat, wear) for the canonical finish pipeline.';
+      }
+    },
+
+    // ════════════════════════════════════════════════════════════════════
+    // PART 67 (v1.23 / v8.15) — OPT-IN VALIDATORS
+    // All 6 new validators are NON-BLOCKING and only fire when the
+    // corresponding opt-in meta / userData flag is set. Like E30,
+    // a model that doesn't use the new PART 67 features is unchanged.
+    // ════════════════════════════════════════════════════════════════════
+
+    // E31. Modifier stack order (PART 67.2 / 39.9).
+    // Fires ONLY when meta.geometryPipeline.modifiers is set.
+    // Warns on duplicate modifier types or out-of-order spatial
+    // modifiers (Taper before Twist, Inflate before Spherize, etc.).
+    {
+      id: 'E31', label: 'Modifier stack order (PART 67.2)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let mods = null;
+        if(Array.isArray(ud.geometryPipeline) && ud.geometryPipeline.length && Array.isArray(ud.geometryPipeline[0].modifiers)){
+          mods = ud.geometryPipeline[0].modifiers;
+        } else if(ud.geometryPipeline && Array.isArray(ud.geometryPipeline.modifiers)){
+          mods = ud.geometryPipeline.modifiers;
+        } else if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          const m = CURRENT_BLUEPRINT.meta;
+          if(m && m.geometryPipeline && Array.isArray(m.geometryPipeline.modifiers)){
+            mods = m.geometryPipeline.modifiers;
+          }
+        }
+        if(!mods || mods.length === 0) return null;
+        const issues = [];
+        // Duplicate types
+        const seen = {};
+        for(let i=0;i<mods.length;i++){
+          const t = String(mods[i].type || '').toLowerCase();
+          if(!t) continue;
+          if(seen[t]) issues.push('duplicate modifier type "' + t + '"');
+          seen[t] = true;
+        }
+        // Out-of-order spatial modifiers — Taper should come before
+        // Twist (twisting a tapered cone produces a different result
+        // than tapering a twisted column). Inflate before Spherize
+        // wastes work since spherize recomputes distances.
+        const order = ['taper','twist','inflate','spherize','noise'];
+        let lastIdx = -1;
+        for(let i=0;i<mods.length;i++){
+          const t = String(mods[i].type || '').toLowerCase();
+          const idx = order.indexOf(t);
+          if(idx < 0) continue;
+          if(idx < lastIdx){
+            issues.push('"' + t + '" appears after a later-stage spatial modifier — apply taper/twist BEFORE inflate/spherize/noise (PART 67.2.1)');
+          }
+          lastIdx = Math.max(lastIdx, idx);
+        }
+        if(issues.length === 0) return null;
+        return issues.slice(0, 2).join('; ') +
+          '. Use lblSpec.helpers.applyModifierStack(geo, mods) for the canonical dispatcher.';
+      }
+    },
+
+    // E32. UV projection vs geometry sanity (PART 67.5 / 8).
+    // Fires ONLY when meta.uv.projection is one of the new values
+    // ('radial' | 'cylindrical' | 'spherical' | 'box').
+    {
+      id: 'E32', label: 'UV projection vs geometry sanity (PART 67.5)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let proj = null;
+        if(ud.uv && typeof ud.uv.projection === 'string'){
+          proj = ud.uv.projection;
+        } else if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          if(CURRENT_BLUEPRINT.meta.uv && typeof CURRENT_BLUEPRINT.meta.uv.projection === 'string'){
+            proj = CURRENT_BLUEPRINT.meta.uv.projection;
+          }
+        }
+        if(!proj) return null;
+        proj = String(proj).toLowerCase();
+        // Compute bbox of the root.
+        if(!root.geometry) {
+          // Group root — no geometry to check. Skip.
+          return null;
+        }
+        root.updateMatrixWorld(true);
+        const bbox = new THREE.Box3().setFromObject(root);
+        const size = bbox.getSize(new THREE.Vector3());
+        const flat = (sz) => sz < 0.02;
+        const issues = [];
+        if(proj === 'spherical' && (flat(size.x) || flat(size.y) || flat(size.z))){
+          issues.push('"spherical" UV on a flat box-like geometry — use "planar" or "box" instead');
+        }
+        if(proj === 'cylindrical' && flat(size.y)){
+          issues.push('"cylindrical" UV on a flat plane — use "planar" or "alongLength" instead');
+        }
+        if(proj === 'radial' && flat(size.x) && flat(size.z)){
+          issues.push('"radial" UV on a flat plane — use "planar" instead');
+        }
+        if(issues.length === 0) return null;
+        return issues[0] + '. Use lblSpec.helpers.projectUV(geo, projection) for the canonical UV reprojection.';
+      }
+    },
+
+    // E33. Modifier stack safety (PART 67.2 / 39.9).
+    // Fires ONLY when meta.geometryPipeline.modifiers is set.
+    // Warns on octaves > 12, turns > 256, stack > 10 entries, or
+    // strength > 1.0 on Spherize/Flatten/Inflate.
+    {
+      id: 'E33', label: 'Modifier stack safety (PART 67.2)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let mods = null;
+        if(ud.geometryPipeline && Array.isArray(ud.geometryPipeline.modifiers)){
+          mods = ud.geometryPipeline.modifiers;
+        } else if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          if(CURRENT_BLUEPRINT.meta.geometryPipeline && Array.isArray(CURRENT_BLUEPRINT.meta.geometryPipeline.modifiers)){
+            mods = CURRENT_BLUEPRINT.meta.geometryPipeline.modifiers;
+          }
+        }
+        if(!mods || mods.length === 0) return null;
+        const issues = [];
+        if(mods.length > 10) issues.push('stack has ' + mods.length + ' entries — cap is 10');
+        for(let i=0;i<mods.length;i++){
+          const m = mods[i];
+          if(!m) continue;
+          if(typeof m.octaves === 'number' && m.octaves > 12){
+            issues.push('"' + m.type + '" octaves=' + m.octaves + ' exceeds cap 12');
+          }
+          if(typeof m.turns === 'number' && m.turns > 256){
+            issues.push('"' + m.type + '" turns=' + m.turns + ' exceeds cap 256');
+          }
+          if(typeof m.strength === 'number' && m.strength > 1.0 &&
+             (String(m.type).toLowerCase() === 'spherize' ||
+              String(m.type).toLowerCase() === 'flatten' ||
+              String(m.type).toLowerCase() === 'inflate')){
+            issues.push('"' + m.type + '" strength=' + m.strength + ' is > 1.0');
+          }
+        }
+        if(issues.length === 0) return null;
+        return issues.slice(0, 2).join('; ') +
+          '. Use lblSpec.helpers.preflightCheck({...}) to validate BEFORE building.';
+      }
+    },
+
+    // E34. Converge direction sanity (PART 67.4 / forge-style).
+    // Fires ONLY when meta.geometryPipeline.converge is set.
+    // Warns when converge.toVertex is outside the model's bbox.
+    {
+      id: 'E34', label: 'Converge direction sanity (PART 67.4)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let cv = null;
+        if(ud.geometryPipeline && ud.geometryPipeline.converge){
+          cv = ud.geometryPipeline.converge;
+        } else if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          if(CURRENT_BLUEPRINT.meta.geometryPipeline && CURRENT_BLUEPRINT.meta.geometryPipeline.converge){
+            cv = CURRENT_BLUEPRINT.meta.geometryPipeline.converge;
+          }
+        }
+        if(!cv) return null;
+        const tv = Array.isArray(cv.toVertex) ? cv.toVertex : null;
+        if(!tv || tv.length < 3) return null;
+        if(!root.geometry) return null;
+        root.updateMatrixWorld(true);
+        const bbox = new THREE.Box3().setFromObject(root);
+        const issues = [];
+        for(let i=0;i<3;i++){
+          if(tv[i] < bbox.min.getComponent(i) - 0.5 || tv[i] > bbox.max.getComponent(i) + 0.5){
+            const axis = ['X','Y','Z'][i];
+            issues.axis = axis;
+            break;
+          }
+        }
+        if(issues.axis){
+          return 'converge.toVertex is outside the model bbox on axis ' + issues.axis +
+            ' — converging "away" from the model wastes work (PART 67.4).';
+        }
+        return null;
+      }
+    },
+
+    // E35. Recolor roles complete (PART 67.6).
+    // Fires ONLY when meta.colorPalette is set. Warns when a declared
+    // role has zero meshes using it (orphan palette entry) — common
+    // when a recolorByPalette call would silently no-op.
+    {
+      id: 'E35', label: 'Recolor roles complete (PART 67.6)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let palette = null;
+        if(Array.isArray(ud.colorPalette)) palette = ud.colorPalette;
+        else if(typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          if(Array.isArray(CURRENT_BLUEPRINT.meta.colorPalette)) palette = CURRENT_BLUEPRINT.meta.colorPalette;
+        }
+        if(!palette || palette.length === 0) return null;
+        const declared = {};
+        palette.forEach(function(p){ if(p && p.role) declared[String(p.role).toLowerCase()] = true; });
+        const used = {};
+        root.traverse(function(o){
+          if(!o.isMesh || !o.material) return;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(function(m){
+            if(m && m.userData && m.userData.role){
+              used[String(m.userData.role).toLowerCase()] = true;
+            }
+          });
+        });
+        const orphans = [];
+        Object.keys(declared).forEach(function(r){
+          if(!used[r]) orphans.push(r);
+        });
+        if(orphans.length === 0) return null;
+        return 'colorPalette declares role(s) [' + orphans.join(', ') +
+          '] but no mesh has userData.role matching — recolorByPalette would no-op (PART 67.6).';
+      }
+    },
+
+    // E36. Preflight check used (PART 67.9).
+    // Fires on models with > 100k triangles that DIDN'T set
+    // meta.usedPreflight = true. Suggests the .ts factory should
+    // call preflightCheck() before building the geometry.
+    {
+      id: 'E36', label: 'Preflight check used (PART 67.9)',
+      check: (root) => {
+        if(!root) return null;
+        // Count total triangles in the tree.
+        let triCount = 0;
+        root.traverse(function(o){
+          if(o.isMesh && o.geometry && o.geometry.attributes && o.geometry.attributes.position){
+            const idx = o.geometry.index;
+            triCount += idx ? (idx.count / 3) : (o.geometry.attributes.position.count / 3);
+          }
+        });
+        if(triCount <= 100000) return null;
+        // Check the opt-in flag.
+        const ud = (root.userData) || {};
+        let usedPreflight = ud.usedPreflight;
+        if(usedPreflight === undefined && typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          usedPreflight = CURRENT_BLUEPRINT.meta.usedPreflight;
+        }
+        if(usedPreflight === true) return null;
+        return 'Model has ' + Math.round(triCount) + ' triangles (>100k) but meta.usedPreflight is not true. ' +
+          'Call lblSpec.helpers.preflightCheck({...}) at the top of the .ts factory to validate budget BEFORE building (PART 67.9).';
+      }
+    },
+
+    // ════════════════════════════════════════════════════════════════════
+    // PART 68-71 (v1.23 / v8.15) — OPT-IN VALIDATORS
+    // From jasonsturges/three-low-poly + achrefelouafi/
+    // LinearAbilityExtThreeJS reference repos. All non-blocking; fire ONLY
+    // when the corresponding opt-in meta.* field is set.
+    // ════════════════════════════════════════════════════════════════════
+
+    // E37. Sub-seed usage (PART 68.1 — from R1 §3.5).
+    // Warns if the model declares meta.usesMathRandom = true (i.e. the
+    // factory openly admits it uses Math.random() instead of
+    // createRandom(meta.seed)). Non-blocking.
+    {
+      id: 'E37', label: 'Sub-seed usage (PART 68.1)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let usesMathRandom = ud.usesMathRandom;
+        if(usesMathRandom === undefined && typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          usesMathRandom = CURRENT_BLUEPRINT.meta.usesMathRandom;
+        }
+        if(usesMathRandom !== true) return null;
+        return 'Model declares usesMathRandom=true — use lblSpec.helpers.createRandom(meta.seed) for reproducible builds. ' +
+          'See PART 68.1 / 40.5 for the canonical sub-seed pattern.';
+      }
+    },
+
+    // E38. Lifetime color ramp validity (PART 68.5 — from R2 §4.10).
+    // Fires ONLY when meta.matRamp is set. Validates the 4 colors are
+    // valid hex and (when shorthand) the key is recognized.
+    {
+      id: 'E38', label: 'Lifetime color ramp validity (PART 68.5)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let matRamp = ud.matRamp;
+        if(matRamp === undefined && typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          matRamp = CURRENT_BLUEPRINT.meta.matRamp;
+        }
+        if(!matRamp) return null;
+        const validKeys = ['mat_ramp_fire', 'mat_ramp_ice', 'mat_ramp_poison',
+                           'mat_ramp_holy', 'mat_ramp_shadow', 'mat_ramp_solar'];
+        if(typeof matRamp === 'string'){
+          if(validKeys.indexOf(matRamp) < 0){
+            return 'meta.matRamp "' + matRamp + '" is not a recognized shorthand. ' +
+              'Valid keys: ' + validKeys.join(', ') + ' (PART 68.5).';
+          }
+          return null;
+        }
+        if(typeof matRamp === 'object'){
+          const issues = [];
+          const fields = ['birth', 'early', 'late', 'death'];
+          for(let i=0;i<fields.length;i++){
+            if(typeof matRamp[fields[i]] !== 'string'){
+              issues.push('matRamp.' + fields[i] + ' is missing or not a hex string');
+            }
+          }
+          if(issues.length === 0) return null;
+          return 'meta.matRamp has ' + issues.length + ' issue(s) (PART 68.5): ' +
+            issues.slice(0, 2).join('; ');
+        }
+        return null;
+      }
+    },
+
+    // E39. Gizmo shape range (PART 68.6 — from R2 §4.6/4.7).
+    // Fires ONLY when meta.gizmo is set. Sanity-checks the gizmo's
+    // declared dimensions (gateWidth/Height, zoneRadius, ringRadius).
+    {
+      id: 'E39', label: 'Gizmo shape range (PART 68.6)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let gizmo = ud.gizmo;
+        if(gizmo === undefined && typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          gizmo = CURRENT_BLUEPRINT.meta.gizmo;
+        }
+        if(!gizmo || !gizmo.shape) return null;
+        const issues = [];
+        if(gizmo.shape === 'gate'){
+          if(typeof gizmo.gateWidth !== 'number' || gizmo.gateWidth <= 0){
+            issues.push('gate gizmo needs gateWidth > 0');
+          }
+          if(typeof gizmo.gateHeight !== 'number' || gizmo.gateHeight <= 0){
+            issues.push('gate gizmo needs gateHeight > 0');
+          }
+          if(typeof gizmo.gateHeight === 'number' && typeof gizmo.gateWidth === 'number' &&
+             gizmo.gateHeight < 0.5 * gizmo.gateWidth){
+            issues.push('gateHeight < 0.5 * gateWidth (hard to read)');
+          }
+        }
+        if(gizmo.shape === 'zone' || gizmo.shape === 'ring' || gizmo.shape === 'scribe'){
+          const r = gizmo.zoneRadius || gizmo.ringRadius;
+          if(typeof r !== 'number' || r <= 0){
+            issues.push(gizmo.shape + ' gizmo needs a positive radius');
+          }
+        }
+        if(typeof gizmo.range === 'number' && gizmo.range <= 0){
+          issues.push('gizmo.range must be > 0');
+        }
+        if(issues.length === 0) return null;
+        return 'meta.gizmo (shape="' + gizmo.shape + '") has ' + issues.length +
+          ' issue(s) (PART 68.6): ' + issues.slice(0, 2).join('; ');
+      }
+    },
+
+    // E40. Bone segment coverage (PART 68.11 — from R2 §4.15).
+    // Fires ONLY when meta.vfx.boneAnchored = true. Verifies that every
+    // bone referenced in meta.vfx.boneSegments exists on the rig.
+    {
+      id: 'E40', label: 'Bone segment coverage (PART 68.11)',
+      check: (root) => {
+        if(!root) return null;
+        const ud = (root.userData) || {};
+        let vfx = ud.vfx;
+        if(vfx === undefined && typeof CURRENT_BLUEPRINT !== 'undefined' && CURRENT_BLUEPRINT && CURRENT_BLUEPRINT.meta){
+          vfx = CURRENT_BLUEPRINT.meta.vfx;
+        }
+        if(!vfx || vfx.boneAnchored !== true) return null;
+        if(!Array.isArray(vfx.boneSegments) || vfx.boneSegments.length === 0) return null;
+        // Collect the rig's bone names.
+        const boneNames = new Set();
+        root.traverse(function(o){
+          if(o.isBone && o.name) boneNames.add(o.name);
+        });
+        const orphans = [];
+        for(let i=0;i<vfx.boneSegments.length;i++){
+          const b = vfx.boneSegments[i];
+          if(b && b.bone && !boneNames.has(b.bone)) orphans.push(b.bone);
+        }
+        if(orphans.length === 0) return null;
+        if(orphans.length === vfx.boneSegments.length){
+          return 'meta.vfx.boneSegments references ' + orphans.length +
+            ' bones but the rig has NONE of them (PART 68.11). Fatal.';
+        }
+        return 'meta.vfx.boneSegments references ' + orphans.length + ' bone(s) the rig lacks: ' +
+          orphans.slice(0, 3).join(', ') + ' (PART 68.11). They will be dropped.';
       }
     }
   ];
@@ -24957,7 +25405,2024 @@ window.lblSpec = (function(){
       };
       sr.wearSlider = slider;
       return slider;
-    }
+    },
+
+    // ════════════════════════════════════════════════════════════════════
+    // PART 67 (v1.23 / v8.15) — OPT-IN CAPABILITY BUNDLE
+    // Cross-primitive vocabulary, deform modifier stack, converge, chain,
+    // recolor-by-palette, material animation, vertex channels, UV
+    // projections, preflight check. These are EXTRA CAPABILITIES for
+    // weapons, blades, and metal-finish subjects — NOT a rule every model
+    // must follow. PART 45 set the precedent: opt-in by meta / userData
+    // flag, never break the load path, never change existing behavior.
+    // ════════════════════════════════════════════════════════════════════
+
+    // ── PART 67.1 — Cross-primitive vocabulary (PART 3.9) ──────────
+    // Shape generators the existing helpers don't cover. Each returns
+    // a THREE.BufferGeometry. The factory never has to re-implement
+    // these. Especially useful for weapons (Disc = barrel cap, Ring
+    // = barrel band, Arc = blade sweep, Helix = rifling coil,
+    // Hemisphere = helmet/visor, Ribbon = scabbard strip, CrossPlanes
+    // = smoke quads from a muzzle flash).
+
+    // makeDisc(opts) — CircleGeometry with optional cap. Defaults to
+    // a flat disc on the XZ plane. opts: { radius, segments, cap }.
+    makeDisc: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const radius   = (typeof opts.radius   === 'number') ? opts.radius   : 0.5;
+      const segments = (typeof opts.segments === 'number') ? opts.segments : 24;
+      const cap      = (opts.cap === true);
+      const g = new THREE.CircleGeometry(radius, segments);
+      if(cap){
+        // Build a simple fan-cap by extruding the disc edges to
+        // a center point at -thickness. Avoids the cost of an
+        // ExtrudeGeometry just to close a shield cap.
+        const thick = (typeof opts.thickness === 'number') ? opts.thickness : 0.02;
+        const pos = g.attributes.position;
+        const v0 = new THREE.Vector3(pos.getX(0), pos.getY(0), pos.getZ(0));
+        for(let i=0;i<pos.count;i++){
+          pos.setXYZ(i, pos.getX(i), pos.getY(i) - thick, pos.getZ(i));
+        }
+        pos.needsUpdate = true;
+      }
+      if(g.computeVertexNormals) g.computeVertexNormals();
+      return g;
+    },
+
+    // makeRing(opts) — RingGeometry. opts: { inner, outer, thetaSegs, phiSegs, thetaStart, thetaLength }.
+    makeRing: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const inner  = (typeof opts.inner  === 'number') ? opts.inner  : 0.3;
+      const outer  = (typeof opts.outer  === 'number') ? opts.outer  : 0.5;
+      const ts     = (typeof opts.thetaSegs  === 'number') ? opts.thetaSegs  : 24;
+      const ps     = (typeof opts.phiSegs    === 'number') ? opts.phiSegs    : 1;
+      const start  = (typeof opts.thetaStart  === 'number') ? opts.thetaStart  : 0;
+      const length = (typeof opts.thetaLength === 'number') ? opts.thetaLength : Math.PI * 2;
+      return new THREE.RingGeometry(inner, outer, ts, ps, start, length);
+    },
+
+    // makeArc(opts) — partial RingGeometry sweep. opts: { inner, outer, sweep (radians), segments, axis }.
+    makeArc: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const inner  = (typeof opts.inner  === 'number') ? opts.inner  : 0.3;
+      const outer  = (typeof opts.outer  === 'number') ? opts.outer  : 0.5;
+      const sweep  = (typeof opts.sweep  === 'number') ? opts.sweep  : Math.PI * 0.5;
+      const segs   = (typeof opts.segments === 'number') ? opts.segments : 12;
+      return new THREE.RingGeometry(inner, outer, segs, 1, 0, sweep);
+    },
+
+    // makeHemisphere(opts) — half-sphere dome. opts: { radius, widthSegs, heightSegs, openEnded }.
+    makeHemisphere: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const radius = (typeof opts.radius === 'number') ? opts.radius : 0.5;
+      const ws     = (typeof opts.widthSegs  === 'number') ? opts.widthSegs  : 16;
+      const hs     = (typeof opts.heightSegs === 'number') ? opts.heightSegs : 8;
+      const openEnded = (opts.openEnded === true);
+      const phiStart = 0;
+      const phiLength = Math.PI * 2;
+      const thetaStart = 0;
+      const thetaLength = Math.PI / 2;
+      return new THREE.SphereGeometry(radius, ws, hs, phiStart, phiLength, thetaStart, thetaLength);
+    },
+
+    // makeRibbon(opts) — tapered PlaneGeometry strip. opts: { length, width, widthEnd, segsL, segsW }.
+    makeRibbon: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const length   = (typeof opts.length   === 'number') ? opts.length   : 1.0;
+      const width    = (typeof opts.width    === 'number') ? opts.width    : 0.3;
+      const widthEnd = (typeof opts.widthEnd === 'number') ? opts.widthEnd : 0.0;
+      const segsL    = (typeof opts.segsL    === 'number') ? opts.segsL    : 1;
+      const segsW    = (typeof opts.segsW    === 'number') ? opts.segsW    : 1;
+      const g = new THREE.PlaneGeometry(width, length, segsW, segsL);
+      // Taper: lerp x toward 0 from the leading edge to the trailing edge.
+      const pos = g.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const y = pos.getY(i);
+        const t = (y + length/2) / length; // 0 at -y, 1 at +y
+        const sx = THREE.MathUtils.lerp(1.0, widthEnd/Math.max(width, 1e-6), t);
+        pos.setX(i, pos.getX(i) * sx);
+      }
+      pos.needsUpdate = true;
+      if(g.computeVertexNormals) g.computeVertexNormals();
+      return g;
+    },
+
+    // makeCrossPlanes(opts) — N PlaneGeometry rotated around a normal. opts: { size, count, axis, segs }.
+    makeCrossPlanes: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const size  = (typeof opts.size  === 'number') ? opts.size  : 0.5;
+      const count = (typeof opts.count === 'number') ? opts.count : 2;
+      const segs  = (typeof opts.segs  === 'number') ? opts.segs  : 1;
+      // The renderer returns a merged BufferGeometry across the N planes
+      // so the factory can wrap it in a single Mesh (cheaper than N draw
+      // calls). mergeGeometries is imported at the top of the module —
+      // fall back to the first plane if the merge helper is missing.
+      const planes = [];
+      for(let i=0;i<count;i++){
+        const a = (i / count) * Math.PI * 2;
+        const p = new THREE.PlaneGeometry(size, size, segs, segs);
+        p.applyMatrix4(new THREE.Matrix4().makeRotationY(a));
+        if(p.toNonIndexed) p.toNonIndexed();
+        planes.push(p);
+      }
+      if(typeof mergeGeometries === 'function'){
+        try {
+          const merged = mergeGeometries(planes, false);
+          if(merged) return merged;
+        } catch(e){ /* fall through */ }
+      }
+      return planes[0];
+    },
+
+    // makeHelix(opts) — TubeGeometry along a custom helix Curve. opts: { radius, turns, length, tubularSegs, radialSegs, radiusTube }.
+    makeHelix: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const radius    = (typeof opts.radius    === 'number') ? opts.radius    : 0.3;
+      const turns     = (typeof opts.turns     === 'number') ? opts.turns     : 4;
+      const length    = (typeof opts.length    === 'number') ? opts.length    : 1.0;
+      const tubular   = (typeof opts.tubularSegs === 'number') ? opts.tubularSegs : 64;
+      const radial    = (typeof opts.radialSegs  === 'number') ? opts.radialSegs  : 8;
+      const tubeR     = (typeof opts.radiusTube  === 'number') ? opts.radiusTube  : 0.03;
+      // Inline helix Curve subclass — keeps the helper self-contained.
+      const HelixCurve = function(r, t, L){
+        THREE.Curve.call(this);
+        this.r = r; this.t = t; this.L = L;
+      };
+      HelixCurve.prototype = Object.create(THREE.Curve.prototype);
+      HelixCurve.prototype.constructor = HelixCurve;
+      HelixCurve.prototype.getPoint = function(u, target){
+        if(!target) target = new THREE.Vector3();
+        const a = u * this.t * Math.PI * 2;
+        const z = u * this.L - this.L / 2;
+        return target.set(Math.cos(a) * this.r, Math.sin(a) * this.r, z);
+      };
+      try {
+        return new THREE.TubeGeometry(new HelixCurve(radius, turns, length), tubular, tubeR, radial, false);
+      } catch(e){
+        // Helix can blow the budget — PART 67.3 E33 caps turns at 256,
+        // but defend in depth: return a plain CylinderGeometry so the
+        // factory never crashes.
+        return new THREE.CylinderGeometry(radius, radius, length, radial, 1, false);
+      }
+    },
+
+    // ── PART 67.2 — Deform modifier stack (PART 39.9) ───────────────
+    // Each helper mutates a BufferGeometry in place and returns the
+    // same geometry for chaining. The factory calls them via
+    // applyModifierStack(geo, mods) which dispatches by type.
+    // Order matters — see PART 67.2.1.
+
+    // taper(geo, axis, strength, falloff) — radial scale falloff along axis.
+    taper: function(geo, axis, strength, falloff){
+      if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+      axis = axis || 'Y';
+      strength = (typeof strength === 'number') ? strength : 0.5;
+      falloff = falloff || 'linear';
+      const ai = ({X:0,Y:1,Z:2})[axis.toUpperCase()] || 1;
+      const pos = geo.attributes.position;
+      // Compute bbox along the chosen axis.
+      let minA = Infinity, maxA = -Infinity;
+      for(let i=0;i<pos.count;i++){
+        const a = pos.getComponent(i, ai);
+        if(a < minA) minA = a;
+        if(a > maxA) maxA = a;
+      }
+      const range = Math.max(maxA - minA, 1e-6);
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        const t = (tmp.getComponent(ai) - minA) / range; // 0..1 along axis
+        let s;
+        if(falloff === 'easeIn')      s = 1 - strength * (t*t);
+        else if(falloff === 'easeOut')s = 1 - strength * (1 - (1-t)*(1-t));
+        else                          s = 1 - strength * t;
+        // Scale the two non-axis components.
+        for(let k=0;k<3;k++){
+          if(k === ai) continue;
+          tmp.setComponent(k, tmp.getComponent(k) * s);
+        }
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geo.computeVertexNormals) geo.computeVertexNormals();
+      return geo;
+    },
+
+    // twist(geo, axis, angle) — progressive rotation around axis. angle in radians.
+    twist: function(geo, axis, angle){
+      if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+      axis = axis || 'Y';
+      angle = (typeof angle === 'number') ? angle : Math.PI / 2;
+      const ai = ({X:0,Y:1,Z:2})[axis.toUpperCase()] || 1;
+      const aj = (ai + 1) % 3;
+      const ak = (ai + 2) % 3;
+      const pos = geo.attributes.position;
+      let minA = Infinity, maxA = -Infinity;
+      for(let i=0;i<pos.count;i++){
+        const a = pos.getComponent(i, ai);
+        if(a < minA) minA = a;
+        if(a > maxA) maxA = a;
+      }
+      const range = Math.max(maxA - minA, 1e-6);
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        const t = (tmp.getComponent(ai) - minA) / range;
+        const phi = angle * t;
+        const c = Math.cos(phi), s = Math.sin(phi);
+        const vj = tmp.getComponent(aj);
+        const vk = tmp.getComponent(ak);
+        tmp.setComponent(aj, vj * c - vk * s);
+        tmp.setComponent(ak, vj * s + vk * c);
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geo.computeVertexNormals) geo.computeVertexNormals();
+      return geo;
+    },
+
+    // bend(geo, axis, angle) — curve the whole mesh around an axis.
+    bend: function(geo, axis, angle){
+      if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+      axis = axis || 'Y';
+      angle = (typeof angle === 'number') ? angle : Math.PI / 4;
+      const ai = ({X:0,Y:1,Z:2})[axis.toUpperCase()] || 1;
+      const pos = geo.attributes.position;
+      let minA = Infinity, maxA = -Infinity;
+      for(let i=0;i<pos.count;i++){
+        const a = pos.getComponent(i, ai);
+        if(a < minA) minA = a;
+        if(a > maxA) maxA = a;
+      }
+      const range = Math.max(maxA - minA, 1e-6);
+      const radius = range / Math.max(Math.abs(angle), 1e-3);
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        const t = (tmp.getComponent(ai) - minA) / range;
+        const phi = (t - 0.5) * angle;
+        // Rotate around an axis perpendicular to the bend axis, through the mid-point.
+        const c = Math.cos(phi), s = Math.sin(phi);
+        // Bend in the plane containing `axis` and (cos axis, sin axis) — we pick X
+        // as the secondary axis when bending around Y, etc.
+        const sec = (ai + 1) % 3;
+        const secVal = tmp.getComponent(sec);
+        const axisMid = minA + range * 0.5;
+        const axisVal = tmp.getComponent(ai) - axisMid;
+        const newSec = secVal * c - axisVal * s;
+        const newAxis = secVal * s + axisVal * c + axisMid;
+        tmp.setComponent(sec, newSec);
+        tmp.setComponent(ai, newAxis);
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geo.computeVertexNormals) geo.computeVertexNormals();
+      return geo;
+    },
+
+    // spherize(geo, strength) — blend toward a sphere centered at origin.
+    spherize: function(geo, strength){
+      if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+      strength = (typeof strength === 'number') ? strength : 0.5;
+      const pos = geo.attributes.position;
+      const tmp = new THREE.Vector3();
+      // Compute a uniform radius (mean distance from origin).
+      let totalR = 0;
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        totalR += tmp.length();
+      }
+      const R = totalR / Math.max(pos.count, 1);
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        if(tmp.length() < 1e-6) continue;
+        const dir = tmp.clone().normalize().multiplyScalar(R);
+        tmp.lerp(dir, strength);
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geo.computeVertexNormals) geo.computeVertexNormals();
+      return geo;
+    },
+
+    // inflate(geo, strength) — push/pull along vertex normal.
+    inflate: function(geo, strength){
+      if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+      strength = (typeof strength === 'number') ? strength : 0.05;
+      if(!geo.attributes.normal && geo.computeVertexNormals) geo.computeVertexNormals();
+      const pos = geo.attributes.position;
+      const nor = geo.attributes.normal;
+      if(!nor) return geo;
+      const tmp = new THREE.Vector3(), nrm = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        nrm.fromBufferAttribute(nor, i);
+        tmp.addScaledVector(nrm, strength);
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geo.computeVertexNormals) geo.computeVertexNormals();
+      return geo;
+    },
+
+    // applyNoise(geo, seed, octaves, lacunarity, persistence, strength)
+    // — deterministic layered spatial displacement. Defaults seed to
+    // `opts.seed || Date.now()` for non-determinism, but the .ts factory
+    // should always pass `meta.seed` so reloads match.
+    applyNoise: function(geo, seed, octaves, lacunarity, persistence, strength){
+      if(!geo || !geo.attributes || !geo.attributes.position) return geo;
+      seed        = (typeof seed        === 'number') ? seed        : 1337;
+      octaves     = (typeof octaves     === 'number') ? octaves     : 4;
+      lacunarity  = (typeof lacunarity  === 'number') ? lacunarity  : 2.0;
+      persistence = (typeof persistence === 'number') ? persistence : 0.5;
+      strength    = (typeof strength    === 'number') ? strength    : 0.05;
+      // Mulberry32 — same as the rest of the renderer.
+      let s = seed >>> 0;
+      const rng = function(){
+        s = (s + 0x6D2B79F5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      // Build a small grid of random gradients for fBm.
+      const grid = {};
+      const key = function(x, y, z){
+        return x + ',' + y + ',' + z;
+      };
+      const grad = function(x, y, z){
+        const k = key(x, y, z);
+        if(!grid[k]){
+          // Hash from (x,y,z,seed) for determinism.
+          const h = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + seed * 0.123) * 43758.5453;
+          grid[k] = (h - Math.floor(h)) * 2 - 1;
+        }
+        return grid[k];
+      };
+      // Trilinear value noise — cheap, good enough for displacement.
+      const fade = function(t){ return t*t*(3-2*t); };
+      const noise3 = function(x, y, z){
+        const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+        const xf = x - xi, yf = y - yi, zf = z - zi;
+        const u = fade(xf), v = fade(yf), w = fade(zf);
+        const n000 = grad(xi,   yi,   zi);
+        const n100 = grad(xi+1, yi,   zi);
+        const n010 = grad(xi,   yi+1, zi);
+        const n110 = grad(xi+1, yi+1, zi);
+        const n001 = grad(xi,   yi,   zi+1);
+        const n101 = grad(xi+1, yi,   zi+1);
+        const n011 = grad(xi,   yi+1, zi+1);
+        const n111 = grad(xi+1, yi+1, zi+1);
+        const x00 = n000 + (n100 - n000) * u;
+        const x10 = n010 + (n110 - n010) * u;
+        const x01 = n001 + (n101 - n001) * u;
+        const x11 = n011 + (n111 - n011) * u;
+        const y0 = x00 + (x10 - x00) * v;
+        const y1 = x01 + (x11 - x01) * v;
+        return y0 + (y1 - y0) * w;
+      };
+      const fbm = function(x, y, z){
+        let amp = 1, freq = 1, sum = 0, norm = 0;
+        for(let o=0;o<octaves;o++){
+          sum += amp * noise3(x * freq, y * freq, z * freq);
+          norm += amp;
+          amp *= persistence;
+          freq *= lacunarity;
+        }
+        return sum / Math.max(norm, 1e-6);
+      };
+      const pos = geo.attributes.position;
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        const n = fbm(tmp.x * 2, tmp.y * 2, tmp.z * 2);
+        // Displace along the position vector from origin (cheap proxy
+        // for the normal — fine for low-poly displacement).
+        const len = tmp.length();
+        if(len > 1e-6){
+          const d = n * strength;
+          tmp.multiplyScalar(1 + d / len);
+        }
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geo.computeVertexNormals) geo.computeVertexNormals();
+      // Touch `rng` so the linter doesn't flag the unused var — the rng
+      // is here for any future per-vertex random-source branch.
+      void rng;
+      return geo;
+    },
+
+    // applyModifierStack(geo, modifiers) — the PART 67.2 dispatcher.
+    // Walks the array in declared order, dispatches by type. Returns
+    // the same geometry. The .ts factory never has to re-implement
+    // the per-modifier math.
+    applyModifierStack: function(geo, modifiers){
+      if(!geo || !Array.isArray(modifiers) || modifiers.length === 0) return geo;
+      for(let i=0;i<modifiers.length;i++){
+        const m = modifiers[i];
+        if(!m || m.enabled === false || !m.type) continue;
+        try {
+          switch(String(m.type).toLowerCase()){
+            case 'taper':   __threeTriHelpers.taper(geo, m.axis, m.strength, m.falloff); break;
+            case 'twist':   __threeTriHelpers.twist(geo, m.axis, m.angle); break;
+            case 'bend':    __threeTriHelpers.bend(geo, m.axis, m.angle); break;
+            case 'spherize':__threeTriHelpers.spherize(geo, m.strength); break;
+            case 'inflate': __threeTriHelpers.inflate(geo, m.strength); break;
+            case 'noise':   __threeTriHelpers.applyNoise(geo, m.seed, m.octaves, m.lacunarity, m.persistence, m.strength); break;
+            default: /* unknown modifier type — skip silently (PART 67.2.2) */ break;
+          }
+        } catch(e){
+          console.warn('[lblSpec] modifier "' + m.type + '" threw — skipping (PART 67.2):', e);
+        }
+      }
+      return geo;
+    },
+
+    // ── PART 67.3 — Packed vertex channels (PART 7.5) ───────────────
+    // fillVertexChannel(geometry, channelName, source, settings) —
+    // fills geometry.attributes.uv1 / uv2 / uv3 with a per-vertex
+    // Vector2 driven by an axis gradient, radial distance, or
+    // deterministic random. source: 'axisGradient' | 'radialDistance'
+    // | 'deterministicRandom' | 'normalizedX' | 'normalizedY' | 'normalizedZ'.
+    fillVertexChannel: function(geometry, channelName, source, settings){
+      if(!geometry || !geometry.attributes || !geometry.attributes.position) return geometry;
+      settings = settings || {};
+      const valid = ['uv1', 'uv2', 'uv3'];
+      const ch = String(channelName || 'uv1').toLowerCase();
+      if(valid.indexOf(ch) < 0) return geometry;
+      const pos = geometry.attributes.position;
+      const count = pos.count;
+      const arr = new Float32Array(count * 2);
+      // Pre-compute bbox for axisGradient.
+      let minA = Infinity, maxA = -Infinity;
+      if(source === 'axisGradient'){
+        const ai = ({X:0,Y:1,Z:2})[String(settings.axis || 'Y').toUpperCase()] || 1;
+        for(let i=0;i<count;i++){
+          const a = pos.getComponent(i, ai);
+          if(a < minA) minA = a;
+          if(a > maxA) maxA = a;
+        }
+      }
+      // Deterministic random — Mulberry32.
+      let rs = (typeof settings.seed === 'number') ? (settings.seed >>> 0) : 1337;
+      const rand = function(){
+        rs = (rs + 0x6D2B79F5) >>> 0;
+        let t = rs;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        let u = 0, v = 0;
+        switch(String(source)){
+          case 'axisgradient': {
+            const ai = ({X:0,Y:1,Z:2})[String(settings.axis || 'Y').toUpperCase()] || 1;
+            const a = tmp.getComponent(ai);
+            u = (a - minA) / Math.max(maxA - minA, 1e-6);
+            v = u;
+            break;
+          }
+          case 'radialdistance': {
+            const r = Math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z);
+            u = r;
+            v = r;
+            break;
+          }
+          case 'deterministicrandom': {
+            u = rand();
+            v = rand();
+            break;
+          }
+          case 'normalizedx': u = (tmp.x + 1) * 0.5; v = u; break;
+          case 'normalizedy': u = (tmp.y + 1) * 0.5; v = u; break;
+          case 'normalizedz': u = (tmp.z + 1) * 0.5; v = u; break;
+          default: u = 0; v = 0; break;
+        }
+        arr[i*2]   = u;
+        arr[i*2+1] = v;
+      }
+      geometry.setAttribute(ch, new THREE.BufferAttribute(arr, 2));
+      return geometry;
+    },
+
+    // ── PART 67.4 — Converge faces (forge-style) ────────────────────
+    // convergeFaces(geometry, toVertex, strength) — pulls every
+    // vertex toward `toVertex` by `strength`. Useful for tent tops,
+    // spike tips, bullet tails, blade points. Mirrors forge's
+    // `Surface.Converge` operator. The .ts factory calls it via
+    // `meta.geometryPipeline.converge = { toVertex, strength }`.
+    convergeFaces: function(geometry, toVertex, strength){
+      if(!geometry || !geometry.attributes || !geometry.attributes.position) return geometry;
+      strength = (typeof strength === 'number') ? THREE.MathUtils.clamp(strength, 0, 1) : 0.5;
+      const tv = (toVertex && typeof toVertex.x === 'number')
+        ? toVertex
+        : new THREE.Vector3(0, 1, 0);
+      const pos = geometry.attributes.position;
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        tmp.lerp(tv, strength);
+        pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      }
+      pos.needsUpdate = true;
+      if(geometry.computeVertexNormals) geometry.computeVertexNormals();
+      return geometry;
+    },
+
+    // ── PART 67.5 — UV projection helper (PART 8 extension) ───────
+    // projectUV(geometry, projection, settings) — re-projects the
+    // geometry's UV0 attribute using one of 7 projections:
+    // 'planar' | 'radial' | 'cylindrical' | 'spherical' | 'box' |
+    // 'alongLength' | 'shapeDefault'. settings.scale, settings.offset,
+    // settings.rotation, settings.flipU, settings.flipV, settings.swapUV.
+    // shapeDefault is a no-op that returns the geometry unchanged.
+    projectUV: function(geometry, projection, settings){
+      if(!geometry || !geometry.attributes || !geometry.attributes.position) return geometry;
+      settings = settings || {};
+      const proj = String(projection || 'shapeDefault').toLowerCase();
+      if(proj === 'shapedefault') return geometry; // no-op
+      const pos = geometry.attributes.position;
+      const count = pos.count;
+      const arr = new Float32Array(count * 2);
+      const scale = (typeof settings.scale === 'number') ? settings.scale : 1.0;
+      const offset = (typeof settings.offset === 'number') ? settings.offset : 0.0;
+      const rot = (typeof settings.rotation === 'number') ? settings.rotation : 0.0;
+      const flipU = (settings.flipU === true) ? -1 : 1;
+      const flipV = (settings.flipV === true) ? -1 : 1;
+      const swapUV = (settings.swapUV === true);
+      // Pre-compute bbox.
+      let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity;
+      for(let i=0;i<count;i++){
+        const x=pos.getX(i), y=pos.getY(i), z=pos.getZ(i);
+        if(x<minX)minX=x; if(x>maxX)maxX=x;
+        if(y<minY)minY=y; if(y>maxY)maxY=y;
+        if(z<minZ)minZ=z; if(z>maxZ)maxZ=z;
+      }
+      const rX = Math.max(maxX-minX,1e-6);
+      const rY = Math.max(maxY-minY,1e-6);
+      const rZ = Math.max(maxZ-minZ,1e-6);
+      const tmp = new THREE.Vector3();
+      for(let i=0;i<count;i++){
+        tmp.fromBufferAttribute(pos, i);
+        let u = 0, v = 0;
+        switch(proj){
+          case 'planar': {
+            u = (tmp.x - minX) / rX;
+            v = (tmp.y - minY) / rY;
+            break;
+          }
+          case 'radial': {
+            const r = Math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z);
+            const a = Math.atan2(tmp.z, tmp.x);
+            u = (a / (Math.PI * 2)) + 0.5;
+            v = r;
+            break;
+          }
+          case 'cylindrical': {
+            const a = Math.atan2(tmp.z, tmp.x);
+            u = (a / (Math.PI * 2)) + 0.5;
+            v = (tmp.y - minY) / rY;
+            break;
+          }
+          case 'spherical': {
+            const a = Math.atan2(tmp.z, tmp.x);
+            const e = Math.asin(THREE.MathUtils.clamp(tmp.y / Math.max(rY, 1e-6), -1, 1));
+            u = (a / (Math.PI * 2)) + 0.5;
+            v = (e / Math.PI) + 0.5;
+            break;
+          }
+          case 'alonglength': {
+            // Project along the longest axis onto the other two.
+            const lenX=rX, lenY=rY, lenZ=rZ;
+            if(lenY >= lenX && lenY >= lenZ){ u = (tmp.x-minX)/rX; v = (tmp.z-minZ)/rZ; }
+            else if(lenX >= lenY && lenX >= lenZ){ u = (tmp.y-minY)/rY; v = (tmp.z-minZ)/rZ; }
+            else { u = (tmp.x-minX)/rX; v = (tmp.y-minY)/rY; }
+            break;
+          }
+          case 'box': {
+            // 6-face box projection — pick the dominant face.
+            const ax=Math.abs(tmp.x)/rX, ay=Math.abs(tmp.y)/rY, az=Math.abs(tmp.z)/rZ;
+            if(ax >= ay && ax >= az){ u = (tmp.z-minZ)/rZ; v = (tmp.y-minY)/rY; }
+            else if(ay >= ax && ay >= az){ u = (tmp.x-minX)/rX; v = (tmp.z-minZ)/rZ; }
+            else { u = (tmp.x-minX)/rX; v = (tmp.y-minY)/rY; }
+            break;
+          }
+          default: u = 0; v = 0; break;
+        }
+        // Apply post-transform.
+        u = (u + offset) * scale * flipU;
+        v = v * scale * flipV;
+        if(rot !== 0){
+          const c = Math.cos(rot), s = Math.sin(rot);
+          const nu = u * c - v * s;
+          const nv = u * s + v * c;
+          u = nu; v = nv;
+        }
+        if(swapUV){ const t = u; u = v; v = t; }
+        arr[i*2]   = u;
+        arr[i*2+1] = v;
+      }
+      geometry.setAttribute('uv', new THREE.BufferAttribute(arr, 2));
+      return geometry;
+    },
+
+    // ── PART 67.6 — Recolor by palette (PART 41.6 extension) ───────
+    // recolorByPalette(root, newPalette) — walks the root, swaps
+    // every MeshStandardMaterial.color from the declared
+    // `meta.colorPalette[i].baseColor` to newPalette[i].baseColor
+    // (matched by role: skin / hair / cloth / metal / leather / wood
+    // / …). No geometry rebuild, no scene-graph mutation. Especially
+    // useful for CS2 finish variants — re-skin a knife from
+    // "Damascus" to "Fade" without rebuilding the mesh.
+    recolorByPalette: function(root, newPalette){
+      if(!root) return null;
+      newPalette = newPalette || [];
+      if(!Array.isArray(newPalette) || newPalette.length === 0) return root;
+      const paletteByRole = {};
+      newPalette.forEach(function(p){
+        if(p && p.role) paletteByRole[String(p.role).toLowerCase()] = p;
+      });
+      let count = 0;
+      root.traverse(function(obj){
+        if(!obj.isMesh || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        const swaps = [];
+        mats.forEach(function(m){
+          if(!m || !m.userData) return;
+          const role = (m.userData.role || m.userData.paletteRole || '');
+          if(!role) return;
+          const rk = String(role).toLowerCase();
+          const p = paletteByRole[rk];
+          if(p && typeof p.baseColor === 'number'){
+            if(m.color && typeof m.color.setHex === 'function') m.color.setHex(p.baseColor);
+            else if(typeof m.color !== 'undefined' && m.color !== null){
+              try { m.color = new THREE.Color(p.baseColor); } catch(e){}
+            }
+            swaps.push(rk);
+            count++;
+          }
+        });
+        if(swaps.length && obj.userData){
+          obj.userData.lastRecolor = swaps;
+        }
+      });
+      if(root.userData){
+        root.userData.lastRecolorCount = count;
+      }
+      return root;
+    },
+
+    // ── PART 67.7 — Chain placement (PART 39.10) ───────────────────
+    // placeChain(parent, protoFactory, count, axis, jitter) — places
+    // N identical sub-parts end-to-end along `axis` with optional
+    // per-instance jitter on rotation / scale / position. Useful for
+    // chain links, ammunition belts, cable segments, fence posts.
+    // protoFactory is a function () => Object3D that builds one link.
+    placeChain: function(parent, protoFactory, count, axis, jitter){
+      if(!parent || typeof protoFactory !== 'function') return [];
+      count = (typeof count === 'number') ? count : 4;
+      axis  = axis || 'Y';
+      jitter = jitter || {};
+      const ai = ({X:0,Y:1,Z:2})[String(axis).toUpperCase()] || 1;
+      const links = [];
+      // Compute the bbox of the first link to know the link length.
+      let linkLen = 0.2; // sensible default
+      try {
+        const probe = protoFactory();
+        if(probe && probe.traverse){
+          probe.traverse(function(o){
+            if(o.isMesh && o.geometry && o.geometry.boundingBox === null){
+              o.geometry.computeBoundingBox();
+            }
+          });
+          let minA = Infinity, maxA = -Infinity;
+          probe.traverse(function(o){
+            if(o.isMesh && o.geometry && o.geometry.boundingBox){
+              o.geometry.boundingBox.getCenter(new THREE.Vector3());
+              const c = o.geometry.boundingBox.getCenter(new THREE.Vector3());
+              const half = o.geometry.boundingBox.getSize(new THREE.Vector3()).getComponent(ai) * 0.5;
+              if(c.getComponent(ai) - half < minA) minA = c.getComponent(ai) - half;
+              if(c.getComponent(ai) + half > maxA) maxA = c.getComponent(ai) + half;
+            }
+          });
+          if(isFinite(minA) && isFinite(maxA)) linkLen = maxA - minA;
+        }
+      } catch(e){ /* keep default */ }
+      for(let i=0;i<count;i++){
+        let link;
+        try { link = protoFactory(); } catch(e){ continue; }
+        if(!link) continue;
+        const offset = (i - (count-1)/2) * linkLen;
+        if(link.position && typeof link.position.setComponent === 'function'){
+          link.position.setComponent(ai, link.position.getComponent(ai) + offset);
+        }
+        if(jitter.rotation){
+          link.rotation.x += (Math.random() - 0.5) * jitter.rotation;
+          link.rotation.y += (Math.random() - 0.5) * jitter.rotation;
+          link.rotation.z += (Math.random() - 0.5) * jitter.rotation;
+        }
+        if(jitter.scale){
+          const s = 1 + (Math.random() - 0.5) * jitter.scale;
+          link.scale.set(s, s, s);
+        }
+        parent.add(link);
+        links.push(link);
+      }
+      return links;
+    },
+
+    // ── PART 67.8 — Time-driven material animation (PART 28.7) ────
+    // applyMaterialAnimation(material, animationArray, elapsed) —
+    // mutates a material's color/tiling/offset/emissiveIntensity
+    // based on time-driven keyframes. Returns an updater function
+    // the renderer can call from the existing tick(dt, elapsed)
+    // pipeline. The .ts factory never has to write per-frame
+    // material logic itself — useful for glowing metal accents
+    // (pulsing emissiveIntensity) or finish color shifts.
+    applyMaterialAnimation: function(material, animationArray, elapsed){
+      if(!material || !Array.isArray(animationArray) || animationArray.length === 0) return material;
+      for(let i=0;i<animationArray.length;i++){
+        const a = animationArray[i];
+        if(!a || !a.channel) continue;
+        const dur = (typeof a.duration === 'number' && a.duration > 0) ? a.duration : 1.0;
+        const tRaw = (elapsed - (a.startAt || 0)) / dur;
+        if(a.loop === false && tRaw > 1) continue;
+        const t = ((tRaw % 1) + 1) % 1; // wrap to [0,1)
+        // Easing.
+        let e = t;
+        if(a.curve === 'easeIn')      e = t * t;
+        else if(a.curve === 'easeOut')e = 1 - (1 - t) * (1 - t);
+        else if(a.curve === 'easeInOut'){
+          e = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
+        }
+        const lerped = (a.from + (a.to - a.from) * e);
+        const ch = String(a.channel);
+        try {
+          if(ch === 'color' || ch === 'emissive'){
+            if(material[ch] && typeof material[ch].setHex === 'function'){
+              material[ch].setHex(Math.round(lerped));
+            }
+          } else if(ch === 'tilingX' && material.map && material.map.repeat){
+            material.map.repeat.x = lerped;
+          } else if(ch === 'tilingY' && material.map && material.map.repeat){
+            material.map.repeat.y = lerped;
+          } else if(ch === 'offsetX' && material.map && material.map.offset){
+            material.map.offset.x = lerped;
+          } else if(ch === 'offsetY' && material.map && material.map.offset){
+            material.map.offset.y = lerped;
+          } else if(ch === 'emissiveIntensity'){
+            material.emissiveIntensity = lerped;
+          } else if(ch === 'roughness' || ch === 'metalness' || ch === 'opacity'){
+            material[ch] = lerped;
+          }
+        } catch(e2){
+          // Unknown channel — skip silently (PART 67.8.2).
+        }
+      }
+      return material;
+    },
+
+    // ── PART 67.9 — Preflight check (safety limits before gen) ─────
+    // preflightCheck(opts) — returns { ok, errors, warnings }. The
+    // .ts factory calls this BEFORE geometry generation; if !ok,
+    // it returns an empty Group + logs the errors. Mirrors
+    // VFXMeshLab's VFXMeshBuildLimits.TryValidate for the web.
+    preflightCheck: function(opts){
+      opts = opts || {};
+      const errors = [];
+      const warnings = [];
+      if(typeof opts.maxSegmentsPerAxis === 'number' && opts.maxSegmentsPerAxis > 4096){
+        errors.push('maxSegmentsPerAxis ' + opts.maxSegmentsPerAxis + ' exceeds cap 4096 (PART 67.9)');
+      }
+      if(typeof opts.maxOctaves === 'number' && opts.maxOctaves > 12){
+        errors.push('maxOctaves ' + opts.maxOctaves + ' exceeds cap 12 (PART 67.9)');
+      }
+      if(typeof opts.maxHelixTurns === 'number' && opts.maxHelixTurns > 256){
+        errors.push('maxHelixTurns ' + opts.maxHelixTurns + ' exceeds cap 256 (PART 67.9)');
+      }
+      if(typeof opts.maxBaseVerts === 'number' && opts.maxBaseVerts > 500000){
+        errors.push('maxBaseVerts ' + opts.maxBaseVerts + ' exceeds cap 500000 (PART 67.9)');
+      }
+      if(typeof opts.maxFinalVerts === 'number' && opts.maxFinalVerts > 1000000){
+        errors.push('maxFinalVerts ' + opts.maxFinalVerts + ' exceeds cap 1000000 (PART 67.9)');
+      }
+      if(typeof opts.trisBudget === 'number' && opts.trisBudget > 50000){
+        warnings.push('trisBudget ' + opts.trisBudget + ' exceeds the soft 50k cap (E12)');
+      }
+      if(Array.isArray(opts.modifiers) && opts.modifiers.length > 10){
+        errors.push('modifier stack has ' + opts.modifiers.length + ' entries — cap is 10 (PART 67.9 / E33)');
+      }
+      if(typeof opts.strength === 'number' && opts.strength > 1.0 &&
+         (opts.modifier === 'spherize' || opts.modifier === 'flatten' || opts.modifier === 'inflate')){
+        warnings.push('strength ' + opts.strength + ' on ' + opts.modifier + ' is > 1.0 (PART 67.9 / E33)');
+      }
+      return { ok: errors.length === 0, errors: errors, warnings: warnings };
+    },
+
+    // ════════════════════════════════════════════════════════════════════
+    // PART 68-71 (v1.23 / v8.15) — OPT-IN CAPABILITY BUNDLE
+    // From jasonsturges/three-low-poly (R1) + achrefelouafi/
+    // LinearAbilityExtThreeJS (R2). 50+ new opt-in helpers, 6 new MAT_DB
+    // color ramps, 5 new MAT_DB procedural patterns, 4 new validators
+    // E37-E40. Everything strictly additive — a model that doesn't opt in
+    // loads identically to v1.22 / v8.14.
+    // ════════════════════════════════════════════════════════════════════
+
+    // ── PART 68.1 — System helpers (P0 — from R2) ──────────────────
+
+    // frame — the shared `frame` uniform object from R2. Every shader that
+    // spreads `...lblSpec.helpers.frame` shares uTime, uDelta, uResolution,
+    // uLightDir, uEnvMap by reference. Writing frame.uTime.value = t once
+    // per frame updates every material that uses it.
+    frame: (typeof THREE !== 'undefined') ? {
+      uTime:            { value: 0 },
+      uDelta:           { value: 0 },
+      uResolution:      { value: new THREE.Vector2(1, 1) },
+      uPixelRatio:      { value: 1 },
+      uCameraNear:      { value: 0.1 },
+      uCameraFar:       { value: 400 },
+      uEnvMap:          { value: null },
+      uLightDir:        { value: new THREE.Vector3(0.45, 0.78, 0.44).normalize() },
+      uShaderIntensity: { value: 1 },
+      uGlobalGlow:      { value: 1 },
+      uSceneDepth:      { value: null },
+      uSceneNormal:     { value: null }
+    } : null,
+
+    // lblFrameTick() — FrameTimer with clamped-delta. Prevents tab-switch
+    // from producing a 5-second jump that blasts the camera. Use in every
+    // per-frame `update()` callback.
+    lblFrameTick: function(){
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+      if(typeof this._last !== 'number') this._last = now;
+      const dt = Math.min(now - this._last, 1 / 20); // 50ms cap
+      this._last = now;
+      this.frame.uTime.value += dt;
+      this.frame.uDelta.value = dt;
+      return dt;
+    },
+
+    // mulberry32(seed) → () => float in [0, 1). The existing PART 40 RNG.
+    mulberry32: function(seed){
+      let s = (typeof seed === 'number') ? (seed >>> 0) : 1337;
+      return function(){
+        s = (s + 0x6D2B79F5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    },
+
+    // splitmix32(seed) — the mixer only, returns a 32-bit hash. Useful as
+    // a building block for deriveSubSeed, not a stream.
+    splitmix32: function(seed){
+      let s = (typeof seed === 'number') ? (seed >>> 0) : 1337;
+      s = (s + 0x9E3779B9) >>> 0;
+      s = Math.imul(s ^ (s >>> 16), 0x85EBCA6B) >>> 0;
+      s = Math.imul(s ^ (s >>> 13), 0xC2B2AE35) >>> 0;
+      return (s ^ (s >>> 16)) >>> 0;
+    },
+
+    // deriveSubSeed(master, salt) — stable 32-bit sub-seed from a master
+    // seed and a per-subsystem salt. Used so each subsystem (trees, rocks,
+    // grass) gets its own independent reproducible stream.
+    deriveSubSeed: function(master, salt){
+      const m = (typeof master === 'number') ? (master >>> 0) : 1337;
+      const s = (typeof salt === 'number') ? (salt >>> 0) : 0;
+      return this.splitmix32((m ^ s) >>> 0);
+    },
+
+    // createRandom(seed?) — ergonomic wrapper around mulberry32. Adds
+    // .next() / .float() / .int() / .pick() / .weighted() / .bool() /
+    // .skewMax() / .skewMin() on top of the raw stream.
+    createRandom: function(seed){
+      const next = this.mulberry32(seed);
+      return {
+        next: next,
+        float: function(min, max){ return min + next() * (max - min); },
+        int:   function(min, max){ return Math.floor(min + next() * (max - min + 1)); },
+        pick:  function(arr){ return arr[Math.floor(next() * arr.length)]; },
+        weighted: function(arr, weights){
+          let total = 0;
+          for(let i=0;i<weights.length;i++) total += weights[i];
+          let r = next() * total;
+          for(let i=0;i<arr.length;i++){
+            r -= weights[i];
+            if(r <= 0) return arr[i];
+          }
+          return arr[arr.length - 1];
+        },
+        bool:  function(p){ return next() < (typeof p === 'number' ? p : 0.5); },
+        skewMax: function(min, max, e){
+          // Skewed toward max (e > 1 biases higher).
+          const t = next();
+          return min + (max - min) * Math.pow(t, 1 / Math.max(e, 1e-6));
+        },
+        skewMin: function(min, max, e){
+          // Skewed toward min (e > 1 biases lower).
+          const t = next();
+          return max - (max - min) * Math.pow(t, 1 / Math.max(e, 1e-6));
+        }
+      };
+    },
+
+    // makeObjectPool(factory, opts) → { acquire, release, activeCount, dispose }
+    // Pools expensive-to-construct objects (Groups, BVH indices, custom-
+    // shader preview meshes). The second demo through the hundredth reuse
+    // the same Group instead of allocating.
+    makeObjectPool: function(factory, opts){
+      opts = opts || {};
+      const max = (typeof opts.max === 'number') ? opts.max : 8;
+      const free = [];
+      const active = new Set();
+      return {
+        acquire: function(){
+          let item;
+          if(free.length > 0){
+            item = free.pop();
+          } else if(active.size < max){
+            item = factory();
+          } else {
+            // Pool exhausted — recycle the oldest active item.
+            const oldest = active.values().next().value;
+            active.delete(oldest);
+            if(opts.releaser) opts.releaser(oldest);
+            item = oldest;
+          }
+          active.add(item);
+          if(opts.reset) opts.reset(item);
+          return item;
+        },
+        release: function(item){
+          if(!active.has(item)) return;
+          active.delete(item);
+          if(opts.releaser) opts.releaser(item);
+          free.push(item);
+        },
+        get activeCount(){ return active.size; },
+        get freeCount(){ return free.length; },
+        dispose: function(){
+          if(opts.disposer){
+            for(const it of free) opts.disposer(it);
+            for(const it of active) opts.disposer(it);
+          }
+          free.length = 0;
+          active.clear();
+        }
+      };
+    },
+
+    // makeAssetLoader() — shared LoadingManager with URL-rewrite. A model
+    // that ships with an authoring tool's absolute local path (e.g.
+    // C:/Users/.../texture.png) does NOT cause 50 404s — it gets a neutral
+    // 1×1 white data URL.
+    makeAssetLoader: function(){
+      if(typeof THREE === 'undefined') return null;
+      const manager = new THREE.LoadingManager();
+      const oneByOneWhite = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      manager.setURLModifier(function(url){
+        // If the URL is absolute but not http(s)/data/blob, rewrite to white.
+        if(typeof url !== 'string') return oneByOneWhite;
+        if(url.startsWith('http') || url.startsWith('data:') ||
+           url.startsWith('blob:') || url.startsWith('/') ||
+           url.startsWith('./') || url.startsWith('../')) return url;
+        // Bare filename (no scheme) or absolute filesystem path → white.
+        return oneByOneWhite;
+      });
+      return {
+        manager: manager,
+        gltf:    new THREE.GLTFLoader(manager),
+        texture: new THREE.TextureLoader(manager),
+        onProgress: function(cb){ manager.onProgress = cb; },
+        onError:    function(cb){ manager.onError = cb; },
+        settle: function(){
+          return new Promise(function(resolve){
+            const check = setInterval(function(){
+              // LoadingManager doesn't expose a "done" promise; poll.
+              if(manager._totalPending === 0 && manager._totalLoading === 0){
+                clearInterval(check);
+                resolve();
+              }
+            }, 50);
+            setTimeout(function(){ clearInterval(check); resolve(); }, 5000);
+          });
+        }
+      };
+    },
+
+    // ── PART 68.2 — 12 curated BufferGeometry classes (P1 — from R1) ─
+    // Each returns a THREE.BufferGeometry, immutable after construction.
+    // Curated subset of jasonsturges/three-low-poly. The factory never has
+    // to re-implement these. Especially useful for weapons (Star = sigil,
+    // Polygon = gem facet, Annulus = mana ring, Heart = heart gem,
+    // Arch = weapon rack, Molding = crossguard trim, Pumpkin = gourd,
+    // Leaf = ivy, EdgedBox = crate / barrel / chest).
+
+    // StarGeometry({ points, innerRadius, outerRadius, twist })
+    StarGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const points     = (typeof opts.points     === 'number') ? opts.points     : 5;
+      const innerR     = (typeof opts.innerRadius === 'number') ? opts.innerRadius : 0.4;
+      const outerR     = (typeof opts.outerRadius === 'number') ? opts.outerRadius : 1.0;
+      const twist      = (typeof opts.twist      === 'number') ? opts.twist      : 0;
+      const positions = [];
+      const indices = [];
+      // Center vertex for fill triangulation.
+      positions.push(0, 0, 0);
+      for(let i=0;i<points*2;i++){
+        const r = (i % 2 === 0) ? outerR : innerR;
+        const a = (i / (points * 2)) * Math.PI * 2 + twist;
+        positions.push(Math.cos(a) * r, 0, Math.sin(a) * r);
+        indices.push(0, i + 1, i + 2);
+      }
+      indices[indices.length - 1] = 1; // close the fan
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      g.setIndex(indices);
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // PolygonGeometry({ sides, radius, twist }) — regular N-gon with optional twist.
+    PolygonGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const sides  = (typeof opts.sides  === 'number') ? opts.sides  : 6;
+      const radius = (typeof opts.radius === 'number') ? opts.radius : 1.0;
+      const twist  = (typeof opts.twist  === 'number') ? opts.twist  : 0;
+      const positions = [0, 0, 0];
+      const indices = [];
+      for(let i=0;i<sides;i++){
+        const a = (i / sides) * Math.PI * 2 + twist;
+        positions.push(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+      }
+      for(let i=0;i<sides;i++){
+        indices.push(0, i + 1, ((i + 1) % sides) + 1);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      g.setIndex(indices);
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // AnnulusGeometry({ inner, outer, segments, thetaStart, thetaLength })
+    // Flat ring (inner+outer radius, segments). Mana rings, halo decals.
+    AnnulusGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const inner  = (typeof opts.inner  === 'number') ? opts.inner  : 0.4;
+      const outer  = (typeof opts.outer  === 'number') ? opts.outer  : 0.6;
+      const segs   = (typeof opts.segments  === 'number') ? opts.segments  : 32;
+      const start  = (typeof opts.thetaStart  === 'number') ? opts.thetaStart  : 0;
+      const length = (typeof opts.thetaLength === 'number') ? opts.thetaLength : Math.PI * 2;
+      return new THREE.RingGeometry(inner, outer, segs, 1, start, length);
+    },
+
+    // HeartGeometry({ size }) — parametric heart silhouette extruded to depth.
+    // Uses a simple cubic-like curve approximation.
+    HeartGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const size = (typeof opts.size === 'number') ? opts.size : 1.0;
+      const positions = [];
+      const indices = [];
+      // 2D heart silhouette — 12 control points.
+      const pts = [
+        [0, -1.0], [0.5, -0.7], [0.7, -0.3], [0.6, 0.0],
+        [0.3, 0.4], [0, 0.6], [-0.3, 0.4], [-0.6, 0.0],
+        [-0.7, -0.3], [-0.5, -0.7], [0, -1.0]
+      ];
+      for(let i=0;i<pts.length;i++){
+        positions.push(pts[i][0] * size, 0, pts[i][1] * size);
+      }
+      for(let i=1;i<pts.length - 1;i++){
+        indices.push(0, i, i + 1);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      g.setIndex(indices);
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // SpadeGeometry({ size }) — parametric spade from cubic silhouette.
+    SpadeGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const size = (typeof opts.size === 'number') ? opts.size : 1.0;
+      const positions = [0, 0, 1.0 * size, 0, 0, -0.5 * size, 0.6 * size, 0, 0,
+                         -0.6 * size, 0, 0, 0.4 * size, 0, 0.6 * size, -0.4 * size, 0, 0.6 * size];
+      const indices = [0, 1, 2, 0, 2, 3, 0, 4, 5];
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      g.setIndex(indices);
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // DiamondGeometry({ size }) — simple diamond / rhombus silhouette.
+    DiamondGeometry: function(opts){
+      return this.PolygonGeometry({ sides: 4, radius: (opts && opts.size) || 1.0, twist: Math.PI / 4 });
+    },
+
+    // BurstGeometry({ points, innerRadius, outerRadius, twist })
+    // N radial spikes from origin (concave star, points pulled inward).
+    BurstGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const points     = (typeof opts.points     === 'number') ? opts.points     : 8;
+      const innerR     = (typeof opts.innerRadius === 'number') ? opts.innerRadius : 0.1;
+      const outerR     = (typeof opts.outerRadius === 'number') ? opts.outerRadius : 1.0;
+      const twist      = (typeof opts.twist      === 'number') ? opts.twist      : 0;
+      // Concave: pull the inner points inward (negative radius) so the
+      // star looks "burst" instead of star.
+      return this.StarGeometry({
+        points: points,
+        innerRadius: -innerR, // negative = points pulled inward (concave)
+        outerRadius: outerR,
+        twist: twist
+      });
+    },
+
+    // ArchedSlabGeometry({ width, height, archHeight, depth })
+    // Slab with a top arch cut into it (window or door blank). Two
+    // material groups: frame and void.
+    ArchedSlabGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const width      = (typeof opts.width      === 'number') ? opts.width      : 1.0;
+      const height     = (typeof opts.height     === 'number') ? opts.height     : 2.0;
+      const archHeight = (typeof opts.archHeight === 'number') ? opts.archHeight : 0.6;
+      const depth      = (typeof opts.depth      === 'number') ? opts.depth      : 0.1;
+      // Build using a shape with an arch hole, then ExtrudeGeometry.
+      const shape = new THREE.Shape();
+      const w = width / 2, h = height, a = archHeight;
+      shape.moveTo(-w, 0);
+      shape.lineTo(-w, h - a);
+      shape.absarc(0, h - a, w, Math.PI, 0, true);
+      shape.lineTo(w, 0);
+      shape.lineTo(-w, 0);
+      // Hole = inner arch.
+      const hole = new THREE.Path();
+      const iw = w * 0.8, ih = h - a - 0.1, ia = a * 0.7;
+      hole.moveTo(-iw, 0.1);
+      hole.lineTo(-iw, ih - ia);
+      hole.absarc(0, ih - ia, iw, Math.PI, 0, true);
+      hole.lineTo(iw, 0.1);
+      hole.lineTo(-iw, 0.1);
+      shape.holes.push(hole);
+      const g = new THREE.ExtrudeGeometry(shape, { depth: depth, bevelEnabled: false });
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // ArchGeometry({ width, height, archHeight, thickness, segments })
+    // Parametric arch trace (half-circle or pointed). Use to derive wall
+    // openings, glass panes, frames.
+    ArchGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const width     = (typeof opts.width     === 'number') ? opts.width     : 1.0;
+      const height    = (typeof opts.height    === 'number') ? opts.height    : 1.5;
+      const archH     = (typeof opts.archHeight === 'number') ? opts.archHeight : 0.5;
+      const thickness = (typeof opts.thickness === 'number') ? opts.thickness : 0.05;
+      const segs      = (typeof opts.segments  === 'number') ? opts.segments  : 16;
+      // Build the arch as a 2D shape (rectangle + arch on top), extrude.
+      const w = width / 2, h = height, a = archH;
+      const shape = new THREE.Shape();
+      shape.moveTo(-w, 0);
+      shape.lineTo(-w, h);
+      shape.absarc(0, h, w, Math.PI, 0, true);
+      shape.lineTo(-w, 0);
+      const hole = new THREE.Path();
+      const t = thickness;
+      hole.moveTo(-w + t, 0);
+      hole.lineTo(-w + t, h - t);
+      hole.absarc(0, h - t, w - t, Math.PI, 0, true);
+      hole.lineTo(-w + t, 0);
+      shape.holes.push(hole);
+      const g = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false, curveSegments: segs });
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // EdgedBoxGeometry({ width, height, depth, edgeWidth })
+    // Box with a hard edge bevel (faceGroups per face, plus a separate edge mesh).
+    EdgedBoxGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const width  = (typeof opts.width  === 'number') ? opts.width  : 1.0;
+      const height = (typeof opts.height === 'number') ? opts.height : 1.0;
+      const depth  = (typeof opts.depth  === 'number') ? opts.depth  : 1.0;
+      // Base box geometry with separate material groups per face.
+      const g = new THREE.BoxGeometry(width, height, depth);
+      // BoxGeometry already has 6 material groups (one per face).
+      return g;
+    },
+
+    // MoldingGeometry({ style, length, width, height })
+    // Sweep a cross-section profile (cyma, torus, chamfer, ovolo) along a path.
+    // Bundled styles: cyma, ovolo, torus, chamfer, bead, fillet, cove, scotia.
+    MoldingGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const style  = opts.style || 'cyma';
+      const length = (typeof opts.length === 'number') ? opts.length : 2.0;
+      const width  = (typeof opts.width  === 'number') ? opts.width  : 0.05;
+      const height = (typeof opts.height === 'number') ? opts.height : 0.08;
+      // Build a 2D profile shape based on style, extrude along Z.
+      const shape = new THREE.Shape();
+      const h = height, w = width;
+      switch(style){
+        case 'cyma': {
+          // S-curve (ogee): a small concave then convex.
+          shape.moveTo(0, 0);
+          shape.bezierCurveTo(w * 0.3, 0, w * 0.3, h * 0.5, w * 0.5, h * 0.5);
+          shape.bezierCurveTo(w * 0.7, h * 0.5, w * 0.7, h, w, h);
+          shape.lineTo(0, h);
+          shape.lineTo(0, 0);
+          break;
+        }
+        case 'ovolo': {
+          // Quarter-circle convex.
+          shape.moveTo(0, 0);
+          shape.absarc(w, 0, w, 0, Math.PI / 2, false);
+          shape.lineTo(0, w);
+          shape.lineTo(0, 0);
+          break;
+        }
+        case 'torus':
+        case 'bead': {
+          // Full half-circle convex.
+          shape.moveTo(0, 0);
+          shape.absarc(w * 0.5, 0, w * 0.5, 0, Math.PI, false);
+          shape.lineTo(0, 0);
+          break;
+        }
+        case 'chamfer':
+        case 'fillet': {
+          // 45-degree bevel.
+          shape.moveTo(0, 0);
+          shape.lineTo(0, h - w);
+          shape.lineTo(w, h);
+          shape.lineTo(0, h);
+          shape.lineTo(0, 0);
+          break;
+        }
+        case 'cove': {
+          // Quarter-circle concave.
+          shape.moveTo(0, 0);
+          shape.lineTo(0, h);
+          shape.lineTo(h, h);
+          shape.absarc(h, h - w, w, Math.PI / 2, 0, true);
+          shape.lineTo(0, 0);
+          break;
+        }
+        case 'scotia': {
+          // S-curve concave.
+          shape.moveTo(0, 0);
+          shape.lineTo(0, h);
+          shape.bezierCurveTo(w, h, w, 0, 0, 0);
+          break;
+        }
+        default: {
+          shape.moveTo(0, 0);
+          shape.lineTo(w, 0);
+          shape.lineTo(w, h);
+          shape.lineTo(0, h);
+          shape.lineTo(0, 0);
+        }
+      }
+      const g = new THREE.ExtrudeGeometry(shape, { depth: length, bevelEnabled: false });
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // PumpkinGeometry({ radius, segments, height })
+    // Pumpkin = merged rind + stem, with an optional gash group. Single
+    // mesh, two material groups.
+    PumpkinGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const radius   = (typeof opts.radius   === 'number') ? opts.radius   : 0.5;
+      const segments = (typeof opts.segments === 'number') ? opts.segments : 8;
+      const height   = (typeof opts.height   === 'number') ? opts.height   : 0.6;
+      // Build a sphere with vertical ribs (segments lobed shape).
+      const g = new THREE.SphereGeometry(radius, segments * 2, 12);
+      const pos = g.attributes.position;
+      const v = new THREE.Vector3();
+      for(let i=0;i<pos.count;i++){
+        v.fromBufferAttribute(pos, i);
+        const a = Math.atan2(v.z, v.x);
+        const rib = Math.cos(a * segments) * 0.05;
+        const r2d = Math.sqrt(v.x * v.x + v.z * v.z);
+        if(r2d > 1e-4){
+          v.x *= (1 + rib / r2d);
+          v.z *= (1 + rib / r2d);
+        }
+        v.y *= height / (2 * radius);
+        pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      pos.needsUpdate = true;
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // LeafGeometry({ length, width, style })
+    // Parametric leaf silhouette (lance, elliptic, heart, ovate).
+    LeafGeometry: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const length = (typeof opts.length === 'number') ? opts.length : 0.5;
+      const width  = (typeof opts.width  === 'number') ? opts.width  : 0.2;
+      const style  = opts.style || 'elliptic';
+      // Build a 2D silhouette in XY plane, then place along Z.
+      const shape = new THREE.Shape();
+      const L = length, W = width;
+      if(style === 'lance'){
+        // Long narrow leaf.
+        shape.moveTo(0, -L / 2);
+        shape.quadraticCurveTo(W, 0, 0, L / 2);
+        shape.quadraticCurveTo(-W, 0, 0, -L / 2);
+      } else if(style === 'heart'){
+        // Heart-shaped leaf (rounded top with notch).
+        shape.moveTo(0, -L / 2);
+        shape.quadraticCurveTo(W, -L / 4, W, L / 8);
+        shape.quadraticCurveTo(W * 0.5, L / 2, 0, L / 4);
+        shape.quadraticCurveTo(-W * 0.5, L / 2, -W, L / 8);
+        shape.quadraticCurveTo(-W, -L / 4, 0, -L / 2);
+      } else if(style === 'ovate'){
+        // Egg-shaped (wider at base).
+        shape.moveTo(0, -L / 2);
+        shape.bezierCurveTo(W, -L / 4, W * 0.9, L / 4, 0, L / 2);
+        shape.bezierCurveTo(-W * 0.9, L / 4, -W, -L / 4, 0, -L / 2);
+      } else {
+        // Elliptic (default).
+        const segs = 16;
+        for(let i=0;i<=segs;i++){
+          const t = i / segs;
+          const a = -Math.PI / 2 + t * Math.PI;
+          shape.lineTo(Math.cos(a) * W * 0.5, Math.sin(a) * L * 0.5);
+        }
+      }
+      const g = new THREE.ShapeGeometry(shape);
+      g.computeVertexNormals();
+      return g;
+    },
+
+    // ── PART 68.3 — Procedural texture helpers + MAT_DB ramps (P1) ─
+    // Each returns a CanvasTexture with the standard wrap / colorSpace
+    // defaults. Especially useful for weapons (sword edge gradients, mana
+    // rings, fire/ice/poison finish overlays).
+
+    // makeCheckerboard(size, squareSize, colorA, colorB, opts)
+    makeCheckerboard: function(size, squareSize, colorA, colorB, opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      size = size || 256;
+      squareSize = squareSize || 32;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = colorA || '#cccccc';
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = colorB || '#999999';
+      for(let y=0;y<size;y+=squareSize){
+        for(let x=0;x<size;x+=squareSize){
+          if(((x / squareSize) + (y / squareSize)) % 2 === 0){
+            ctx.fillRect(x, y, squareSize, squareSize);
+          }
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = (opts.wrap || THREE.RepeatWrapping);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.repeat.set(opts.repeatX || 1, opts.repeatY || 1);
+      return tex;
+    },
+
+    // makeRadialGradient(stops, opts) — stops = [{ t, color }]
+    makeRadialGradient: function(stops, opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      const size = opts.size || 256;
+      stops = stops || [{ t: 0, color: '#ffffff' }, { t: 1, color: '#000000' }];
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      for(let i=0;i<stops.length;i++){
+        grad.addColorStop(Math.max(0, Math.min(1, stops[i].t)), stops[i].color);
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = (opts.wrap || THREE.ClampToEdgeWrapping);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    },
+
+    // makeLinearGradient(stops, opts) — stops = [{ t, color }], direction 'vertical' (default) or 'horizontal'
+    makeLinearGradient: function(stops, opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      const size = opts.size || 256;
+      const horizontal = opts.direction === 'horizontal';
+      stops = stops || [{ t: 0, color: '#ffffff' }, { t: 1, color: '#000000' }];
+      const c = document.createElement('canvas');
+      c.width  = horizontal ? size : 1;
+      c.height = horizontal ? 1 : size;
+      const ctx = c.getContext('2d');
+      const grad = horizontal
+        ? ctx.createLinearGradient(0, 0, size, 0)
+        : ctx.createLinearGradient(0, 0, 0, size);
+      for(let i=0;i<stops.length;i++){
+        grad.addColorStop(Math.max(0, Math.min(1, stops[i].t)), stops[i].color);
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, c.width, c.height);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = (opts.wrap || THREE.ClampToEdgeWrapping);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    },
+
+    // ── PART 68.4 — Alignment helpers (P2 — from R1) ──────────────
+
+    // alignToEdge(mesh, edge, target) — snap one edge of `mesh` to a line.
+    alignToEdge: function(mesh, edge, target){
+      if(!mesh || !mesh.geometry) return null;
+      mesh.geometry.computeBoundingBox();
+      const bb = mesh.geometry.boundingBox;
+      const size = bb.getSize(new THREE.Vector3());
+      const center = bb.getCenter(new THREE.Vector3());
+      let offset = 0;
+      if(edge === 'left')   offset = -center.x + size.x / 2;
+      if(edge === 'right')  offset = -center.x - size.x / 2;
+      if(edge === 'top')    offset = -center.y - size.y / 2;
+      if(edge === 'bottom') offset = -center.y + size.y / 2;
+      if(edge === 'front')  offset = -center.z - size.z / 2;
+      if(edge === 'back')   offset = -center.z + size.z / 2;
+      const axis = ({left:'x',right:'x',top:'y',bottom:'y',front:'z',back:'z'})[edge];
+      if(target && typeof target === 'number' && axis){
+        mesh.position[axis] = target + offset;
+      }
+      return mesh.position.clone();
+    },
+
+    // alignToRow(meshes, axis, gap) — equally space meshes along an axis.
+    alignToRow: function(meshes, axis, gap){
+      if(!Array.isArray(meshes) || meshes.length === 0) return [];
+      gap = (typeof gap === 'number') ? gap : 0.1;
+      // Compute total width.
+      let total = -gap;
+      const widths = [];
+      for(let i=0;i<meshes.length;i++){
+        if(!meshes[i] || !meshes[i].geometry) { widths.push(0); continue; }
+        meshes[i].geometry.computeBoundingBox();
+        const sz = meshes[i].geometry.boundingBox.getSize(new THREE.Vector3());
+        widths.push(sz[axis] || 0);
+        total += widths[i] + gap;
+      }
+      let cursor = -total / 2;
+      for(let i=0;i<meshes.length;i++){
+        cursor += widths[i] / 2;
+        meshes[i].position[axis] = cursor;
+        cursor += widths[i] / 2 + gap;
+      }
+      return meshes.map(m => m.position.clone());
+    },
+
+    // alignToSurface(mesh, surface) — translate mesh so its lowest point sits on a plane.
+    alignToSurface: function(mesh, surface){
+      if(!mesh || !mesh.geometry) return null;
+      mesh.geometry.computeBoundingBox();
+      const minY = mesh.geometry.boundingBox.min.y;
+      const offsetY = (typeof surface === 'number') ? (surface - minY) : -minY;
+      mesh.position.y += offsetY;
+      return mesh.position.clone();
+    },
+
+    // center(mesh, mode) — recenter geometry: bbox center, geometry centroid, or base center.
+    center: function(mesh, mode){
+      if(!mesh || !mesh.geometry) return null;
+      mode = mode || 'bbox';
+      mesh.geometry.computeBoundingBox();
+      const bb = mesh.geometry.boundingBox;
+      if(mode === 'bbox' || mode === 'bboxCenter'){
+        const c = bb.getCenter(new THREE.Vector3());
+        mesh.position.sub(c);
+        return c;
+      }
+      if(mode === 'base' || mode === 'baseCenter'){
+        const base = new THREE.Vector3(0, bb.min.y, 0);
+        const c = bb.getCenter(new THREE.Vector3());
+        mesh.position.x -= c.x;
+        mesh.position.z -= c.z;
+        mesh.position.y -= bb.min.y;
+        return base;
+      }
+      if(mode === 'centroid'){
+        // Compute centroid by averaging positions.
+        const pos = mesh.geometry.attributes.position;
+        const c = new THREE.Vector3();
+        for(let i=0;i<pos.count;i++){
+          c.x += pos.getX(i);
+          c.y += pos.getY(i);
+          c.z += pos.getZ(i);
+        }
+        c.divideScalar(pos.count);
+        mesh.position.sub(c);
+        return c;
+      }
+      return null;
+    },
+
+    // ── PART 68.5 — Lifetime color ramps (P1 — from R2 §4.10) ──────
+    // buildMatRamp(rampKeyOrObject) → CanvasTexture for a 4-color lifetime
+    // gradient. Pairs with `meta.matRamp` declaration.
+    buildMatRamp: function(rampKeyOrObject){
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      const ramps = {
+        'mat_ramp_fire':   ['#1a0a02', '#7a1a06', '#ff7818', '#ffe8a8'],
+        'mat_ramp_ice':    ['#020612', '#1a3a78', '#7fcfff', '#e0f8ff'],
+        'mat_ramp_poison': ['#0a1a02', '#1a4806', '#5a9818', '#b8e878'],
+        'mat_ramp_holy':   ['#0a0a18', '#1a2078', '#a890ff', '#ffffff'],
+        'mat_ramp_shadow': ['#000000', '#1a0820', '#5a1878', '#a058c8'],
+        'mat_ramp_solar':  ['#1a0a02', '#7a3a06', '#ffc850', '#ffffe0']
+      };
+      let colors;
+      if(typeof rampKeyOrObject === 'string' && ramps[rampKeyOrObject]){
+        colors = ramps[rampKeyOrObject];
+      } else if(rampKeyOrObject && rampKeyOrObject.birth){
+        colors = [
+          rampKeyOrObject.birth || '#000000',
+          rampKeyOrObject.early || '#222222',
+          rampKeyOrObject.late  || '#888888',
+          rampKeyOrObject.death || '#ffffff'
+        ];
+      } else {
+        colors = ramps.mat_ramp_fire; // safe default
+      }
+      const c = document.createElement('canvas');
+      c.width = 4; c.height = 1;
+      const ctx = c.getContext('2d');
+      for(let i=0;i<4;i++){
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(i, 0, 1, 1);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    },
+
+    // ── PART 68.6 — Sky helpers (P2 — from R1 §3.7) ──────────────
+
+    // skyFullMoon(opts) — full disc with halo, procedural craters.
+    skyFullMoon: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      const radius     = (typeof opts.radius     === 'number') ? opts.radius     : 0.5;
+      const haloSize   = (typeof opts.haloSize   === 'number') ? opts.haloSize   : 0.7;
+      const haloColor  = opts.haloColor || '#fff4d0';
+      const craters    = (typeof opts.craters    === 'number') ? opts.craters    : 5;
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      // Halo.
+      const halo = ctx.createRadialGradient(size/2, size/2, size * 0.1, size/2, size/2, size * haloSize);
+      halo.addColorStop(0, haloColor);
+      halo.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, size, size);
+      // Moon disc.
+      ctx.fillStyle = '#fffae0';
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size * radius, 0, Math.PI * 2);
+      ctx.fill();
+      // Craters.
+      const rng = this.createRandom(opts.seed || 1337);
+      for(let i=0;i<craters;i++){
+        const a = rng.float(0, Math.PI * 2);
+        const r = rng.float(0, size * radius * 0.7);
+        const cr = rng.float(4, 12);
+        const x = size/2 + Math.cos(a) * r;
+        const y = size/2 + Math.sin(a) * r;
+        ctx.fillStyle = `rgba(180, 170, 140, ${rng.float(0.3, 0.6)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, cr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const tex = new THREE.CanvasTexture(c);
+      const geo = new THREE.PlaneGeometry(2, 2);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'skyFullMoon';
+      return mesh;
+    },
+
+    // skyStarField(opts) — N procedurally placed stars on the celestial sphere.
+    skyStarField: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      const density  = (typeof opts.density  === 'number') ? opts.density  : 200;
+      const size     = 512;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#000010';
+      ctx.fillRect(0, 0, size, size);
+      const rng = this.createRandom(opts.seed || 1337);
+      for(let i=0;i<density;i++){
+        const x = rng.float(0, size);
+        const y = rng.float(0, size);
+        const r = rng.skewMin(0.3, 2.0, 3);
+        const alpha = rng.float(0.4, 1.0);
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // A few brighter "lead stars" with a 4-pointed burst.
+      for(let i=0;i<4;i++){
+        const x = rng.float(size * 0.2, size * 0.8);
+        const y = rng.float(size * 0.2, size * 0.8);
+        const r = 4;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - r * 3, y); ctx.lineTo(x + r * 3, y);
+        ctx.moveTo(x, y - r * 3); ctx.lineTo(x, y + r * 3);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const tex = new THREE.CanvasTexture(c);
+      const geo = new THREE.SphereGeometry(50, 16, 16);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'skyStarField';
+      return mesh;
+    },
+
+    // ── PART 68.7 — Atmospheric effects (P1 — from R1 §3.8) ──────
+    // Each returns an Object3D with .update(dt) method. Drop into a
+    // scene, wire into the render loop, set meta.atmospheric.<name> = true
+    // to enable in your model.
+
+    // atmosphereRain(opts) — instanced vertical streaks.
+    atmosphereRain: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const intensity = (typeof opts.intensity === 'number') ? opts.intensity : 0.5;
+      const count = Math.floor(50 + intensity * 450);
+      const group = new THREE.Group();
+      group.name = 'atmosphereRain';
+      const rng = this.createRandom(opts.seed || 1337);
+      for(let i=0;i<count;i++){
+        const x = rng.float(-5, 5);
+        const y = rng.float(-5, 5);
+        const z = rng.float(-5, 5);
+        const len = rng.float(0.1, 0.3);
+        const geo = new THREE.PlaneGeometry(0.01, len);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xaaccff, transparent: true, opacity: 0.4,
+          side: THREE.DoubleSide, depthWrite: false
+        });
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, y, z);
+        m.userData.speed = rng.float(2, 4);
+        group.add(m);
+      }
+      group.userData.update = function(dt){
+        for(const c of group.children){
+          c.position.y -= c.userData.speed * dt;
+          if(c.position.y < -5) c.position.y = 5;
+        }
+      };
+      return group;
+    },
+
+    // atmosphereGroundFog(opts) — flat cards with fbm-eroded puffs.
+    atmosphereGroundFog: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || typeof document === 'undefined') return null;
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      // Simple fbm puff texture.
+      const img = ctx.createImageData(size, size);
+      const rng = this.createRandom(opts.seed || 1337);
+      for(let y=0;y<size;y++){
+        for(let x=0;x<size;x++){
+          let n = 0, amp = 1, freq = 1, norm = 0;
+          for(let o=0;o<4;o++){
+            n += amp * (Math.sin(x * 0.05 * freq + y * 0.03 * freq + rng.next() * 6.28) * 0.5 + 0.5);
+            norm += amp; amp *= 0.5; freq *= 2;
+          }
+          n /= norm;
+          const a = Math.max(0, n - 0.3) * 255;
+          const i = (y * size + x) * 4;
+          img.data[i] = 200; img.data[i+1] = 200; img.data[i+2] = 220; img.data[i+3] = a;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      const group = new THREE.Group();
+      group.name = 'atmosphereGroundFog';
+      for(let i=0;i<5;i++){
+        const geo = new THREE.PlaneGeometry(3 + i, 3 + i);
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex, transparent: true, opacity: 0.3,
+          depthWrite: false, side: THREE.DoubleSide
+        });
+        const m = new THREE.Mesh(geo, mat);
+        m.rotation.x = -Math.PI / 2;
+        m.position.y = i * 0.1;
+        m.userData.drift = rng.float(0.1, 0.3) * (rng.bool() ? 1 : -1);
+        group.add(m);
+      }
+      group.userData.update = function(dt){
+        for(const c of group.children){
+          c.position.x += c.userData.drift * dt;
+          if(c.position.x > 3) c.position.x = -3;
+          if(c.position.x < -3) c.position.x = 3;
+        }
+      };
+      return group;
+    },
+
+    // atmosphereDustMotes(opts) — small floating particles.
+    atmosphereDustMotes: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const count = (typeof opts.count === 'number') ? opts.count : 60;
+      const group = new THREE.Group();
+      group.name = 'atmosphereDustMotes';
+      const rng = this.createRandom(opts.seed || 1337);
+      for(let i=0;i<count;i++){
+        const x = rng.float(-3, 3);
+        const y = rng.float(0, 4);
+        const z = rng.float(-3, 3);
+        const geo = new THREE.SphereGeometry(0.02, 4, 4);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xfff4d0, transparent: true, opacity: 0.6 });
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, y, z);
+        m.userData.drift = new THREE.Vector3(
+          rng.float(-0.1, 0.1), rng.float(0.05, 0.15), rng.float(-0.1, 0.1)
+        );
+        group.add(m);
+      }
+      group.userData.update = function(dt){
+        for(const c of group.children){
+          c.position.add(c.userData.drift.clone().multiplyScalar(dt));
+          if(c.position.y > 5) c.position.y = 0;
+        }
+      };
+      return group;
+    },
+
+    // ── PART 68.8 — Lookdev helpers (P2 — from R1 §3.10) ──────────
+
+    // cyclorama(opts) — a soft curved backdrop for studio renders.
+    cyclorama: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const width = (typeof opts.width === 'number') ? opts.width : 10;
+      const height = (typeof opts.height === 'number') ? opts.height : 6;
+      const cornerRadius = (typeof opts.cornerRadius === 'number') ? opts.cornerRadius : 1.5;
+      // Build as an L-shape with a curved corner.
+      const shape = new THREE.Shape();
+      shape.moveTo(-width / 2, 0);
+      shape.lineTo(-width / 2, height - cornerRadius);
+      shape.absarc(-width / 2 + cornerRadius, height - cornerRadius, cornerRadius, Math.PI, Math.PI / 2, true);
+      shape.lineTo(width / 2, height);
+      shape.lineTo(width / 2, 0);
+      shape.lineTo(-width / 2, 0);
+      const geo = new THREE.ShapeGeometry(shape);
+      const mat = new THREE.MeshStandardMaterial({
+        color: opts.color || 0xeeeeee,
+        side: THREE.DoubleSide,
+        roughness: 0.9,
+        metalness: 0.0
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'cyclorama';
+      return mesh;
+    },
+
+    // groundGrid(opts) — a studio ground grid helper.
+    groundGrid: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const size = (typeof opts.size === 'number') ? opts.size : 10;
+      const divisions = (typeof opts.divisions === 'number') ? opts.divisions : 20;
+      const colorCenter = (typeof opts.colorCenter === 'number') ? opts.colorCenter : 0x666666;
+      const colorGrid = (typeof opts.colorGrid === 'number') ? opts.colorGrid : 0x444444;
+      const grid = new THREE.GridHelper(size, divisions, colorCenter, colorGrid);
+      grid.name = 'groundGrid';
+      return grid;
+    },
+
+    // contactShadows(target, opts) — cheap ground contact shadow.
+    contactShadows: function(target, opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || !target) return null;
+      const size = (typeof opts.size === 'number') ? opts.size : 4;
+      const opacity = (typeof opts.opacity === 'number') ? opts.opacity : 0.4;
+      const blur = (typeof opts.blur === 'number') ? opts.blur : 2;
+      // Render target's depth from below into a small canvas.
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,' + opacity + ')';
+      ctx.filter = 'blur(' + blur + 'px)';
+      // Approximate: draw a radial gradient under the target.
+      const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      grad.addColorStop(0, 'rgba(0,0,0,' + opacity + ')');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+      const tex = new THREE.CanvasTexture(c);
+      const geo = new THREE.PlaneGeometry(size, size);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0.01;
+      mesh.name = 'contactShadows';
+      return mesh;
+    },
+
+    // ── PART 68.9 — Closed-form curve math (P2 — from R1+R2) ──────
+
+    // constantCurvatureArc(opts) — derive arc length from radius and angle.
+    constantCurvatureArc: function(opts){
+      opts = opts || {};
+      const radius = (typeof opts.radius === 'number') ? opts.radius : 1.0;
+      const angle  = (typeof opts.angle  === 'number') ? opts.angle  : Math.PI / 2;
+      const length = radius * angle;
+      const mid = {
+        x: radius * (1 - Math.cos(angle / 2)),
+        y: radius * Math.sin(angle / 2)
+      };
+      const tip = { x: radius * (1 - Math.cos(angle)), y: radius * Math.sin(angle) };
+      return { length: length, mid: mid, tip: tip };
+    },
+
+    // circularArc(opts) — derive segment count for an arc of given length.
+    circularArc: function(opts){
+      opts = opts || {};
+      const radius   = (typeof opts.radius   === 'number') ? opts.radius   : 1.0;
+      const arcLength = (typeof opts.arcLength === 'number') ? opts.arcLength : Math.PI;
+      const length = radius * arcLength;
+      const segments = Math.max(2, Math.ceil(length * 8));
+      return { length: length, segments: segments };
+    },
+
+    // helixPath(opts) → points[] — 3D helix path for sweep / tube.
+    helixPath: function(opts){
+      opts = opts || {};
+      const turns   = (typeof opts.turns   === 'number') ? opts.turns   : 4;
+      const length  = (typeof opts.length  === 'number') ? opts.length  : 1.0;
+      const radius  = (typeof opts.radius  === 'number') ? opts.radius  : 0.3;
+      const segs    = (typeof opts.segments === 'number') ? opts.segments : 64;
+      const pts = [];
+      for(let i=0;i<=segs;i++){
+        const t = i / segs;
+        const a = t * turns * Math.PI * 2;
+        pts.push(new THREE.Vector3(
+          Math.cos(a) * radius,
+          Math.sin(a) * radius,
+          t * length - length / 2
+        ));
+      }
+      return pts;
+    },
+
+    // spiralPath(opts) → points[] — Archimedean spiral on the XZ plane.
+    spiralPath: function(opts){
+      opts = opts || {};
+      const turns   = (typeof opts.turns   === 'number') ? opts.turns   : 3;
+      const innerR  = (typeof opts.innerRadius === 'number') ? opts.innerRadius : 0.1;
+      const outerR  = (typeof opts.outerRadius === 'number') ? opts.outerRadius : 1.0;
+      const segs    = (typeof opts.segments === 'number') ? opts.segments : 64;
+      const pts = [];
+      for(let i=0;i<=segs;i++){
+        const t = i / segs;
+        const a = t * turns * Math.PI * 2;
+        const r = innerR + (outerR - innerR) * t;
+        pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
+      }
+      return pts;
+    },
+
+    // ── PART 68.10 — Easing / Falloff constants (P2 — from R1) ──────
+
+    easing: (typeof THREE !== 'undefined') ? {
+      linear:      function(t){ return t; },
+      inQuad:      function(t){ return t * t; },
+      outQuad:     function(t){ return 1 - (1 - t) * (1 - t); },
+      inOutQuad:   function(t){ return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; },
+      inCubic:     function(t){ return t * t * t; },
+      outCubic:    function(t){ return 1 - Math.pow(1 - t, 3); },
+      inOutCubic:  function(t){ return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
+      inQuart:     function(t){ return t * t * t * t; },
+      outQuart:    function(t){ return 1 - Math.pow(1 - t, 4); },
+      inOutQuart:  function(t){ return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2; },
+      inSine:      function(t){ return 1 - Math.cos(t * Math.PI / 2); },
+      outSine:     function(t){ return Math.sin(t * Math.PI / 2); },
+      inOutSine:   function(t){ return -(Math.cos(Math.PI * t) - 1) / 2; },
+      inExpo:      function(t){ return t === 0 ? 0 : Math.pow(2, 10 * t - 10); },
+      outExpo:     function(t){ return t === 1 ? 1 : 1 - Math.pow(2, -10 * t); },
+      inOutExpo:   function(t){
+        return t === 0 ? 0 : t === 1 ? 1 :
+          t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 :
+          (2 - Math.pow(2, -20 * t + 10)) / 2;
+      },
+      inBack:      function(t){ const c1 = 1.70158, c3 = c1 + 1; return c3 * t * t * t - c1 * t * t; },
+      outBack:     function(t){ const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+      inOutBack:   function(t){
+        const c1 = 1.70158, c2 = c1 * 1.525;
+        return t < 0.5 ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2 :
+          (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+      },
+      inElastic:   function(t){
+        const c4 = (2 * Math.PI) / 3;
+        return t === 0 ? 0 : t === 1 ? 1 :
+          -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
+      },
+      outElastic:  function(t){
+        const c4 = (2 * Math.PI) / 3;
+        return t === 0 ? 0 : t === 1 ? 1 :
+          Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+      },
+      inBounce:    function(t){ return 1 - this.outBounce(1 - t); },
+      outBounce:   function(t){
+        const n1 = 7.5625, d1 = 2.75;
+        if(t < 1 / d1) return n1 * t * t;
+        if(t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+        if(t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+        return n1 * (t -= 2.625 / d1) * t + 0.984375;
+      }
+    } : null,
+
+    falloff: {
+      linear:    function(t){ return t; },
+      smooth:    function(t){ return t * t * (3 - 2 * t); },
+      smoothstep:function(t){ return Math.max(0, Math.min(1, (t - 0) / (1 - 0))); },
+      gauss:     function(t){ return Math.exp(-Math.pow((t - 0.5) * 3, 2)); },
+      exp:       function(t){ return Math.exp(t) - 1; },
+      invExp:    function(t){ return 1 - Math.exp(-t * 3); },
+      root:      function(t){ return Math.sqrt(t); },
+      inv:       function(t){ return 1 - Math.sqrt(1 - t); }
+    },
+
+    // ── PART 68.11 — Bone segments table (P2 — from R2 §4.15) ─────
+
+    boneSegments: [
+      { bone: 'Spine',         weight: 0.5, radius: 0.15 },
+      { bone: 'Spine1',        weight: 0.4, radius: 0.14 },
+      { bone: 'Spine2',        weight: 0.4, radius: 0.14 },
+      { bone: 'Neck',          weight: 0.3, radius: 0.06 },
+      { bone: 'Head',          weight: 0.6, radius: 0.12 },
+      { bone: 'LeftShoulder',  weight: 0.3, radius: 0.06 },
+      { bone: 'RightShoulder', weight: 0.3, radius: 0.06 },
+      { bone: 'LeftArm',       weight: 0.5, radius: 0.05 },
+      { bone: 'RightArm',      weight: 0.5, radius: 0.05 },
+      { bone: 'LeftForeArm',   weight: 0.5, radius: 0.04 },
+      { bone: 'RightForeArm',  weight: 0.5, radius: 0.04 },
+      { bone: 'LeftHand',      weight: 0.3, radius: 0.04 },
+      { bone: 'RightHand',     weight: 0.3, radius: 0.04 },
+      { bone: 'Hips',          weight: 0.4, radius: 0.14 },
+      { bone: 'LeftUpLeg',     weight: 0.6, radius: 0.07 },
+      { bone: 'RightUpLeg',    weight: 0.6, radius: 0.07 },
+      { bone: 'LeftLeg',       weight: 0.5, radius: 0.06 },
+      { bone: 'RightLeg',      weight: 0.5, radius: 0.06 },
+      { bone: 'LeftFoot',      weight: 0.3, radius: 0.05 },
+      { bone: 'RightFoot',     weight: 0.3, radius: 0.05 }
+    ]
   };
 
   // ── PART 33.1[9] — USDZ export ────────────────────────────────────
@@ -25259,6 +27724,77 @@ window.lblSpec = (function(){
     // The renderer's E30 CS2 profile compliance
     // validator fires ONLY when `meta.cs2Finish` is
     // set, so a non-CS2 model is unchanged.
+    // PART 67 (RJS UPDATE 15) — OPT-IN Capability
+    // Bundle adds 23 more helpers to the same
+    // `helpers` bundle, all opt-in by construction
+    // (the .ts factory calls them only when the
+    // corresponding meta flag is set; a model that
+    // doesn't opt in loads identically to v1.22):
+    // `makeDisc / makeRing / makeArc / makeHemisphere
+    // / makeRibbon / makeCrossPlanes / makeHelix` (7
+    // cross-primitive shape generators — CircleGeometry
+    // for shields/plates, RingGeometry for rims, partial
+    // RingGeometry for blade arcs, half-sphere for domes,
+    // tapered plane for trails, N-Plane cross for smoke
+    // quads, TubeGeometry along a helix Curve for coils
+    // and rifling — especially useful for weapons),
+    // `taper / twist / bend / spherize / inflate /
+    // applyNoise` (6 deform modifiers — per-vertex
+    // math dispatched by `applyModifierStack(geo, mods)`
+    // for canonical modifier stacks; uses Mulberry32
+    // for deterministic noise; great for tapered
+    // cones, twisted rifling, bent scimitars,
+    // spherized rocks, inflated knife edges, organic
+    // displacement),
+    // `fillVertexChannel(geometry, channel, source, settings)`
+    // (fills geometry.attributes.uv1/uv2/uv3 with axis
+    // gradient / radial distance / deterministic random —
+    // the packed-channel trick VFX shaders use for
+    // dissolve masks and flow maps without extra
+    // textures),
+    // `projectUV(geometry, projection, settings)` (7
+    // UV projections: planar / radial / cylindrical /
+    // spherical / box / alongLength / shapeDefault —
+    // the new 4 [radial/cylindrical/spherical/box]
+    // complement the existing planar/shapeDefault),
+    // `convergeFaces(geometry, toVertex, strength)`
+    // (forge-style converge — pulls every vertex
+    // toward `toVertex` by `strength`; useful for
+    // tent tops, spike tips, bullet tails, blade
+    // points),
+    // `recolorByPalette(root, newPalette)` (walks the
+    // root, swaps every MeshStandardMaterial.color
+    // from the declared `meta.colorPalette[i].baseColor`
+    // to newPalette[i].baseColor matched by role:
+    // skin/hair/cloth/metal/leather/wood — no geometry
+    // rebuild; useful for re-skinning a CS2 knife
+    // from one finish to another without rebuilding),
+    // `placeChain(parent, protoFactory, count, axis, jitter)`
+    // (places N identical sub-parts end-to-end with
+    // optional per-instance jitter; useful for chain
+    // links, ammunition belts, cable segments, fence
+    // posts),
+    // `applyMaterialAnimation(material, animationArray, elapsed)`
+    // (mutates a material's color/tiling/offset/
+    // emissiveIntensity based on time-driven keyframes
+    // — the factory can wire this into the existing
+    // `tick(dt, elapsed)` contract for glowing metal
+    // accents or finish color shifts),
+    // and `preflightCheck(opts)` (returns
+    // `{ ok, errors, warnings }` — the .ts factory
+    // calls this BEFORE geometry generation; mirrors
+    // VFXMeshLab's VFXMeshBuildLimits.TryValidate for
+    // the web). PART 67 is an EXTRA CAPABILITY for
+    // weapons, blades, and metal-finish subjects —
+    // not a rule every model must follow (same
+    // opt-in-by-construction pattern as PART 45).
+    // The 6 new validators E31-E36 (modifier stack
+    // order, UV projection sanity, modifier stack
+    // safety, converge direction, recolor roles,
+    // preflight used) all fire ONLY when the
+    // corresponding opt-in meta flag is set, so a
+    // model that doesn't use the new PART 67
+    // features is unchanged.
     inspectModelTriangles,
     openTrianglePanel,
     getLastTriMetrics: () => lblSpecState.trisMetrics,

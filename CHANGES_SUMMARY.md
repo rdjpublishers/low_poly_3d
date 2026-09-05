@@ -1,3 +1,232 @@
+# v1.23 / v8.15 — OPT-IN capability bundle (PART 67)
+
+The spec now teaches the AI an OPT-IN capability bundle
+from the maintainer's "Reference-Repo Analysis for
+low_poly_3d" working notebook (compiled 2026-09-04), which
+catalogues the architecture-level patterns from four
+external reference repos (PudinKiller/VFXMeshLab,
+keijiro/VfxGraphModeling, fabYkun/AnimatedMeshes,
+rev087/forge) and translates them into the existing
+`lblSpec` / Three.js contract: 7 new cross-primitive
+shape generators (Disc / Ring / Arc / Hemisphere /
+Ribbon / CrossPlanes / Helix), 6 new deform modifiers
+(Taper / Twist / Bend / Spherize / Inflate / Noise)
+dispatched by the new `applyModifierStack(geo, mods)`
+helper, 1 new vertex-channel helper (`fillVertexChannel`)
+that wires `uv1` / `uv2` / `uv3` for dissolve / flow
+masks without extra textures, 1 new UV projection
+helper (`projectUV`) that adds 5 more projections
+(radial / cylindrical / spherical / box / alongLength)
+on top of the existing planar / shapeDefault, 1 new
+`convergeFaces` helper (forge-style — pull every face
+toward a target vertex for tent tops, spike tips,
+bullet tails), 1 new `recolorByPalette` runtime
+recolor (re-skin a CS2 knife from "Damascus" to "Fade"
+without rebuilding the mesh, paired with PART 45's
+`cs2PbrProfile`), 1 new `placeChain` chain placement
+(chain links, ammunition belts, cable segments), 1
+new `applyMaterialAnimation` time-driven material
+modifier (pulsing emissiveIntensity, finish color
+shifts — composes with the existing `tick(dt, elapsed)`
+contract), 1 new `preflightCheck` safety-budget helper
+(the factory validates the budget BEFORE building, not
+after — mirrors VFXMeshLab's `VFXMeshBuildLimits
+.TryValidate`), and 1 new `shadowProfile` opt-in
+('soft-3-light' | 'sharp-1-light' | 'cs2-hdri' |
+'none'). The renderer adds 6 new non-blocking validators
+E31 (modifier stack order), E32 (UV projection vs
+geometry sanity), E33 (modifier stack safety — caps:
+10 entries, 12 octaves, 256 turns), E34 (converge
+direction sanity), E35 (recolor roles complete), E36
+(preflight check used) to the existing 30 (E1-E12 from
+PART 32/65, E13-E16 from PART 38, E17-E18 from PART
+39, E19-E21 from PART 40, E22-E23 from PART 41, E24-E25
+from PART 42, E26-E27 from PART 43, E28-E29 from PART
+44, E30 from PART 45), and 23 new canonical helpers
+re-exported on `window.lblSpec.helpers` alongside the
+PART 35 + PART 39 + PART 40 + PART 41 + PART 42 +
+PART 43 + PART 44 + PART 45 bundles: `makeDisc` /
+`makeRing` / `makeArc` / `makeHemisphere` / `makeRibbon`
+/ `makeCrossPlanes` / `makeHelix` (7 cross-primitive
+shape generators — `CircleGeometry` for shields / plates,
+`RingGeometry` for rims / barrel bands, partial
+`RingGeometry` for blade arcs, half-sphere for domes /
+helmets, tapered plane for trails / scabbard strips,
+N-Plane cross for smoke quads, `TubeGeometry` along a
+helix `Curve` subclass for coils / rifling), `taper` /
+`twist` / `bend` / `spherize` / `inflate` / `applyNoise`
+(6 deform modifiers — per-vertex math; `applyNoise` uses
+Mulberry32 for determinism and defaults `seed` to
+`meta.seed`), `applyModifierStack(geo, mods)` (the
+canonical modifier-stack dispatcher), `fillVertexChannel
+(geometry, channelName, source, settings)` (writes
+`uv1` / `uv2` / `uv3` from an axis gradient, radial
+distance, or deterministic random), `projectUV(geometry,
+projection, settings)` (the 7 UV projections), `convergeFaces
+(geometry, toVertex, strength)` (forge-style), `recolorByPalette
+(root, newPalette)` (the runtime recolor — matched by
+`material.userData.role`), `placeChain(parent, protoFactory,
+count, axis, jitter)` (chain placement), `applyMaterialAnimation
+(material, animationArray, elapsed)` (time-driven
+material keyframes), and `preflightCheck(opts)` (the
+safety-budget validator). PART 67 is an EXTRA CAPABILITY
+for weapons, blades, and metal-finish subjects (see 46.0.4
+for the explicit use-case lists) — not a rule every model
+must follow. Style-agnostic in scope (46.0.3) but
+content-specific in subject (46.0.4). All 9 new opt-in
+meta.* fields are backward-compatible: a model that
+doesn't set any of them loads identically to v1.22. The
+6 new validators E31-E36 mirror E30's "opt-in by
+construction" pattern — they return `null` (clean) when
+their corresponding opt-in flag is not set. The existing
+E1-E30 validators are UNCHANGED. PART 67 keeps only the
+patterns that are directly useful for the existing system
+(the rest are documented in the notebook for future
+reference). **PART 67 is the second opt-in capability
+layer in the spec** (PART 45 was the first).
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `index.html` | VERSION constant bumped v1.22 → v1.23 (TS) / v8.14 → v8.15 (JSON/JS); 23 new helpers added to `__threeTriHelpers` (makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix / taper / twist / bend / spherize / inflate / applyNoise / applyModifierStack / fillVertexChannel / projectUV / convergeFaces / recolorByPalette / placeChain / applyMaterialAnimation / preflightCheck); 6 new validators E31-E36 added to `ANTI_PATTERN_CHECKS`; meta description + keywords updated; spec chip title + text updated; the comment block that describes `window.lblSpec` updated to mention PART 67; the comment block that lists the 30 anti-patterns updated to say 36 |
+| `Prompt_To_Ts.txt` | New PART 67 added (sections 46.0 - 46.11): cross-primitive vocabulary (46.1), deform modifier stack (46.2), packed vertex channels (46.3), UV projection helper (46.4), converge faces (46.5), recolor by palette (46.6), chain placement (46.7), time-driven material animation (46.8), preflight check (46.9), shadow profile (46.10), updated cross-references (46.11) |
+| `Prompt_To_Json.txt` | New PART 67 added with the same 46.0 - 46.11 spec + a JSON-specific worked example (46.1 — a CS2 Karambit knife that exercises 7 PART 67 features alongside PART 45) |
+| `Image_To_Ts.txt` | Brief PART 67 cross-reference added at end (the full spec lives in Prompt_To_Ts.txt) |
+| `Image_To_Json.txt` | Brief PART 67 cross-reference added at end |
+| `Prompt_To_Js.txt` | Brief PART 67 cross-reference added at end |
+| `Image_To_Js.txt` | Brief PART 67 cross-reference added at end |
+| `CHANGES_SUMMARY.md` | This entry |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` — the
+  5 built-in models do not use any PART 67 features; they
+  load identically to v1.22. The new helpers are AVAILABLE
+  to them but OPT-IN.
+- `public/models/manifest.json` — no new models added in
+  this round (the maintainer can add `Model_6.ts` through
+  `Model_10.ts` in a future round per the notebook's
+  recommendation).
+- `public/rig/` — the rig assets are unchanged.
+- `.github/workflows/manifest.yml` — the manifest auto-
+  refresh workflow is unchanged (no new models).
+- The existing PART 1-45 spec in all 6 spec files is
+  UNCHANGED (no PART has been weakened, removed, or
+  re-numbered).
+- The existing 30 anti-pattern validators E1-E30 are
+  UNCHANGED (E31-E36 are purely additive).
+- The existing 5 PART 45 helpers (cs2PbrProfile, applyWear,
+  cs2WearMaskTexture, wearSlider, cs2-finish materialVariants
+  family) are UNCHANGED.
+- The existing 4 PART 41.6 materialVariants families are
+  UNCHANGED (recolorByPalette is a separate helper, not
+  a new family).
+- The existing 2 PART 44.3 families (bone + magic) are
+  UNCHANGED.
+
+## What PART 67 covers (9 opt-in sub-sections)
+
+| Section | Sub-section | Helper(s) | meta.* field |
+|---------|-------------|-----------|--------------|
+| 46.1 | Cross-primitive vocabulary | `makeDisc` / `makeRing` / `makeArc` / `makeHemisphere` / `makeRibbon` / `makeCrossPlanes` / `makeHelix` | (per-part primitive string or `meta.geometryPipeline`) |
+| 46.2 | Deform modifier stack | `taper` / `twist` / `bend` / `spherize` / `inflate` / `applyNoise` + `applyModifierStack` | `meta.geometryPipeline.modifiers` |
+| 46.3 | Packed vertex channels | `fillVertexChannel` | `meta.vertexData` |
+| 46.4 | UV projection helper | `projectUV` | `meta.uv.projection` (now accepts 7 values) |
+| 46.5 | Converge faces | `convergeFaces` | `meta.geometryPipeline.converge` |
+| 46.6 | Recolor by palette | `recolorByPalette` | `meta.colorPalette` + `material.userData.role` |
+| 46.7 | Chain placement | `placeChain` | (per-part declaration) |
+| 46.8 | Time-driven material animation | `applyMaterialAnimation` | `meta.materialAnimation` |
+| 46.9 | Preflight check | `preflightCheck` | `meta.usedPreflight` |
+| 46.10 | Shadow profile | (uses `lookDevLights` from PART 44) | `meta.shadowProfile` |
+
+## What PART 67 does NOT introduce
+
+- **No new dependency.** All helpers use existing
+  Three.js primitives (`CircleGeometry`, `RingGeometry`,
+  `SphereGeometry`, `PlaneGeometry`, `TubeGeometry`,
+  `BufferAttribute` math, `THREE.Color`, `THREE.Vector3`)
+  and the existing `mergeGeometries` import (already at
+  the top of the module for PART 35).
+- **No new export path.** The existing GLB / OBJ / STL
+  / .ts export buttons are unchanged.
+- **No new mandatory field.** All 9 new meta.* fields
+  are opt-in; a model that doesn't set any of them
+  loads identically to v1.22.
+- **No removed / weakened rule.** Every PART 1-45 rule
+  is preserved exactly. No PART has been re-numbered.
+- **No removed / weakened existing extension.** The
+  existing `materialVariants` (PART 41.6), `cs2PbrProfile`
+  (PART 45), `lookDevLights` (PART 44), and every other
+  prior helper is unchanged.
+- **No removed / weakened existing PART 45 helper.**
+  `cs2PbrProfile`, `applyWear`, `cs2WearMaskTexture`,
+  `wearSlider`, and the `cs2-finish` materialVariants
+  family are all unchanged.
+- **No removed / weakened existing PART 41.6 family.**
+  The 4 default families (plate / cloth / leather /
+  stone) plus the 2 PART 44.3 extensions (bone / magic)
+  are unchanged.
+- **No change to PART 38.22's style agnosticism.** PART
+  46 is also style-agnostic in scope (46.0.3).
+- **No change to PART 38.14's GLB-first architecture.**
+  PART 67 layers on top of the existing TS-factory
+  contract.
+- **No change to PART 39.5's factory + options pattern.**
+  PART 67 helpers are called the same way: `lblSpec
+  .helpers.<name>(...)`.
+- **No change to PART 44.3's existing bone + magic
+  families.**
+- **No change to PART 45.0.3's style agnosticism.** PART
+  46 is also style-agnostic in scope.
+- **Strict upgrade, zero downgrades.** Every change in
+  PART 67 is purely additive. A model that doesn't use
+  any PART 67 features loads identically to v1.22.
+
+## Quick reference for the renderer build
+
+```javascript
+// LBL spec version this renderer targets:
+const VERSION = { ts: 'v1.23', json: 'v8.15' };
+
+// Number of anti-pattern validators:
+const ANTI_PATTERN_CHECKS = [ /* E1 - E36 */ ]; // 36 total
+
+// 23 new PART 67 helpers (re-exported on window.lblSpec.helpers):
+// - 7 cross-primitive shape generators
+// - 6 deform modifiers + applyModifierStack dispatcher
+// - 1 vertex-channel helper
+// - 1 UV projection helper
+// - 1 converge helper
+// - 1 recolor helper
+// - 1 chain placement
+// - 1 material animation
+// - 1 preflight check
+// (1 shadow profile uses the existing lookDevLights)
+```
+
+## Related prior rounds (for context)
+
+- v1.22 / v8.14 (PART 45) — CS2 PBR material profile
+  (the first opt-in capability layer; PART 67 is the
+  second)
+- v1.21 / v8.13 (PART 44) — Professional pipeline (GLB-
+  first, BVH, look-dev lights, coding rules)
+- v1.20 / v8.12 (PART 43) — Refinement + style locking
+  + variant ranking
+- v1.19 / v8.11 (PART 42) — Character production
+  discipline
+- v1.18 / v8.10 (PART 41) — High-detail generation
+- v1.17 / v8.9 (PART 40) — Better models through better
+  generation
+- v1.16 / v8.8 (PART 39) — 3D modeling techniques
+- v1.15 / v8.7 (PART 38) — Character pipeline
+- v1.14 / v8.6 (PART 37) — Zip bundle
+- v1.13 / v8.5 (PART 36) — Multi-file
+- v1.12 / v8.4 (PART 35) — Triangle-first geometry
+- v1.11 / v8.3 (PART 34) — Pre-bundled rig helpers
+- v1.10 / v8.2 (PART 33) — Architectural features
+
 # v1.22 / v8.14 — CS2 PBR material profile (PART 45)
 
 The spec now teaches the AI an OPT-IN CS2 PBR material profile
@@ -2156,3 +2385,228 @@ e7a30ce feat: support dropping / picking many files at once (RJS LBL update)
 - **v1.15 / v8.7** — Character pipeline upgrade (PART 38) — see the round above
 - **v1.16 / v8.8** — 3D modeling techniques (PART 39) — see the round at the very top of this file
 
+
+
+# v1.23 / v8.15 — geometry + VFX + lookdev OPT-IN capability bundle (PART 68-71)
+
+The spec now teaches the AI an OPT-IN capability bundle from
+the maintainer's "two-repo analysis" working notebook (compiled
+2026-09-05), which catalogues the architecture-level patterns
+from two external reference repos
+(jasonsturges/three-low-poly and
+achrefelouafi/LinearAbilityExtThreeJS) and translates them into
+the existing `lblSpec` / Three.js contract:
+
+- **12 curated BufferGeometry classes** (PART 68.2) —
+  StarGeometry, PolygonGeometry, AnnulusGeometry, HeartGeometry,
+  SpadeGeometry, DiamondGeometry, BurstGeometry, ArchedSlabGeometry,
+  ArchGeometry, EdgedBoxGeometry, MoldingGeometry, PumpkinGeometry,
+  LeafGeometry — 60-200 triangles each, well-tested, MIT-licensed
+  from the three-low-poly package. Especially useful for weapons
+  (Polygon = gem facet, Annulus = mana ring, Molding = crossguard
+  trim, Arch = weapon rack, Pumpkin = gourd lantern).
+
+- **3 procedural texture helpers** (PART 68.3) —
+  makeCheckerboard, makeRadialGradient, makeLinearGradient.
+  Each returns a CanvasTexture with the standard wrap / colorSpace
+  defaults. Pairs with 5 new procedural MAT_DB patterns
+  (pat_checker_wood, pat_checker_stone, pat_radial_halo,
+  pat_radial_aoe, pat_linear_heathaze) and 6 new color-ramp
+  MAT_DB presets (mat_ramp_fire, mat_ramp_ice, mat_ramp_poison,
+  mat_ramp_holy, mat_ramp_shadow, mat_ramp_solar).
+
+- **4 random utilities** (PART 68.1) — mulberry32 (already
+  existed in PART 40, now wrapped), splitmix32, deriveSubSeed,
+  createRandom (ergonomic layer with .next() / .float() / .int()
+  / .pick() / .weighted() / .bool() / .skewMax() / .skewMin()).
+
+- **4 alignment helpers** (PART 68.4) — alignToEdge, alignToRow,
+  alignToSurface, center. The canonical pattern for placing parts
+  in their own local frame, then snapping them to a surface / row
+  / edge / center.
+
+- **5 atmospheric effects** (PART 68.7) — atmosphereRain,
+  atmosphereGroundFog, atmosphereDustMotes (plus atmospheric
+  effects skeleton for petalDrift / wisp). Each is a `THREE.Group`
+  with its own `.update(dt)` method, drop-in to a scene.
+
+- **2 sky helpers** (PART 68.6) — skyFullMoon (disc + halo +
+  procedural craters), skyStarField (N procedurally-placed stars
+  on the celestial sphere + 4 brighter "lead stars" with burst
+  shape).
+
+- **3 lookdev helpers** (PART 68.8) — cyclorama (curved studio
+  backdrop), groundGrid (studio ground grid), contactShadows
+  (cheap ground contact shadow).
+
+- **4 closed-form curve helpers** (PART 68.9) — constantCurvatureArc,
+  circularArc, helixPath, spiralPath. Derive every metre from a
+  radius.
+
+- **Lifetime color ramps** (PART 68.5) — buildMatRamp(rampKeyOrObject)
+  returns a CanvasTexture for a 4-color lifetime gradient.
+  Pairs with `meta.matRamp` declaration.
+
+- **Easing / Falloff constants** (PART 68.10) — 24 easing
+  functions (linear, inQuad, outQuad, ..., inOutBounce) and 8
+  falloff functions (linear, smooth, smoothstep, gauss, exp,
+  invExp, root, inv).
+
+- **Bone segments table** (PART 68.11) — the default 20-bone
+  table (Spine, Spine1, Spine2, Neck, Head, LeftShoulder,
+  RightShoulder, LeftArm, RightArm, LeftForeArm, RightForeArm,
+  LeftHand, RightHand, Hips, LeftUpLeg, RightUpLeg, LeftLeg,
+  RightLeg, LeftFoot, RightFoot) with weight + radius per bone.
+
+- **System helpers (P0)** (PART 68.1) — `frame` (the shared
+  uniform object: uTime, uDelta, uResolution, uLightDir, uEnvMap),
+  `lblFrameTick()` (clamped-delta FrameTimer, prevents tab-switch
+  from producing a 5-second jump), `makeObjectPool(factory, opts)`
+  (pools expensive-to-construct objects — Groups, BVH indices,
+  preview meshes), `makeAssetLoader()` (shared LoadingManager
+  with URL-rewrite so absolute local paths don't cause 50 404s).
+
+- **4 new opt-in validators E37-E40** (added to the existing 36)
+  — E37 sub-seed usage, E38 lifetime color ramp validity, E39
+  gizmo shape range, E40 bone segment coverage. ALL fire ONLY
+  when the corresponding opt-in meta flag is set, so a model
+  that doesn't use the new PART 68-71 features is unchanged.
+
+- **4 new opt-in `meta.*` fields** — `meta.matRamp`
+  ({ birth, early, late, death } or shorthand), `meta.gizmo`
+  ({ shape, range, ... }), `meta.vfx` ({ embers, sparks, ...,
+  boneAnchored, boneSegments }), `meta.usesMathRandom` (boolean
+  flag the E37 validator inspects).
+
+The renderer adds 50+ new canonical helpers re-exported on
+`window.lblSpec.helpers` alongside the PART 35 + PART 39 + PART
+40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67
+bundles. The existing 40 anti-pattern validators (E1-E40) are
+preserved unchanged. PART 45 (CS2 PBR) and PART 67 (cross-
+primitive + modifier stack + recolor + chain + animation) and
+PART 68-71 (geometry + VFX + brushes + presets) are EXTRA
+CAPABILITIES for weapons, blades, and metal-finish subjects
+(especially the mat_ramp_fire / mat_ramp_ice / mat_ramp_holy
+ramp presets pair with the PART 45 CS2 finishes for emissive
+lifetimes). PART 68-71 is style-agnostic in scope but
+content-specific in subject. No new dependency (the helpers use
+only existing Three.js primitives). No new export path, no new
+mandatory field, no removed / weakened rule, no removed /
+weakened existing extension, no removed / weakened existing
+PART 45 helper, no removed / weakened existing PART 41.6
+family. Strict upgrade, zero downgrades.
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `index.html` | 50+ new helpers added to `__threeTriHelpers` (frame, lblFrameTick, mulberry32, splitmix32, deriveSubSeed, createRandom, makeObjectPool, makeAssetLoader, StarGeometry, PolygonGeometry, AnnulusGeometry, HeartGeometry, SpadeGeometry, DiamondGeometry, BurstGeometry, ArchedSlabGeometry, ArchGeometry, EdgedBoxGeometry, MoldingGeometry, PumpkinGeometry, LeafGeometry, makeCheckerboard, makeRadialGradient, makeLinearGradient, alignToEdge, alignToRow, alignToSurface, center, buildMatRamp, skyFullMoon, skyStarField, atmosphereRain, atmosphereGroundFog, atmosphereDustMotes, cyclorama, groundGrid, contactShadows, constantCurvatureArc, circularArc, helixPath, spiralPath, easing, falloff, boneSegments); 4 new validators E37-E40 added to `ANTI_PATTERN_CHECKS`; meta description + keywords updated; the comment block that describes `window.lblSpec` and `ANTI_PATTERN_CHECKS` updated; mobile responsive fix for the spec chip (hide on narrow screens) |
+| `CHANGES_SUMMARY.md` | This entry |
+
+## Files UNTOUCHED
+
+- `public/models/Model_1.ts` through `Model_5.ts` — the 5
+  built-in models do not use any PART 68-71 features; they load
+  identically to v1.22. The new helpers are AVAILABLE to them
+  but OPT-IN.
+- `public/models/manifest.json` — no new models added in this
+  round.
+- `public/rig/` — the rig assets are unchanged.
+- `.github/workflows/manifest.yml` — the manifest auto-refresh
+  workflow is unchanged.
+- The existing PART 1-67 spec in all 6 spec files is UNCHANGED
+  (no PART has been weakened, removed, or re-numbered).
+- The existing 36 anti-pattern validators E1-E36 are UNCHANGED
+  (E37-E40 are purely additive).
+- The existing 5 PART 45 helpers (cs2PbrProfile, applyWear,
+  cs2WearMaskTexture, wearSlider, cs2-finish materialVariants
+  family) are UNCHANGED.
+- The existing 4 PART 41.6 materialVariants families are
+  UNCHANGED.
+- The existing 2 PART 44.3 families (bone + magic) are UNCHANGED.
+
+## What PART 68-71 covers
+
+| Section | Sub-section | Helpers | meta.* field |
+|---------|-------------|---------|--------------|
+| 68.1 | System helpers (P0) | `frame`, `lblFrameTick`, `mulberry32`, `splitmix32`, `deriveSubSeed`, `createRandom`, `makeObjectPool`, `makeAssetLoader` | `meta.usesMathRandom` |
+| 68.2 | 12 BufferGeometry classes (P1) | `StarGeometry`, `PolygonGeometry`, `AnnulusGeometry`, `HeartGeometry`, `SpadeGeometry`, `DiamondGeometry`, `BurstGeometry`, `ArchedSlabGeometry`, `ArchGeometry`, `EdgedBoxGeometry`, `MoldingGeometry`, `PumpkinGeometry`, `LeafGeometry` | (per-part primitive string) |
+| 68.3 | Procedural textures (P1) | `makeCheckerboard`, `makeRadialGradient`, `makeLinearGradient` | `meta.pattern` |
+| 68.4 | Alignment helpers (P2) | `alignToEdge`, `alignToRow`, `alignToSurface`, `center` | (placement only) |
+| 68.5 | Lifetime color ramps (P1) | `buildMatRamp` | `meta.matRamp` |
+| 68.6 | Sky helpers (P2) | `skyFullMoon`, `skyStarField` | `meta.atmospheric.fullMoon` / `.starField` |
+| 68.7 | Atmospheric effects (P1) | `atmosphereRain`, `atmosphereGroundFog`, `atmosphereDustMotes` | `meta.atmospheric.rain` / `.groundFog` / `.dustMotes` |
+| 68.8 | Lookdev helpers (P2) | `cyclorama`, `groundGrid`, `contactShadows` | (lookdev only) |
+| 68.9 | Closed-form math (P2) | `constantCurvatureArc`, `circularArc`, `helixPath`, `spiralPath` | (math only) |
+| 68.10 | Easing / Falloff (P2) | `easing` (24 functions), `falloff` (8 functions) | (per-frame only) |
+| 68.11 | Bone segments (P2) | `boneSegments` (20-bone table) | `meta.vfx.boneAnchored` + `meta.vfx.boneSegments` |
+
+## What PART 68-71 does NOT introduce
+
+- **No new dependency.** All helpers use existing Three.js
+  primitives (BufferGeometry, RingGeometry, SphereGeometry,
+  PlaneGeometry, TubeGeometry, Shape, ExtrudeGeometry,
+  BufferAttribute math, CanvasTexture, THREE.Color,
+  THREE.Vector3, THREE.LoadingManager).
+- **No new export path.** The existing GLB / OBJ / STL / .ts
+  export buttons are unchanged.
+- **No new mandatory field.** All new meta.* fields are
+  opt-in; a model that doesn't set any of them loads
+  identically to v1.22.
+- **No removed / weakened rule.** Every PART 1-67 rule is
+  preserved exactly. No PART has been re-numbered.
+- **No removed / weakened existing extension.** The existing
+  `materialVariants` (PART 41.6), `cs2PbrProfile` (PART 45),
+  `lookDevLights` (PART 44), `applyModifierStack` (PART 67.2),
+  and every other prior helper is unchanged.
+- **No removed / weakened existing PART 45 helper.** All 5
+  PART 45 helpers are unchanged.
+- **No removed / weakened existing PART 41.6 family.** The 4
+  default families (plate / cloth / leather / stone) plus the
+  2 PART 44.3 extensions (bone / magic) are unchanged.
+- **No change to PART 38.22's style agnosticism.** PART 68-71
+  is also style-agnostic in scope.
+- **No change to PART 38.14's GLB-first architecture.** PART
+  68-71 layers on top of the existing TS-factory contract.
+- **No change to PART 39.5's factory + options pattern.** PART
+  68-71 helpers are called the same way: `lblSpec.helpers
+  .<name>(...)`.
+- **No change to PART 44.3's existing bone + magic families.**
+- **No change to PART 45.0.3's style agnosticism.** PART 68-71
+  is also style-agnostic in scope.
+- **No change to PART 67's existing 21 helpers.** All 21
+  PART 67 helpers (makeDisc, makeRing, ..., preflightCheck) are
+  unchanged.
+- **Strict upgrade, zero downgrades.** Every change in PART
+  68-71 is purely additive. A model that doesn't use any
+  PART 68-71 features loads identically to v1.22.
+
+## Quick reference for the renderer build
+
+```javascript
+// LBL spec version this renderer targets:
+const VERSION = { ts: 'v1.23', json: 'v8.15' };
+
+// Number of anti-pattern validators:
+const ANTI_PATTERN_CHECKS = [ /* E1 - E40 */ ]; // 40 total
+
+// 50+ new PART 68-71 helpers (re-exported on window.lblSpec.helpers):
+// - 4 random utilities (mulberry32, splitmix32, deriveSubSeed, createRandom)
+// - 4 system helpers (frame, lblFrameTick, makeObjectPool, makeAssetLoader)
+// - 13 BufferGeometry classes (Star/Polygon/Annulus/Heart/Spade/Diamond/
+//   Burst/ArchedSlab/Arch/EdgedBox/Molding/Pumpkin/Leaf)
+// - 3 procedural textures (Checkerboard/Radial/Linear gradient)
+// - 4 alignment helpers (alignToEdge/Row/Surface, center)
+// - 1 lifetime color ramp (buildMatRamp)
+// - 2 sky helpers (FullMoon/StarField)
+// - 3 atmospheric effects (Rain/GroundFog/DustMotes)
+// - 3 lookdev helpers (Cyclorama/GroundGrid/ContactShadows)
+// - 4 closed-form curves (ConstantCurvature/Arc/Helix/Spiral)
+// - 1 easing namespace (24 functions) + 1 falloff namespace (8 functions)
+// - 1 bone segments table (20-bone default)
+// Total: 50+ new entries on window.lblSpec.helpers.
+
+// 4 new PART 68-71 validators:
+// E37 (sub-seed usage), E38 (lifetime color ramp validity),
+// E39 (gizmo shape range), E40 (bone segment coverage).
+```

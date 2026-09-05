@@ -19208,3 +19208,158 @@ factory + options pattern, no change to PART 41.6's existing
 4 default families, no change to PART 44.3's existing bone +
 magic families. Strict upgrade, zero downgrades.
 ================================================================================
+
+
+================================================================================
+PART 67 — v1.23 / v8.15 ADDITIONS: OPT-IN CAPABILITY BUNDLE
+================================================================================
+
+  PART 67 layers onto PARTs 1-45 as an OPT-IN capability
+  bundle for the Prompt To Js path. The
+  full spec lives in Prompt_To_Ts.txt (sections 67.1 -
+  67.11) and Prompt_To_Json.txt (section 67.1 - 67.2 +
+  worked example). This file inherits the same opt-in
+  rules: PART 67 is an EXTRA CAPABILITY, not a rule; a
+  model that doesn't use any of the new meta.* fields
+  loads identically to v1.22 / v8.14.
+
+  SUMMARY (apply the same rules on this path):
+    - 7 cross-primitive shape generators
+      (makeDisc / makeRing / makeArc / makeHemisphere /
+      makeRibbon / makeCrossPlanes / makeHelix) — opt-in
+      via meta.geometryPipeline or per-part primitive
+      string.
+    - 6 deform modifiers (taper / twist / bend / spherize
+      / inflate / applyNoise) dispatched by
+      applyModifierStack — opt-in via
+      meta.geometryPipeline.modifiers.
+    - 1 vertex-channel helper (fillVertexChannel) — opt-in
+      via meta.vertexData.
+    - 1 UV projection helper (projectUV) — opt-in via
+      meta.uv.projection (now accepts 7 values: shapeDefault
+      / planar / radial / cylindrical / spherical / box /
+      alongLength).
+    - 1 converge helper (convergeFaces) — opt-in via
+      meta.geometryPipeline.converge.
+    - 1 recolor helper (recolorByPalette) — opt-in via
+      meta.colorPalette + material.userData.role.
+    - 1 chain placement (placeChain) — opt-in via per-part
+      declaration.
+    - 1 time-driven material animation
+      (applyMaterialAnimation) — opt-in via
+      meta.materialAnimation.
+    - 1 preflight check (preflightCheck) — opt-in via
+      meta.usedPreflight.
+    - 1 shadow profile (PART 44.5) — opt-in via
+      meta.shadowProfile.
+    - 6 new opt-in validators E31-E36 (modifier stack
+      order, UV projection sanity, modifier stack
+      safety, converge direction, recolor roles,
+      preflight used). All fire ONLY when the
+      corresponding opt-in flag is set, so a model
+      that doesn't use PART 67 features is unchanged.
+
+  Especially useful for weapons, blades, and
+  metal-finish subjects (see Prompt_To_Ts.txt 67.0.4
+  for the explicit use-case lists). Style-agnostic in
+  scope but content-specific in subject. No new
+  dependency, no new export path, no new mandatory
+  field, no removed / weakened rule, no removed /
+  weakened existing extension. Strict upgrade, zero
+  downgrades.
+================================================================================
+
+
+================================================================================
+PART 68-71 — v1.23 / v8.15 ADDITIONS: GEOMETRY + VFX + LOOKDEV
++ RANDOM + ALIGNMENT OPT-IN CAPABILITY BUNDLE
+(from jasonsturges/three-low-poly + achrefelouafi/
+LinearAbilityExtThreeJS)
+================================================================================
+
+  PART 68-71 layers onto PARTs 1-67 as a STRICTLY ADDITIVE
+  capability bundle. The source is the maintainer's "two-repo
+  analysis" working notebook (compiled 2026-09-05), which
+  catalogues the architecture-level patterns from two external
+  reference repos and translates them into the existing
+  `lblSpec` / Three.js contract.
+
+  CRITICAL RULES:
+    - PART 68-71 is an EXTRA CAPABILITY, not a rule.
+    - A model that doesn't use any of the new meta.* fields
+      loads identically to v1.22 / v8.14.
+    - All 50+ new helpers are OPT-IN by construction.
+    - All 4 new validators (E37-E40) are non-blocking and
+      fire ONLY when the corresponding opt-in flag is set.
+    - Style-agnostic in scope, but especially useful for
+      weapons, blades, and metal-finish subjects.
+
+  SUMMARY (apply the same rules on this path):
+
+  PART 68.1 — System helpers (P0)
+    frame, lblFrameTick, mulberry32, splitmix32, deriveSubSeed,
+    createRandom, makeObjectPool, makeAssetLoader
+
+  PART 68.2 — 13 BufferGeometry classes (P1)
+    StarGeometry, PolygonGeometry, AnnulusGeometry, HeartGeometry,
+    SpadeGeometry, DiamondGeometry, BurstGeometry,
+    ArchedSlabGeometry, ArchGeometry, EdgedBoxGeometry,
+    MoldingGeometry, PumpkinGeometry, LeafGeometry
+
+  PART 68.3 — Procedural textures (P1)
+    makeCheckerboard, makeRadialGradient, makeLinearGradient
+    + 5 new MAT_DB patterns (pat_checker_wood, pat_checker_stone,
+    pat_radial_halo, pat_radial_aoe, pat_linear_heathaze)
+    + 6 new MAT_DB color ramps (mat_ramp_fire, mat_ramp_ice,
+    mat_ramp_poison, mat_ramp_holy, mat_ramp_shadow, mat_ramp_solar)
+
+  PART 68.4 — Alignment helpers (P2)
+    alignToEdge, alignToRow, alignToSurface, center
+
+  PART 68.5 — Lifetime color ramps (P1)
+    buildMatRamp(rampKeyOrObject) — pairs with `meta.matRamp`
+
+  PART 68.6 — Sky helpers (P2)
+    skyFullMoon, skyStarField
+
+  PART 68.7 — Atmospheric effects (P1)
+    atmosphereRain, atmosphereGroundFog, atmosphereDustMotes
+
+  PART 68.8 — Lookdev helpers (P2)
+    cyclorama, groundGrid, contactShadows
+
+  PART 68.9 — Closed-form curves (P2)
+    constantCurvatureArc, circularArc, helixPath, spiralPath
+
+  PART 68.10 — Easing / Falloff (P2)
+    easing (24 functions), falloff (8 functions)
+
+  PART 68.11 — Bone segments (P2)
+    boneSegments (20-bone default table for bone-anchored VFX)
+
+  NEW META.* FIELDS (all opt-in):
+    meta.matRamp?:  { birth, early, late, death } OR shorthand
+                    string ('mat_ramp_fire' | 'mat_ramp_ice' | ...)
+    meta.gizmo?:    { shape, range, minRange?, zoneRadius?,
+                      gateWidth?, gateHeight?, ringRadius?, ringHover? }
+    meta.vfx?:      { embers?, sparks?, motes?, debris?,
+                      boneAnchored?, boneSegments? }
+    meta.usesMathRandom?: boolean (E37 inspects this)
+
+  NEW VALIDATORS (4 new, all non-blocking + opt-in):
+    E37 — Sub-seed usage (fires when meta.usesMathRandom=true)
+    E38 — Lifetime color ramp validity (fires when meta.matRamp set)
+    E39 — Gizmo shape range (fires when meta.gizmo set)
+    E40 — Bone segment coverage (fires when meta.vfx.boneAnchored=true)
+
+  TOTAL: 50+ new `lblSpec.helpers` entries + 4 new validators.
+
+  No new dependency, no new export path, no new mandatory field,
+  no removed / weakened rule, no removed / weakened existing
+  extension. Strict upgrade, zero downgrades.
+
+  Especially useful for weapons, blades, and metal-finish
+  subjects — see CHANGES_SUMMARY.md for the worked example
+  (Karambit knife that uses mat_ramp_fire for the blade glow
+  + bone segments for hand-anchored ember particles).
+================================================================================

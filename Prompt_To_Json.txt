@@ -18987,3 +18987,285 @@ factory + options pattern, no change to PART 41.6's existing
 4 default families, no change to PART 44.3's existing bone +
 magic families. Strict upgrade, zero downgrades.
 ================================================================================
+
+
+================================================================================
+PART 67 — v1.23 / v8.15 ADDITIONS: OPT-IN CAPABILITY BUNDLE
+(JSON/JS PATH)
+================================================================================
+
+  The JSON/JS path uses the same PART 67 spec as the TS
+  path; this file mirrors the changes from Prompt_To_Ts.txt
+  to the JSON/JS contract. The opt-in capability, the 7
+  cross-primitive shape generators, the 6 deform modifiers,
+  the 1 vertex-channel helper, the 1 UV projection helper,
+  the 1 converge helper, the 1 recolor helper, the 1 chain
+  placement, the 1 material animation helper, the 1
+  preflight check, the 6 new opt-in validators E31-E36,
+  and the new opt-in meta.* fields all apply unchanged on
+  the JSON/JS path. The 67.7 section below gives the
+  JSON-specific worked example.
+
+OVERVIEW
+--------
+
+  PART 67 layers onto PARTs 1-45 as an OPT-IN capability
+  bundle for JSON/JS blueprint authors. The source is the
+  maintainer's "Reference-Repo Analysis for low_poly_3d"
+  working notebook (compiled 2026-09-04), which catalogues
+  the architecture-level patterns from four external
+  reference repos (PudinKiller/VFXMeshLab, keijiro/
+  VfxGraphModeling, fabYkun/AnimatedMeshes, rev087/forge)
+  and translates them into the existing `lblSpec` /
+  Three.js contract.
+
+  The single most important rule:
+
+    PART 67 is an EXTRA CAPABILITY, not a rule. The
+    JSON/JS blueprint uses it WHEN the subject calls for
+    it (weapons, blades, polished/brushed metal, coils,
+    chain links, tent shapes, any subject that benefits
+    from non-default shapes or non-uniform deformation)
+    and SKIPS it otherwise. No existing rule is changed;
+    no existing material default is changed; no model
+    that doesn't opt in loads any differently.
+
+  67.0.1  EXTENDS, not replaces. PART 67 layers on top of
+          PART 3 (geometry vocabulary), PART 7 (materials),
+          PART 7.5 (vertex data — new), PART 8 (textures /
+          UV), PART 28.7 (time-driven material animation
+          — new), PART 39.9 (deform modifier stack — new),
+          PART 39.10 (chain placement — new), PART 41.6
+          (materialVariants — extended with recolorByPalette),
+          and PART 45 (CS2 PBR — recolorByPalette pairs
+          with cs2PbrProfile for finish variants). The
+          blueprint's PART 1 / 2 / 4 / 5 / 6 contract is
+          unchanged.
+
+  67.0.2  OPT-IN by construction. Every PART 67 meta.*
+          field is opt-in: if the field is missing, the
+          renderer behaves identically to v8.14. The
+          validator surface (E31-E36) is opt-in too —
+          each new validator returns `null` (clean) when
+          its corresponding opt-in flag is not set. A
+          model that uses NONE of the PART 67 features
+          triggers ZERO new validators, exactly like
+          PART 45's E30.
+
+67.1 — JSON/JS WORKED EXAMPLE (Karambit knife)
+-----------------------------------------------
+
+  The following blueprint shows a CS2-style Karambit
+  knife that uses PART 67 features (PART 67.1 / 67.2 /
+  67.6) alongside PART 45 (CS2 PBR):
+
+      {
+        "version": 1,
+        "id": "karambit_damascus",
+        "meta": {
+          "style": "lowpoly",
+          "subjectClass": "weapon",
+          "seed": 1337,
+          "cs2Finish": "Damascus",
+          "cs2Wear": 0.15,
+          "cs2WearUserTunable": true,
+          "geometryPipeline": {
+            "modifiers": [
+              { "type": "Taper", "axis": "Y", "strength": 0.4, "falloff": "linear" },
+              { "type": "Twist", "axis": "Y", "angle": 0.3 }
+            ],
+            "converge": { "toVertex": [0, 0.2, 0], "strength": 0.3 }
+          },
+          "materialAnimation": [
+            { "channel": "emissiveIntensity", "from": 0.0, "to": 0.4, "duration": 2.0, "curve": "easeInOut", "loop": true }
+          ],
+          "shadowProfile": "cs2-hdri",
+          "colorPalette": [
+            { "role": "blade", "baseColor": 0xb8b8b8 },
+            { "role": "ring",  "baseColor": 0x404040 }
+          ],
+          "usedPreflight": true
+        },
+        "nodes": [
+          { "name": "blade",   "primitive": "makeArc", "opts": { "inner": 0, "outer": 0.25, "sweep": 1.4, "segments": 10 } },
+          { "name": "ring",    "primitive": "makeRing", "opts": { "inner": 0.10, "outer": 0.13, "thetaSegs": 16 } },
+          { "name": "handle",  "primitive": "makeHelix", "opts": { "radius": 0.10, "turns": 2, "length": 0.4, "tubularSegs": 32, "radiusTube": 0.02 } }
+        ],
+        "materials": [
+          { "name": "blade_mat",  "userData": { "role": "blade" }, "preset": "cs2-damascussteel" },
+          { "name": "ring_mat",   "userData": { "role": "ring"  }, "preset": "cs2-anodizedgold" }
+        ]
+      }
+
+  This blueprint exercises:
+    - PART 67.1.3 (`makeArc` for the curved blade)
+    - PART 67.1.2 (`makeRing` for the karambit ring)
+    - PART 67.1.7 (`makeHelix` for the grip wrap)
+    - PART 67.2   (`modifiers: [Taper, Twist]` for the
+                   blade taper + twist)
+    - PART 67.5   (`converge` to pull the blade tip)
+    - PART 67.8   (`materialAnimation` for the
+                   emissiveIntensity pulse)
+    - PART 67.10  (`shadowProfile: 'cs2-hdri'`)
+    - PART 67.6   (`colorPalette` for the recolor
+                   targets)
+    - PART 67.9   (`usedPreflight: true`)
+    - PART 45     (`cs2Finish: 'Damascus'`,
+                   `cs2Wear: 0.15`,
+                   `cs2WearUserTunable: true`)
+
+  The validator will surface:
+    - E30 (CS2 profile compliance — fires for
+           `cs2Finish: 'Damascus'`)
+    - E31 (modifier stack order — fires for the
+           declared `modifiers` array)
+    - E32 (UV projection vs geometry sanity — only
+           if `meta.uv.projection` is set; this
+           blueprint doesn't set it)
+    - E33 (modifier stack safety — fires for the
+           2 modifiers; well within caps)
+    - E34 (converge direction sanity — fires for the
+           declared `converge.toVertex`)
+    - E35 (recolor roles complete — fires for the
+           `colorPalette`; both roles are used)
+    - E36 (preflight check used — fires because
+           `usedPreflight: true` is set; clean)
+    - All 30 prior validators (E1-E30)
+
+67.2 — UPDATED CROSS-REFERENCES
+--------------------------------
+
+  PART 67 layers on top of, never replaces:
+    - PART 1  (factory contract)         — JSON/JS path
+    - PART 2  (primitives)               — JSON/JS path
+    - PART 3  (geometry vocabulary)      — JSON/JS path (67.1)
+    - PART 7  (materials)                — JSON/JS path
+    - PART 7.5 (packed vertex channels)  — JSON/JS path (67.3)
+    - PART 8  (textures / UV)            — JSON/JS path (67.4)
+    - PART 28.7 (time-driven material)   — JSON/JS path (67.8)
+    - PART 39.9 (deform modifier stack)  — JSON/JS path (67.2)
+    - PART 39.10 (chain placement)       — JSON/JS path (67.7)
+    - PART 41.6 (materialVariants)       — JSON/JS path (67.6)
+    - PART 44.3 (6-family material)      — JSON/JS path
+    - PART 44.5 (shadow profile)         — JSON/JS path (67.10)
+    - PART 45  (CS2 PBR)                 — JSON/JS path (67.6)
+    - PART 33 / 34 / 35 / 36 / 37 / 38 / 39 / 40 / 41 / 42
+      / 43 / 44 (all unchanged)
+
+  The maintainer's "Reference-Repo Analysis for
+  low_poly_3d" notebook (compiled 2026-09-04) is the
+  source doc. PART 67 keeps only the patterns that are
+  directly useful for the existing system (the rest are
+  documented in the notebook for future reference).
+  PART 67 is an EXTRA CAPABILITY for weapons, blades,
+  and metal-finish subjects — not a rule every model
+  must follow. Style-agnostic in scope but content-
+  specific in subject. No new dependency (the helpers
+  use only existing Three.js primitives). No new export
+  path, no new mandatory field, no removed / weakened
+  rule, no removed / weakened existing extension, no
+  removed / weakened existing PART 45 helper, no removed
+  / weakened existing PART 41.6 family. No change to
+  PART 38.22's style agnosticism, no change to PART
+  38.14's GLB-first architecture, no change to PART
+  39.5's factory + options pattern, no change to PART
+  41.6's existing 4 default families, no change to PART
+  44.3's existing bone + magic families, no change to
+  PART 45.0.3's style agnosticism. Strict upgrade, zero
+  downgrades.
+================================================================================
+
+
+================================================================================
+PART 68-71 — v1.23 / v8.15 ADDITIONS: GEOMETRY + VFX + LOOKDEV
++ RANDOM + ALIGNMENT OPT-IN CAPABILITY BUNDLE
+(from jasonsturges/three-low-poly + achrefelouafi/
+LinearAbilityExtThreeJS)
+================================================================================
+
+  PART 68-71 layers onto PARTs 1-67 as a STRICTLY ADDITIVE
+  capability bundle. The source is the maintainer's "two-repo
+  analysis" working notebook (compiled 2026-09-05), which
+  catalogues the architecture-level patterns from two external
+  reference repos and translates them into the existing
+  `lblSpec` / Three.js contract.
+
+  CRITICAL RULES:
+    - PART 68-71 is an EXTRA CAPABILITY, not a rule.
+    - A model that doesn't use any of the new meta.* fields
+      loads identically to v1.22 / v8.14.
+    - All 50+ new helpers are OPT-IN by construction.
+    - All 4 new validators (E37-E40) are non-blocking and
+      fire ONLY when the corresponding opt-in flag is set.
+    - Style-agnostic in scope, but especially useful for
+      weapons, blades, and metal-finish subjects.
+
+  SUMMARY (apply the same rules on this path):
+
+  PART 68.1 — System helpers (P0)
+    frame, lblFrameTick, mulberry32, splitmix32, deriveSubSeed,
+    createRandom, makeObjectPool, makeAssetLoader
+
+  PART 68.2 — 13 BufferGeometry classes (P1)
+    StarGeometry, PolygonGeometry, AnnulusGeometry, HeartGeometry,
+    SpadeGeometry, DiamondGeometry, BurstGeometry,
+    ArchedSlabGeometry, ArchGeometry, EdgedBoxGeometry,
+    MoldingGeometry, PumpkinGeometry, LeafGeometry
+
+  PART 68.3 — Procedural textures (P1)
+    makeCheckerboard, makeRadialGradient, makeLinearGradient
+    + 5 new MAT_DB patterns (pat_checker_wood, pat_checker_stone,
+    pat_radial_halo, pat_radial_aoe, pat_linear_heathaze)
+    + 6 new MAT_DB color ramps (mat_ramp_fire, mat_ramp_ice,
+    mat_ramp_poison, mat_ramp_holy, mat_ramp_shadow, mat_ramp_solar)
+
+  PART 68.4 — Alignment helpers (P2)
+    alignToEdge, alignToRow, alignToSurface, center
+
+  PART 68.5 — Lifetime color ramps (P1)
+    buildMatRamp(rampKeyOrObject) — pairs with `meta.matRamp`
+
+  PART 68.6 — Sky helpers (P2)
+    skyFullMoon, skyStarField
+
+  PART 68.7 — Atmospheric effects (P1)
+    atmosphereRain, atmosphereGroundFog, atmosphereDustMotes
+
+  PART 68.8 — Lookdev helpers (P2)
+    cyclorama, groundGrid, contactShadows
+
+  PART 68.9 — Closed-form curves (P2)
+    constantCurvatureArc, circularArc, helixPath, spiralPath
+
+  PART 68.10 — Easing / Falloff (P2)
+    easing (24 functions), falloff (8 functions)
+
+  PART 68.11 — Bone segments (P2)
+    boneSegments (20-bone default table for bone-anchored VFX)
+
+  NEW META.* FIELDS (all opt-in):
+    meta.matRamp?:  { birth, early, late, death } OR shorthand
+                    string ('mat_ramp_fire' | 'mat_ramp_ice' | ...)
+    meta.gizmo?:    { shape, range, minRange?, zoneRadius?,
+                      gateWidth?, gateHeight?, ringRadius?, ringHover? }
+    meta.vfx?:      { embers?, sparks?, motes?, debris?,
+                      boneAnchored?, boneSegments? }
+    meta.usesMathRandom?: boolean (E37 inspects this)
+
+  NEW VALIDATORS (4 new, all non-blocking + opt-in):
+    E37 — Sub-seed usage (fires when meta.usesMathRandom=true)
+    E38 — Lifetime color ramp validity (fires when meta.matRamp set)
+    E39 — Gizmo shape range (fires when meta.gizmo set)
+    E40 — Bone segment coverage (fires when meta.vfx.boneAnchored=true)
+
+  TOTAL: 50+ new `lblSpec.helpers` entries + 4 new validators.
+
+  No new dependency, no new export path, no new mandatory field,
+  no removed / weakened rule, no removed / weakened existing
+  extension. Strict upgrade, zero downgrades.
+
+  Especially useful for weapons, blades, and metal-finish
+  subjects — see CHANGES_SUMMARY.md for the worked example
+  (Karambit knife that uses mat_ramp_fire for the blade glow
+  + bone segments for hand-anchored ember particles).
+================================================================================

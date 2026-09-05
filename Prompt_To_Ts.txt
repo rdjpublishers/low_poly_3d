@@ -16148,3 +16148,645 @@ factory + options pattern, no change to PART 41.6's existing
 4 default families, no change to PART 44.3's existing bone +
 magic families. Strict upgrade, zero downgrades.
 ================================================================================
+
+
+================================================================================
+PART 67 — v1.23 / v8.15 ADDITIONS: OPT-IN CAPABILITY BUNDLE
+(CROSS-PRIMITIVE VOCABULARY + DEFORM MODIFIER STACK + RECOLOR
++ CHAIN + CONVERGE + MATERIAL ANIMATION + VERTEX CHANNELS
++ UV PROJECTIONS + PREFLIGHT)
+================================================================================
+
+OVERVIEW
+--------
+
+  PART 67 layers onto PARTs 1-45 as an OPT-IN capability bundle
+  for the .ts factory authors. The source is the maintainer's
+  "Reference-Repo Analysis for low_poly_3d" working notebook
+  (compiled 2026-09-04), which catalogues the architecture-
+  level patterns from four external reference repos
+  (PudinKiller/VFXMeshLab, keijiro/VfxGraphModeling,
+  fabYkun/AnimatedMeshes, rev087/forge) and translates them
+  into the existing `lblSpec` / Three.js contract.
+
+  The single most important rule:
+
+    PART 67 is an EXTRA CAPABILITY, not a rule. The .ts
+    factory uses it WHEN the subject calls for it (weapons,
+    blades, polished/brushed metal, coils, chain links, tent
+    shapes, any subject that benefits from non-default shapes
+    or non-uniform deformation) and SKIPS it otherwise. No
+    existing rule is changed; no existing material default is
+    changed; no model that doesn't opt in loads any
+    differently.
+
+  67.0.1  EXTENDS, not replaces. PART 67 layers on top of
+          PART 3 (geometry vocabulary), PART 7 (materials),
+          PART 7.5 (vertex data — new), PART 8 (textures /
+          UV), PART 28.7 (time-driven material animation
+          — new), PART 39.9 (deform modifier stack — new),
+          PART 39.10 (chain placement — new), PART 41.6
+          (materialVariants — extended with recolorByPalette),
+          and PART 45 (CS2 PBR — recolorByPalette pairs
+          with cs2PbrProfile for finish variants). The
+          factory's PART 1 / 2 / 4 / 5 / 6 contract is
+          unchanged.
+
+  67.0.2  OPT-IN by construction. Every PART 67 meta.* field
+          is opt-in: if the field is missing, the renderer
+          behaves identically to v1.22. The validator
+          surface (E31-E36) is opt-in too — each new
+          validator returns `null` (clean) when its
+          corresponding opt-in flag is not set. A model
+          that uses NONE of the PART 67 features triggers
+          ZERO new validators, exactly like PART 45's
+          E30.
+
+  67.0.3  STYLE-AGNOSTIC in scope. PART 67 applies to
+          every model style (low-poly / mid-poly / high-
+          poly / smooth-shaded / stylized / photoreal /
+          voxel / hand-painted / toon-cel / retro-PSX /
+          any combination). The cross-primitive vocabulary
+          (PART 3.9) and the modifier stack (PART 39.9) are
+          about shape, not surface finish.
+
+  67.0.4  CONTENT-SPECIFIC in subject. PART 67 is
+          especially useful for weapons, blades, and
+          metal-finish subjects (see 67.1 / 67.2 / 67.6 for
+          the explicit use-case lists). The .ts factory
+          SHOULD reach for `makeDisc` / `makeRing` /
+          `makeArc` / `makeHelix` when the subject is a
+          barrel / barrel band / blade sweep / rifling
+          coil. It SHOULD reach for `taper` / `twist` /
+          `bend` when the subject is a tapered cone /
+          rifled barrel / curved blade. It SHOULD reach
+          for `recolorByPalette` when the subject is a
+          CS2-style finish variant. Non-weapon / non-
+          metal subjects CAN still use these helpers when
+          the geometry calls for it (e.g. a low-poly tree
+          trunk benefits from `taper`; a stylized rock
+          benefits from `spherize` + `applyNoise`).
+
+  67.0.5  LAYERING ON THE EXISTING STACK. PART 67 layers
+          on top of PART 1-45 like PART 45 did. All the
+          cross-references at the end of PART 45.15 are
+          preserved unchanged; PART 67 just adds 9 new
+          opt-in meta.* fields, 6 new opt-in validators,
+          and 23 new opt-in helpers. The factory call
+          pattern is identical: `lblSpec.helpers.<name>(...)`.
+
+67.1 — CROSS-PRIMITIVE VOCABULARY (PART 3.9)
+--------------------------------------------
+
+  PART 3 already covers Box / Cylinder / Cone / Sphere /
+  Tube / Lathe / Extrude. PART 67 adds 7 more shape
+  primitives that the existing helpers don't cover, each
+  with a thin helper on `lblSpec.helpers` that returns a
+  `THREE.BufferGeometry` ready to wrap in a Mesh. The
+  factory never has to re-implement these.
+
+  67.1.1  Disc — `lblSpec.helpers.makeDisc(opts)` →
+          `CircleGeometry(radius, segments)` with optional
+          cap. opts: `{ radius, segments, cap, thickness }`.
+          Use cases: shields, plates, halos, manhole covers,
+          barrel caps. Set `cap: true` to add a simple
+          fan-cap at -thickness (cheaper than ExtrudeGeometry
+          for a flat disc).
+
+  67.1.2  Ring — `lblSpec.helpers.makeRing(opts)` →
+          `RingGeometry(inner, outer, thetaSegs, phiSegs,
+          thetaStart, thetaLength)`. Use cases: rims,
+          gaskets, halo borders, barrel bands. Pass a
+          partial `thetaLength` for an arc segment.
+
+  67.1.3  Arc — `lblSpec.helpers.makeArc(opts)` →
+          partial RingGeometry sweep. opts: `{ inner, outer,
+          sweep, segments }`. Use cases: curved blades,
+          crescent moons, slash effects, scimitar sweeps.
+
+  67.1.4  Hemisphere — `lblSpec.helpers.makeHemisphere(opts)`
+          → `SphereGeometry` clamped to half. opts:
+          `{ radius, widthSegs, heightSegs, openEnded }`.
+          Use cases: domes, bowls, helmets, visors, scope
+          caps.
+
+  67.1.5  Ribbon — `lblSpec.helpers.makeRibbon(opts)` →
+          tapered PlaneGeometry strip. opts: `{ length,
+          width, widthEnd, segsL, segsW }`. Use cases:
+          trails, banners, scabbard strips, flag strips.
+          `widthEnd: 0` produces a knife-blade shape.
+
+  67.1.6  CrossPlanes — `lblSpec.helpers.makeCrossPlanes(opts)`
+          → N PlaneGeometry rotated around a normal, merged
+          into a single BufferGeometry. opts: `{ size, count,
+          axis, segs }`. Use cases: 2D-style foliage, smoke
+          quads, billboard grass, muzzle-flash quads,
+          particle card stacks. The helper merges the N
+          planes so the factory wraps them in a single Mesh
+          (cheaper than N draw calls).
+
+  67.1.7  Helix — `lblSpec.helpers.makeHelix(opts)` →
+          `TubeGeometry` along a custom helix `Curve`
+          subclass. opts: `{ radius, turns, length,
+          tubularSegs, radialSegs, radiusTube }`. Use
+          cases: coils, springs, drill bits, twisted wire,
+          rifling grooves. The helper caps `turns` at 256
+          (E33) and falls back to a plain CylinderGeometry
+          if the TubeGeometry throws.
+
+  Worked example — barrel with rifling:
+
+      // Barrel body
+      const barrel = new THREE.CylinderGeometry(
+        0.15, 0.15, 1.0, 16
+      );
+      // Rifling coil inside the barrel
+      const rifling = lblSpec.helpers.makeHelix({
+        radius:    0.12,
+        turns:     8,
+        length:    0.9,
+        tubularSegs: 64,
+        radiusTube:  0.01,
+      });
+
+  Worked example — CS2 knife blade sweep:
+
+      const blade = lblSpec.helpers.makeArc({
+        inner:    0.0,
+        outer:    0.3,
+        sweep:    Math.PI * 0.6,
+        segments: 8,
+      });
+
+67.2 — DEFORM MODIFIER STACK (PART 39.9)
+----------------------------------------
+
+  67.2.0  PURPOSE. PART 3 already covers the 7 base
+          primitives. PART 67 adds a stack of 6 deform
+          modifiers that mutate a `BufferGeometry` in
+          place, applied in declared order. Modifiers
+          are a different layer from `tick(dt, elapsed)`:
+          they bake ONCE at build time. Mirrors
+          VFXMeshLab's `VFXModifierProcessor` (Taper,
+          Twist, Bend, Wave, RadialRipple, Noise,
+          Inflate, Spherize, Flatten).
+
+  67.2.1  DECLARATION. The .ts factory declares the stack
+          on `meta.geometryPipeline.modifiers`:
+
+              meta.geometryPipeline = {
+                modifiers: [
+                  { type: 'Taper',   axis: 'Y', strength: 0.6, falloff: 'linear' },
+                  { type: 'Twist',   axis: 'Y', angle: 90 },
+                  { type: 'Noise',   axis: 'Y', strength: 0.05, seed: 1337, octaves: 4 }
+                ]
+              };
+
+          The renderer applies the modifiers IN DECLARED
+          ORDER. The order matters — see the E31 validator
+          for the recommended ordering (Taper → Twist →
+          Inflate → Spherize → Noise).
+
+  67.2.2  THE 6 MODIFIERS.
+
+          - `Taper(geo, axis, strength, falloff)` — radial
+            scale falloff along an axis. `falloff`: 'linear'
+            | 'easeIn' | 'easeOut'. Use cases: tapered
+            cones, wider tops, spires that thin, knife
+            tangs that thicken toward the guard.
+          - `Twist(geo, axis, angle)` — progressive
+            rotation around an axis (angle in radians).
+            Use cases: candy-cane stripes, drills, DNA
+            helices, rifled barrels.
+          - `Bend(geo, axis, angle)` — curve the whole
+            mesh around an axis. Use cases: banana,
+            scimitar, slumping pipe, curved horn.
+          - `Spherize(geo, strength)` — blend toward a
+            sphere centered at origin. Use cases: tent
+            tops, stylized rocks, blobby subjects.
+          - `Inflate(geo, strength)` — push/pull along
+            vertex normal. Use cases: knife-edge inflation,
+            armor-plate thickness, organic puff.
+          - `applyNoise(geo, seed, octaves, lacunarity,
+            persistence, strength)` — deterministic
+            layered spatial displacement. Use cases: rock
+            surfaces, weathered metal, organic detail.
+            Defaults `seed` to `meta.seed` (PART 2) so
+            reloads are deterministic.
+
+  67.2.3  THE DISPATCHER. `lblSpec.helpers.applyModifierStack
+          (geo, mods)` walks the array in declared order
+          and dispatches by `type`. Unknown modifier types
+          are skipped silently with a console warn. The
+          factory's pattern:
+
+              let bladeGeo = /* base geometry */;
+              lblSpec.helpers.applyModifierStack(bladeGeo,
+                meta.geometryPipeline.modifiers);
+              bladeGeo.computeVertexNormals();
+              const bladeMesh = new THREE.Mesh(bladeGeo,
+                lblSpec.helpers.cs2PbrProfile('damascussteel'));
+
+          This is the canonical way to combine a base shape
+          with a modifier stack — the factory never writes
+          per-modifier math.
+
+  67.2.4  SAFETY CAPS (PART 67.2.4 — E33). The stack is
+          capped at 10 entries. `octaves` is capped at 12.
+          `turns` is capped at 256. `strength` > 1.0 on
+          `Spherize` / `Flatten` / `Inflate` is allowed
+          but surfaces a non-blocking warning. The
+          preflightCheck helper (67.9) lets the factory
+          validate the budget BEFORE building.
+
+67.3 — PACKED VERTEX CHANNELS (PART 7.5)
+----------------------------------------
+
+  67.3.0  PURPOSE. Three.js `BufferGeometry` ships with
+          one `uv` channel by default; the renderer's
+          existing PBR pipeline uses only `uv`. PART 67
+          exposes `uv1` / `uv2` / `uv3` for shaders /
+          custom materials that need dissolve masks,
+          flow maps, vertex AO, or rim-light masks. The
+          packed-UV trick lets a single mesh carry up
+          to 4 Vector2 channels without extra textures.
+
+  67.3.1  DECLARATION. The .ts factory declares the
+          channels on `meta.vertexData`:
+
+              meta.vertexData = {
+                channel1: { source: 'axisGradient',    axis: 'Y' },
+                channel2: { source: 'radialDistance' },
+                channel3: { source: 'deterministicRandom', seed: 1337 }
+              };
+
+          Source values: 'axisGradient' | 'radialDistance'
+          | 'deterministicRandom' | 'normalizedX' |
+          'normalizedY' | 'normalizedZ'.
+
+  67.3.2  THE HELPER. `lblSpec.helpers.fillVertexChannel
+          (geometry, channelName, source, settings)` fills
+          `geometry.attributes.uv1` (or `uv2` / `uv3`)
+          with a per-vertex `Vector2`. The factory calls
+          it once per channel after the base geometry is
+          built.
+
+67.4 — UV PROJECTION HELPER (PART 8 EXTENSION)
+----------------------------------------------
+
+  67.4.0  PURPOSE. The existing UV system supports
+          'shapeDefault' and 'planar' (PART 8). PART 67
+          adds 5 more: 'radial' (bullseye, clock face),
+          'cylindrical' (label wrap), 'spherical'
+          (equirectangular unwrap), 'box' (6-face
+          projection for cubes / boxy props), 'alongLength'
+          (project along the longest axis onto the other
+          two). The factory never has to write per-vertex
+          UV math.
+
+  67.4.1  DECLARATION. The .ts factory declares the
+          projection on `meta.uv.projection`:
+
+              meta.uv = {
+                projection: 'cylindrical',
+                scale: 1.0, offset: 0.0,
+                rotation: 0.0,
+                flipU: false, flipV: false, swapUV: false
+              };
+
+  67.4.2  THE HELPER. `lblSpec.helpers.projectUV(geometry,
+          projection, settings)` re-projects the geometry's
+          `uv0` attribute in place. The factory calls it
+          after the base geometry is built. The post-
+          transform flags (scale / offset / rotation /
+          flipU / flipV / swapUV) are applied after the
+          projection.
+
+  67.4.3  E32 SANITY. The E32 validator warns when
+          `spherical` is set on a flat box-like geometry,
+          `cylindrical` on a flat plane, or `radial` on a
+          flat plane. Non-blocking — the .ts factory can
+          still proceed.
+
+67.5 — CONVERGE FACES (PART 67.4 / forge-style)
+-----------------------------------------------
+
+  67.5.0  PURPOSE. Mirrors forge's `Surface.Converge`
+          operator. Pulls every vertex toward `toVertex`
+          by `strength`. Useful for tent tops, spike
+          tips, bullet tails, blade points, teardrop
+          shapes. The factory calls it as one more step
+          in the modifier pipeline.
+
+  67.5.1  DECLARATION. The .ts factory declares the
+          converge on `meta.geometryPipeline.converge`:
+
+              meta.geometryPipeline = {
+                modifiers: [...],
+                converge: { toVertex: [0, 1, 0], strength: 0.5 }
+              };
+
+  67.5.2  THE HELPER. `lblSpec.helpers.convergeFaces
+          (geometry, toVertex, strength)` mutates the
+          geometry in place. `toVertex` is a 3-element
+          array or a `THREE.Vector3`. `strength` is
+          clamped to [0, 1].
+
+  67.5.3  E34 SANITY. The E34 validator warns when
+          `toVertex` is outside the model's bbox — the
+          converge direction is "away" from the model,
+          which is almost always a bug.
+
+67.6 — RECOLOR BY PALETTE (PART 41.6 EXTENSION)
+-----------------------------------------------
+
+  67.6.0  PURPOSE. The existing `materialVariants`
+          helper (PART 41.6) handles per-material family
+          swaps. PART 67 adds `recolorByPalette`, a
+          RUNTIME recolor that walks the root and swaps
+          every MeshStandardMaterial.color from the
+          declared `meta.colorPalette[i].baseColor` to
+          `newPalette[i].baseColor`, matched by role
+          (skin / hair / cloth / metal / leather / wood
+          / …). No geometry rebuild, no scene-graph
+          mutation. Especially useful for CS2 finish
+          variants — re-skin a knife from "Damascus" to
+          "Fade" without rebuilding the mesh.
+
+  67.6.1  THE HELPER. `lblSpec.helpers.recolorByPalette
+          (root, newPalette)` returns the same root.
+          Each material that should participate needs
+          `material.userData.role = 'metal'` (or 'skin',
+          etc.) at build time. The helper looks up
+          `newPalette[i]` by the same role string.
+
+  67.6.2  E35 SANITY. The E35 validator warns when
+          `meta.colorPalette` declares a role that no
+          mesh uses (orphan palette entry — the recolor
+          would silently no-op). Non-blocking.
+
+67.7 — CHAIN PLACEMENT (PART 39.10)
+-----------------------------------
+
+  67.7.0  PURPOSE. The existing part-list pattern
+          (PART 1's `nodes`) places named parts by
+          hand. PART 67 adds `placeChain` for placing
+          N identical sub-parts end-to-end with optional
+          per-instance jitter on rotation / scale /
+          position. Useful for chain links, ammunition
+          belts, cable segments, fence posts, vertebrae.
+
+  67.7.1  THE HELPER. `lblSpec.helpers.placeChain
+          (parent, protoFactory, count, axis, jitter)`
+          returns an array of N links. `protoFactory` is
+          a `() => Object3D` that builds one link (the
+          helper auto-detects the link length from the
+          bbox of the first probe). `axis`: 'X' | 'Y' |
+          'Z'. `jitter`: `{ rotation, scale }` (radians
+          and 0-1 respectively).
+
+67.8 — TIME-DRIVEN MATERIAL ANIMATION (PART 28.7)
+-------------------------------------------------
+
+  67.8.0  PURPOSE. The existing `tick(dt, elapsed)`
+          (PART 5) does geometry animation. PART 67
+          adds `applyMaterialAnimation` for TIME-DRIVEN
+          material mutations (color / tiling / offset /
+          emissiveIntensity) — the same pattern as
+          fabYkun's `MaterialModifier`. Composes
+          trivially with the existing `tick(dt,
+          elapsed)` contract.
+
+  67.8.1  DECLARATION. The .ts factory declares the
+          animation on `meta.materialAnimation`:
+
+              meta.materialAnimation = [
+                { channel: 'color',             from: 0xff0000, to: 0x00ff00, duration: 2.0, curve: 'easeInOut' },
+                { channel: 'tilingX',           from: 1.0,      to: 4.0,      duration: 1.5, curve: 'linear' },
+                { channel: 'emissiveIntensity', from: 0.0,      to: 1.0,      duration: 0.5, curve: 'easeOut' }
+              ];
+
+          Curves: 'linear' | 'easeIn' | 'easeOut' |
+          'easeInOut'. Channels: 'color' | 'emissive' |
+          'tilingX' | 'tilingY' | 'offsetX' | 'offsetY'
+          | 'emissiveIntensity' | 'roughness' |
+          'metalness' | 'opacity'.
+
+  67.8.2  THE HELPER. `lblSpec.helpers.applyMaterial
+          Animation(material, animationArray, elapsed)`
+          mutates the material in place. The renderer
+          wires it into the existing `tick(dt, elapsed)`
+          loop automatically when `meta.materialAnimation`
+          is set. The factory's pattern:
+
+              // At build time:
+              const material = new THREE.MeshStandard
+                Material({ color: 0xff0000 });
+              // At render time (renderer handles it):
+              // lblSpec.helpers.applyMaterialAnimation(
+              //   material, meta.materialAnimation, elapsed);
+
+67.9 — PREFLIGHT CHECK (safety limits before gen)
+-------------------------------------------------
+
+  67.9.0  PURPOSE. The existing validators (E12, E21)
+          run AFTER the model is built. PART 67 adds
+          `preflightCheck` so the .ts factory can
+          validate the budget BEFORE generation —
+          mirroring VFXMeshLab's `VFXMeshBuildLimits
+          .TryValidate`. The factory calls it as the
+          first line:
+
+              const pre = lblSpec.helpers.preflightCheck({
+                maxSegmentsPerAxis: 4096,
+                maxOctaves:         12,
+                maxHelixTurns:      256,
+                maxBaseVerts:       500000,
+                maxFinalVerts:      1000000,
+                trisBudget:         30000,
+                modifiers:          meta.geometryPipeline
+                                          && meta.geometryPipeline
+                                          .modifiers,
+              });
+              if(!pre.ok){
+                console.error(pre.errors);
+                return new THREE.Group(); // bail out
+              }
+
+  67.9.1  E36 SANITY. The E36 validator warns when a
+          loaded model has > 100k triangles and
+          `meta.usedPreflight !== true` — the .ts
+          factory should have validated the budget
+          first.
+
+67.10 — SHADOW PROFILE (PART 44.5)
+----------------------------------
+
+  67.10.0 PURPOSE. Each loaded model can declare a
+          shadow profile. The renderer pairs the model
+          with a look-dev light rig. Mirrors VFX
+          Graph's per-graph `Shadow.asset` pattern.
+
+  67.10.1 DECLARATION. `meta.shadowProfile =
+          'soft-3-light' | 'sharp-1-light' |
+          'cs2-hdri' | 'none'`. The renderer maps
+          'soft-3-light' to the existing
+          `lblSpec.helpers.lookDevLights()` 3-light
+          setup, 'sharp-1-light' to a single
+          directional + small fill, 'cs2-hdri' to
+          the CS2 HDRI look (pairs with PART 45's
+          `cs2PbrProfile`), and 'none' to no look-dev
+          rig (the model renders in the existing
+          scene lights only).
+
+67.11 — UPDATED CROSS-REFERENCES
+--------------------------------
+
+  PART 67 layers on top of, never replaces:
+    - PART 1  (factory contract)         — TS path
+    - PART 2  (primitives)               — TS path
+    - PART 3  (geometry vocabulary)      — TS path (67.1)
+    - PART 7  (materials)                — TS path
+    - PART 7.5 (packed vertex channels)  — TS path (67.3)
+    - PART 8  (textures / UV)            — TS path (67.4)
+    - PART 28.7 (time-driven material)   — TS path (67.8)
+    - PART 39.9 (deform modifier stack)  — TS path (67.2)
+    - PART 39.10 (chain placement)       — TS path (67.7)
+    - PART 41.6 (materialVariants)       — TS path (67.6)
+    - PART 44.3 (6-family material)      — TS path
+    - PART 44.5 (shadow profile)         — TS path (67.10)
+    - PART 45  (CS2 PBR)                 — TS path (67.6
+                                            pairs recolor
+                                            with cs2Pbr
+                                            Profile for
+                                            finish variants)
+    - PART 33 / 34 / 35 / 36 / 37 / 38 / 39 / 40 / 41 / 42
+      / 43 / 44 (all unchanged)
+
+  The maintainer's "Reference-Repo Analysis for
+  low_poly_3d" notebook (compiled 2026-09-04) is the
+  source doc. It catalogues 4 reference repos
+  (VFXMeshLab, VfxGraphModeling, AnimatedMeshes,
+  Forge), their data shapes, their modifier stacks,
+  their UV projections, their preview modes, their
+  safety limits, and translates each pattern into
+  the existing `lblSpec` / Three.js contract. PART
+  46 keeps only the patterns that are directly
+  useful for the existing system (the rest are
+  documented in the notebook for future reference).
+  PART 67 is an EXTRA CAPABILITY for weapons, blades,
+  and metal-finish subjects (see 67.0.4 for the
+  explicit use-case lists) — not a rule every model
+  must follow. Style-agnostic in scope (67.0.3) but
+  content-specific in subject (67.0.4). No new
+  dependency (the helpers use only existing Three.js
+  primitives: CircleGeometry, RingGeometry,
+  SphereGeometry, PlaneGeometry, TubeGeometry, and
+  BufferAttribute math). No new export path, no new
+  mandatory field, no removed / weakened rule, no
+  removed / weakened existing extension, no removed
+  / weakened existing PART 45 helper, no removed /
+  weakened existing PART 41.6 family. No change to
+  PART 38.22's style agnosticism, no change to PART
+  38.14's GLB-first architecture, no change to PART
+  39.5's factory + options pattern, no change to
+  PART 41.6's existing 4 default families, no change
+  to PART 44.3's existing bone + magic families, no
+  change to PART 45.0.3's style agnosticism. Strict
+  upgrade, zero downgrades.
+================================================================================
+
+
+================================================================================
+PART 68-71 — v1.23 / v8.15 ADDITIONS: GEOMETRY + VFX + LOOKDEV
++ RANDOM + ALIGNMENT OPT-IN CAPABILITY BUNDLE
+(from jasonsturges/three-low-poly + achrefelouafi/
+LinearAbilityExtThreeJS)
+================================================================================
+
+  PART 68-71 layers onto PARTs 1-67 as a STRICTLY ADDITIVE
+  capability bundle. The source is the maintainer's "two-repo
+  analysis" working notebook (compiled 2026-09-05), which
+  catalogues the architecture-level patterns from two external
+  reference repos and translates them into the existing
+  `lblSpec` / Three.js contract.
+
+  CRITICAL RULES:
+    - PART 68-71 is an EXTRA CAPABILITY, not a rule.
+    - A model that doesn't use any of the new meta.* fields
+      loads identically to v1.22 / v8.14.
+    - All 50+ new helpers are OPT-IN by construction.
+    - All 4 new validators (E37-E40) are non-blocking and
+      fire ONLY when the corresponding opt-in flag is set.
+    - Style-agnostic in scope, but especially useful for
+      weapons, blades, and metal-finish subjects.
+
+  SUMMARY (apply the same rules on this path):
+
+  PART 68.1 — System helpers (P0)
+    frame, lblFrameTick, mulberry32, splitmix32, deriveSubSeed,
+    createRandom, makeObjectPool, makeAssetLoader
+
+  PART 68.2 — 13 BufferGeometry classes (P1)
+    StarGeometry, PolygonGeometry, AnnulusGeometry, HeartGeometry,
+    SpadeGeometry, DiamondGeometry, BurstGeometry,
+    ArchedSlabGeometry, ArchGeometry, EdgedBoxGeometry,
+    MoldingGeometry, PumpkinGeometry, LeafGeometry
+
+  PART 68.3 — Procedural textures (P1)
+    makeCheckerboard, makeRadialGradient, makeLinearGradient
+    + 5 new MAT_DB patterns (pat_checker_wood, pat_checker_stone,
+    pat_radial_halo, pat_radial_aoe, pat_linear_heathaze)
+    + 6 new MAT_DB color ramps (mat_ramp_fire, mat_ramp_ice,
+    mat_ramp_poison, mat_ramp_holy, mat_ramp_shadow, mat_ramp_solar)
+
+  PART 68.4 — Alignment helpers (P2)
+    alignToEdge, alignToRow, alignToSurface, center
+
+  PART 68.5 — Lifetime color ramps (P1)
+    buildMatRamp(rampKeyOrObject) — pairs with `meta.matRamp`
+
+  PART 68.6 — Sky helpers (P2)
+    skyFullMoon, skyStarField
+
+  PART 68.7 — Atmospheric effects (P1)
+    atmosphereRain, atmosphereGroundFog, atmosphereDustMotes
+
+  PART 68.8 — Lookdev helpers (P2)
+    cyclorama, groundGrid, contactShadows
+
+  PART 68.9 — Closed-form curves (P2)
+    constantCurvatureArc, circularArc, helixPath, spiralPath
+
+  PART 68.10 — Easing / Falloff (P2)
+    easing (24 functions), falloff (8 functions)
+
+  PART 68.11 — Bone segments (P2)
+    boneSegments (20-bone default table for bone-anchored VFX)
+
+  NEW META.* FIELDS (all opt-in):
+    meta.matRamp?:  { birth, early, late, death } OR shorthand
+                    string ('mat_ramp_fire' | 'mat_ramp_ice' | ...)
+    meta.gizmo?:    { shape, range, minRange?, zoneRadius?,
+                      gateWidth?, gateHeight?, ringRadius?, ringHover? }
+    meta.vfx?:      { embers?, sparks?, motes?, debris?,
+                      boneAnchored?, boneSegments? }
+    meta.usesMathRandom?: boolean (E37 inspects this)
+
+  NEW VALIDATORS (4 new, all non-blocking + opt-in):
+    E37 — Sub-seed usage (fires when meta.usesMathRandom=true)
+    E38 — Lifetime color ramp validity (fires when meta.matRamp set)
+    E39 — Gizmo shape range (fires when meta.gizmo set)
+    E40 — Bone segment coverage (fires when meta.vfx.boneAnchored=true)
+
+  TOTAL: 50+ new `lblSpec.helpers` entries + 4 new validators.
+
+  No new dependency, no new export path, no new mandatory field,
+  no removed / weakened rule, no removed / weakened existing
+  extension. Strict upgrade, zero downgrades.
+
+  Especially useful for weapons, blades, and metal-finish
+  subjects — see CHANGES_SUMMARY.md for the worked example
+  (Karambit knife that uses mat_ramp_fire for the blade glow
+  + bone segments for hand-anchored ember particles).
+================================================================================
