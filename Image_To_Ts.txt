@@ -2,6 +2,14 @@
 LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.25 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
+>>> v8.17 RIGGING — If the model needs ANY rigging or
+>>> animation, also see the v8.17 cross-ref in the
+>>> Prompt_To_*.txt master spec (PART 75-89) and the
+>>> worked examples in public/EXAMPLES_v8_17.md.
+>>> The image-to-TS path inherits the same v8.17
+>>> opt-in capability bundle with TypeScript type
+>>> annotations on the public API.
+================================================================================
 CHANGELOG
   v1.25 (2026-09-06) — PROCEDURAL RIGGING + SKIN-WEIGHTS
     INTEGRATION (13 NEW OPT-IN PARTs, PART 75-89). See the

@@ -2,6 +2,30 @@
 LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.25 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
+>>> v8.17 RIGGING QUICK-START — If the model needs ANY
+>>> rigging, animation, or auto-rigger behavior, also
+>>> read these PARTs (in this order):
+>>>   PART 34    — the basic rigGraph escape hatch
+>>>   PART 66.1[10] — the 13 canonical Bone_* ids
+>>>                    (extended to 21 by PART 77, then
+>>>                    to 30 by PART 81)
+>>>   PART 75    — the 6-value rigOptions.skin enum
+>>>   PART 76    — the skeleton class + 6 template files
+>>>   PART 77    — the Mixamo bone remap
+>>>   PART 81    — chain-curvature animation
+>>>   PART 82    — the 12-constraint catalog
+>>> See public/EXAMPLES_v8_17.md for 10 worked JSON
+>>> snippets; see public/models/Model_6.ts for a
+>>> complete v8.17 reference model. Public API:
+>>>   lblSpec.helpers.buildGeodesicWeights,
+>>>   lblSpec.helpers.buildHeatDiffusionWeights,
+>>>   lblSpec.helpers.buildInverseDistanceWeights,
+>>>   lblSpec.helpers.buildSegmentationWeights,
+>>>   lblSpec.helpers.applyChainCurvature,
+>>>   lblSpec.helpers.applyConstraintsPost,
+>>>   lblSpec.helpers.autoRigVoxel,
+>>>   lblSpec.helpers.autoRigPose.
+================================================================================
 CHANGELOG
   v1.25 (2026-09-06) — PROCEDURAL RIGGING + SKIN-WEIGHTS
     INTEGRATION (13 NEW OPT-IN PARTs, PART 75-89).
@@ -20853,6 +20877,25 @@ OVERVIEW
   bone structure. The result is fed to PART 75.4
   (inverse-distance weights) for the weight build.
 
+  >>> v8.17 STUB DISCLAIMER: PART 78 ships as a
+  >>> WORKING STUB in v8.17. The full glb-rigger
+  >>> voxelization + 3D thinning + Douglas-Peucker
+  >>> line-approximation pipeline is a v8.18+ feature.
+  >>> The v8.17 stub in index.html (`__lblAutoRigVoxel`)
+  >>> does a bounding-box heuristic + synthesizes a
+  >>> 5-bone baseline (Bone_Root, Bone_Spine, Bone_Chest,
+  >>> Bone_Head, Bone_Shoulder_L). The model loads and
+  >>> animates correctly with this stub, but the rig
+  >>> quality is mediocre. The renderer logs an info
+  >>> message when the stub is used. The full pipeline
+  >>> is the v8.18 priority-1 follow-up.
+  >>>
+  >>> AI authoring rule: continue to declare
+  >>> `userData.autoRig: "voxel"` per the spec; the
+  >>> renderer will swap in the real pipeline when
+  >>> it ships. Models that use this flag do not need
+  >>> to be re-authored.
+
   78.0.1  EXTENDS, not replaces. PART 78 is a NEW
           fallback in the chain:
             blueprint.skeleton (PART 30)
@@ -20973,6 +21016,30 @@ OVERVIEW
   blueprint.skeleton OR userData.rigGraph is present
   AND no userData.useTemplateSkeleton is declared,
   the renderer:
+
+  >>> v8.17 STUB DISCLAIMER: PART 79 ships as a
+  >>> WORKING STUB in v8.17. The full BodyPix TF.js
+  >>> integration + ray-cast + segmentation-based
+  >>> weight pipeline is a v8.18+ feature. The v8.17
+  >>> stub in index.html (`__lblAutoRigPose`) returns
+  >>> a canonical 13-bone humanoid in A-pose, scaled
+  >>> to the model's bounding box. The model loads and
+  >>> animates correctly with this stub, but the rig
+  >>> quality is mediocre (it always returns an A-pose
+  >>> regardless of the input pose; the segmentation
+  >>> map is null so PART 75.5 falls back to
+  >>> PART 75.2 geodesic weights). The renderer logs
+  >>> an info message when the stub is used.
+  >>>
+  >>> BodyPix is NOT loaded in v8.17 (no ~2 MB
+  >>> download, no IndexedDB cache). The full pipeline
+  >>> is the v8.18 priority-2 follow-up.
+  >>>
+  >>> AI authoring rule: continue to declare
+  >>> `userData.autoRig: "pose"` per the spec; the
+  >>> renderer will swap in the real pipeline when it
+  >>> ships. Models that use this flag do not need to
+  >>> be re-authored.
 
     1. Renders the mesh to a 2D canvas from the +Z
        frontal camera.
@@ -21130,6 +21197,23 @@ OVERVIEW
   weights) as an OPT-IN capability bundle. The source
   is sketchpunklabs/autoskinning's (Section 2.6)
   GPGPU distance-field-into-DataTexture trick.
+
+  >>> v8.17 STATUS: PART 80 ships as a NO-OP STUB
+  >>> in v8.17. The `compute` flag is accepted and
+  >>> validated, but the GPU path always falls back
+  >>> to PART 75.4's CPU implementation regardless of
+  >>> the value. The full GPGPU distance-field
+  >>> pipeline (sketchpunklabs' TransformFeedback
+  >>> trick) is a v8.18+ feature.
+  >>>
+  >>> AI authoring rule: continue to declare
+  >>> `rigOptions.compute: "auto"` per the spec; the
+  >>> renderer will swap in the GPU path when it
+  >>> ships. Models that use this flag do not need
+  >>> to be re-authored. The CPU path is what runs
+  >>> today; latency is < 10 ms for low-poly
+  >>> (< 2000 vertices) which is what most v8.17
+  >>> models are.
 
   PART 80 adds a NEW rigOptions flag:
 
@@ -21841,6 +21925,20 @@ OVERVIEW
   an OPT-IN capability bundle. The source is
   Aero-Ex/ComfyUI-SkinTokens's (Section 3.4) voxel
   post-processing.
+
+  >>> v8.17 STATUS: PART 87 ships as a NO-OP STUB
+  >>> in v8.17. The `postProcess` flag is accepted
+  >>> and validated, but only the "none" path is
+  >>> functional. The "voxel-smooth" path logs an
+  >>> info message and returns the raw weights. The
+  >>> full voxel-domain smoothing is a v8.18+ feature.
+  >>>
+  >>> AI authoring rule: continue to declare
+  >>> `rigOptions.postProcess: "voxel-smooth"` per
+  >>> the spec for cavity-heavy meshes; the renderer
+  >>> will swap in the real pipeline when it ships.
+  >>> Models that use this flag do not need to be
+  >>> re-authored.
 
   PART 87 adds a NEW rigOptions flag:
 

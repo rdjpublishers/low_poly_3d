@@ -2,6 +2,13 @@
 LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.17 — IMAGE-TO-JSON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
+>>> v8.17 RIGGING — If the model needs ANY rigging or
+>>> animation, also see the v8.17 cross-ref in the
+>>> Prompt_To_*.txt master spec (PART 75-89) and the
+>>> worked examples in public/EXAMPLES_v8_17.md.
+>>> The image-to-JSON path inherits the same v8.17
+>>> opt-in capability bundle.
+================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
 code-only output that produces an actual Three.js Group from a reference
 image (real geometry code, per-frame tick()/VFX animation, and richer

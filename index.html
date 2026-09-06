@@ -2616,6 +2616,41 @@ window.LBL_V8_17_API = {
 };
 console.info("[LBL v8.17] procedural-rigging + skin-weights API installed. See window.LBL_V8_17_API for the public surface, PART 75-89 in Prompt_To_*.txt for the spec.");
 
+// ---------------------------------------------------------------------------
+// v8.17 smoke test — runs once on first model load to verify that all 6
+// PART 76 skeleton templates are reachable from the renderer's base path.
+// Logs a clear success / failure line so the maintainer can verify the
+// path on every deploy without running a full model. Per PART 76.2, the
+// templates live at ./public/rig/skeletons/*.json relative to the page.
+// ---------------------------------------------------------------------------
+let __lblV8_17_SmokeTestRan = false;
+async function __lblV8_17_SmokeTest() {
+  if (__lblV8_17_SmokeTestRan) return;
+  __lblV8_17_SmokeTestRan = true;
+  const templates = ["humanoid", "quadruped", "bird", "fish", "insect", "object"];
+  const results = await Promise.allSettled(templates.map(async (cls) => {
+    try {
+      const tpl = await __lblLoadSkeletonTemplate(cls);
+      return { cls, ok: true, jointCount: (tpl.joints || []).length };
+    } catch (e) {
+      return { cls, ok: false, error: e && e.message };
+    }
+  }));
+  const ok = results.filter(r => r.value && r.value.ok).length;
+  const fail = templates.length - ok;
+  if (fail === 0) {
+    console.info(`[LBL v8.17 smoke test] OK — all ${templates.length} skeleton templates reachable: ` +
+      results.map(r => `${r.value.cls}=${r.value.jointCount}j`).join(", "));
+  } else {
+    console.warn(`[LBL v8.17 smoke test] PARTIAL — ${ok}/${templates.length} templates reachable. ` +
+      `Failed: ` + results.filter(r => r.value && !r.value.ok).map(r => `${r.value.cls} (${r.value.error})`).join(", ") +
+      `. PART 76 auto-rigger will fall back to PART 32.x A2 heuristic for failed templates.`);
+  }
+}
+// Fire after a short delay so the page has settled; not awaited so it
+// doesn't block the first model load.
+setTimeout(__lblV8_17_SmokeTest, 100);
+
 // ============================================================================
 // END PART 75-89 RENDERER-SIDE STUBS
 // ============================================================================
