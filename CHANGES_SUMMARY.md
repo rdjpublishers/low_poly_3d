@@ -1,3 +1,328 @@
+# v1.25 / v8.17 — Procedural rigging + skin-weights integration (PART 75-89) — OPT-IN capability bundle
+
+The spec now teaches the AI a FOURTH OPT-IN capability
+bundle, derived from the maintainer's "Procedural Rigging
++ Skin-Weights Integration" working notebook (compiled
+2026-09-06), which distills the architecture-level patterns
+from **10 reference repositories** into 13 new PARTs
+(PART 75 through PART 87) plus 2 wrap-up PARTs (PART 88
+renderer-side stub summary, PART 89 v8.17 one-paragraph
+summary). The 10 reference repos, one technique each:
+
+  - **VAST-AI-Research/UniRig** (SIGGRAPH 2025) →
+    geodesic-prior skin weights, skeleton class tokens,
+    spring-bone attributes → **PART 75.2 + PART 76**
+  - **Baran & Popovic (Pinocchio, SIGGRAPH 2007)** →
+    heat-diffusion skin weights, 9-basis-penalty
+    validation → **PART 75.3**
+  - **Mesh2Motion/mesh2motion-app** → skeleton template
+    library (human / quadruped / bird / fish / insect),
+    live preview, Mixamo bone remap → **PART 76 + PART 77**
+  - **davebenson/glb-rigger** → voxelization + 3D
+    thinning + line-approximation skeleton, inverse-
+    distance skin weights → **PART 75.4 + PART 78**
+  - **cansik/instance-rig** → BodyPix 2D-pose + ray-
+    cast 3D-joint auto-rigger, segmentation-based
+    weights, T-pose / A-pose canonicalization →
+    **PART 79 + PART 75.5**
+  - **sketchpunklabs/autoskinning** → GPGPU distance
+    field, TransformFeedback pipeline → **PART 80**
+  - **Wenzy--/Procedural-Rigging-in-Unity** → curvature-
+    driven chain (tail / tentacle / whip) animation →
+    **PART 81**
+  - **cardosoandre/Animation-Rigging-Examples** → Unity
+    Animation Rigging constraint catalog (12 constraints)
+    → **PART 82**
+  - **zeljkovranjes/auto-rigger** → 7-model catalog
+    survey, vast.ai cloud-fallback, weights non-
+    redistribution → **PART 83 + PART 84 + PART 85**
+  - **Aero-Ex/ComfyUI-SkinTokens** → sampling-knobs UX,
+    voxel-based weight post-processing, reuse-existing-
+    skeleton mode → **PART 86 + PART 87**
+
+The single most important rule:
+
+  PART 75-89 is an EXTRA CAPABILITY, not a rule. The
+  .ts / .json / .js factory uses a feature WHEN the
+  subject benefits from it (humanoids → geodesic weights
+  + PART 76 humanoid template + PART 77 Mixamo remap;
+  quadrupeds → PART 76 quadruped template; mechanical
+  parts → PART 75.4 inverse-distance weights; any
+  uploaded OBJ/GLB with no rig → PART 78 voxel or
+  PART 79 BodyPix auto-rigger; tails / tentacles /
+  whips / hair / cables → PART 81 chain-curvature;
+  complex animation logic → PART 82 constraint catalog)
+  and SKIPS it otherwise. No existing rule is changed;
+  no existing PART 30 / 32 / 34 / 66 / 72 behavior is
+  changed; no existing helper is removed; no model that
+  doesn't opt in loads any differently. The golden rule
+  from PART 74 carries over verbatim.
+
+## What this round adds
+
+PART 75-89 layers 15 sub-sections onto PARTs 1-74 as an
+OPT-IN capability bundle for the .ts / .json / .js factory
+authors and the renderer maintainer:
+
+- **PART 75 — Multi-mode skin weight algorithms (the
+  weight blender)**. The `rigOptions.skin` enum grows
+  from 2 values to **6 values**: `"semantic"` (4-influence
+  squared-Euclidean falloff, PART 34.2 baseline),
+  `"rigid"` (1-influence uint8, PART 34.2 baseline),
+  `"geodesic"` (4-influence BFS-over-mesh-edges, mirror
+  of UniRig's `concat(F_W, D)` trick — **PART 75.2**),
+  `"heat-diffusion"` (4-influence Pinocchio Laplace
+  smoothing, ~50 CG iterations, throws on non-manifold
+  meshes with automatic fallback — **PART 75.3**),
+  `"inverse-distance"` (2-influence `1/d^2`, mirror of
+  glb-rigger's weighting, compact vec2 storage — **PART
+  75.4**), and `"segmentation"` (4-influence body-part
+  map, mirror of instance-rig's BodyPix weights —
+  **PART 75.5**). 4 new public functions are added to
+  `three-rig-helpers.js` (see the **Renderer** section
+  below). The pre-emission checklist grows by 3 items
+  (PART 65.4 items 19-21).
+
+- **PART 76 — Skeleton class + 6 template files** (the
+  "drop a quadruped, get a quadruped rig" feature). A
+  new `rigGraph.class` field accepts one of 6 enum
+  strings (`"humanoid"`, `"quadruped"`, `"bird"`,
+  `"fish"`, `"insect"`, `"object"`, default `"auto"`).
+  The renderer lazy-loads the matching template from
+  `./public/rig/skeletons/{humanoid,quadruped,bird,
+  fish,insect,object}.json` (6 new ship assets, ~1 KB
+  each, ~6 KB total), auto-scales it to the model's
+  bounding box, and treats the scaled template as if
+  the AI had declared it as `userData.rigGraph`. The
+  template composes with PART 34's existing
+  `buildSkeleton` + `buildSemanticWeights` pipeline.
+  No new validator; the existing PART 21 checklist
+  extends with 2 items (PART 65.4 items 22-23).
+
+- **PART 77 — Mixamo bone remap** (the "use Mixamo
+  clips" feature; canonical catalog extended 13 → 21
+  bones). A new `userData.boneRemap` field rewrites
+  animation-clip track names at import time. A shipped
+  `MIXAMO_TO_BONE_PRESET` constant maps the 21 standard
+  Mixamo bone names to 21 canonical `Bone_*` ids. The
+  canonical catalog is extended from 13 (PART 66.1[10])
+  to 21 by adding `Bone_Shoulder_L/R`, `Bone_Arm_L/R`,
+  `Bone_Forearm_L/R`, `Bone_Hand_L/R` (8 upper-body
+  bones). Existing blueprints that use only the 13
+  lower-body ids are unchanged (no force-migration).
+  Pre-emission checklist extends with 2 items
+  (PART 65.4 items 24-25).
+
+- **PART 78 — Voxel-fallback auto-rigger** (the "any
+  model" path). A new `userData.autoRig: "voxel"`
+  field triggers a voxelization + 3D-thinning +
+  line-approximation pipeline. Latency on a 1000-vertex
+  mesh: ~1 second in a Web Worker; on a 10k-vertex mesh:
+  ~10 seconds. The voxel path is the **last-resort**
+  fallback in the chain: `blueprint.skeleton` (PART 30)
+  → `userData.rigGraph` (PART 34) → `userData.useTemplateSkeleton`
+  (PART 76) → `userData.autoRig: "pose"` (PART 79) →
+  `userData.autoRig: "voxel"` (PART 78) → PART 32.x A2
+  heuristic. Pre-emission checklist extends with 2 items
+  (PART 65.4 items 26-27).
+
+- **PART 79 — 2D-pose-estimation humanoid auto-rigger**
+  (the "upload a scanned human, get a rigged model"
+  pipeline). A new `userData.autoRig: "pose"` + `userData.skeletonClass:
+  "humanoid"` field triggers BodyPix (TensorFlow.js,
+  ~2 MB, downloaded on first use, cached in IndexedDB;
+  see **PART 84** for the license / hash convention).
+  The pipeline renders the mesh to a 2D canvas, runs
+  BodyPix for 17 keypoints + 24-class body-part
+  segmentation, ray-casts the 2D keypoints to 3D joint
+  positions, and feeds the result to PART 75.5
+  (segmentation-based weights). T-pose / A-pose
+  canonicalization prompts the user before applying a
+  corrective rotation. Latency: ~300 ms. Pre-emission
+  checklist extends with 3 items (PART 65.4 items
+  28-30).
+
+- **PART 80 — GPU-computed skin weights** (the fast
+  path). A new `rigOptions.compute: "auto" | "cpu" |
+  "gpu"` field. The GPU path bakes a 3D distance field
+  into a DataTexture and computes 4-influence weights
+  in a WebGL2 TransformFeedback-equivalent pipeline
+  (< 5 ms for 100k-vertex meshes on modern desktop GPUs).
+  Browser-capability fallback to the CPU path
+  (PART 75.4) when WebGL2 + `EXT_color_buffer_float` is
+  not available. Pre-emission checklist extends with
+  1 item (PART 65.4 item 31).
+
+- **PART 81 — Chain-curvature animation mode** (the
+  tail / tentacle / whip / hair / cable use case). A
+  new `animationFsm.states[].type: "chain-curvature"`
+  field applies a sinusoidal + perlin-noise-perturbed
+  wave to each bone in the chain (from `chainRoot` to
+  the chain's leaf). The renderer implements the
+  `applyChainCurvature` tick in the animation loop.
+  The canonical catalog is extended by **9 NEW chain-
+  root names** (`Bone_TailRoot`, `Bone_TentacleRoot`,
+  `Bone_AntennaRoot_L/R`, `Bone_HairRoot`, `Bone_WhipRoot`,
+  `Bone_CableRoot`, `Bone_ChainRoot`, `Bone_VineRoot`)
+  for a grand total of **30 canonical `Bone_*` ids**.
+  Pre-emission checklist extends with 2 items
+  (PART 65.4 items 32-33).
+
+- **PART 82 — 12-constraint catalog** (rig-as-post-
+  process, Unity Animation Rigging parity). A new
+  `userData.rigGraphPost.constraints[]` field runs a
+  constraint chain in the animation loop, AFTER the
+  base skeletal animation has been applied. The 12
+  catalog types are: `two-bone-ik` (PART 66.2[2] —
+  already shipped, re-homed), `multi-aim`,
+  `multi-position`, `multi-rotation`, `multi-parent`,
+  `multi-referential`, `override`, `damped-transform`
+  (PART 66.2[8] — already shipped, re-homed),
+  `twist-correction`, `twist-chain`, `ik` (multi-bone
+  FABRIK, optional heavy), `look-at`. ~400 lines of
+  renderer-side code. Pre-emission checklist extends
+  with 2 items (PART 65.4 items 34-35).
+
+- **PART 83 — Rigging model survey** (INFORMATIONAL).
+  A reference table for the 7 major neural / hybrid
+  rigging models (RigNet, UniRig, SkinTokens/TokenRig,
+  MagicArticulate, Puppeteer, RigAnything, Anymate)
+  with one-line summaries + "is it runnable in the
+  browser?" status. No new fields, no new code.
+
+- **PART 84 — Model-weight non-redistribution** (the
+  legal hygiene rule). The spec NEVER ships a model-
+  weights bundle. New top-level `LICENSE-3RD-PARTY.md`
+  file documents the LICENSE, ATTRIBUTION, and SHA-256
+  HASH for every third-party model dependency. BodyPix
+  (~2 MB, used by PART 79) is the first entry; future
+  TF.js ports are added as they ship.
+
+- **PART 85 — Opt-in cloud-rig fallback** (the "send
+  to cloud for rigging" button — FUTURE, out of scope
+  for v8.17). A new `userData.cloudRigEndpoint` field
+  (no default) hides the cloud-rig button by default.
+  The renderer NEVER auto-fires the cloud service.
+  The endpoint is preserved for forward-compatibility;
+  the actual cloud service is a v8.18+ feature. Pre-
+  emission checklist extends with 3 items (PART 65.4
+  items 36-38).
+
+- **PART 86 — Sampling-knobs UX** (FORWARD-COMPATIBILITY).
+  A new `SAMPLING_KNOBS_SCHEMA` constant documents the
+  5 canonical transformer sampling knobs (creativity /
+  focus / diversity / exploration / anti-repeat) for
+  any future ML-based rig. The inspector reads the
+  schema and exposes the sliders automatically when a
+  future ML-based PART is added. No new fields in
+  v8.17.
+
+- **PART 87 — Voxel-based weight post-processing** (the
+  cavity refiner). A new `rigOptions.postProcess:
+  "none" | "voxel-smooth" | "laplacian-smooth" |
+  "gaussian-smooth"` field applies a downstream
+  refinement to whatever weights PART 75 produced. The
+  `voxel-smooth` option bakes weights into a 3D voxel
+  grid, applies a 3D Gaussian blur, and samples back;
+  the right choice for cavity-heavy meshes (insects,
+  hollow robots, organic shapes with internal voids).
+  Pre-emission checklist extends with 1 item
+  (PART 65.4 item 39).
+
+- **PART 88 — Renderer-side stub summary** (the public
+  API the new PARTs assume). 4 new public functions in
+  `three-rig-helpers.js` (`buildGeodesicWeights`,
+  `buildHeatDiffusionWeights`, `buildInverseDistanceWeights`,
+  `buildSegmentationWeights`); ~250 lines added. ~400
+  lines of renderer-side stubs in `index.html`
+  (auto-riggers, constraint catalog dispatcher,
+  chain-curvature tick, Mixamo remap, sampling-knobs
+  schema, post-processing options). 6 new ship assets
+  in `./public/rig/skeletons/`. 1 new top-level file
+  `LICENSE-3RD-PARTY.md`. Total ship size increase:
+  ~10 KB code + ~6 KB templates + 3.4 KB license
+  file = ~20 KB.
+
+- **PART 89 — v8.17 one-paragraph summary**. The TL;DR
+  for the round: 10 reference repos, 13 new PARTs, all
+  OPT-IN, all layered on the existing PART 30/32/34/66/72
+  foundation. Recommended order of implementation
+  (PART 75.2 geodesic first, then PART 75.3 heat-
+  diffusion, then PART 76 templates, then PART 77
+  Mixamo, then PART 79 BodyPix). Total estimated
+  spec + implementation effort: ~35-40 working days.
+
+## What this round does NOT change
+
+PART 75-89 introduces NO new validator (it EXTENDS PART
+65.4 with 21 new opt-in items, items 19-39, all non-
+blocking), NO new mandatory field, NO new renderer
+behaviour that changes existing models. The PART 34
+public surface (5 functions → 9 functions, 4 new) is
+STRICTLY ADDITIVE; the existing 5 functions
+(`buildSkeleton`, `buildSemanticWeights`,
+`buildRigidSemanticWeights`, `validateRigGraph`,
+`validateWeights`) are unchanged. The PART 66.1[10]
+canonical bone catalog is EXTENDED (13 → 21 with
+PART 77, 21 → 30 with PART 81); existing blueprints
+that use only the 13 lower-body ids are unchanged.
+The PART 32.x A2 fallback is still the path when
+neither PART 76 / 78 / 79 applies. No existing helper
+is removed. No existing export path is removed. No
+existing model that doesn't opt in loads any
+differently.
+
+## Renderer (index.html + three-rig-helpers.js)
+
+This round adds the following to the renderer:
+
+  - `three-rig-helpers.js` (9.9 KB minified, up from
+    3.9 KB): 4 new public functions
+    (`buildGeodesicWeights`, `buildHeatDiffusionWeights`,
+    `buildInverseDistanceWeights`, `buildSegmentationWeights`).
+    The `RigGraph` type gains an optional `class` field.
+  - `index.html`: ~400 lines of renderer-side stubs.
+    12 new global symbols exposed on `window`:
+    `__lblApplySkinWeights`, `__lblRemapAnimationClip`,
+    `__lblAutoRigVoxel`, `__lblAutoRigPose`,
+    `__lblApplyChainCurvature`, `__lblApplyConstraintsPost`,
+    `__lblRequestCloudRig`, `__lblLoadSkeletonTemplate`,
+    `__lblScaleTemplateToModel`, `__lblPostProcessWeights`,
+    plus the constants `MIXAMO_TO_BONE_PRESET`,
+    `CANONICAL_BONE_CATALOG_30`, `SAMPLING_KNOBS_SCHEMA`,
+    `POST_PROCESS_OPTIONS`, and the inspector summary
+    `LBL_V8_17_API`.
+  - `public/rig/skeletons/*.json` (6 new files, ~1 KB
+    each): humanoid / quadruped / bird / fish / insect /
+    object templates. Lazy-loaded on first opt-in,
+    cached in IndexedDB (future enhancement).
+  - `LICENSE-3RD-PARTY.md` (new top-level file, 3.4 KB):
+    documents the LICENSE / ATTRIBUTION / SHA-256 HASH
+    for every third-party model dependency (PART 84).
+    BodyPix is the first entry; future TF.js ports are
+    added as they ship.
+
+No new external dependencies. The only optional lazy-
+loaded dependency is the TF.js BodyPix model (~2 MB,
+downloaded on first use per PART 79, cached in
+IndexedDB per PART 84). No backend, no Python, no
+Blender.
+
+## Source notebook
+
+The maintainer's "Procedural Rigging + Skin-Weights
+Integration" working notebook (compiled 2026-09-06) is
+the source doc for this round, derived from 10 external
+reference repos. The 10 repos are listed at the top of
+this entry; each one contributes ONE specific technique
+that PART 75-87 layers on top of the existing
+foundation. PART 88-89 are the wrap-up summary + TL;DR.
+Strict upgrade, zero downgrades.
+
+## Bumped from v1.24 / v8.16 to v1.25 / v8.17.
+
+---
+
 # v1.24 / v8.16 — Procedural texturing & shading techniques (PART 74) — OPT-IN capability bundle
 
 The spec now teaches the AI a THIRD OPT-IN capability

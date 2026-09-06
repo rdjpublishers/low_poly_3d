@@ -1,0 +1,27 @@
+{
+  "class": "insect",
+  "_meta": {
+    "source": "Mesh2Motion distilled, see PART 76.2 of LBL v1.25 / v8.17",
+    "restPose": "0.05 m long standing",
+    "jointCount": 17
+  },
+  "joints": [
+    { "id": "Bone_Root",     "restPosition": [0, 0.00, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Head",     "parentId": "Bone_Root", "restPosition": [0, 0.03, 0.02], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Thorax",   "parentId": "Bone_Root", "restPosition": [0, 0.025, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Abdomen",  "parentId": "Bone_Root", "restPosition": [0, 0.015, -0.01], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Tail",     "parentId": "Bone_Abdomen", "restPosition": [0, 0.005, -0.025], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegCoxa_FL","parentId": "Bone_Thorax", "restPosition": [ 0.015, 0.02,  0.015], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegFemur_FL","parentId": "Bone_LegCoxa_FL", "restPosition": [ 0.025, 0.01,  0.025], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegTibia_FL","parentId": "Bone_LegFemur_FL", "restPosition": [ 0.030, -0.005,  0.030], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegCoxa_FR","parentId": "Bone_Thorax", "restPosition": [-0.015, 0.02,  0.015], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegFemur_FR","parentId": "Bone_LegCoxa_FR", "restPosition": [-0.025, 0.01,  0.025], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegTibia_FR","parentId": "Bone_LegFemur_FR", "restPosition": [-0.030, -0.005,  0.030], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegCoxa_ML","parentId": "Bone_Thorax", "restPosition": [ 0.015, 0.02,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegFemur_ML","parentId": "Bone_LegCoxa_ML", "restPosition": [ 0.025, 0.01,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegTibia_ML","parentId": "Bone_LegFemur_ML", "restPosition": [ 0.030, -0.005,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegCoxa_BL","parentId": "Bone_Abdomen", "restPosition": [ 0.012, 0.012, -0.012], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegFemur_BL","parentId": "Bone_LegCoxa_BL", "restPosition": [ 0.020, 0.005, -0.020], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_LegTibia_BL","parentId": "Bone_LegFemur_BL", "restPosition": [ 0.025, -0.008, -0.025], "restRotation": [0, 0, 0, 1] }
+  ]
+}

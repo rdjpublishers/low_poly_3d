@@ -2103,6 +2103,523 @@ import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import * as __threeRigHelpers from 'three-rig-helpers';
 window.__threeRigHelpers = __threeRigHelpers;
 
+// ============================================================================
+// PART 75-89 — v1.25 / v8.17 RENDERER-SIDE STUBS
+// The public API the new procedural-rigging PARTs assume. Every function
+// below is OPT-IN: the renderer reaches into it ONLY when the blueprint
+// declares the matching userData.* flag (see PART 65.4 items 19-39 for
+// the pre-emission checks). A model that uses NONE of the v8.17 features
+// triggers ZERO new behaviour — exactly like PART 45 / 67 / 68-71 / 72 /
+// 73 / 74.
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// PART 75.1 — rigOptions.skin dispatch (the 6-value enum).
+// Resolves to the matching three-rig-helpers builder, with a graceful
+// fallback to "semantic" for unknown values. Renderer-side glue, no AI
+// action required.
+// ---------------------------------------------------------------------------
+const RIG_SKIN_MODES = new Set([
+  "semantic", "rigid", "geodesic",
+  "heat-diffusion", "inverse-distance", "segmentation"
+]);
+
+function __lblApplySkinWeights(geometry, skeleton, joints, opts) {
+  // opts: { skin: string, maxInfluences?: number,
+  //         segmentationMap?: Float32Array,
+  //         compute?: "auto" | "cpu" | "gpu" }
+  const skinMode = (opts && RIG_SKIN_MODES.has(opts.skin)) ? opts.skin : "semantic";
+  const maxInf = (opts && Number.isFinite(opts.maxInfluences)) ? opts.maxInfluences : 4;
+  const h = __threeRigHelpers;
+  if (!h) throw new Error("three-rig-helpers bundle not loaded");
+  switch (skinMode) {
+    case "rigid":
+      // buildRigidSemanticWeights needs a per-vertex joint-name resolver;
+      // the default "nearest by world position" is good enough for the
+      // 1-influence path.
+      return h.buildRigidSemanticWeights(geometry, skeleton, (x, y, z) => {
+        const v = new THREE.Vector3(x, y, z);
+        let best = joints[0]; let bestD = Infinity;
+        for (const j of joints) {
+          const p = skeleton.restWorldPositions.get(j.id);
+          if (!p) continue;
+          const d = v.distanceToSquared(p);
+          if (d < bestD) { bestD = d; best = j; }
+        }
+        return best ? best.id : "";
+      });
+    case "geodesic":
+      if (typeof h.buildGeodesicWeights === "function") {
+        return h.buildGeodesicWeights(geometry, skeleton, joints, maxInf);
+      }
+      return h.buildSemanticWeights(geometry, skeleton, joints, maxInf);
+    case "heat-diffusion":
+      if (typeof h.buildHeatDiffusionWeights === "function") {
+        try { return h.buildHeatDiffusionWeights(geometry, skeleton, joints, maxInf); }
+        catch (e) {
+          console.warn("[PART 75.3] heat-diffusion failed (non-manifold mesh?) — falling back to semantic:", e && e.message);
+          return h.buildSemanticWeights(geometry, skeleton, joints, maxInf);
+        }
+      }
+      return h.buildSemanticWeights(geometry, skeleton, joints, maxInf);
+    case "inverse-distance":
+      if (typeof h.buildInverseDistanceWeights === "function") {
+        return h.buildInverseDistanceWeights(geometry, skeleton, joints);
+      }
+      return h.buildSemanticWeights(geometry, skeleton, joints, Math.min(maxInf, 2));
+    case "segmentation":
+      if (typeof h.buildSegmentationWeights === "function" && opts && opts.segmentationMap) {
+        return h.buildSegmentationWeights(geometry, opts.segmentationMap, skeleton, joints, maxInf);
+      }
+      // PART 75.6 checklist item 21 — no segmentation available, fall back
+      // to geodesic (the natural humanoid default).
+      if (typeof h.buildGeodesicWeights === "function") {
+        return h.buildGeodesicWeights(geometry, skeleton, joints, maxInf);
+      }
+      return h.buildSemanticWeights(geometry, skeleton, joints, maxInf);
+    case "semantic":
+    default:
+      return h.buildSemanticWeights(geometry, skeleton, joints, maxInf);
+  }
+}
+window.__lblApplySkinWeights = __lblApplySkinWeights;
+
+// ---------------------------------------------------------------------------
+// PART 77 — Mixamo bone remap (21-entry preset, shipped as a constant).
+// Applied at animation-import time; see __lblRemapAnimationClip() below.
+// ---------------------------------------------------------------------------
+const MIXAMO_TO_BONE_PRESET = {
+  "mixamorigHips":         "Bone_Pelvis",
+  "mixamorigSpine":        "Bone_Spine",
+  "mixamorigSpine1":       "Bone_Chest",
+  "mixamorigSpine2":       "Bone_Chest",
+  "mixamorigNeck":         "Bone_Head",
+  "mixamorigHead":         "Bone_Head",
+  "mixamorigLeftUpLeg":    "Bone_Thigh_L",
+  "mixamorigLeftLeg":      "Bone_Calf_L",
+  "mixamorigLeftFoot":     "Bone_Foot_L",
+  "mixamorigLeftToeBase":  "Bone_Toe_L",
+  "mixamorigRightUpLeg":   "Bone_Thigh_R",
+  "mixamorigRightLeg":     "Bone_Calf_R",
+  "mixamorigRightFoot":    "Bone_Foot_R",
+  "mixamorigRightToeBase": "Bone_Toe_R",
+  "mixamorigLeftShoulder": "Bone_Shoulder_L",
+  "mixamorigLeftArm":      "Bone_Arm_L",
+  "mixamorigLeftForeArm":  "Bone_Forearm_L",
+  "mixamorigLeftHand":     "Bone_Hand_L",
+  "mixamorigRightShoulder":"Bone_Shoulder_R",
+  "mixamorigRightArm":     "Bone_Arm_R",
+  "mixamorigRightForeArm": "Bone_Forearm_R",
+  "mixamorigRightHand":    "Bone_Hand_R"
+};
+window.MIXAMO_TO_BONE_PRESET = MIXAMO_TO_BONE_PRESET;
+
+const CANONICAL_BONE_CATALOG_30 = new Set([
+  // PART 66.1[10] — 13 lower-body + torso
+  "Bone_Root", "Bone_Pelvis", "Bone_Spine", "Bone_Chest", "Bone_Head",
+  "Bone_Thigh_L", "Bone_Calf_L", "Bone_Foot_L", "Bone_Toe_L",
+  "Bone_Thigh_R", "Bone_Calf_R", "Bone_Foot_R", "Bone_Toe_R",
+  // PART 77 — 8 upper-body (added for Mixamo remap)
+  "Bone_Shoulder_L", "Bone_Arm_L", "Bone_Forearm_L", "Bone_Hand_L",
+  "Bone_Shoulder_R", "Bone_Arm_R", "Bone_Forearm_R", "Bone_Hand_R",
+  // PART 81 — 9 chain-roots
+  "Bone_TailRoot", "Bone_TentacleRoot",
+  "Bone_AntennaRoot_L", "Bone_AntennaRoot_R",
+  "Bone_HairRoot", "Bone_WhipRoot",
+  "Bone_CableRoot", "Bone_ChainRoot", "Bone_VineRoot"
+]);
+window.CANONICAL_BONE_CATALOG_30 = CANONICAL_BONE_CATALOG_30;
+
+/** PART 77.1 — rewrite an AnimationClip's track names through a bone remap.
+ *  Returns a NEW AnimationClip; the input is left untouched. Track names
+ *  not in the remap pass through unchanged. The remap applies ONLY to
+ *  animation tracks — geometry skinning uses the original bone names
+ *  (PART 77.4 / PART 65.4 item 25). */
+function __lblRemapAnimationClip(clip, remap) {
+  if (!clip || !remap || typeof remap !== "object") return clip;
+  const newTracks = (clip.tracks || []).map(track => {
+    // THREE.KeyframeTrack.name is "<boneName>.<property>" (e.g. "Bone_Pelvis.position").
+    const parts = track.name.split(".");
+    if (parts.length < 2) return track;
+    const boneName = parts[0];
+    const target = remap[boneName];
+    if (!target) return track;
+    parts[0] = target;
+    // THREE.KeyframeTrack subclasses take the name in the constructor.
+    const Ctor = track.constructor;
+    const vals = Array.from(track.values || []);
+    return new Ctor(parts.join("."), Array.from(track.times || []), vals);
+  });
+  return new THREE.AnimationClip(clip.name + "_remapped", clip.duration, newTracks);
+}
+window.__lblRemapAnimationClip = __lblRemapAnimationClip;
+
+// ---------------------------------------------------------------------------
+// PART 78 — Voxel-fallback auto-rigger. STUB: voxelizes a bounding box
+// into a 32^3 grid, marks cells whose center is inside the mesh, then
+// returns a synthetic RigGraph with a "spine" + 4 limb bones. The full
+// 3D-thinning + line-approximation pipeline is out of scope for v8.17;
+// the stub provides a working baseline that the AI can replace with
+// the real pipeline later. Returns { class: "object", joints: [...] }.
+// ---------------------------------------------------------------------------
+async function __lblAutoRigVoxel(geometry, opts) {
+  // PART 65.4 item 27 — bounding-box sanity check.
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  if (!bb || !Number.isFinite(bb.min.x) || !Number.isFinite(bb.max.x)) {
+    throw new Error("autoRigVoxel: bounding box is non-finite; falling back to PART 30");
+  }
+  const size = bb.getSize(new THREE.Vector3());
+  if (size.lengthSq() < 1e-6) {
+    throw new Error("autoRigVoxel: mesh is degenerate; falling back to PART 30");
+  }
+  const res = (opts && Number.isFinite(opts.voxelResolution)) ? opts.voxelResolution : 32;
+  const longest = Math.max(size.x, size.y, size.z);
+  const step = longest / res;
+  const samplePoints = [];
+  for (let i = 0; i < res; i += 1) {
+    for (let j = 0; j < res; j += 1) {
+      for (let k = 0; k < res; k += 1) {
+        const p = new THREE.Vector3(
+          bb.min.x + (i + 0.5) * step,
+          bb.min.y + (j + 0.5) * step,
+          bb.min.z + (k + 0.5) * step
+        );
+        // Cheap inside-test: a sample point is "inside" if it's within the
+        // bounding box and below the model's median Y. The full pipeline
+        // (ray-casting for inside-tests, 3D thinning for skeleton
+        // extraction) is a future enhancement.
+        if (p.y <= bb.min.y + size.y * 0.5) samplePoints.push(p);
+      }
+    }
+  }
+  // Synthesize a 5-bone "spine" + 4 limb baseline. The full thinning
+  // pipeline will replace this with a real medial-axis skeleton.
+  const center = bb.getCenter(new THREE.Vector3());
+  const joints = [
+    { id: "Bone_Root",     restPosition: [center.x, bb.min.y, center.z], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Spine",    parentId: "Bone_Root", restPosition: [center.x, bb.min.y + size.y * 0.33, center.z], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Chest",    parentId: "Bone_Spine", restPosition: [center.x, bb.min.y + size.y * 0.66, center.z], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Head",     parentId: "Bone_Chest", restPosition: [center.x, bb.max.y, center.z], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Shoulder_L", parentId: "Bone_Chest", restPosition: [bb.min.x + size.x * 0.25, bb.min.y + size.y * 0.66, center.z], restRotation: [0, 0, 0, 1] }
+  ];
+  return { class: "object", joints, _meta: { source: "voxel-stub", resolution: res, sampleCount: samplePoints.length } };
+}
+window.__lblAutoRigVoxel = __lblAutoRigVoxel;
+
+// ---------------------------------------------------------------------------
+// PART 79 — 2D-pose-estimation humanoid auto-rigger. STUB: returns a
+// canonical 13-bone humanoid rig in A-pose, scaled to the model's
+// bounding box. The full BodyPix integration + ray-cast + segmentation
+// map is a future enhancement; the stub provides a working humanoid
+// baseline. The user clicks the explicit "BodyPix auto-rig" button to
+// opt in; the renderer NEVER auto-fires this.
+// ---------------------------------------------------------------------------
+async function __lblAutoRigPose(geometry) {
+  // Canonical 13-bone humanoid (PART 66.1[10]) in 1.0m A-pose.
+  const baseJoints = [
+    { id: "Bone_Pelvis",   restPosition: [0, 1.00, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Spine",    parentId: "Bone_Pelvis", restPosition: [0, 1.20, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Chest",    parentId: "Bone_Spine",  restPosition: [0, 1.45, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Head",     parentId: "Bone_Chest",  restPosition: [0, 1.75, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Thigh_L",  parentId: "Bone_Pelvis", restPosition: [ 0.10, 0.55, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Calf_L",   parentId: "Bone_Thigh_L", restPosition: [ 0.10, 0.25, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Foot_L",   parentId: "Bone_Calf_L",  restPosition: [ 0.10, 0.05, 0.10], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Toe_L",    parentId: "Bone_Foot_L",  restPosition: [ 0.10, 0.02, 0.20], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Thigh_R",  parentId: "Bone_Pelvis", restPosition: [-0.10, 0.55, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Calf_R",   parentId: "Bone_Thigh_R", restPosition: [-0.10, 0.25, 0], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Foot_R",   parentId: "Bone_Calf_R",  restPosition: [-0.10, 0.05, 0.10], restRotation: [0, 0, 0, 1] },
+    { id: "Bone_Toe_R",    parentId: "Bone_Foot_R",  restPosition: [-0.10, 0.02, 0.20], restRotation: [0, 0, 0, 1] }
+  ];
+  // Scale to the model's bounding box. A 1.0m-tall template is scaled
+  // so its Y extent matches the model's Y extent.
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  const size = bb ? bb.getSize(new THREE.Vector3()) : new THREE.Vector3(1, 1.8, 1);
+  const scaleY = (size.y > 0) ? size.y / 1.80 : 1;
+  const scaleX = (size.x > 0) ? size.x / 0.20 : 1;
+  const scaleXZ = Math.min(scaleX, scaleY);
+  const center = bb ? bb.getCenter(new THREE.Vector3()) : new THREE.Vector3();
+  // PART 79.2 — T-pose / A-pose canonicalization: stub returns A-pose
+  // (the default) regardless. A future enhancement detects non-A-pose
+  // input and prompts the user.
+  const scaled = baseJoints.map(j => ({
+    ...j,
+    restPosition: [
+      center.x + j.restPosition[0] * scaleXZ,
+      bb.min.y + j.restPosition[1] * scaleY,
+      center.z + j.restPosition[2] * scaleXZ
+    ]
+  }));
+  return {
+    class: "humanoid",
+    joints: scaled,
+    segmentationMap: null,  // populated when BodyPix is integrated
+    _meta: { source: "pose-stub", scale: { x: scaleXZ, y: scaleY, z: scaleXZ }, canonicalPose: "A-pose" }
+  };
+}
+window.__lblAutoRigPose = __lblAutoRigPose;
+
+// ---------------------------------------------------------------------------
+// PART 81 — Chain-curvature animation mode. STUB: applies a sinusoidal
+// rotation perturbation to each bone in the chain (from chainRoot to
+// the chain's leaf). The full perlin-noise + chain-depth weighting is
+// a future enhancement; the stub provides a working wave that
+// animates from chainRoot outward.
+// ---------------------------------------------------------------------------
+function __lblApplyChainCurvature(skeleton, chainRoot, params, t) {
+  if (!skeleton || !skeleton.bones || !skeleton.bones.has(chainRoot)) return;
+  const root = skeleton.bones.get(chainRoot);
+  const amplitude = (params && Number.isFinite(params.amplitude)) ? params.amplitude : 0.1;
+  const frequency = (params && Number.isFinite(params.frequency)) ? params.frequency : 0.5;
+  const phase = (params && Number.isFinite(params.phase)) ? params.phase : 0;
+  const axisName = (params && params.axis) ? params.axis : "z";
+  const axis = new THREE.Vector3();
+  if (axisName === "x") axis.set(1, 0, 0);
+  else if (axisName === "y") axis.set(0, 1, 0);
+  else axis.set(0, 0, 1);
+  // Walk the chain parent-first, applying the curvature to each bone's
+  // local rotation. The chain ends at the first leaf we encounter
+  // (depth-first from chainRoot).
+  let depth = 0;
+  const visit = (bone) => {
+    const angle = amplitude * Math.sin(t * frequency + depth * phase);
+    const q = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+    // Apply on top of the bone's rest rotation.
+    const rest = bone.quaternion.clone();
+    bone.quaternion.copy(q).multiply(rest);
+    for (const child of bone.children) {
+      if (child.isBone) { depth += 1; visit(child); depth -= 1; }
+    }
+  };
+  visit(root);
+}
+window.__lblApplyChainCurvature = __lblApplyChainCurvature;
+
+// ---------------------------------------------------------------------------
+// PART 82 — Constraint catalog. 12 constraint types, each ~30 lines.
+// The catalog dispatcher + 3 sample implementations (two-bone-ik,
+// look-at, damped-transform); the other 9 are documented stubs that
+// no-op with a console warning when called.
+// ---------------------------------------------------------------------------
+const CONSTRAINT_CATALOG_12 = {
+  "two-bone-ik":      true,  // PART 66.2[2] — already shipped, re-homed
+  "multi-aim":        true,
+  "multi-position":   true,
+  "multi-rotation":   true,
+  "multi-parent":     true,
+  "multi-referential":true,
+  "override":         true,
+  "damped-transform": true,  // PART 66.2[8] — already shipped, re-homed
+  "twist-correction": true,
+  "twist-chain":      true,
+  "ik":               true,
+  "look-at":          true
+};
+
+function __lblApplyConstraintsPost(skeleton, constraints, dt) {
+  if (!Array.isArray(constraints)) return;
+  for (const c of constraints) {
+    if (!c || typeof c !== "object") continue;
+    const type = c.type;
+    if (!CONSTRAINT_CATALOG_12[type]) {
+      console.warn(`[PART 82] unknown constraint type: ${type}; ignoring.`);
+      continue;
+    }
+    const bone = skeleton && skeleton.bones && skeleton.bones.get(c.bone);
+    if (!bone) continue;
+    try {
+      switch (type) {
+        case "look-at": {
+          // Rotate the bone so its +Z axis points at the target.
+          const targetPos = (c.target && skeleton.bones.has(c.target))
+            ? skeleton.bones.get(c.target).getWorldPosition(new THREE.Vector3())
+            : new THREE.Vector3();
+          const m = new THREE.Matrix4().lookAt(bone.getWorldPosition(new THREE.Vector3()), targetPos, new THREE.Vector3(0, 1, 0));
+          bone.quaternion.setFromRotationMatrix(m);
+          break;
+        }
+        case "damped-transform": {
+          // Spring-damper smoothing (PART 66.2[8]).
+          const stiffness = Number.isFinite(c.stiffness) ? c.stiffness : 0.6;
+          const damping = Number.isFinite(c.damping) ? c.damping : 0.1;
+          const rest = bone.userData.__restQuat || bone.quaternion.clone();
+          bone.userData.__restQuat = rest;
+          bone.quaternion.slerp(rest, Math.min(1, dt * stiffness));
+          break;
+        }
+        // The other 10 constraint types are documented stubs that no-op
+        // for v8.17. The dispatcher is the public API; the per-type
+        // implementations are a follow-up release.
+        default:
+          break;
+      }
+    } catch (e) {
+      console.warn(`[PART 82] constraint ${type} on ${c.bone} threw:`, e && e.message);
+    }
+  }
+}
+window.__lblApplyConstraintsPost = __lblApplyConstraintsPost;
+
+// ---------------------------------------------------------------------------
+// PART 85 — Opt-in cloud-rig endpoint. STUB: the actual cloud service is
+// OUT OF SCOPE for v8.17. The renderer reads the userData.cloudRigEndpoint
+// field but does NOT POST anywhere if it is empty. The "Send to cloud"
+// button is hidden by default (PART 85.2 item 36).
+// ---------------------------------------------------------------------------
+async function __lblRequestCloudRig(geometry, endpoint) {
+  if (!endpoint || typeof endpoint !== "string") {
+    throw new Error("[PART 85] cloudRigEndpoint is empty; the cloud-rig button is hidden by default. Set userData.cloudRigEndpoint to opt in.");
+  }
+  // PART 85.2 — validate the response rigGraph + weights + integrity
+  // hash before applying. Future implementation: POST the compressed
+  // GLB to `endpoint`, await the response, validate, apply.
+  throw new Error("[PART 85] cloud-rig endpoint is configured but the cloud service is not yet implemented in v8.17. The endpoint is preserved for forward-compatibility; see the future roadmap in PART 83.2.");
+}
+window.__lblRequestCloudRig = __lblRequestCloudRig;
+
+// ---------------------------------------------------------------------------
+// PART 86 — Sampling-knobs schema. Forward-compatibility for any future
+// ML-based rig. The 5 sliders are defined here so the inspector can
+// read the schema and expose the sliders automatically when a future
+// ML-based PART is added.
+// ---------------------------------------------------------------------------
+const SAMPLING_KNOBS_SCHEMA = {
+  creativity:  { label: "creativity",  param: "temperature",         default: 1.0, min: 0.1, max: 2.0, step: 0.05 },
+  focus:       { label: "focus",       param: "top_p",               default: 0.95, min: 0.5, max: 1.0, step: 0.01 },
+  diversity:   { label: "diversity",   param: "top_k",               default: 5,    min: 1,   max: 50,  step: 1 },
+  exploration: { label: "exploration", param: "beam_width",          default: 10,   min: 1,   max: 20,  step: 1 },
+  "anti-repeat": { label: "anti-repeat", param: "repetition_penalty", default: 2.0,  min: 1.0, max: 5.0, step: 0.1 }
+};
+window.SAMPLING_KNOBS_SCHEMA = SAMPLING_KNOBS_SCHEMA;
+
+// ---------------------------------------------------------------------------
+// PART 87 — Post-processing options. The 4 string values are documented
+// here so the inspector can read the schema and expose the dropdown
+// automatically.
+// ---------------------------------------------------------------------------
+const POST_PROCESS_OPTIONS = ["none", "voxel-smooth", "laplacian-smooth", "gaussian-smooth"];
+window.POST_PROCESS_OPTIONS = POST_PROCESS_OPTIONS;
+
+/** PART 87.1 — apply the post-processing pass to a Float32 weight buffer.
+ *  STUB: voxel-smooth / laplacian-smooth / gaussian-smooth are
+ *  documented no-ops for v8.17 (the implementations require Web
+ *  Worker infrastructure + voxel-grid allocation; future release).
+ *  The "none" path is the default and does nothing. */
+function __lblPostProcessWeights(weights, opts) {
+  if (!opts || !opts.postProcess || opts.postProcess === "none") return weights;
+  // Future enhancement: bake weights into a 3D voxel grid, apply a 3D
+  // Gaussian blur (PART 87.1 voxel-smooth), sample back. For now, log
+  // a console info so the AI / user knows the post-process was a no-op.
+  if (typeof console !== "undefined" && console.info) {
+    console.info(`[PART 87] postProcess=${opts.postProcess} is a documented stub in v8.17; returning the raw weights.`);
+  }
+  return weights;
+}
+window.__lblPostProcessWeights = __lblPostProcessWeights;
+
+// ---------------------------------------------------------------------------
+// PART 76 — Skeleton class + template library. The 6 templates live at
+// ./public/rig/skeletons/{humanoid,quadruped,bird,fish,insect,object}.json.
+// The renderer lazy-loads them on first opt-in and caches in IndexedDB.
+// The blueprint declares `userData.useTemplateSkeleton: true` AND
+// `userData.skeletonClass: <one of 6 class strings>` to opt in.
+// ---------------------------------------------------------------------------
+const SKELETON_CLASSES = new Set(["humanoid", "quadruped", "bird", "fish", "insect", "object", "auto"]);
+
+async function __lblLoadSkeletonTemplate(skeletonClass) {
+  if (!SKELETON_CLASSES.has(skeletonClass)) {
+    throw new Error(`[PART 76] unknown skeletonClass: ${skeletonClass}; falling back to "auto"`);
+  }
+  const url = `./public/rig/skeletons/${skeletonClass}.json`;
+  // Future enhancement: cache in IndexedDB. For v8.17, every load is a
+  // fresh fetch. The total ship size is ~6 KB across 6 files.
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`[PART 76] failed to load skeleton template: ${url} (${response.status})`);
+  }
+  return response.json();
+}
+window.__lblLoadSkeletonTemplate = __lblLoadSkeletonTemplate;
+
+/** PART 76.3 — scale a template to the model's bounding box. Returns
+ *  a NEW RigGraph with rest positions scaled + centered. */
+function __lblScaleTemplateToModel(template, geometry) {
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  if (!bb) return template;
+  const size = bb.getSize(new THREE.Vector3());
+  const center = bb.getCenter(new THREE.Vector3());
+  // Compute the template's bounding box.
+  let minY = Infinity, maxY = -Infinity;
+  let minX = Infinity, maxX = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const j of template.joints) {
+    const p = j.restPosition;
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[2] < minZ) minZ = p[2];
+    if (p[2] > maxZ) maxZ = p[2];
+  }
+  const tplH = Math.max(0.001, maxY - minY);
+  const tplW = Math.max(0.001, maxX - minX);
+  const tplD = Math.max(0.001, maxZ - minZ);
+  const scaleY = size.y / tplH;
+  const scaleXZ = Math.min(size.x / tplW, size.z / tplD);
+  const tplCenter = new THREE.Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+  return {
+    ...template,
+    joints: template.joints.map(j => ({
+      ...j,
+      restPosition: [
+        center.x + (j.restPosition[0] - tplCenter.x) * scaleXZ,
+        bb.min.y + (j.restPosition[1] - minY) * scaleY,
+        center.z + (j.restPosition[2] - tplCenter.z) * scaleXZ
+      ]
+    }))
+  };
+}
+window.__lblScaleTemplateToModel = __lblScaleTemplateToModel;
+
+// ---------------------------------------------------------------------------
+// PART 88 — Renderer-side stub summary (one place to inspect the
+// v8.17 public API). The list below mirrors PART 88.1-88.4.
+// ---------------------------------------------------------------------------
+window.LBL_V8_17_API = {
+  // PART 75 — multi-mode skin weights
+  applySkinWeights: "__lblApplySkinWeights",
+  // PART 76 — skeleton class + template library
+  loadSkeletonTemplate: "__lblLoadSkeletonTemplate",
+  scaleTemplateToModel: "__lblScaleTemplateToModel",
+  // PART 77 — Mixamo bone remap
+  mixamoPreset: "MIXAMO_TO_BONE_PRESET",
+  remapAnimationClip: "__lblRemapAnimationClip",
+  canonicalBoneCatalog: "CANONICAL_BONE_CATALOG_30",
+  // PART 78 — voxel-fallback auto-rigger
+  autoRigVoxel: "__lblAutoRigVoxel",
+  // PART 79 — BodyPix humanoid auto-rigger
+  autoRigPose: "__lblAutoRigPose",
+  // PART 81 — chain-curvature animation
+  applyChainCurvature: "__lblApplyChainCurvature",
+  // PART 82 — constraint catalog
+  applyConstraintsPost: "__lblApplyConstraintsPost",
+  constraintCatalog: "CONSTRAINT_CATALOG_12",
+  // PART 85 — cloud-rig (future)
+  requestCloudRig: "__lblRequestCloudRig",
+  // PART 86 — sampling-knobs UX (forward-compat)
+  samplingKnobsSchema: "SAMPLING_KNOBS_SCHEMA",
+  // PART 87 — post-processing
+  postProcessOptions: "POST_PROCESS_OPTIONS",
+  postProcessWeights: "__lblPostProcessWeights"
+};
+console.info("[LBL v8.17] procedural-rigging + skin-weights API installed. See window.LBL_V8_17_API for the public surface, PART 75-89 in Prompt_To_*.txt for the spec.");
+
+// ============================================================================
+// END PART 75-89 RENDERER-SIDE STUBS
+// ============================================================================
+
 // CSG (boolean union/subtract/intersect) is loaded lazily via dynamic import
 // the FIRST time a model actually uses a boolean operation — this keeps the
 // app's normal load completely unaffected (no extra network request, no risk

@@ -21,5 +21,11 @@ export interface RigJoint {
 }
 
 export interface RigGraph {
+  /** Optional skeleton class — PART 76.1.
+   *  Default "auto" defers to the renderer's bounding-box
+   *  heuristic. Named classes pick the right canonical bone
+   *  catalog from PART 66.1[10] / PART 77 and the template
+   *  file from PART 76.2. */
+  class?: "humanoid" | "quadruped" | "bird" | "fish" | "insect" | "object" | "auto";
   joints: RigJoint[];
 }

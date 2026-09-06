@@ -1,0 +1,29 @@
+{
+  "class": "quadruped",
+  "_meta": {
+    "source": "Mesh2Motion distilled, see PART 76.2 of LBL v1.25 / v8.17",
+    "restPose": "1.0 m long standing, tail neutral, legs at shoulder / hip width",
+    "jointCount": 19
+  },
+  "joints": [
+    { "id": "Bone_Root",     "restPosition": [0, 0.50, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Spine",    "parentId": "Bone_Root", "restPosition": [0, 0.65, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Chest",    "parentId": "Bone_Spine",  "restPosition": [0.30, 0.65, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Head",     "parentId": "Bone_Chest",  "restPosition": [0.45, 0.80, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_TailRoot", "parentId": "Bone_Root",   "restPosition": [-0.20, 0.55, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Tail1",    "parentId": "Bone_TailRoot", "restPosition": [-0.30, 0.50, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Tail2",    "parentId": "Bone_Tail1", "restPosition": [-0.40, 0.45, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Thigh_FL", "parentId": "Bone_Chest", "restPosition": [ 0.25, 0.45,  0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Calf_FL",  "parentId": "Bone_Thigh_FL", "restPosition": [ 0.25, 0.20, 0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Foot_FL",  "parentId": "Bone_Calf_FL", "restPosition": [ 0.25, 0.02, 0.25], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Thigh_FR", "parentId": "Bone_Chest", "restPosition": [ 0.25, 0.45, -0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Calf_FR",  "parentId": "Bone_Thigh_FR", "restPosition": [ 0.25, 0.20, -0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Foot_FR",  "parentId": "Bone_Calf_FR", "restPosition": [ 0.25, 0.02, -0.25], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Thigh_BL", "parentId": "Bone_Root", "restPosition": [-0.20, 0.45,  0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Calf_BL",  "parentId": "Bone_Thigh_BL", "restPosition": [-0.20, 0.20, 0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Foot_BL",  "parentId": "Bone_Calf_BL", "restPosition": [-0.20, 0.02, 0.25], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Thigh_BR", "parentId": "Bone_Root", "restPosition": [-0.20, 0.45, -0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Calf_BR",  "parentId": "Bone_Thigh_BR", "restPosition": [-0.20, 0.20, -0.20], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Foot_BR",  "parentId": "Bone_Calf_BR", "restPosition": [-0.20, 0.02, -0.25], "restRotation": [0, 0, 0, 1] }
+  ]
+}

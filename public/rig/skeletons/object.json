@@ -1,0 +1,14 @@
+{
+  "class": "object",
+  "_meta": {
+    "source": "Mesh2Motion distilled, see PART 76.2 of LBL v1.25 / v8.17",
+    "restPose": "1.0 m cube, joints at bounding-box extremes",
+    "jointCount": 4
+  },
+  "joints": [
+    { "id": "Bone_Top",    "restPosition": [ 0,  0.5,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Bottom", "restPosition": [ 0, -0.5,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Left",   "restPosition": [-0.5, 0,    0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Right",  "restPosition": [ 0.5, 0,    0], "restRotation": [0, 0, 0, 1] }
+  ]
+}

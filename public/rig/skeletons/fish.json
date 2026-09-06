@@ -1,0 +1,19 @@
+{
+  "class": "fish",
+  "_meta": {
+    "source": "Mesh2Motion distilled, see PART 76.2 of LBL v1.25 / v8.17",
+    "restPose": "0.5 m long straight",
+    "jointCount": 9
+  },
+  "joints": [
+    { "id": "Bone_Root",     "restPosition": [-0.20, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Spine_1",  "parentId": "Bone_Root", "restPosition": [-0.10, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Spine_2",  "parentId": "Bone_Spine_1", "restPosition": [ 0.00, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Spine_3",  "parentId": "Bone_Spine_2", "restPosition": [ 0.10, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Spine_4",  "parentId": "Bone_Spine_3", "restPosition": [ 0.20, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Tail",     "parentId": "Bone_Spine_4", "restPosition": [ 0.30, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_TailFin",  "parentId": "Bone_Tail",   "restPosition": [ 0.40, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_DorsalFin","parentId": "Bone_Spine_2","restPosition": [ 0.00, 0.05, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_PectoralFin_L","parentId": "Bone_Spine_1","restPosition": [-0.10, 0,  0.08], "restRotation": [0, 0, 0, 1] }
+  ]
+}
