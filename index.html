@@ -21628,6 +21628,31 @@ function lblAnimNext(){
   lblUpdateAnimUI();
 }
 
+// LBL FIX — Play a specific named clip. Used by the FSM state-trigger
+// fallback in triggerFsmState() (line 24114) when a model exposes
+// `userData.animationFsm` with `targetState.clipId` but no `transition`
+// method — the renderer needs to find the matching clip by name and
+// play it. Mirrors lblAnimNext() exactly except the target index is
+// looked up by clip name instead of cycled.
+function lblAnimPlay(clipName){
+  if(!lblAnim.mixer || !lblAnim.actions.length) return;
+  // Find the action whose underlying clip matches `clipName`.
+  const targetIdx = lblAnim.clips.findIndex(c => c && c.name === clipName);
+  if(targetIdx < 0) return; // no matching clip — silent no-op
+  // Stop every action, restore the rest pose so the previous clip's
+  // last frame doesn't leak into the new one (visible "pop"), then
+  // switch currentIdx and play the target.
+  lblAnim.actions.forEach(a => { try{ a.stop(); }catch(_){ } });
+  lblRestorePose(lblAnim.initialPose);
+  try{ lblAnim.mixer.update(0); }catch(_){ }
+  lblAnim.currentIdx = targetIdx;
+  const cur = lblAnim.actions[lblAnim.currentIdx];
+  if(cur){ try{ cur.reset(); cur.play(); }catch(_){ } }
+  lblAnim.pausedTime = 0;
+  lblAnim.isPlaying = true;
+  lblUpdateAnimUI();
+}
+
 // Wire up the buttons (they live in the floating #anim-controls-panel
 // now, not the topbar — but the IDs are the same, so the wiring is
 // unchanged. lblUpdateAnimUI() handles the show/hide via the
@@ -22048,10 +22073,24 @@ window.lblSpec = (function(){
         // Walk + Run + Jump. Models without it still play the raw
         // clips; this is just a heads-up that the inspector's FSM
         // panel will be empty.
-        const clips = (root.animations) || [];
-        if(clips.length < 2) return null;
+        // LBL FIX — count clips from ALL paths the spec recognises, not
+        // just the legacy `root.animations` slot. The modern TS shape
+        // (PART 5.6a) puts clips at `rt.animations.clips`; the legacy
+        // hint-array shape (PART 5.6b) puts them at `rt.animations`
+        // (a plain array). Without these two, a modern factory with
+        // 4 clips and no FSM silently escaped the warning.
+        const rt = root.userData && root.userData.sculptRuntime;
+        let clipCount = 0;
+        if(Array.isArray(root.animations)) clipCount = Math.max(clipCount, root.animations.length);
+        if(rt){
+          if(rt.animations && Array.isArray(rt.animations.clips))
+            clipCount = Math.max(clipCount, rt.animations.clips.length);
+          if(Array.isArray(rt.animations))
+            clipCount = Math.max(clipCount, rt.animations.length);
+        }
+        if(clipCount < 2) return null;
         if(!root.userData || !root.userData.animationFsm){
-          return 'Model has ' + clips.length + ' clips but no userData.animationFsm; inspector won\'t show FSM state buttons.';
+          return 'Model has ' + clipCount + ' clips but no userData.animationFsm; inspector won\'t show FSM state buttons.';
         }
         return null;
       }
