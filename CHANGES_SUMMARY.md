@@ -1,3 +1,396 @@
+# v1.24 / v8.16 — Procedural texturing & shading techniques (PART 74) — OPT-IN capability bundle
+
+The spec now teaches the AI a THIRD OPT-IN capability
+bundle, derived from the maintainer's "Procedural
+Texturing & Shading Techniques" working notebook
+(compiled 2026-09-06), which catalogues the
+architecture-level patterns from two external reference
+repos (RodZill4/material-maker for the noise / SDF /
+pattern / filter / 3D-texture-pipeline families, and
+xr843/insect-world for the micro-texture / hex-facet /
+loft / PBR-recipe / determinism families) and translates
+them into the existing `lblSpec` / Three.js contract.
+
+The single most important rule:
+
+  PART 74 is an EXTRA CAPABILITY, not a rule. The
+  .ts / .json / .js factory uses it WHEN the subject
+  benefits from it (creatures, insects, organic
+  shapes with skin / shell / wing / membrane, any model
+  that needs procedural micro-texture without shipping
+  image assets, any model that needs loft-based organic
+  shapes, any model that needs hex-scale / honeycomb /
+  compound-eye patterns) and SKIPS it otherwise. No
+  existing rule is changed; no existing material
+  default is changed; no existing MAT_DB preset is
+  changed; no existing helper is removed; no model
+  that doesn't opt in loads any differently.
+
+## What this round adds
+
+PART 74 layers 10 sub-sections onto PARTs 1-73 as an
+OPT-IN capability bundle for the .ts / .json / .js
+factory authors:
+
+- **74.1 — Procedural noise toolkit**. 6 noise helpers
+  re-implemented in JS: `mulberry32` and `fnv1a` are
+  re-exports from PART 68-71; `valueNoise2D` is a
+  re-implementation of Material Maker's
+  `value_noise_2d` with Perlin's quintic smoothstep
+  `f*f*f*(f*(f*6-15)+10)` for C2-continuous derivatives;
+  `fbm2D` is a re-implementation of Material Maker's
+  `fbm_2d_value` with per-octave seed offset
+  `seed + float(i)` for independent octave random fields
+  + the `folds` parameter for the abs(2n-1) ridge /
+  turbulence trick; `voronoi2D` returns `{F1, F2}` for
+  cavity-dirt applications; `domainWarpFBM` is the
+  canonical "marble veins / wood grain / molten gold"
+  look in 5 lines of math:
+  `FBM(coord + FBM(coord + FBM(coord)))`.
+
+- **74.2 — Procedural micro-texture pipeline** (the
+  killer feature). 3 new `CanvasTexture` generators
+  re-implemented from insect-world's
+  `src/three/builders/surface.ts` (373 lines, the
+  production reference): (74.2.1) `microRoughnessMap`
+  — the universal "kill plastic feel" overlay
+  (3-octave value noise, formula
+  `1 - 0.12 * valueNoise`, never darkens, never below
+  base roughness, never above 1.0; the single biggest
+  bang-for-buck in PBR lookdev); (74.2.2) `punctateMaps`
+  — beetle-elytra "puncture dots" texture bundle
+  (N random cos-shaped pits, Sobel-from-height with
+  wrap-around for tile-safety, pit centres are rougher
+  than the field); (74.2.3) `striateMaps` — vertical
+  "groove" texture bundle (N longitudinal grooves with
+  micro-bulge between + 1D noise wobble, groove bottoms
+  are rougher). All three are cached globally by
+  parameter-string key (~8MB total VRAM for 60+
+  species, trivial for a 3-scene model), guarded with
+  `typeof document === 'undefined'` for node-test
+  compatibility, and seed-driven for CI-testable
+  determinism.
+
+- **74.3 — Height-to-X conversions** (one source, four
+  outputs). 5 helpers: (74.3.1) `heightToNormal` (Sobel
+  with wrap-around sampling for tile-safe tangent-space
+  normal maps; the wrap-around is what makes the
+  texture tile without seam); (74.3.2) `heightToRoughness`
+  (groove-bottom / pit-centre roughness differentiation);
+  (74.3.3) `heightToAO` (cheap horizon-AO approximation);
+  (74.3.4) `heightToCurvature` (Laplacian for the
+  "polished rim, dull field" weathered-metal / chitin
+  signature); (74.3.5) `cavityDirt` — the cavity-dirt
+  helper (Voronoi F2 - F1 + remap, the canonical
+  "dirt in crevices" look, the single most useful
+  post-FX trick in both reference repos). 90% of the
+  "looks like Substance" benefit for 10% of the code.
+
+- **74.4 — PBR creature recipe trio**. 4 named factory
+  functions, ~50 lines each, re-implemented from
+  insect-world's `kit.ts` (1439 lines, the production
+  reference): (74.4.1) `chitin` — the general body-wall
+  material (with `translucent: true` for the "you can
+  almost see through it" wing-membrane / larval-cuticle
+  look at `transmission=0.35`, `thickness=0.6`,
+  `ior=1.42`); (74.4.2) `elytra` — the beetle-shell /
+  hard-shell material with **clearcoat CAPPED at 0.55**
+  (the "ACES tonemap, prefer darker" rule — any higher
+  + an environment map = full over-exposure on the
+  directly-lit side), default `metalness=0.25`, with
+  `iridescent: true` for `iridescence=1`,
+  `iridescenceIOR=1.8`, and
+  `iridescenceThicknessRange = [260, 460]` for
+  green→copper→violet or `[300, 480]` for redder end;
+  (74.4.3) `membrane` — the thin insect wing /
+  translucent membrane at `DoubleSide`,
+  `transmission=0.55`, `thickness=0.05`, `ior=1.33`,
+  `roughness=0.22`, `opacity=0.32`, with subtler
+  iridescence defaulting to 0.45 (overridable to
+  0.20-0.25 for small-winged species that go garish
+  at full strength); (74.4.4) `velvet` — the fuzzy /
+  moth / soft-fabric material at `sheen=1`,
+  `sheenColor = base color lightened 30%` (no sheen
+  map needed, the sheen lobe alone produces the
+  rim-light-of-a-fuzzy-surface signature); (74.4.5)
+  `applySurface(material, surface)` — the 5-way
+  surface switch ('smooth' | 'punctate' | 'striate' |
+  'velvet' | default `microRoughnessMap`-only).
+  Composes with PART 45: a CS2-style jewel-beetle knife
+  gets `cs2PbrProfile` (PART 45) AND
+  `elytra({ iridescent: true })` (PART 74) on the same
+  material; no conflict; no override.
+
+- **74.5 — Loft-based organic geometry** (the "rig
+  without bones" pattern). 4 helpers re-implemented
+  from insect-world's `loft()`: (74.5.1) `loft(sections,
+  opts)` — the cross-section-extrusion builder,
+  canonical for body segment, leg, antenna, abdomen,
+  proboscis, stinger, snake, worm, fish, plant stem,
+  tree branch, hair braid, fabric tube, chain link,
+  rivet, nail; (74.5.2) `spindle(opts)` — the tapered-
+  shape recipe with asymmetric sinusoidal bulge,
+  canonical for polished rivet, bowling pin, water
+  droplet, bullet casing, missile body, candle flame,
+  stalactite, stalagmite, dropper tip, pen tip, carrot,
+  radish, teardrop; (74.5.3) `segmentedAbdomen(opts)` —
+  the canonical 6-segment insect abdomen recipe with
+  a **SHARED `abdomenEnvelope` function** so the
+  inter-segment membrane rings EXACTLY match the body
+  cross-section at the ring position (no separate math,
+  no mismatch); (74.5.4) the surface-decoration-along-
+  a-curved-body pattern (sample N points, push out
+  0.01 along the surface normal, loft the result;
+  canonical for red copper bands on jewel beetles,
+  gold bands on a bumblebee's abdomen, painted racing
+  stripes on a car body, veins, scales, rivets,
+  waterlines). Composes with PART 67's
+  `applyModifierStack` and the `taper` / `twist` /
+  `bend` / `spherize` / `inflate` / `applyNoise`
+  modifiers; the canonical "rifled barrel" combo is
+  loft + Taper + Twist + Noise in ~12 lines of math.
+
+- **74.6 — Hexagonal facet pattern** (triangular-
+  lattice Voronoi trick). 1 helper: `facetHeightField`
+  via "place cell centers on a triangular grid and ask
+  'which is closest' — the partition you get is
+  hexagons, no hex math needed." Wrap-around (NO
+  wrapping of `centerX` / `centerY` to modulo, only
+  the row INDEX is modulo'd for parity) for natural
+  tile-safety with no seam. **FORCE EVEN ROW COUNT**
+  (`rows = max(4, round(size / spacing / 2) * 2)`) —
+  odd-row parity flips between bottom and top edge
+  causing a 1-row visible seam, the universal "no
+  seam" trick for any staggered-grid texture. The
+  two-use-case family — the same function with
+  different cells + cellProfile parameters produces
+  `eyeballFacets()` (cells: 32, dome profile, narrow
+  groove at edge), `honeycombPattern()` (cells: 16,
+  flat profile, deep groove at edge),
+  `soccerBallPattern()` (cells: 12, flat profile, flat
+  groove at edge), `lizardScales()` (cells: 64,
+  shallow dome, no groove), `hexTileFloor()` (cells: 8,
+  deep groove, slight rounding). Uses 74.3.1
+  `heightToNormal` for tangent-space normal map
+  conversion — the full pipeline is two helper calls.
+
+- **74.7 — Domain warp, slope blur, make-tileable**
+  (3 cross-cutting tricks). (74.7.1) `domainWarpFBM(
+  coord, opts)` (defined in 74.1.6, the canonical
+  marble / wood / molten look in 5 lines of math);
+  (74.7.2) `slopeBlur(height, size, amount, iterations)`
+  — blur ALONG a gradient field (the canonical "dirt
+  in crevices" / "wear on edges" / "rust streaks" /
+  "snow accumulation" / "oil dripping"
+  Substance-dirt-node pattern); (74.7.3)
+  `makeTileableSquare(src, size)` and
+  `makeTileablePeriodic(src, period)` — the
+  tile-safety helpers exposed for factory authors.
+
+- **74.8 — Procedural pattern library**. 4 more
+  patterns from Material Maker's Pattern family, the
+  most reusable across non-creature subjects:
+  (74.8.1) `makeBricksPattern` (brick courses with
+  optional "offset every Nth row" parameter);
+  (74.8.2) `makeTruchetPattern` (Truchet curves, single
+  2-arc tile randomly rotated by `hash(uv)` gives
+  infinite organic-looking interlocking patterns from
+  one image); (74.8.3) `makeCairoPattern` (5-fold
+  Islamic tiling pattern, 5-edge star, one instance of
+  this in the texture library gives 5-fold Islamic
+  geometric art for free); (74.8.4) `makeSplatterPattern`
+  (N random "stamps" placed at random UV positions
+  with optional size jitter and rotation jitter,
+  canonical for leopard spots, rust patches, dirt
+  clumps, leaf litter, scuff marks, paint splatters,
+  camouflage). All four use the seeded determinism
+  stack.
+
+- **74.9 — Seeded determinism (mulberry32 + FNV-1a)**.
+  The formal determinism contract for the procedural
+  texturing side. (74.9.1) every PART 74 helper accepts
+  an optional `seed` param and defaults to
+  `meta.seed ?? 42` (same default the geometry side
+  uses); (74.9.2) sub-seed discipline — use
+  `deriveSubSeed(parentSeed, label)` for every PART
+  74 helper, NEVER re-roll the global seed, NEVER use
+  `Math.random()` in a PART 74 helper; (74.9.3) cache
+  key — the texture cache (74.2.4) keys on the
+  parameter string including the seed; (74.9.4)
+  hash-bashed deterministic geometry — every vertex /
+  face / loop in the loft-based geometry (74.5) is
+  determined by a hash of its parameters, not by
+  `Math.random()`.
+
+- **74.10 — Updated cross-references**. PART 74 layers
+  on top of, never replaces PART 3 (geometry
+  vocabulary) / PART 7 (materials) / PART 7.5 (vertex
+  data) / PART 8 (textures / UV) / PART 21 (validation
+  checklist, EXTENDED with one new item:
+  "if the model uses procedural texturing, every PART
+  74 helper is invoked with a deterministic seed and
+  the texture cache key is included in the per-model
+  hash") / PART 33 / 34 / 35 / 36 / 37 / 38 / 39 / 40
+  / 41 / 42 / 43 / 44 / 45 / 67 / 68-71 / 72 / 73
+  (all unchanged).
+
+## Style-agnostic in scope
+
+PART 74 applies to every model style (low-poly /
+mid-poly / high-poly / smooth-shaded / stylized /
+photoreal / voxel / hand-painted / toon-cel /
+retro-PSX / any combination). The micro-texture
+pipeline (74.2) is about surface finish; the
+loft-based geometry pattern (74.5) is about shape;
+both layers compose independently of the chosen
+style.
+
+## Content-specific in subject
+
+PART 74 is ESPECIALLY USEFUL for:
+- creatures (any organism with skin / shell / wing /
+  membrane)
+- insects (beetle elytra, dragonfly wings, moth
+  velvet, butterfly scales, ant chitin)
+- organic shapes with identifiable material micro-
+  structure (puncture dots, grooves, scales, veining,
+  hairs, ridges)
+- any subject that needs procedural micro-texture
+  without shipping image assets (PART 74 ships ZERO
+  external image files; every texture is generated
+  at runtime from a seed)
+- any model that needs loft-based organic shapes
+  (snake, worm, fish, plant stem, tree branch, hair
+  braid, fabric tube, chain link)
+- any model that needs hex-scale / honeycomb /
+  compound-eye patterns (insect eyes, lizard scales,
+  soccer ball, hex tile floor)
+
+Non-organic subjects CAN still use these helpers when
+the surface calls for it (a low-poly brick wall
+benefits from `makeBricksPattern`; a stylised shield
+benefits from `chitin` recipe even though it's not a
+creature; a marble floor benefits from
+`domainWarpFBM`).
+
+## Files modified (8)
+
+| File | Change |
+|------|--------|
+| `index.html` | VERSION constant bumped v1.23 → v1.24 (TS) / v8.15 → v8.16 (JSON/JS); 26 new PART 74 helpers added to `__threeTriHelpers` (valueNoise2D / fbm2D / voronoi2D / domainWarpFBM / microRoughnessMap / punctateMaps / striateMaps / heightToNormal / heightToRoughness / heightToAO / heightToCurvature / cavityDirt / chitin / elytra / membrane / velvet / applySurface / loft / spindle / segmentedAbdomen / facetHeightField / slopeBlur / makeTileablePeriodic / makeTileableSquare / makeBricksPattern / makeTruchetPattern / makeCairoPattern / makeSplatterPattern / clearTextureCache); meta description + keywords updated; spec chip title + text updated; the version comment block updated to mention PART 74 |
+| `Prompt_To_Ts.txt` | New PART 74 added (sections 74.0 - 74.10): procedural noise toolkit (74.1), micro-texture pipeline (74.2), height-to-X conversions (74.3), PBR creature recipes (74.4), loft-based organic geometry (74.5), hex facet pattern (74.6), cross-cutting tricks (74.7), procedural pattern library (74.8), seeded determinism (74.9), updated cross-references (74.10); v1.23 → v1.24 in title + changelog header |
+| `Prompt_To_Json.txt` | New PART 74 added (sections 74.0 - 74.10) with JSON-specific worked example; v8.15 → v8.16 in title + changelog header |
+| `Prompt_To_Js.txt` | New PART 74 added (sections 74.0 - 74.10) with JS-specific worked example; v8.15 → v8.16 in title + changelog header |
+| `Image_To_Ts.txt` | Brief PART 74 cross-reference added (summary of 74.1 - 74.9) at end (the full spec lives in Prompt_To_Ts.txt); v1.23 → v1.24 in title + changelog header |
+| `Image_To_Json.txt` | Brief PART 74 cross-reference added (summary of 74.1 - 74.9) at end; v8.15 → v8.16 in title + changelog header |
+| `Image_To_Js.txt` | Brief PART 74 cross-reference added (summary of 74.1 - 74.9) at end; v8.15 → v8.16 in title + changelog header |
+| `CHANGES_SUMMARY.md` | This entry |
+
+## What's STRICTLY UNCHANGED
+
+- All PART 1-73 sections in the spec files
+- All existing 50 anti-pattern validators (E1-E50)
+- All existing MAT_DB presets (the 4 default families
+  from PART 7, the 8 CS2 presets from PART 45)
+- All existing helpers (PART 35, PART 39, PART 40,
+  PART 41, PART 42, PART 43, PART 44, PART 45, PART
+  67, PART 68-71, PART 72, PART 73)
+- All existing material recipes
+- All existing export paths (GLB, OBJ, STL, .ts)
+- The existing 4 default material families (plate /
+  cloth / leather / stone)
+- The existing `__threeTriHelpers` API
+- The existing `lblSpec` interface
+- The existing version, chip, and meta descriptions
+  in the chrome
+- The existing `applyModifierStack`, `cs2PbrProfile`,
+  `applyWear`, `materialVariants`, `recolorByPalette`,
+  `preflightCheck` helpers
+- The existing E1-E50 validator surface (PART 74 does
+  NOT add new validators; the new helpers are covered
+  by the existing E19 PBR + UV completeness / E20
+  hard-constraint / E22 detail-inventory compliance
+  and the extended PART 21 validation checklist — see
+  PART 74.10.4)
+
+## Zero downgrades, only upgrades
+
+- No existing rule is changed.
+- No existing material default is changed.
+- No existing MAT_DB preset is changed.
+- No existing helper is removed.
+- No existing validator is removed.
+- No existing export path is removed.
+- No existing meta.* field is removed.
+- No existing `userData.role` is renamed.
+- No existing style-agnosticism rule is changed.
+- A model that doesn't use any of the new PART 74
+  features loads identically to v1.23 / v8.15.
+
+## If only ONE sub-section of PART 74 is implemented
+
+Implement **74.2.1 (`microRoughnessMap`)**. It is the
+single highest-leverage PBR lookdev trick (every
+material that calls it stops looking like plastic), is
+one ~30-line function, and costs nothing to add since
+it's a procedural texture, not a renderer change. The
+chitin / elytra / membrane recipes (74.4) all call it
+by default for the universal "kill plastic feel" overlay.
+
+## Quick reference for the renderer build
+
+```javascript
+// LBL spec version this renderer targets:
+const VERSION = { ts: 'v1.24', json: 'v8.16' };
+
+// 26 new PART 74 helpers (re-exported on
+// window.lblSpec.helpers):
+// - valueNoise2D(x, y, opts)             (74.1 — Perlin quintic)
+// - fbm2D(x, y, opts)                    (74.1 — multi-octave FBM)
+// - voronoi2D(x, y, opts)                (74.1 — returns {F1, F2})
+// - domainWarpFBM(x, y, opts)            (74.1 — marble / wood)
+// - microRoughnessMap(opts)              (74.2.1 — kill plastic)
+// - punctateMaps(opts)                   (74.2.2 — beetle elytra)
+// - striateMaps(opts)                    (74.2.3 — grooves)
+// - heightToNormal(height, size, s)      (74.3.1 — Sobel wrap)
+// - heightToRoughness(height, s, b, a)   (74.3.2)
+// - heightToAO(height, size, samples)    (74.3.3)
+// - heightToCurvature(height, s, k)      (74.3.4)
+// - cavityDirt(uvFn, opts)               (74.3.5 — F2-F1 worley)
+// - chitin(opts)                         (74.4.1 — body wall)
+// - elytra(opts)                         (74.4.2 — beetle shell)
+// - membrane(opts)                       (74.4.3 — insect wing)
+// - velvet(opts)                         (74.4.4 — fuzzy / moth)
+// - applySurface(material, surface)      (74.4.5 — 5-way switch)
+// - loft(sections, opts)                 (74.5.1 — extrude)
+// - spindle(opts)                        (74.5.2 — tapered)
+// - segmentedAbdomen(opts)               (74.5.3 — 6-segment)
+// - facetHeightField(opts)               (74.6 — hex via Voronoi)
+// - slopeBlur(height, size, a, iter)     (74.7.2 — gradient blur)
+// - makeTileablePeriodic(src, period)    (74.7.3)
+// - makeTileableSquare(src, size)        (74.7.3)
+// - makeBricksPattern(opts)              (74.8.1 — brick courses)
+// - makeTruchetPattern(opts)             (74.8.2 — Truchet curves)
+// - makeCairoPattern(opts)               (74.8.3 — 5-fold Islamic)
+// - makeSplatterPattern(opts)            (74.8.4 — N stamps)
+// - clearTextureCache()                  (74 — cache control)
+
+// 8 new opt-in meta.* fields:
+// - meta.proceduralTextures   (boolean — opts into 74.x)
+// - meta.microRoughnessMap    (params for 74.2.1)
+// - meta.punctateMaps         (params for 74.2.2)
+// - meta.striateMaps          (params for 74.2.3)
+// - meta.chitinRecipe         (params for 74.4.1)
+// - meta.elytraRecipe         (params for 74.4.2)
+// - meta.membraneRecipe       (params for 74.4.3)
+// - meta.velvetRecipe         (params for 74.4.4)
+
+// NO new validator (the new helpers are covered by the
+// existing E19 / E20 / E22 / PART 21 validation checklist).
+```
+
+---
+
 # v1.23 / v8.15 — OPT-IN capability bundle (PART 67)
 
 The spec now teaches the AI an OPT-IN capability bundle

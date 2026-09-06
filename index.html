@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.23 (TS path) and v8.15 (JSON/JS path) with 10 opt-in architectural features, 36 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30, 6 PART 67 opt-in validators E31 modifier stack order / E32 UV projection sanity / E33 modifier stack safety / E34 converge direction / E35 recolor roles / E36 preflight check), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider), and PART 67 OPT-IN CAPABILITY BUNDLE (7 new cross-primitive shape generators makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix + 6 deform modifiers taper / twist / bend / spherize / inflate / applyNoise dispatched by applyModifierStack + 3 UV projections via projectUV + 1 vertex-channel helper fillVertexChannel + 1 convergeFaces helper + 1 recolorByPalette runtime swap + 1 placeChain chain placement + 1 applyMaterialAnimation time-driven material keyframes + 1 preflightCheck safety budget — especially useful for weapons, blades, and metal-finish subjects). PART 45 and PART 67 are EXTRA CAPABILITIES for weapons, blades, and metal-finish subjects — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.23, LBL v8.15, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, low_poly_3d, v1.23 v8.15, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments"/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.24 (TS path) and v8.16 (JSON/JS path) with 10 opt-in architectural features, 36 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30, 6 PART 67 opt-in validators E31 modifier stack order / E32 UV projection sanity / E33 modifier stack safety / E34 converge direction / E35 recolor roles / E36 preflight check), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider), PART 67 OPT-IN CAPABILITY BUNDLE (7 new cross-primitive shape generators makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix + 6 deform modifiers taper / twist / bend / spherize / inflate / applyNoise dispatched by applyModifierStack + 3 UV projections via projectUV + 1 vertex-channel helper fillVertexChannel + 1 convergeFaces helper + 1 recolorByPalette runtime swap + 1 placeChain chain placement + 1 applyMaterialAnimation time-driven material keyframes + 1 preflightCheck safety budget — especially useful for weapons, blades, and metal-finish subjects), and PART 74 OPT-IN CAPABILITY BUNDLE (procedural texturing & shading techniques: 6 noise helpers mulberry32 / fnv1a / valueNoise2D / fbm2D / voronoi2D / domainWarpFBM + 3 procedural micro-texture generators microRoughnessMap / punctateMaps / striateMaps with Sobel-with-wrap-around tile-safety + 5 height-to-X conversions heightToNormal / heightToRoughness / heightToAO / heightToCurvature / cavityDirt + 4 PBR creature recipes chitin / elytra / membrane / velvet with clearcoat-capped-at-0.55 + 4 loft-based organic geometry helpers loft / spindle / segmentedAbdomen / surfaceDecorationAlongCurvedBody + 1 hex-facet helper facetHeightField via triangular-lattice Voronoi + 3 cross-cutting tricks domainWarpFBM / slopeBlur / makeTileableSquare / makeTileablePeriodic + 4 procedural pattern helpers makeBricksPattern / makeTruchetPattern / makeCairoPattern / makeSplatterPattern + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane, and any model whose reference surface has identifiable material micro-structure). PART 45, PART 67, and PART 74 are EXTRA CAPABILITIES — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.24, LBL v8.16, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.24 v8.16, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1477,9 +1477,9 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
   <!-- RJS UPDATE 14 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
-       TS factories target v1.23 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects), JSON/JS blueprints target v8.15 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67).
+       TS factories target v1.24 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects + PART 74 procedural texturing & shading techniques OPT-IN capability bundle: 6 noise helpers + 3 procedural micro-texture generators + 5 height-to-X conversions + 4 PBR creature recipes (chitin / elytra / membrane / velvet) + 4 loft-based organic geometry helpers + 1 hex-facet helper + 3 cross-cutting tricks + 4 procedural pattern helpers + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane), JSON/JS blueprints target v8.16 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67 + PART 74).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 36 anti-patterns from PART 32/65/38/39/40/41/42/43/44/45/67. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.23 TS / v8.15 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), and PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR) and PART 67 (cross-primitive + modifier stack + recolor + chain + animation) are EXTRA CAPABILITIES for weapons, blades, and metal-finish subjects, NOT a rule every model must follow.">LBL: v1.23 / v8.15</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.24 TS / v8.16 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), and PART 74 OPT-IN validators are intentionally NOT added (PART 74's new helpers are covered by the existing E19 PBR + UV completeness, E20 hard-constraint, E22 detail-inventory compliance, and the extended PART 21 validation checklist — see PART 74.10.4) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), and PART 74 (procedural texturing & shading techniques) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.24 / v8.16</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -21745,7 +21745,7 @@ buildScene = function(blueprint){
 // =============================================================================
 window.lblSpec = (function(){
   // The targeted LBL spec version for this renderer build. TS factories
-  // target v1.23 (PART 33 architectural features + PART 34 pre-bundled
+  // target v1.24 (PART 33 architectural features + PART 34 pre-bundled
   // rig helpers + PART 35 triangle-first geometry + PART 36 multi-file
   // drop + model + rig pairing + PART 37 zip bundle support + PART 38
   // character pipeline upgrade + PART 39 3D modeling techniques +
@@ -21844,7 +21844,7 @@ window.lblSpec = (function(){
   // (73.5) the "rigid-looking parts placed near a joint"
   // fix + `rigidityClass` declaration; (73.6) updated
   // cross-references);
-  // JSON/JS blueprints target v8.15 (PART 66 feature bridge + PART 34
+  // JSON/JS blueprints target v8.16 (PART 66 feature bridge + PART 34
   // runtime contract for userData.rigGraph + PART 35 tris inspector +
   // PART 36 same + PART 37 same + PART 38 character pipeline upgrade +
   // PART 39 3D modeling techniques + PART 40 better models through
@@ -21854,11 +21854,25 @@ window.lblSpec = (function(){
   // PART 45 CS2 PBR material profile + PART 67 OPT-IN capability
   // bundle + PART 68-71 OPT-IN capability bundle + PART 72
   // img2threejs structural-fidelity alignment + PART 73 measured
-  // placement).
+  // placement + PART 74 procedural texturing & shading techniques
+  // OPT-IN capability bundle: 6 noise helpers, 3 procedural
+  // micro-texture generators (micro-roughness / punctate / striate),
+  // 5 height-to-X conversions, 4 PBR creature recipes
+  // (chitin / elytra / membrane / velvet), 4 loft-based organic
+  // geometry helpers (loft / spindle / segmentedAbdomen / surface-
+  // decoration-along-a-curved-body), 1 hex-facet helper
+  // (facetHeightField), 3 cross-cutting tricks (domain warp / slope
+  // blur / make-tileable), 4 procedural pattern helpers
+  // (bricks / truchet / cairo / splatter), and 4 determinism
+  // contract items (seed param, sub-seed discipline, cache key,
+  // hash-bashed deterministic geometry). Especially useful for
+  // creatures, insects, organic shapes with skin / shell / wing /
+  // membrane, and any model whose reference surface has
+  // identifiable material micro-structure).
   // The chip in the topbar shows both.
   // Updating these constants is the only place to bump for a new spec
   // release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.23', json: 'v8.15' };
+  const VERSION = { ts: 'v1.24', json: 'v8.16' };
 
   // The 50 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) for the first 12, PART 38 (character
@@ -28347,6 +28361,1234 @@ window.lblSpec = (function(){
         'This wrapper adds the outline/interior split (PART 72.12) so the ' +
         'validator can gate on BOTH scores instead of just the outline IoU.';
       return report;
+    },
+
+    // ══════════════════════════════════════════════════════════════════
+    // PART 74 (v1.24 / v8.16) — OPT-IN CAPABILITY BUNDLE
+    // Procedural texturing & shading techniques. From
+    // RodZill4/material-maker (R1) + xr843/insect-world (R2).
+    // 12+ new opt-in helpers, 4 PBR creature recipes, 4 loft-based
+    // organic geometry helpers, 1 hex-facet helper, 5 height-to-X
+    // conversions, 3 procedural micro-texture generators, 4
+    // procedural pattern helpers, 3 cross-cutting tricks, 4
+    // determinism contract items. Everything strictly additive — a
+    // model that doesn't opt in loads identically to v1.23 / v8.15.
+    // Especially useful for creatures, insects, organic shapes with
+    // skin / shell / wing / membrane, and any model whose reference
+    // surface has identifiable material micro-structure (puncture
+    // dots, grooves, scales, veining, hairs, ridges). No new
+    // dependency, no new export path, no new mandatory field. Strict
+    // upgrade, zero downgrades. The existing E19 (PBR + UV
+    // completeness) / E20 (hard-constraint) / E22 (detail-inventory
+    // compliance) and the extended PART 21 validation checklist (one
+    // new item: "if the model uses procedural texturing, every PART
+    // 74 helper is invoked with a deterministic seed and the texture
+    // cache key is included in the per-model hash") cover all
+    // PART 74 opt-in behaviour. See PART 74.10 in Prompt_To_Ts.txt
+    // for the canonical cross-reference table.
+
+    // ── PART 74.1 — Procedural noise toolkit ─────────────────────────
+    // (re-exports mulberry32 + fnv1a from PART 68-71 above; the
+    // valueNoise2D / fbm2D / voronoi2D / domainWarpFBM helpers
+    // re-implement Material Maker's GLSL noise family in JS).
+
+    // valueNoise2D(x, y, opts) → [0, 1] — Perlin's classic value
+    // noise with quintic smoothstep (6t^5-15t^4+10t^3) for
+    // C2-continuous derivatives. Re-implementation of Material
+    // Maker's value_noise_2d.
+    valueNoise2D: function(x, y, opts){
+      opts = opts || {};
+      const size    = (typeof opts.size    === 'number') ? opts.size    : 256;
+      const offset  = (typeof opts.offset  === 'number') ? opts.offset  : 0;
+      const seed    = (typeof opts.seed    === 'number') ? opts.seed    : 42;
+      // Hash function for the lattice
+      const hash = function(a, b){
+        let h = ((a * 374761393) ^ (b * 668265263) ^ (seed * 1442695040888963407)) >>> 0;
+        h = ((h ^ (h >>> 13)) * 1274126177) >>> 0;
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+      };
+      const ix = Math.floor(x), iy = Math.floor(y);
+      const fx = x - ix, fy = y - iy;
+      // Quintic smoothstep
+      const u = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+      const v = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+      const x0 = ((ix % size) + size) % size;
+      const x1 = ((ix + 1) % size + size) % size;
+      const y0 = ((iy % size) + size) % size;
+      const y1 = ((iy + 1) % size + size) % size;
+      const p00 = hash(x0, y0);
+      const p10 = hash(x1, y0);
+      const p01 = hash(x0, y1);
+      const p11 = hash(x1, y1);
+      return (p00 * (1 - u) + p10 * u) * (1 - v) + (p01 * (1 - u) + p11 * u) * v;
+    },
+
+    // fbm2D(x, y, opts) → [0, 1] — multi-octave FBM with per-octave
+    // seed offset (seed + i) and optional abs(2n-1) ridge folds.
+    // Re-implementation of Material Maker's fbm_2d_value.
+    fbm2D: function(x, y, opts){
+      opts = opts || {};
+      const size        = (typeof opts.size        === 'number') ? opts.size        : 256;
+      const octaves     = (typeof opts.octaves     === 'number') ? opts.octaves     : 4;
+      const persistence = (typeof opts.persistence === 'number') ? opts.persistence : 0.5;
+      const lacunarity  = (typeof opts.lacunarity  === 'number') ? opts.lacunarity  : 2.0;
+      const folds       = (typeof opts.folds       === 'number') ? opts.folds       : 0;
+      const offset      = (typeof opts.offset      === 'number') ? opts.offset      : 0;
+      const seed        = (typeof opts.seed        === 'number') ? opts.seed        : 42;
+      let value = 0, scale = 1, norm = 0;
+      let cx = x, cy = y, cs = size;
+      for(let i = 0; i < octaves; i++){
+        let n = this.valueNoise2D(cx, cy, {
+          size: cs, offset: offset, seed: seed + i * 131
+        });
+        for(let f = 0; f < folds; f++) n = Math.abs(2 * n - 1);
+        value += n * scale;
+        norm += scale;
+        cx *= lacunarity; cy *= lacunarity; cs *= lacunarity;
+        scale *= persistence;
+      }
+      return value / Math.max(norm, 1e-6);
+    },
+
+    // voronoi2D(x, y, opts) → { F1, F2 } — classic Voronoi (F1, F2
+    // nearest / second-nearest cell-center distances). Re-
+    // implementation of Material Maker's voronoi2 + the cavity
+    // extension (F2 - F1 is the canonical "dirt in crevices" mask).
+    voronoi2D: function(x, y, opts){
+      opts = opts || {};
+      const cells = (typeof opts.cells === 'number') ? opts.cells : 8;
+      const seed  = (typeof opts.seed  === 'number') ? opts.seed  : 42;
+      const hash = function(a, b){
+        let h = ((a * 374761393) ^ (b * 668265263) ^ (seed * 1442695040888963407)) >>> 0;
+        h = ((h ^ (h >>> 13)) * 1274126177) >>> 0;
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+      };
+      const ix = Math.floor(x), iy = Math.floor(y);
+      let F1 = 1e9, F2 = 1e9;
+      for(let dy = -1; dy <= 1; dy++){
+        for(let dx = -1; dx <= 1; dx++){
+          const cx = ix + dx, cy = iy + dy;
+          const ox = hash(cx, cy), oy = hash(cx, cy + 0.5);
+          const px = cx + ox, py = cy + oy;
+          const ddx = px - x, ddy = py - y;
+          const d = ddx * ddx + ddy * ddy;
+          if(d < F1){ F2 = F1; F1 = d; }
+          else if(d < F2){ F2 = d; }
+        }
+      }
+      return { F1: Math.sqrt(F1), F2: Math.sqrt(F2) };
+    },
+
+    // domainWarpFBM(x, y, opts) → [0, 1] — FBM warped by another
+    // FBM. The canonical "marble veins / wood grain / molten gold"
+    // look in 5 lines of math: fbm(coord + fbm(coord + fbm(coord))).
+    // Re-implementation of Material Maker's clouds_noise.
+    domainWarpFBM: function(x, y, opts){
+      opts = opts || {};
+      const warpAmount = (typeof opts.warpAmount === 'number') ? opts.warpAmount : 0.5;
+      const w1 = this.fbm2D(x + 7.3, y + 3.1, opts);
+      const w2 = this.fbm2D(x + w1 * warpAmount, y + w1 * warpAmount, opts);
+      return this.fbm2D(x + w2 * warpAmount, y + w2 * warpAmount, opts);
+    },
+
+    // ── PART 74.2 — Procedural micro-texture pipeline ────────────────
+    // The 3 micro-texture generators (microRoughnessMap /
+    // punctateMaps / striateMaps) re-implement insect-world's
+    // src/three/builders/surface.ts. All 3 are CanvasTexture,
+    // cached globally by parameter-string key, node-test guarded
+    // (return null when document is undefined), seed-driven for
+    // CI-testable determinism.
+
+    // Global parameter-keyed texture cache (insect-world pattern).
+    _textureCache: new Map(),
+
+    _textureCacheGet: function(key, make){
+      if(this._textureCache.has(key)) return this._textureCache.get(key);
+      const v = make();
+      this._textureCache.set(key, v);
+      return v;
+    },
+
+    // microRoughnessMap(opts) — the universal "kill plastic feel"
+    // overlay. 3-octave value noise, formula value = 1 - 0.12 *
+    // valueNoise (never darkens, never below base roughness, never
+    // above 1.0). The single biggest bang-for-buck in PBR lookdev.
+    microRoughnessMap: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;  // node-test guard
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size      = (typeof opts.size      === 'number') ? opts.size      : 256;
+      const scale     = (typeof opts.scale     === 'number') ? opts.scale     : 1.0;
+      const amplitude = (typeof opts.amplitude === 'number') ? opts.amplitude : 0.12;
+      const seed      = (typeof opts.seed      === 'number') ? opts.seed      : 42;
+      const cacheKey  = 'microRoughnessMap:' + JSON.stringify({size, scale, amplitude, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        const img = ctx.createImageData(size, size);
+        for(let y = 0; y < size; y++){
+          for(let x = 0; x < size; x++){
+            const n = this.fbm2D(x * scale / size, y * scale / size, {
+              octaves: 3, persistence: 0.5, seed: seed
+            });
+            const v = Math.max(0, Math.min(255, Math.round((1.0 - amplitude * n) * 255)));
+            const i = (y * size + x) * 4;
+            img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+            img.data[i + 3] = 255;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        tex.userData = { part74: 'microRoughnessMap', seed: seed, size: size };
+        return tex;
+      });
+    },
+
+    // punctateMaps(opts) — beetle-elytra "puncture dots" texture
+    // bundle. Returns { height, normalMap, roughnessMap } all
+    // generated as CanvasTexture with Sobel-with-wrap-around normal
+    // extraction for tile-safety.
+    punctateMaps: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size      = (typeof opts.size      === 'number') ? opts.size      : 512;
+      const density   = (typeof opts.density   === 'number') ? opts.density   : 260;
+      const pitRadius = (typeof opts.pitRadius === 'number') ? opts.pitRadius : 0.016;
+      const pitDepth  = (typeof opts.pitDepth  === 'number') ? opts.pitDepth  : 0.6;
+      const normalStrength = (typeof opts.normalStrength === 'number') ? opts.normalStrength : 2.2;
+      const seed      = (typeof opts.seed      === 'number') ? opts.seed      : 42;
+      const cacheKey  = 'punctateMaps:' + JSON.stringify({size, density, pitRadius, pitDepth, normalStrength, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        // 1) Build height field with N random cos-shaped pits
+        const height = new Float32Array(size * size);
+        for(let i = 0; i < density; i++){
+          const cx = rng() * size;
+          const cy = rng() * size;
+          const r  = pitRadius * size * (0.7 + rng() * 0.6);
+          for(let y = Math.floor(cy - r * 1.5); y <= Math.ceil(cy + r * 1.5); y++){
+            for(let x = Math.floor(cx - r * 1.5); x <= Math.ceil(cx + r * 1.5); x++){
+              const dx = x - cx, dy = y - cy;
+              const d  = Math.sqrt(dx * dx + dy * dy) / r;
+              if(d < 1.0){
+                const pit = (1.0 - d * d) * pitDepth;
+                const yy = ((y % size) + size) % size;
+                const xx = ((x % size) + size) % size;
+                const idx = yy * size + xx;
+                if(pit > height[idx]) height[idx] = pit;
+              }
+            }
+          }
+        }
+        // 2) Sobel with wrap-around → normal map
+        const at = function(x, y){
+          const yy = ((y % size) + size) % size;
+          const xx = ((x % size) + size) % size;
+          return height[yy * size + xx];
+        };
+        const normalCanvas = document.createElement('canvas');
+        normalCanvas.width = normalCanvas.height = size;
+        const nctx = normalCanvas.getContext('2d');
+        const nimg = nctx.createImageData(size, size);
+        for(let y = 0; y < size; y++){
+          for(let x = 0; x < size; x++){
+            const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)
+                      - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
+            const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)
+                      - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
+            const nx = -normalStrength * dx;
+            const ny =  normalStrength * dy;
+            const inv = 1.0 / Math.max(Math.sqrt(nx * nx + ny * ny + 1), 1e-6);
+            const i = (y * size + x) * 4;
+            nimg.data[i]     = Math.round((nx * inv * 0.5 + 0.5) * 255);
+            nimg.data[i + 1] = Math.round((ny * inv * 0.5 + 0.5) * 255);
+            nimg.data[i + 2] = Math.round((inv * 0.5 + 0.5) * 255);
+            nimg.data[i + 3] = 255;
+          }
+        }
+        nctx.putImageData(nimg, 0, 0);
+        const normalMap = new THREE.CanvasTexture(normalCanvas);
+        normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+        normalMap.needsUpdate = true;
+        normalMap.userData = { part74: 'punctateMaps.normalMap', seed: seed };
+        // 3) Roughness map — pits are rougher
+        const roughCanvas = document.createElement('canvas');
+        roughCanvas.width = roughCanvas.height = size;
+        const rctx = roughCanvas.getContext('2d');
+        const rimg = rctx.createImageData(size, size);
+        for(let i = 0; i < size * size; i++){
+          const v = Math.max(0, Math.min(255, Math.round((0.6 + 0.4 * height[i]) * 255)));
+          rimg.data[i * 4] = rimg.data[i * 4 + 1] = rimg.data[i * 4 + 2] = v;
+          rimg.data[i * 4 + 3] = 255;
+        }
+        rctx.putImageData(rimg, 0, 0);
+        const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+        roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+        roughnessMap.needsUpdate = true;
+        roughnessMap.userData = { part74: 'punctateMaps.roughnessMap', seed: seed };
+        return { height: height, normalMap: normalMap, roughnessMap: roughnessMap };
+      });
+    },
+
+    // striateMaps(opts) — vertical "groove" texture bundle. N
+    // longitudinal grooves with micro-bulge between + 1D noise
+    // wobble. Returns { height, normalMap, roughnessMap }.
+    striateMaps: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size      = (typeof opts.size      === 'number') ? opts.size      : 512;
+      const count     = (typeof opts.count     === 'number') ? opts.count     : 24;
+      const depth     = (typeof opts.depth     === 'number') ? opts.depth     : 0.04;
+      const width     = (typeof opts.width     === 'number') ? opts.width     : 0.04;
+      const wobble    = (typeof opts.wobble    === 'number') ? opts.wobble    : 0.008;
+      const normalStrength = (typeof opts.normalStrength === 'number') ? opts.normalStrength : 2.2;
+      const seed      = (typeof opts.seed      === 'number') ? opts.seed      : 42;
+      const cacheKey  = 'striateMaps:' + JSON.stringify({size, count, depth, width, wobble, normalStrength, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        // 1D wobble field (one value per u column)
+        const wob = new Float32Array(size);
+        for(let i = 0; i < size; i++) wob[i] = (rng() - 0.5) * 2.0 * wobble;
+        // Build height field: cos valleys at each u-period
+        const height = new Float32Array(size * size);
+        for(let y = 0; y < size; y++){
+          const v = y / size;
+          for(let x = 0; x < size; x++){
+            const u = x / size;
+            const phase = (u + wob[y]) * count;
+            const cellPos = phase - Math.floor(phase);
+            // Cos groove at cellPos = 0.5 (valley), micro-bulge at 0
+            const d = Math.abs(cellPos - 0.5);
+            let h = (1.0 - Math.cos(d * 2.0 * Math.PI)) * 0.5;  // smooth bump
+            if(d > 0.5 - width) h -= (1.0 - (1.0 - d) / width) * depth;  // groove
+            height[y * size + x] = h;
+          }
+        }
+        // Sobel with wrap-around → normal map
+        const at = function(x, y){
+          const yy = ((y % size) + size) % size;
+          const xx = ((x % size) + size) % size;
+          return height[yy * size + xx];
+        };
+        const normalCanvas = document.createElement('canvas');
+        normalCanvas.width = normalCanvas.height = size;
+        const nctx = normalCanvas.getContext('2d');
+        const nimg = nctx.createImageData(size, size);
+        for(let y = 0; y < size; y++){
+          for(let x = 0; x < size; x++){
+            const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)
+                      - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
+            const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)
+                      - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
+            const nx = -normalStrength * dx;
+            const ny =  normalStrength * dy;
+            const inv = 1.0 / Math.max(Math.sqrt(nx * nx + ny * ny + 1), 1e-6);
+            const i = (y * size + x) * 4;
+            nimg.data[i]     = Math.round((nx * inv * 0.5 + 0.5) * 255);
+            nimg.data[i + 1] = Math.round((ny * inv * 0.5 + 0.5) * 255);
+            nimg.data[i + 2] = Math.round((inv * 0.5 + 0.5) * 255);
+            nimg.data[i + 3] = 255;
+          }
+        }
+        nctx.putImageData(nimg, 0, 0);
+        const normalMap = new THREE.CanvasTexture(normalCanvas);
+        normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+        normalMap.needsUpdate = true;
+        normalMap.userData = { part74: 'striateMaps.normalMap', seed: seed };
+        // Roughness map — groove bottoms are rougher
+        const roughCanvas = document.createElement('canvas');
+        roughCanvas.width = roughCanvas.height = size;
+        const rctx = roughCanvas.getContext('2d');
+        const rimg = rctx.createImageData(size, size);
+        for(let i = 0; i < size * size; i++){
+          const v = Math.max(0, Math.min(255, Math.round((0.5 + 0.5 * height[i]) * 255)));
+          rimg.data[i * 4] = rimg.data[i * 4 + 1] = rimg.data[i * 4 + 2] = v;
+          rimg.data[i * 4 + 3] = 255;
+        }
+        rctx.putImageData(rimg, 0, 0);
+        const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+        roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+        roughnessMap.needsUpdate = true;
+        roughnessMap.userData = { part74: 'striateMaps.roughnessMap', seed: seed };
+        return { height: height, normalMap: normalMap, roughnessMap: roughnessMap };
+      });
+    },
+
+    // ── PART 74.3 — Height-to-X conversions (1 source, 4 outputs) ───
+
+    // heightToNormal(height, size, strength) — Sobel with wrap-
+    // around sampling for tile-safe tangent-space normal maps. The
+    // wrap-around is what makes the texture tile without seam.
+    heightToNormal: function(height, size, strength){
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      strength = (typeof strength === 'number') ? strength : 2.0;
+      const at = function(x, y){
+        const yy = ((y % size) + size) % size;
+        const xx = ((x % size) + size) % size;
+        return height[yy * size + xx];
+      };
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(size, size);
+      for(let y = 0; y < size; y++){
+        for(let x = 0; x < size; x++){
+          const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)
+                    - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
+          const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)
+                    - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
+          const nx = -strength * dx;
+          const ny =  strength * dy;
+          const inv = 1.0 / Math.max(Math.sqrt(nx * nx + ny * ny + 1), 1e-6);
+          const i = (y * size + x) * 4;
+          img.data[i]     = Math.round((nx * inv * 0.5 + 0.5) * 255);
+          img.data[i + 1] = Math.round((ny * inv * 0.5 + 0.5) * 255);
+          img.data[i + 2] = Math.round((inv * 0.5 + 0.5) * 255);
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.needsUpdate = true;
+      tex.userData = { part74: 'heightToNormal', size: size };
+      return tex;
+    },
+
+    // heightToRoughness(height, size, base, amplitude) — linear
+    // remap of height values to [base, base + amplitude]. Use case:
+    // groove bottoms / pit centres are rougher than the field.
+    heightToRoughness: function(height, size, base, amplitude){
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      base = (typeof base === 'number') ? base : 0.4;
+      amplitude = (typeof amplitude === 'number') ? amplitude : 0.5;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(size, size);
+      for(let i = 0; i < size * size; i++){
+        const v = Math.max(0, Math.min(255, Math.round((base + height[i] * amplitude) * 255)));
+        img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+        img.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.needsUpdate = true;
+      tex.userData = { part74: 'heightToRoughness', size: size };
+      return tex;
+    },
+
+    // heightToAO(height, size, samples) — cheap horizon-AO
+    // approximation. Higher sample count = darker concavities.
+    heightToAO: function(height, size, samples){
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      samples = (typeof samples === 'number') ? samples : 8;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(size, size);
+      for(let y = 0; y < size; y++){
+        for(let x = 0; x < size; x++){
+          let occ = 0;
+          const h0 = height[y * size + x];
+          for(let s = 0; s < samples; s++){
+            const a = (s / samples) * Math.PI * 2;
+            const dx = Math.cos(a) * 3, dy = Math.sin(a) * 3;
+            const sx = ((x + dx) % size + size) % size;
+            const sy = ((y + dy) % size + size) % size;
+            if(height[Math.floor(sy) * size + Math.floor(sx)] > h0 + 0.05) occ++;
+          }
+          const v = Math.round((1 - occ / samples) * 255);
+          const i = (y * size + x) * 4;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.needsUpdate = true;
+      tex.userData = { part74: 'heightToAO', size: size };
+      return tex;
+    },
+
+    // heightToCurvature(height, size, kernel) — Laplacian of the
+    // height field. Negative curvature = concave (groove bottom);
+    // positive = convex (ridge top). Use case: "polished rim, dull
+    // field" weathered-metal / chitin signature.
+    heightToCurvature: function(height, size, kernel){
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      kernel = (typeof kernel === 'number') ? kernel : 1;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(size, size);
+      const at = function(x, y){
+        const yy = ((y % size) + size) % size;
+        const xx = ((x % size) + size) % size;
+        return height[yy * size + xx];
+      };
+      for(let y = 0; y < size; y++){
+        for(let x = 0; x < size; x++){
+          const lap = (at(x + kernel, y) + at(x - kernel, y)
+                     + at(x, y + kernel) + at(x, y - kernel)) * 0.25
+                     - at(x, y);
+          const v = Math.max(0, Math.min(255, Math.round((0.5 - lap * 4) * 255)));
+          const i = (y * size + x) * 4;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+          img.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.needsUpdate = true;
+      tex.userData = { part74: 'heightToCurvature', size: size };
+      return tex;
+    },
+
+    // cavityDirt(uvFn, opts) → { mask, color } — combine Voronoi
+    // F2 - F1 with remap for the canonical "dirt in crevices" look
+    // (the single most useful post-FX trick in both reference
+    // repos). uvFn(u, v) → { x, y } for sampling.
+    cavityDirt: function(uvFn, opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size   = (typeof opts.size   === 'number') ? opts.size   : 256;
+      const cells  = (typeof opts.cells  === 'number') ? opts.cells  : 8;
+      const seed   = (typeof opts.seed   === 'number') ? opts.seed   : 42;
+      const amount = (typeof opts.amount === 'number') ? opts.amount : 0.3;
+      const cacheKey = 'cavityDirt:' + JSON.stringify({size, cells, seed, amount});
+      return this._textureCacheGet(cacheKey, () => {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        const img = ctx.createImageData(size, size);
+        for(let y = 0; y < size; y++){
+          for(let x = 0; x < size; x++){
+            const p = uvFn(x / size, y / size);
+            const vor = this.voronoi2D(p.x * cells, p.y * cells, { cells: cells, seed: seed });
+            const cavity = Math.min(1, Math.max(0, (vor.F2 - vor.F1) * 3));
+            const v = Math.round((1 - cavity * amount) * 255);
+            const i = (y * size + x) * 4;
+            img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+            img.data[i + 3] = 255;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        tex.userData = { part74: 'cavityDirt', seed: seed };
+        return tex;
+      });
+    },
+
+    // ── PART 74.4 — PBR creature recipe trio ─────────────────────────
+    // The 4 PBR recipes (chitin / elytra / membrane / velvet) give
+    // the renderer a complete "creature / shell / wing" PBR
+    // library, re-implemented from insect-world's kit.ts.
+
+    // chitin(opts) → THREE.MeshPhysicalMaterial — the general
+    // body-wall material. With `translucent: true` it's the "you
+    // can almost see through it" wing-membrane / larval-cuticle
+    // look at transmission=0.35, thickness=0.6, ior=1.42.
+    chitin: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || !THREE.MeshPhysicalMaterial) return null;
+      const color = opts.color || 0x6a3a18;
+      const gloss = (typeof opts.gloss === 'number') ? opts.gloss : 0.5;
+      const translucent = !!opts.translucent;
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: color,
+        roughness: 1 - gloss * 0.92,
+        metalness: 0,
+        clearcoat: 0,
+        ior: 1.42
+      });
+      if(translucent){
+        mat.transmission = 0.35;
+        mat.thickness = 0.6;
+      }
+      // Universal "kill plastic feel" overlay (PART 74.2.1)
+      const micro = this.microRoughnessMap({ seed: opts.seed });
+      if(micro) mat.roughnessMap = micro;
+      mat.userData = mat.userData || {};
+      mat.userData.role = 'chitin';
+      mat.userData.recipe = translucent ? 'chitin-translucent' : 'chitin';
+      return mat;
+    },
+
+    // elytra(opts) → THREE.MeshPhysicalMaterial — the beetle-shell
+    // / hard-shell material. Clearcoat CAPPED at 0.55 (the "ACES
+    // tonemap, prefer darker" rule). With `iridescent: true` it's
+    // the full iridescence recipe (iridescence=1, iridescenceIOR
+    // =1.8, iridescenceThicknessRange = [260, 460]).
+    elytra: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || !THREE.MeshPhysicalMaterial) return null;
+      const color  = opts.color  || 0x2244aa;
+      const metal  = (typeof opts.metal === 'number') ? opts.metal : 0.25;
+      const surface = opts.surface || 'punctate';
+      const iridescent = !!opts.iridescent;
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: color,
+        roughness: 0.35,
+        metalness: metal,
+        clearcoat: 0.55,  // CAP (PART 74.4.2)
+        clearcoatRoughness: 0.05,
+        ior: 1.5
+      });
+      if(iridescent){
+        mat.iridescence = 1.0;
+        mat.iridescenceIOR = 1.8;
+        mat.iridescenceThicknessRange = opts.iridescenceRange || [260, 460];
+      }
+      // Surface micro-structure
+      if(surface === 'punctate'){
+        const pm = this.punctateMaps({ seed: opts.seed });
+        if(pm){ mat.normalMap = pm.normalMap; mat.roughnessMap = pm.roughnessMap; }
+      } else if(surface === 'striate'){
+        const sm = this.striateMaps({ seed: opts.seed });
+        if(sm){ mat.normalMap = sm.normalMap; mat.roughnessMap = sm.roughnessMap; }
+      } else {
+        const micro = this.microRoughnessMap({ seed: opts.seed });
+        if(micro) mat.roughnessMap = micro;
+      }
+      mat.userData = mat.userData || {};
+      mat.userData.role = 'elytra';
+      mat.userData.recipe = iridescent ? 'elytra-iridescent' : 'elytra';
+      return mat;
+    },
+
+    // membrane(opts) → THREE.MeshPhysicalMaterial — the thin insect
+    // wing / translucent membrane. DoubleSide, transmission=0.55,
+    // thickness=0.05, ior=1.33, roughness=0.22, opacity=0.32.
+    membrane: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || !THREE.MeshPhysicalMaterial) return null;
+      const color = opts.color || 0xe0f0f8;
+      const opacity = (typeof opts.opacity === 'number') ? opts.opacity : 0.32;
+      const iridescent = !!opts.iridescent;
+      const iridStrength = (typeof opts.iridescence === 'number') ? opts.iridescence : 0.45;
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: color,
+        roughness: 0.22,
+        metalness: 0,
+        transmission: 0.55,
+        thickness: 0.05,
+        ior: 1.33,
+        opacity: opacity,
+        transparent: true,
+        side: (typeof THREE !== 'undefined' && THREE.DoubleSide) ? THREE.DoubleSide : 0
+      });
+      if(iridescent){
+        mat.iridescence = iridStrength;
+        mat.iridescenceIOR = 1.3;
+        mat.iridescenceThicknessRange = [200, 500];
+      }
+      const micro = this.microRoughnessMap({ seed: opts.seed });
+      if(micro) mat.roughnessMap = micro;
+      mat.userData = mat.userData || {};
+      mat.userData.role = 'membrane';
+      mat.userData.recipe = iridescent ? 'membrane-iridescent' : 'membrane';
+      return mat;
+    },
+
+    // velvet(opts) → THREE.MeshPhysicalMaterial — the fuzzy / moth
+    // / soft-fabric material. sheen=1, sheenColor = base color
+    // lightened by 30% (no sheen map needed).
+    velvet: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined' || !THREE.MeshPhysicalMaterial) return null;
+      const color = opts.color || 0x4a2a18;
+      const baseColor = new THREE.Color(color);
+      const sheenColor = baseColor.clone().lerp(new THREE.Color(1, 1, 1), 0.3);
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: color,
+        roughness: 1.0,
+        metalness: 0,
+        sheen: 1.0,
+        sheenColor: sheenColor,
+        sheenRoughness: 0.5
+      });
+      mat.userData = mat.userData || {};
+      mat.userData.role = 'velvet';
+      mat.userData.recipe = 'velvet';
+      return mat;
+    },
+
+    // applySurface(material, surface) — the 5-way surface switch.
+    // 'smooth'   → no maps, plain physical (no-op)
+    // 'punctate' → punctateMaps (PART 74.2.2)
+    // 'striate'  → striateMaps (PART 74.2.3)
+    // 'velvet'   → sheen=1, sheenColor=base (handled by velvet())
+    // default    → microRoughnessMap (PART 74.2.1) — the universal
+    //              "kill plastic feel" overlay
+    applySurface: function(material, surface, opts){
+      opts = opts || {};
+      if(!material) return material;
+      if(surface === 'smooth') return material;
+      if(surface === 'velvet') return material;  // handled by velvet() factory
+      if(surface === 'punctate'){
+        const pm = this.punctateMaps({ seed: opts.seed });
+        if(pm){ material.normalMap = pm.normalMap; material.roughnessMap = pm.roughnessMap; }
+        return material;
+      }
+      if(surface === 'striate'){
+        const sm = this.striateMaps({ seed: opts.seed });
+        if(sm){ material.normalMap = sm.normalMap; material.roughnessMap = sm.roughnessMap; }
+        return material;
+      }
+      // default = microRoughnessMap only
+      const micro = this.microRoughnessMap({ seed: opts.seed });
+      if(micro) material.roughnessMap = micro;
+      return material;
+    },
+
+    // ── PART 74.5 — Loft-based organic geometry helpers ─────────────
+    // The "rig without bones" pattern re-implemented from insect-
+    // world's loft() in kit.ts (the 1439-line production
+    // reference). Composes with PART 67's applyModifierStack and
+    // the taper / twist / bend / spherize / inflate / applyNoise
+    // modifiers; the canonical "rifled barrel" combo is loft +
+    // Taper + Twist + Noise in ~12 lines of math.
+
+    // loft(sections, opts) → THREE.BufferGeometry — cross-section-
+    // extrusion builder. Each section is { at: Vector3, ry, rz,
+    // twist? }. The natural way to make any long-ish round-ish
+    // body part.
+    loft: function(sections, opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const radialSegments = (typeof opts.radialSegments === 'number') ? opts.radialSegments : 24;
+      const capEnds = (typeof opts.capEnds === 'boolean') ? opts.capEnds : true;
+      if(!sections || sections.length < 2) return null;
+      const positions = [];
+      const indices = [];
+      const normals = [];
+      // Generate ring vertices for each section
+      for(let i = 0; i < sections.length; i++){
+        const s = sections[i];
+        const twist = s.twist || 0;
+        for(let j = 0; j <= radialSegments; j++){
+          const t = (j / radialSegments) * Math.PI * 2;
+          const ct = Math.cos(t + twist), st = Math.sin(t + twist);
+          positions.push(
+            s.at.x + s.ry * ct,
+            s.at.y + s.rz * st,
+            s.at.z
+          );
+          normals.push(ct, st, 0);
+        }
+      }
+      // Build indices (quads as 2 triangles)
+      for(let i = 0; i < sections.length - 1; i++){
+        for(let j = 0; j < radialSegments; j++){
+          const a = i * (radialSegments + 1) + j;
+          const b = a + 1;
+          const c = a + (radialSegments + 1);
+          const d = c + 1;
+          indices.push(a, c, b, b, c, d);
+        }
+      }
+      // Optional caps
+      if(capEnds && sections.length > 0){
+        // front cap (center fan at section 0)
+        const c0 = positions.length / 3;
+        positions.push(sections[0].at.x, sections[0].at.y, sections[0].at.z);
+        normals.push(0, 0, -1);
+        for(let j = 0; j < radialSegments; j++){
+          indices.push(c0, j + 1, j);
+        }
+        // back cap (center fan at section N-1)
+        const c1 = positions.length / 3;
+        const last = (sections.length - 1) * (radialSegments + 1);
+        positions.push(
+          sections[sections.length - 1].at.x,
+          sections[sections.length - 1].at.y,
+          sections[sections.length - 1].at.z
+        );
+        normals.push(0, 0, 1);
+        for(let j = 0; j < radialSegments; j++){
+          indices.push(c1, last + j, last + j + 1);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      geo.userData = { part74: 'loft', sections: sections.length, radialSegments: radialSegments };
+      return geo;
+    },
+
+    // spindle(opts) → THREE.BufferGeometry — tapered-shape recipe
+    // with asymmetric sinusoidal bulge. Canonical for polished
+    // rivet, bowling pin, water droplet, bullet casing, missile
+    // body, candle flame, stalactite, stalagmite, dropper tip, pen
+    // tip, carrot, radish, teardrop.
+    spindle: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      if(!opts.from || !opts.to) return null;
+      const from = opts.from, to = opts.to;
+      const radius = (typeof opts.radius === 'number') ? opts.radius : 0.1;
+      const taperStart = (typeof opts.taperStart === 'number') ? opts.taperStart : radius;
+      const taperEnd   = (typeof opts.taperEnd   === 'number') ? opts.taperEnd   : radius;
+      const bulge      = (typeof opts.bulge      === 'number') ? opts.bulge      : 0.5;
+      const sections   = (typeof opts.sections   === 'number') ? opts.sections   : 18;
+      const radialSegments = (typeof opts.radialSegments === 'number') ? opts.radialSegments : 24;
+      const secArr = [];
+      for(let i = 0; i <= sections; i++){
+        const t = i / sections;
+        const r0 = taperStart * (1 - t) + taperEnd * t;
+        // Asymmetric sinusoidal bulge
+        let r = r0;
+        if(t < bulge){
+          const k = t / bulge;
+          r += Math.sin(k * Math.PI / 2) * radius * bulge;
+        } else {
+          const k = (t - bulge) / (1 - bulge);
+          r += (1 - k) * radius * bulge;
+        }
+        const at = new THREE.Vector3(
+          from.x + (to.x - from.x) * t,
+          from.y + (to.y - from.y) * t,
+          from.z + (to.z - from.z) * t
+        );
+        secArr.push({ at: at, ry: r, rz: r });
+      }
+      return this.loft(secArr, { radialSegments: radialSegments });
+    },
+
+    // segmentedAbdomen(opts) → THREE.BufferGeometry — the canonical
+    // 6-segment insect abdomen recipe. The shared `abdomenEnvelope`
+    // function (the per-t radius curve) is the SAME function used
+    // by the inter-segment membrane rings (PART 74.5.3 — the
+    // "share the envelope" pattern).
+    segmentedAbdomen: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      if(!opts.from || !opts.to) return null;
+      const from = opts.from, to = opts.to;
+      const r0 = (typeof opts.r0 === 'number') ? opts.r0 : 0.15;
+      const r1 = (typeof opts.r1 === 'number') ? opts.r1 : 0.05;
+      const segments = (typeof opts.segments === 'number') ? opts.segments : 6;
+      const groove   = (typeof opts.groove   === 'number') ? opts.groove   : 0.02;
+      const bulge    = (typeof opts.bulge    === 'number') ? opts.bulge    : 0.4;
+      // Shared envelope function — used by both the body and the
+      // inter-segment membrane rings (PART 74.5.3).
+      const abdomenEnvelope = function(t){
+        let r = r0 * (1 - t) + r1 * t;
+        if(t < bulge){
+          const k = t / bulge;
+          r += Math.sin(k * Math.PI / 2) * r0 * 0.2;
+        }
+        // Per-segment groove: at t = 1/segments, 2/segments, ..., the
+        // radius dips by `groove` (the inter-segment membrane sits
+        // here)
+        const segT = t * segments;
+        const segF = segT - Math.floor(segT);
+        if(segF < 0.05 || segF > 0.95) r -= groove;
+        return r;
+      };
+      const sections = (typeof opts.sections === 'number') ? opts.sections : 18;
+      const radialSegments = (typeof opts.radialSegments === 'number') ? opts.radialSegments : 24;
+      const secArr = [];
+      for(let i = 0; i <= sections; i++){
+        const t = i / sections;
+        const r = abdomenEnvelope(t);
+        const at = new THREE.Vector3(
+          from.x + (to.x - from.x) * t,
+          from.y + (to.y - from.y) * t,
+          from.z + (to.z - from.z) * t
+        );
+        secArr.push({ at: at, ry: r, rz: r });
+      }
+      const bodyGeo = this.loft(secArr, { radialSegments: radialSegments });
+      if(bodyGeo) bodyGeo.userData.abdomenEnvelope = abdomenEnvelope;
+      return bodyGeo;
+    },
+
+    // ── PART 74.6 — Hexagonal facet pattern ─────────────────────────
+    // The triangular-lattice Voronoi trick re-implemented from
+    // insect-world's facetHeightField in eyes.ts.
+
+    // facetHeightField(opts) → Float32Array — hex-facet height
+    // field via "place cell centers on a triangular grid and ask
+    // 'which is closest' — the partition you get is hexagons, no
+    // hex math needed." Wrap-around (no wrapping of centerX /
+    // centerY to modulo, only the row INDEX is modulo'd for
+    // parity) for natural tile-safety. FORCE EVEN ROW COUNT.
+    facetHeightField: function(opts){
+      opts = opts || {};
+      if(typeof THREE === 'undefined') return null;
+      const size  = (typeof opts.size  === 'number') ? opts.size  : 512;
+      const cells = (typeof opts.cells === 'number') ? opts.cells : 32;
+      const seed  = (typeof opts.seed  === 'number') ? opts.seed  : 42;
+      const domeAmount  = (typeof opts.domeAmount  === 'number') ? opts.domeAmount  : 1.0;
+      const grooveAmount = (typeof opts.grooveAmount === 'number') ? opts.grooveAmount : 0.18;
+      const cacheKey = 'facetHeightField:' + JSON.stringify({size, cells, seed, domeAmount, grooveAmount});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        // Triangular-lattice cell setup
+        const cols = Math.max(2, Math.round(cells));
+        const a = size / cols;  // horizontal cell spacing
+        // FORCE EVEN ROW COUNT (PART 74.6.4)
+        const idealRowSpacing = a * 0.866;  // sqrt(3)/2 for triangular
+        const rows = Math.max(4, Math.round(size / idealRowSpacing / 2) * 2);
+        const rowSpacing = size / rows;
+        const height = new Float32Array(size * size);
+        // Per-cell random offset for natural look
+        const cellOffsets = new Float32Array(cols * rows * 2);
+        for(let i = 0; i < cols * rows * 2; i++) cellOffsets[i] = rng() - 0.5;
+        for(let y = 0; y < size; y++){
+          // NO modulo wrap of y here — the cell center is computed
+          // from the un-wrapped row number (PART 74.6.3)
+          const yn = y / size;
+          const row = Math.floor(yn * rows);
+          const yCenter = (row + 0.5) * rowSpacing;
+          const parity = row % 2;  // even row = 0 offset, odd = a/2
+          for(let x = 0; x < size; x++){
+            const xn = x / size;
+            let minD = 1e9;
+            // Search 3 row-neighbors × 3 col-neighbors
+            for(let dr = -1; dr <= 1; dr++){
+              const cr = row + dr;
+              // The un-wrapped center Y for the candidate row
+              const cy = (cr + 0.5) * rowSpacing;
+              // Only the row INDEX is modulo'd for parity
+              const crParity = ((cr % rows) + rows) % rows;
+              for(let dc = -1; dc <= 1; dc++){
+                const cc = (xn * cols) + dc;
+                const cx = (cc + (crParity ? 0.5 : 0) + cellOffsets[((crParity * cols + ((cc % cols + cols) % cols)) * 2)]) * a;
+                const ddx = cx - x;
+                const ddy = cy - y;
+                const d = ddx * ddx + ddy * ddy;
+                if(d < minD) minD = d;
+              }
+            }
+            const d = Math.sqrt(minD);
+            // Apothem: a / sqrt(3) (for a regular triangular grid)
+            const apothem = a / Math.sqrt(3);
+            const u = d / apothem;  // normalized distance to center
+            // Bump profile: max(0, 1 - u^2) — dome, 1 at center
+            const dome = Math.max(0, 1 - u * u) * domeAmount;
+            // Narrow groove at edge: exp(-((u-1)/0.22)^2) * 0.18
+            const groove = Math.exp(-Math.pow((u - 1) / 0.22, 2)) * grooveAmount;
+            height[y * size + x] = dome - groove;
+          }
+        }
+        return height;
+      });
+    },
+
+    // ── PART 74.7 — Cross-cutting tricks (3 helpers) ──────────────
+
+    // slopeBlur(height, size, amount, iterations) → Float32Array —
+    // blur ALONG a gradient field. The "dirt in crevices" / "wear
+    // on edges" / "rust streaks" / "snow accumulation" Substance-
+    // dirt-node pattern.
+    slopeBlur: function(height, size, amount, iterations){
+      iterations = (typeof iterations === 'number') ? iterations : 4;
+      amount = (typeof amount === 'number') ? amount : 0.05;
+      const out = new Float32Array(height);
+      for(let iter = 0; iter < iterations; iter++){
+        const tmp = new Float32Array(out);
+        for(let y = 0; y < size; y++){
+          for(let x = 0; x < size; x++){
+            // Gradient (Sobel) → 2D direction
+            const dx = (tmp[y * size + ((x + 1) % size)]
+                      - tmp[y * size + ((x - 1 + size) % size)]) * 0.5;
+            const dy = (tmp[((y + 1) % size) * size + x]
+                      - tmp[((y - 1 + size) % size) * size + x]) * 0.5;
+            // Sample ALONG the gradient (slope direction)
+            const sx = Math.round(x + dx * amount * 10);
+            const sy = Math.round(y + dy * amount * 10);
+            const ssx = ((sx % size) + size) % size;
+            const ssy = ((sy % size) + size) % size;
+            out[y * size + x] = tmp[ssy * size + ssx];
+          }
+        }
+      }
+      return out;
+    },
+
+    // makeTileablePeriodic(src, period) — wrap the input
+    // coordinates modulo `period` BEFORE sampling. For
+    // procedurally-generated sources that are already tile-safe
+    // internally, this is a no-op. For custom sources, this is
+    // the recommended way to ensure tile-safety.
+    makeTileablePeriodic: function(src, period){
+      // The src helper is expected to accept (u, v) ∈ [0, 1].
+      // If src already wraps, this is a no-op. The helper is
+      // provided as a marker that the source is intended to be
+      // tileable, and the cache key includes `period`.
+      if(typeof src === 'function'){
+        return function(u, v){
+          const uu = ((u % 1) + 1) % 1;
+          const vv = ((v % 1) + 1) % 1;
+          return src(uu, vv);
+        };
+      }
+      return src;
+    },
+
+    // makeTileableSquare(src, size) — re-sample the source at
+    // shifted offsets and average (Material Maker's
+    // filter/make_tileable_square pattern).
+    makeTileableSquare: function(src, size){
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(size, size);
+      for(let y = 0; y < size; y++){
+        for(let x = 0; x < size; x++){
+          // Average of 4 shifted samples — quarter-tile offsets
+          const samples = [
+            src(x, y),
+            src(x + size, y),
+            src(x, y + size),
+            src(x + size, y + size)
+          ];
+          let r = 0, g = 0, b = 0, a = 0;
+          for(const s of samples){ r += s[0]; g += s[1]; b += s[2]; a += s[3]; }
+          r /= 4; g /= 4; b /= 4; a /= 4;
+          const i = (y * size + x) * 4;
+          img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = a;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.needsUpdate = true;
+      tex.userData = { part74: 'makeTileableSquare', size: size };
+      return tex;
+    },
+
+    // ── PART 74.8 — Procedural pattern library (4 helpers) ─────────
+    // Re-implementations of Material Maker's Pattern family — the
+    // most reusable across non-creature subjects.
+
+    // makeBricksPattern(opts) → THREE.CanvasTexture — brick
+    // courses with optional "offset every Nth row" parameter.
+    makeBricksPattern: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size           = (typeof opts.size           === 'number') ? opts.size           : 256;
+      const courses        = (typeof opts.courses        === 'number') ? opts.courses        : 8;
+      const bricksPerCourse = (typeof opts.bricksPerCourse === 'number') ? opts.bricksPerCourse : 4;
+      const offsetEvery    = (typeof opts.offsetEvery    === 'number') ? opts.offsetEvery    : 2;
+      const mortarThickness = (typeof opts.mortarThickness === 'number') ? opts.mortarThickness : 0.05;
+      const brickColor     = opts.brickColor || '#a04020';
+      const mortarColor    = opts.mortarColor || '#c0b090';
+      const seed           = (typeof opts.seed           === 'number') ? opts.seed           : 42;
+      const cacheKey = 'makeBricksPattern:' + JSON.stringify({size, courses, bricksPerCourse, offsetEvery, mortarThickness, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = mortarColor;
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = brickColor;
+        const courseH = size / courses;
+        const brickW  = size / bricksPerCourse;
+        for(let r = 0; r < courses; r++){
+          const y0 = r * courseH + mortarThickness * courseH;
+          const y1 = (r + 1) * courseH - mortarThickness * courseH;
+          const offset = (r % offsetEvery === 0) ? 0 : brickW * 0.5;
+          for(let b = 0; b < bricksPerCourse + 1; b++){
+            const x0 = b * brickW + offset + mortarThickness * brickW;
+            const x1 = (b + 1) * brickW + offset - mortarThickness * brickW;
+            // Per-brick color jitter
+            const j = (rng() - 0.5) * 30;
+            ctx.fillStyle = 'rgb(' + Math.max(0, Math.min(255, 0xa0 + j)) + ','
+                                + Math.max(0, Math.min(255, 0x40 + j)) + ','
+                                + Math.max(0, Math.min(255, 0x20 + j)) + ')';
+            ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+          }
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        tex.userData = { part74: 'makeBricksPattern', seed: seed };
+        return tex;
+      });
+    },
+
+    // makeTruchetPattern(opts) → THREE.CanvasTexture — Truchet
+    // curves: single 2-arc tile randomly rotated by hash(uv).
+    makeTruchetPattern: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size  = (typeof opts.size  === 'number') ? opts.size  : 256;
+      const cells = (typeof opts.cells === 'number') ? opts.cells : 8;
+      const seed  = (typeof opts.seed  === 'number') ? opts.seed  : 42;
+      const color = opts.color || '#1a1a2a';
+      const bg    = opts.bg    || '#e8e0d0';
+      const cacheKey = 'makeTruchetPattern:' + JSON.stringify({size, cells, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = size / cells * 0.15;
+        const cs = size / cells;
+        for(let cy = 0; cy < cells; cy++){
+          for(let cx = 0; cx < cells; cx++){
+            const x0 = cx * cs, y0 = cy * cs;
+            const flip = rng() < 0.5;
+            ctx.beginPath();
+            if(flip){
+              ctx.arc(x0, y0 + cs, cs * 0.5, -Math.PI / 2, 0);
+              ctx.arc(x0 + cs, y0, cs * 0.5, Math.PI, Math.PI * 1.5);
+            } else {
+              ctx.arc(x0 + cs, y0 + cs, cs * 0.5, Math.PI, Math.PI * 1.5);
+              ctx.arc(x0, y0, cs * 0.5, 0, Math.PI / 2);
+            }
+            ctx.stroke();
+          }
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        tex.userData = { part74: 'makeTruchetPattern', seed: seed };
+        return tex;
+      });
+    },
+
+    // makeCairoPattern(opts) → THREE.CanvasTexture — 5-fold
+    // Islamic tiling pattern (5-edge star). One instance of this
+    // in the texture library gives 5-fold Islamic geometric art
+    // for free.
+    makeCairoPattern: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size  = (typeof opts.size  === 'number') ? opts.size  : 256;
+      const cells = (typeof opts.cells === 'number') ? opts.cells : 4;
+      const seed  = (typeof opts.seed  === 'number') ? opts.seed  : 42;
+      const color = opts.color || '#1a3a5a';
+      const bg    = opts.bg    || '#e8d8b8';
+      const cacheKey = 'makeCairoPattern:' + JSON.stringify({size, cells, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        const cs = size / cells;
+        // 5-pointed star
+        const drawStar = function(cx, cy, r){
+          ctx.beginPath();
+          for(let i = 0; i < 10; i++){
+            const a = (i / 10) * Math.PI * 2 + (rng() - 0.5) * 0.05;
+            const rad = (i % 2 === 0) ? r : r * 0.4;
+            const px = cx + Math.cos(a) * rad;
+            const py = cy + Math.sin(a) * rad;
+            if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fill();
+        };
+        for(let cy = 0; cy < cells; cy++){
+          for(let cx = 0; cx < cells; cx++){
+            const parity = (cx + cy) % 2;
+            const x0 = cx * cs + (parity ? cs * 0.5 : 0);
+            const y0 = cy * cs + (parity ? cs * 0.5 : 0);
+            drawStar(x0, y0, cs * 0.35);
+            drawStar(x0 + cs * 0.5, y0, cs * 0.35);
+            drawStar(x0, y0 + cs * 0.5, cs * 0.35);
+            drawStar(x0 + cs * 0.5, y0 + cs * 0.5, cs * 0.35);
+          }
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        tex.userData = { part74: 'makeCairoPattern', seed: seed };
+        return tex;
+      });
+    },
+
+    // makeSplatterPattern(opts) → THREE.CanvasTexture — N random
+    // "stamps" placed at random UV positions with optional size
+    // jitter and rotation jitter.
+    makeSplatterPattern: function(opts){
+      opts = opts || {};
+      if(typeof document === 'undefined') return null;
+      if(typeof THREE === 'undefined' || !THREE.CanvasTexture) return null;
+      const size  = (typeof opts.size  === 'number') ? opts.size  : 256;
+      const count = (typeof opts.count === 'number') ? opts.count : 40;
+      const minR  = (typeof opts.minR  === 'number') ? opts.minR  : 0.02;
+      const maxR  = (typeof opts.maxR  === 'number') ? opts.maxR  : 0.06;
+      const seed  = (typeof opts.seed  === 'number') ? opts.seed  : 42;
+      const color = opts.color || '#1a1a1a';
+      const bg    = opts.bg    || '#e8d8c0';
+      const cacheKey = 'makeSplatterPattern:' + JSON.stringify({size, count, minR, maxR, seed});
+      return this._textureCacheGet(cacheKey, () => {
+        const rng = this.mulberry32(seed);
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = color;
+        for(let i = 0; i < count; i++){
+          const x = rng() * size;
+          const y = rng() * size;
+          const r = minR * size + rng() * (maxR - minR) * size;
+          ctx.beginPath();
+          // Irregular splat (4-6 lobes)
+          const lobes = 4 + Math.floor(rng() * 3);
+          for(let l = 0; l < lobes; l++){
+            const a = (l / lobes) * Math.PI * 2 + (rng() - 0.5) * 0.3;
+            const lr = r * (0.7 + rng() * 0.6);
+            const px = x + Math.cos(a) * lr;
+            const py = y + Math.sin(a) * lr;
+            if(l === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.needsUpdate = true;
+        tex.userData = { part74: 'makeSplatterPattern', seed: seed };
+        return tex;
+      });
+    },
+
+    // ── PART 74.9 — Seeded determinism (no new PRNG; re-uses
+    // PART 68-71's mulberry32). The contract is documented in
+    // the helper docstrings above. ─────────────────────────────────
+
+    // clearTextureCache() — drop the parameter-keyed texture cache.
+    // Useful when switching between radically different parameter
+    // sets in a single session (e.g. A/B comparing two finishes).
+    clearTextureCache: function(){
+      this._textureCache.clear();
     }
   };
 
