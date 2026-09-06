@@ -1,8 +1,22 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.24 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.25 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 CHANGELOG
+  v1.25 (2026-09-06) — PROCEDURAL RIGGING + SKIN-WEIGHTS
+    INTEGRATION (13 NEW OPT-IN PARTs, PART 75-89). See the
+    full spec in Prompt_To_Ts.txt (PART 75-87) and the
+    cross-file summary in Prompt_To_Js.txt. The image-to-TS
+    factory gains the same opt-in capability bundle with
+    TypeScript type annotations: buildGeodesicWeights,
+    buildHeatDiffusionWeights, buildInverseDistanceWeights,
+    buildSegmentationWeights, autoRigVoxel, autoRigPose,
+    applyConstraintsPost, applyChainCurvature,
+    requestCloudRig. Canonical bone catalog extends
+    13 → 30. No new mandatory fields; no removed rules;
+    no model that doesn't opt in loads any differently.
+    Bumped from v1.24 to v1.25.
+
   v1.24 (2026-09-06) — PROCEDURAL TEXTURING & SHADING TECHNIQUES
     (OPT-IN CAPABILITY BUNDLE — PART 74). Mirrors the v1.24
     update in Prompt_To_Ts.txt. The full spec lives in

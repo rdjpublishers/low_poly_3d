@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.16 — IMAGE-TO-JS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.17 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 NOTE — a third input format exists alongside JSON and JS: for a richer,
@@ -170,6 +170,19 @@ author. PART 66 reinforces — never replaces — PARTs 5, 28, 30, 64,
     were. No new dependency, no new export path, no new
     mandatory blueprint field, no removed / weakened
     rule. (45.13) Component Recipe Database for weapons (knife blade types + handle construction, pistol components, rifle components, boolean operations, edge treatment) preserved verbatim from the source notebook as a content guide; (45.14) bilingual EN/VI Vocabulary Glossary (5 core terms + 5 spatial modifiers + the 4-way damage-type × PBR-map rubric) preserved as a reference resource for the AI; (45.15) updated cross-references. Bumped from v8.13 to v8.14.
+
+  v8.17 (2026-09-06) — PROCEDURAL RIGGING + SKIN-WEIGHTS
+    INTEGRATION (13 NEW OPT-IN PARTs, PART 75-89). See the
+    full spec in Prompt_To_Js.txt (PART 75-87) and the
+    cross-file summary in Prompt_To_Ts.txt. The image-to-JS
+    factory gains the same opt-in capability bundle:
+    rigOptions.skin grows from 2 to 6 values; skeleton
+    templates + Mixamo remap + voxel / pose auto-riggers +
+    chain-curvature + 12-constraint catalog + voxel
+    post-processing, all opt-in. Canonical bone catalog
+    extends 13 → 30 (PART 77 + PART 81). No new mandatory
+    fields; no removed rules; no model that doesn't opt in
+    loads any differently. Bumped from v8.16 to v8.17.
 
   v8.16 (2026-09-06) — PROCEDURAL TEXTURING & SHADING TECHNIQUES
     (OPT-IN CAPABILITY BUNDLE — PART 74). Mirrors the v1.24
