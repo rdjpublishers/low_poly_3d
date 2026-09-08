@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>3D Model Mockup Generator — Low Poly 3D</title>
 <meta name="description" content="Drop a GLB / glTF, set a background, choose an aspect ratio, and download image or video mockups. Auto-detect animations and export them as MP4." />
-<link rel="icon" type="image/png" href="Logo.png" />
+<!-- Inline SVG favicon (no 404 if Logo.png is missing) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236c63ff'/><stop offset='1' stop-color='%23a78bfa'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><path d='M20 18 L20 46 L26 46 L26 34 L38 34 L38 46 L44 46 L44 18 L38 18 L38 28 L26 28 L26 18 Z' fill='%23fff'/></svg>" />
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%236c63ff'/><path d='M20 18 L20 46 L26 46 L26 34 L38 34 L38 46 L44 46 L44 18 L38 18 L38 28 L26 28 L26 18 Z' fill='%23fff'/></svg>" />
 <style>
   :root {
     --bg: #0a0c10;
@@ -195,7 +197,9 @@
     position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
   }
-  #bg-canvas { z-index: 0; }
+  /* bgCanvas is display:none — it's only kept in the DOM as a drawing
+     surface for the THREE.CanvasTexture that backs scene.background. */
+  #bg-canvas { display: none !important; }
   #render-canvas { z-index: 1; }
 
   .stage-empty {
@@ -215,16 +219,34 @@
   }
   #rec-indicator {
     position: absolute; top: 12px; right: 12px;
-    display: none; align-items: center; gap: 6px;
-    background: rgba(220, 38, 38, .9); color: #fff;
-    padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
-    z-index: 10;
+    display: none; align-items: center; gap: 8px;
+    background: rgba(220, 38, 38, .92); color: #fff;
+    padding: 6px 6px 6px 12px; border-radius: 22px; font-size: 11px; font-weight: 600;
+    z-index: 10; backdrop-filter: blur(4px);
+    box-shadow: 0 4px 16px -4px rgba(220, 38, 38, .5);
   }
   #rec-indicator.on { display: inline-flex; }
   #rec-indicator::before {
     content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff;
-    animation: pulse 1s infinite;
+    animation: pulse 1s infinite; flex-shrink: 0;
   }
+  #rec-label { font-variant-numeric: tabular-nums; }
+  #rec-progress-track {
+    width: 80px; height: 4px; background: rgba(255,255,255,.25);
+    border-radius: 2px; overflow: hidden;
+  }
+  #rec-progress-bar {
+    width: 0%; height: 100%; background: #fff; border-radius: 2px;
+    transition: width .12s linear;
+  }
+  #rec-cancel {
+    background: rgba(0,0,0,.25); border: 0; color: #fff;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 11px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+  }
+  #rec-cancel:hover { background: rgba(0,0,0,.5); }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
   /* ===== Right panel — animations & export ===== */
@@ -407,10 +429,11 @@
   <div class="vdiv"></div>
   <button class="tbtn" id="back-btn" title="Back to the Low Poly 3D tool"><span class="back-text">← Back to Low Poly 3D</span><span class="back-icon" style="display:none">←</span></button>
   <div class="vdiv"></div>
-  <button class="tbtn primary" id="upload-btn">📦 Upload 3D Model</button>
+  <button class="tbtn primary" id="upload-btn" title="Upload a .glb or .gltf file (or drop one anywhere)">📦 Upload 3D Model</button>
   <input type="file" id="file-input" accept=".glb,.gltf" style="display:none" />
   <div class="vdiv"></div>
-  <button class="tbtn" id="reset-view-btn" disabled>🎯 Reset View</button>
+  <button class="tbtn" id="reset-view-btn" disabled title="Re-fit the camera to the loaded model">🎯 Reset View</button>
+  <button class="tbtn ghost" id="reset-all-btn" title="Reset every control back to defaults">↺ Reset All</button>
   <div id="stage-info">No model loaded</div>
 </div>
 
@@ -539,8 +562,8 @@
       <div class="ico">🎲</div>
       <div class="txt">Drop a GLB or glTF to start</div>
     </div>
-    <div id="stage-hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
-    <div id="rec-indicator">REC</div>
+    <div id="stage-hint">Drag to orbit · Scroll to zoom · Right-drag to pan · <b>I</b> image · <b>V</b> video · <b>Esc</b> cancel</div>
+    <div id="rec-indicator"><span id="rec-label">REC</span><div id="rec-progress-track"><div id="rec-progress-bar"></div></div><button id="rec-cancel" type="button" title="Cancel recording (Esc)">✕</button></div>
   </main>
 
   <!-- ========== RIGHT: Format + Animations + Export ========== -->
@@ -571,10 +594,17 @@
 
     <div class="panel-section" data-tab="format">
       <div class="panel-title">Image Export</div>
+      <div class="control">
+        <label>Format</label>
+        <div class="seg-group" id="img-fmt-group">
+          <button class="seg-btn active" data-val="png">PNG</button>
+          <button class="seg-btn" data-val="jpeg">JPEG</button>
+        </div>
+      </div>
       <button class="tbtn primary" id="download-image" style="width:100%; justify-content:center" disabled>
-        🖼 Download Image (PNG)
+        🖼 Download Image
       </button>
-      <div class="hint">Renders at the chosen aspect ratio, exactly the size you see.</div>
+      <div class="hint">Renders at the chosen aspect ratio, exactly the size you see. PNG is lossless; JPEG is smaller.</div>
     </div>
 
     <div class="panel-section" data-tab="format">
@@ -646,7 +676,7 @@
 <div id="toast"></div>
 
 <!-- ====== gif.js — client-side GIF encoder (used by the GIF export path) ====== -->
-<script src="https://unpkg.com/gif.js@0.2.0/dist/gif.js"></script>
+<script src="vendor/gif.js"></script>
 
 <!-- ====== Three.js (matches the version used in low_poly_3d) ====== -->
 <script type="importmap">
@@ -712,6 +742,9 @@ const autoFrameChk = $('auto-frame');
 const downloadImageBtn = $('download-image');
 const downloadIdleBtn = $('download-idle');
 const idleHintEl = $('idle-hint');
+const recCancelBtn = $('rec-cancel');
+const recProgressBar = $('rec-progress-bar');
+const recLabel = $('rec-label');
 const animEmpty = $('anim-empty');
 const animListEl = $('anim-list');
 const animCount = $('anim-count');
@@ -747,6 +780,7 @@ const state = {
   longEdge: 1280,
   speed: 1.0,
   exportFormat: 'video',  // 'video' | 'gif'
+  imageFormat: 'png',     // 'png' | 'jpeg'
   isRecording: false,
   cancelRecording: false,
   pauseMainLoop: false,
@@ -755,6 +789,7 @@ const state = {
 
 let renderer, scene, camera, controls, pmremGen, envTexture;
 let bgCtx = null;
+let bgTexture = null;       // THREE.CanvasTexture wrapping the hidden bg canvas
 
 /* ═══════════════════════════════════════════════════════════
    Renderer + scene setup
@@ -763,8 +798,7 @@ function initThree() {
   renderer = new THREE.WebGLRenderer({
     canvas: renderCanvas,
     antialias: true,
-    alpha: true,        // transparent so background canvas shows through
-    preserveDrawingBuffer: true,  // needed for image export
+    preserveDrawingBuffer: true,  // needed for image export / captureStream
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -774,7 +808,10 @@ function initThree() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   scene = new THREE.Scene();
-  scene.background = null;
+  // scene.background is set to a CanvasTexture by renderBackground(), so the
+  // 3D canvas already holds the full composite (bg + model).  This makes
+  // captureStream() and toBlob() on the WebGL canvas work directly, instead
+  // of going through an unreliable 2D-canvas captureStream path.
 
   camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
   camera.position.set(2.2, 1.6, 3.0);
@@ -805,70 +842,105 @@ function initThree() {
 }
 
 function applyLightingPreset(name) {
-  // Clear existing lights
-  scene.children.filter(c => c.isLight).forEach(l => scene.remove(l));
+  // Clear existing lights (lights are flat children of the scene, never nested)
+  for (let i = scene.children.length - 1; i >= 0; i--) {
+    if (scene.children[i].isLight) scene.remove(scene.children[i]);
+  }
 
-  const add = (light) => {
-    light.castShadow = state.shadowOn;
+  // Only lights that *can* cast shadows (Directional, Spot, Point) get the flag.
+  // Ambient and Hemisphere lights silently ignore `castShadow` and just spam warnings.
+  const canShadow = (light) =>
+    light.isDirectionalLight || light.isSpotLight || light.isPointLight;
+
+  const add = (light, pos) => {
+    if (canShadow(light)) light.castShadow = state.shadowOn;
+    if (pos) light.position.set(pos[0], pos[1], pos[2]);
     scene.add(light);
+    return light;
   };
 
+  // Each preset also scales the IBL contribution so "dark" actually looks
+  // dark.  scene.environmentIntensity was added in Three.js r155 — we ship r160.
+  let envScale = 1.0;
   switch (name) {
     case 'studio': {
-      add(new THREE.DirectionalLight(0xffffff, 1.0));
-      const k = scene.children.filter(c => c.isLight).slice(-1)[0];
-      k.position.set(3, 5, 4);
-      add(new THREE.DirectionalLight(0xb6cfff, 0.5));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(-3, 3, -2);
-      add(new THREE.DirectionalLight(0xffe0b3, 0.35));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(0, -2, 3);
+      add(new THREE.DirectionalLight(0xffffff, 1.0),  [ 3,  5,  4]);
+      add(new THREE.DirectionalLight(0xb6cfff, 0.5),  [-3,  3, -2]);
+      add(new THREE.DirectionalLight(0xffe0b3, 0.35), [ 0, -2,  3]);
       add(new THREE.AmbientLight(0xffffff, 0.25));
+      envScale = 1.0;
       break;
     }
     case 'bright': {
-      add(new THREE.DirectionalLight(0xffffff, 1.1));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(2, 4, 3);
+      add(new THREE.DirectionalLight(0xffffff, 1.1), [2, 4, 3]);
       add(new THREE.HemisphereLight(0xddeeff, 0xfff2d6, 0.7));
       add(new THREE.AmbientLight(0xffffff, 0.3));
+      envScale = 1.2;
       break;
     }
     case 'dramatic': {
-      add(new THREE.DirectionalLight(0xffffff, 1.4));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(4, 6, 2);
-      add(new THREE.DirectionalLight(0x6b73ff, 0.25));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(-4, 2, -3);
+      add(new THREE.DirectionalLight(0xffffff, 1.4), [4, 6,  2]);
+      add(new THREE.DirectionalLight(0x6b73ff, 0.25),[-4, 2, -3]);
       add(new THREE.AmbientLight(0xffffff, 0.08));
+      envScale = 0.5;
       break;
     }
     case 'outdoor': {
-      add(new THREE.DirectionalLight(0xfff5d1, 1.2));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(5, 8, 3);
+      add(new THREE.DirectionalLight(0xfff5d1, 1.2), [5, 8, 3]);
       add(new THREE.HemisphereLight(0x9fc8ff, 0xb0976a, 0.6));
       add(new THREE.AmbientLight(0xffffff, 0.15));
+      envScale = 1.3;
       break;
     }
     case 'dark': {
-      add(new THREE.DirectionalLight(0xa5b8ff, 0.6));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(3, 5, 2);
-      add(new THREE.DirectionalLight(0xff9966, 0.25));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(-2, 1, -3);
+      add(new THREE.DirectionalLight(0xa5b8ff, 0.6), [3, 5,  2]);
+      add(new THREE.DirectionalLight(0xff9966, 0.25),[-2, 1, -3]);
       add(new THREE.AmbientLight(0xffffff, 0.05));
+      envScale = 0.18;
       break;
     }
     case 'neutral': {
-      add(new THREE.DirectionalLight(0xffffff, 0.85));
-      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(2, 4, 3);
+      add(new THREE.DirectionalLight(0xffffff, 0.85), [2, 4, 3]);
       add(new THREE.AmbientLight(0xffffff, 0.45));
+      envScale = 0.9;
       break;
     }
+  }
+  if ('environmentIntensity' in scene) scene.environmentIntensity = envScale;
+
+  // For the dark preset, drop the IBL entirely — it's the only way to get
+  // a genuinely moody look (RoomEnvironment provides significant ambient
+  // light that doesn't respect the directional-light scaling).
+  scene.environment = (name === 'dark') ? null : envTexture;
+
+  // Also nudge the tone-mapping exposure so the look matches the mood:
+  // dark preset should look genuinely dim, bright preset should pop.
+  if (renderer) {
+    if (name === 'dark')     renderer.toneMappingExposure = 0.55;
+    else if (name === 'bright')  renderer.toneMappingExposure = 1.25;
+    else if (name === 'outdoor') renderer.toneMappingExposure = 1.1;
+    else if (name === 'dramatic')renderer.toneMappingExposure = 0.95;
+    else                          renderer.toneMappingExposure = 1.05;  // studio + neutral
   }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Background canvas (separate from 3D canvas)
+   Background — drawn to a hidden 2D canvas, then uploaded as a
+   THREE.CanvasTexture and assigned to scene.background so the
+   WebGL renderer composites the bg + model in one pass.  This
+   means captureStream() and toBlob() on the WebGL canvas "just
+   work" without going through a flaky 2D-canvas captureStream.
    ═══════════════════════════════════════════════════════════ */
 function initBgCtx() {
   bgCtx = bgCanvas.getContext('2d');
+  if (!bgTexture) {
+    bgTexture = new THREE.CanvasTexture(bgCanvas);
+    bgTexture.colorSpace = THREE.SRGBColorSpace;
+    bgTexture.minFilter = THREE.LinearFilter;
+    bgTexture.magFilter = THREE.LinearFilter;
+    bgTexture.wrapS = THREE.ClampToEdgeWrapping;
+    bgTexture.wrapT = THREE.ClampToEdgeWrapping;
+  }
 }
 
 function renderBackground() {
@@ -908,6 +980,9 @@ function renderBackground() {
     bgCtx.drawImage(img, dx, dy, dw, dh);
     bgCtx.restore();
   }
+
+  // Tell Three.js to re-upload the texture next frame.
+  if (bgTexture) bgTexture.needsUpdate = true;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -942,8 +1017,8 @@ function sizeFrame() {
   // Canvas display size
   renderCanvas.style.width = fw + 'px';
   renderCanvas.style.height = fh + 'px';
-  bgCanvas.style.width = fw + 'px';
-  bgCanvas.style.height = fh + 'px';
+  // bgCanvas is hidden visually (display:none) — it exists only as a
+  // drawing surface for the THREE.CanvasTexture that backs scene.background.
 
   // Canvas internal resolution = longEdge dims
   const outDims = getLongEdgeDims();
@@ -959,6 +1034,11 @@ function sizeFrame() {
 
   // Stage info chip
   resolutionVal.textContent = `${outDims.w}×${outDims.h}`;
+
+  // Wire the bg canvas into the scene as a texture so the WebGL renderer
+  // composites bg + model in one pass (this is what makes captureStream /
+  // toBlob on the WebGL canvas work correctly).
+  if (bgTexture) scene.background = bgTexture;
 
   renderBackground();
   if (renderer) renderer.setSize(outDims.w, outDims.h, false);
@@ -1295,28 +1375,29 @@ $('shadow-group').querySelectorAll('.seg-btn').forEach(btn => {
 lightingPreset.addEventListener('change', () => applyLightingPreset(lightingPreset.value));
 
 /* ═══════════════════════════════════════════════════════════
-   Image download
+   Image download — renderCanvas already holds bg+model (via
+   scene.background = bgTexture), so we just need toBlob() it.
    ═══════════════════════════════════════════════════════════ */
 downloadImageBtn.addEventListener('click', () => {
   if (!state.model) { toast('Load a model first', 'err'); return; }
-  // Render fresh
+
+  const fmt = (state.imageFormat || 'png');
+  const mime = fmt === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const ext  = fmt === 'jpeg' ? 'jpg' : 'png';
+  const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+  // Make sure the latest frame is in the buffer (preserveDrawingBuffer is on,
+  // but a fresh render guarantees the very latest state is what we read).
   renderBackground();
-  if (renderer) renderer.render(scene, camera);
+  renderer.render(scene, camera);
 
-  // Composite bg + render onto a temp canvas
-  const out = document.createElement('canvas');
-  out.width = renderCanvas.width;
-  out.height = renderCanvas.height;
-  const octx = out.getContext('2d');
-  octx.drawImage(bgCanvas, 0, 0);
-  octx.drawImage(renderCanvas, 0, 0);
-
-  out.toBlob((blob) => {
-    if (!blob) { toast('Image export failed', 'err'); return; }
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    downloadBlob(blob, `mockup_${state.aspect.replace(':', 'x')}_${ts}.png`);
-    toast('Image downloaded', 'ok');
-  }, 'image/png');
+  downloadImageBtn.disabled = true;
+  renderCanvas.toBlob((blob) => {
+    downloadImageBtn.disabled = false;
+    if (!blob) { toast('Image export failed (browser returned no data)', 'err'); return; }
+    downloadBlob(blob, `mockup_${state.aspect.replace(':', 'x')}_${ts}.${ext}`);
+    toast(`${fmt.toUpperCase()} downloaded · ${(blob.size / 1024).toFixed(0)} KB`, 'ok');
+  }, mime, fmt === 'jpeg' ? 0.92 : undefined);
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -1332,6 +1413,19 @@ formatGroup.querySelectorAll('.seg-btn').forEach((btn) => {
     updateFormatLabels();
   });
 });
+
+/* Image format (PNG / JPEG) */
+const imgFmtGroup = $('img-fmt-group');
+if (imgFmtGroup) {
+  imgFmtGroup.querySelectorAll('.seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.imageFormat = btn.dataset.val;
+      imgFmtGroup.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b === btn));
+      const lbl = downloadImageBtn;
+      if (lbl) lbl.textContent = `🖼 Download Image (${state.imageFormat.toUpperCase()})`;
+    });
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════
    Mobile tab bar — only does anything on small viewports.
@@ -1491,11 +1585,12 @@ async function recordAnimSequence(order, filename) {
       for (let k = 0; k < actions.length; k++) {
         const a = actions[k];
         if (k === activeIdx) {
-          a.action.paused = false;
+          // Drive this action to activeLocalT, keeping it paused so the
+          // mixer doesn't auto-advance it.
+          a.action.paused = true;
           a.action.time = activeLocalT;
-          a.action.paused = true; // hold, then we drive it explicitly
         } else {
-          // park inactive actions at time 0 (won't contribute to the pose)
+          // Park inactive actions at time 0 (they won't contribute to the pose)
           a.action.paused = true;
           a.action.time = 0;
         }
@@ -1520,15 +1615,35 @@ async function recordAnimSequence(order, filename) {
 
 async function recordCanvas({ duration, onTick, filename, format = 'video' }) {
   if (state.isRecording) { toast('Already recording…', 'err'); return; }
+
+  // Capability check before we touch anything.
+  if (format === 'gif') {
+    if (typeof GIF === 'undefined') {
+      toast('GIF encoder not loaded — check your network and reload.', 'err', 6000);
+      return;
+    }
+  } else {
+    if (typeof MediaRecorder === 'undefined' ||
+        typeof renderCanvas.captureStream !== 'function') {
+      toast('Your browser does not support video recording (MediaRecorder / captureStream missing).', 'err', 6000);
+      return;
+    }
+  }
+
   state.isRecording = true;
   state.cancelRecording = false;
   state.pauseMainLoop = true; // pause the main animate() so it doesn't fight our seek
   recIndicator.classList.add('on');
+  setRecordingProgress(0, duration, format);
 
-  // Composite canvas — we render to it every frame and either feed it
-  // to MediaRecorder (video) or push frames to gif.js (gif).
+  // For video: capture the WebGL canvas directly — it's the most reliable
+  //   path.  captureStream() on a WebGL canvas is well-supported and
+  //   produces correct output.
+  // For GIF: we still need to push frames into gif.js, so we copy the
+  //   WebGL canvas (which already has bg+model via scene.background) into
+  //   a 2D canvas every frame and hand the bitmap to gif.js.
   const capture = document.createElement('canvas');
-  capture.width = renderCanvas.width;
+  capture.width  = renderCanvas.width;
   capture.height = renderCanvas.height;
   const cctx = capture.getContext('2d');
 
@@ -1537,18 +1652,30 @@ async function recordCanvas({ duration, onTick, filename, format = 'video' }) {
   if (format === 'gif') {
     sink = makeGifSink(capture);
   } else {
-    sink = makeVideoSink(capture);
+    sink = makeVideoSink(renderCanvas);  // capture WebGL canvas directly
   }
 
   const start = performance.now();
   const totalMs = duration * 1000;
   let lastFrameTime = 0;
-  const targetFps = format === 'gif' ? 18 : 30;   // GIF: 18 fps is the sweet spot for size vs smoothness
+  const targetFps = format === 'gif' ? 18 : 30;
   const minFrameGap = 1000 / targetFps;
+
+  // Hard safety: if MediaRecorder.onstop never fires (some headless /
+  // unusual browser configurations), we don't want the UI stuck forever.
+  const safetyTimer = setTimeout(() => {
+    if (state.isRecording) {
+      console.warn('[mockup] recording safety timeout fired');
+      try { sink.abort(); } catch (_) {}
+      toast('Recording timed out (browser did not stop the recorder).', 'err', 6000);
+      finishRecording();
+    }
+  }, totalMs + 8000);
 
   function tick(now) {
     if (state.cancelRecording) {
-      sink.abort();
+      try { sink.abort(); } catch (_) {}
+      toast('Recording cancelled', 'err');
       finishRecording();
       return;
     }
@@ -1557,27 +1684,45 @@ async function recordCanvas({ duration, onTick, filename, format = 'video' }) {
 
     if (onTick) onTick(Math.min(t, duration));
 
-    // Render 3D, then composite over background
+    // Render 3D to the WebGL canvas (bg is already composited via scene.background).
     renderer.render(scene, camera);
-    cctx.drawImage(bgCanvas, 0, 0);
-    cctx.drawImage(renderCanvas, 0, 0);
 
-    // Push a frame to the sink (rate-limited)
+    // For GIF, we need the current frame in a 2D canvas to hand to gif.js.
+    if (format === 'gif') {
+      cctx.clearRect(0, 0, capture.width, capture.height);
+      cctx.drawImage(renderCanvas, 0, 0);
+    }
+
+    // Rate-limit frame pushes.
     if (now - lastFrameTime >= minFrameGap) {
-      sink.add(cctx);
+      sink.add(format === 'gif' ? cctx : null);
       lastFrameTime = now;
     }
 
+    setRecordingProgress(Math.min(elapsed, totalMs) / totalMs, duration, format);
+
     if (elapsed >= totalMs) {
-      // Hold last frame for one more render then stop
-      cctx.drawImage(bgCanvas, 0, 0);
-      cctx.drawImage(renderCanvas, 0, 0);
-      sink.add(cctx);
+      // Final push so the last frame lands.
+      if (format === 'gif') {
+        cctx.clearRect(0, 0, capture.width, capture.height);
+        cctx.drawImage(renderCanvas, 0, 0);
+        sink.add(cctx);
+      }
       sink.finish().then((blob) => {
+        if (!blob || blob.size === 0) {
+          toast('Recording produced no data — try a shorter duration or lower resolution.', 'err', 6000);
+          finishRecording();
+          return;
+        }
         const ext = format === 'gif' ? 'gif' : (blob.type.includes('mp4') ? 'mp4' : 'webm');
         const finalName = filename.replace(/\.(mp4|webm|gif)$/i, '.' + ext);
         downloadBlob(blob, finalName);
-        toast(`${format === 'gif' ? 'GIF' : 'Video'} saved (${ext.toUpperCase()})`, 'ok');
+        const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
+        toast(`${format === 'gif' ? 'GIF' : 'Video'} saved (${ext.toUpperCase()} · ${sizeMB} MB)`, 'ok');
+        finishRecording();
+      }).catch((err) => {
+        console.error('[mockup] record finish failed', err);
+        toast('Recording failed: ' + (err.message || err), 'err', 6000);
         finishRecording();
       });
       return;
@@ -1586,30 +1731,73 @@ async function recordCanvas({ duration, onTick, filename, format = 'video' }) {
   }
 
   function finishRecording() {
+    clearTimeout(safetyTimer);
     state.isRecording = false;
     state.pauseMainLoop = false;
     recIndicator.classList.remove('on');
+    setRecordingProgress(0, 0, format);
+    // Re-render once so the main loop has a clean frame after recording ends.
+    renderer.render(scene, camera);
   }
 
-  // Render first frame
+  // First frame: render once and hand it to the sink so the first millisecond
+  // of the recording isn't an empty buffer.
   renderer.render(scene, camera);
-  cctx.drawImage(bgCanvas, 0, 0);
-  cctx.drawImage(renderCanvas, 0, 0);
-  sink.add(cctx);
+  if (format === 'gif') {
+    cctx.drawImage(renderCanvas, 0, 0);
+    sink.add(cctx);
+  } else {
+    sink.add(null);
+  }
   lastFrameTime = performance.now();
   requestAnimationFrame(tick);
 }
 
-/* ── MediaRecorder sink (MP4 / WebM) ─────────────────────────────── */
-function makeVideoSink(capture) {
+/* ═══════════════════════════════════════════════════════════
+   Recording UI: cancel button + progress bar
+   ═══════════════════════════════════════════════════════════ */
+function setRecordingProgress(frac, totalSec, format) {
+  if (!recCancelBtn) return;
+  if (frac <= 0 || frac >= 1 || !totalSec) {
+    recCancelBtn.classList.remove('on');
+    recIndicator.classList.remove('on');
+    if (recProgressBar) recProgressBar.style.width = '0%';
+    return;
+  }
+  recCancelBtn.classList.add('on');
+  recIndicator.classList.add('on');
+  if (recProgressBar) recProgressBar.style.width = (frac * 100).toFixed(1) + '%';
+  const left = Math.max(0, totalSec * (1 - frac));
+  recIndicator.innerHTML = `REC · ${left.toFixed(1)}s left`;
+}
+
+function cancelRecording() {
+  if (!state.isRecording) return;
+  state.cancelRecording = true;
+}
+if (recCancelBtn) recCancelBtn.addEventListener('click', cancelRecording);
+// Expose for automated tests / debugging.
+window.__cancelRec = cancelRecording;
+
+/* ── MediaRecorder sink (MP4 / WebM) ───────────────────────────────
+   captureStream() on a WebGL canvas is the well-supported path.
+   The bg + model are already composited inside the WebGL framebuffer
+   (scene.background = bgTexture), so the stream contains the full image.
+*/
+function makeVideoSink(webglCanvas) {
   const fps = 30;
-  const stream = capture.captureStream(fps);
+  const stream = webglCanvas.captureStream(fps);
   const mime = getRecorderMime();
   let recorder;
   try {
-    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 });
+    recorder = new MediaRecorder(
+      stream,
+      mime
+        ? { mimeType: mime, videoBitsPerSecond: 8_000_000 }
+        : { videoBitsPerSecond: 8_000_000 }
+    );
   } catch (e) {
-    toast('MediaRecorder failed: ' + e.message, 'err');
+    console.error('[mockup] MediaRecorder ctor failed', e);
     throw e;
   }
   const chunks = [];
@@ -1617,11 +1805,14 @@ function makeVideoSink(capture) {
   return {
     add() { /* captureStream is continuous, nothing to push */ },
     finish() {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         recorder.onstop = () => {
           resolve(new Blob(chunks, { type: mime || 'video/webm' }));
         };
-        if (recorder.state !== 'inactive') recorder.stop();
+        recorder.onerror = (e) => reject(e.error || new Error('MediaRecorder error'));
+        try {
+          if (recorder.state !== 'inactive') recorder.stop();
+        } catch (e) { reject(e); }
       });
     },
     abort() { try { if (recorder.state !== 'inactive') recorder.stop(); } catch(e){} },
@@ -1636,7 +1827,7 @@ function makeGifSink(capture) {
     quality: 10,                // 1 = best, 30 = worst
     width: capture.width,
     height: capture.height,
-    workerScript: 'https://unpkg.com/gif.js@0.2.0/dist/gif.worker.js',
+    workerScript: 'vendor/gif.worker.js',
     dither: 'FloydSteinberg-serpentine',
   });
   let finished = false;
@@ -1728,14 +1919,106 @@ backBtn.addEventListener('click', () => {
   location.href = here + 'index.html';
 });
 
+/* ═══════════════════════════════════════════════════════════
+   Reset All — restore every control to its default value
+   ═══════════════════════════════════════════════════════════ */
+const DEFAULTS = {
+  bgType: 'color', bgColor: '#1a1d24', bgGradA: '#6c63ff', bgGradB: '#4fc3f7',
+  bgGradAngle: 135, bgImgScale: 100, bgImgX: 0, bgImgY: 0, bgImgBlur: 0, bgImgOpacity: 100,
+  shadowOn: true, aspect: '4:3', longEdge: 1280, speed: 1.0, exportFormat: 'video', imageFormat: 'png',
+  lightingPreset: 'studio',
+};
+const resetAllBtn = $('reset-all-btn');
+if (resetAllBtn) {
+  resetAllBtn.addEventListener('click', () => {
+    if (state.isRecording) { toast('Cannot reset while recording', 'err'); return; }
+    Object.assign(state, DEFAULTS);
+    // Sync UI
+    bgColor.value = state.bgColor;        bgColorVal.textContent = state.bgColor;
+    bgGradA.value = state.bgGradA;        bgGradAVal.textContent = state.bgGradA;
+    bgGradB.value = state.bgGradB;        bgGradBVal.textContent = state.bgGradB;
+    bgGradAngle.value = state.bgGradAngle; bgGradAngleVal.textContent = state.bgGradAngle + '°';
+    bgImgScale.value = state.bgImgScale;  bgImgScaleVal.textContent = state.bgImgScale + '%';
+    bgImgX.value = state.bgImgX;          bgImgXVal.textContent = (50 + state.bgImgX / 2) + '%';
+    bgImgY.value = state.bgImgY;          bgImgYVal.textContent = (50 + state.bgImgY / 2) + '%';
+    bgImgBlur.value = state.bgImgBlur;    bgImgBlurVal.textContent = state.bgImgBlur + 'px';
+    bgImgOpacity.value = state.bgImgOpacity; bgImgOpacityVal.textContent = state.bgImgOpacity + '%';
+    resolutionSel.value = String(state.longEdge);
+    // Segmented groups: re-apply 'active' class on the right button.
+    const seg = (rootSel, attr, val) => {
+      const root = $(rootSel); if (!root) return;
+      root.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset[attr] === val));
+    };
+    seg('bg-type-group', 'type', state.bgType);
+    seg('ratio-group',   'val',  state.aspect);
+    seg('speed-group',   'val',  String(state.speed));
+    seg('format-group',  'val',  state.exportFormat);
+    seg('img-fmt-group', 'val',  state.imageFormat);
+    seg('shadow-group',  'val',  state.shadowOn ? 'on' : 'off');
+    // Lighting preset
+    lightingPreset.value = state.lightingPreset;
+    applyLightingPreset(state.lightingPreset);
+    // bg type visibility
+    $('bg-color-controls').style.display    = state.bgType === 'color'    ? 'block' : 'none';
+    $('bg-gradient-controls').style.display = state.bgType === 'gradient' ? 'block' : 'none';
+    $('bg-image-controls').style.display    = state.bgType === 'image'    ? 'block' : 'none';
+    if (renderer) {
+      renderer.shadowMap.enabled = state.shadowOn;
+      const plane = scene.getObjectByName('__mockup_shadow_plane__');
+      if (plane) plane.visible = state.shadowOn;
+      if (state.model) state.model.traverse(c => { if (c.isMesh) { c.castShadow = state.shadowOn; c.receiveShadow = state.shadowOn; } });
+    }
+    sizeFrame();
+    if (state.model) fitCameraToObject(state.model, 1.3);
+    updateFormatLabels();
+    if (downloadImageBtn) downloadImageBtn.textContent = `🖼 Download Image (${state.imageFormat.toUpperCase()})`;
+    toast('All settings reset to defaults', 'ok');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Keyboard shortcuts (only when not typing in an input)
+   ═══════════════════════════════════════════════════════════ */
+window.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, select, textarea')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (state.isRecording && e.key !== 'Escape') return;
+  switch (e.key) {
+    case 'i': case 'I':
+      if (!downloadImageBtn.disabled) downloadImageBtn.click();
+      e.preventDefault(); break;
+    case 'v': case 'V':
+      if (!downloadIdleBtn.disabled) downloadIdleBtn.click();
+      e.preventDefault(); break;
+    case 'Escape':
+      if (state.isRecording) cancelRecording();
+      break;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   Toast
+   ═══════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg, kind = '', ms = 3000) {
+  toastEl.textContent = msg;
+  toastEl.className = 'show ' + kind;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.className = ''; }, ms);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Boot  — start the 3D engine exactly once
+   ═══════════════════════════════════════════════════════════ */
 try {
   initThree();
+  initBgCtx();
+  sizeFrame();
 } catch (e) {
-  console.error('[mockup] initThree failed:', e);
+  console.error('[mockup] boot failed:', e);
+  toast('3D engine failed to start: ' + (e.message || e), 'err', 8000);
   throw e;
 }
-initBgCtx();
-sizeFrame();
 
 /* ═══════════════════════════════════════════════════════════
    Render loop
@@ -1744,36 +2027,12 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   if (state.pauseMainLoop) return; // recording is driving render + mixer manually
-  const dt = clock.getDelta();
+  const dt = Math.min(clock.getDelta(), 0.1); // clamp to avoid huge jumps on tab-switch
   if (state.mixer) state.mixer.update(dt);
   controls.update();
   if (renderer && state.model) renderer.render(scene, camera);
 }
 animate();
-
-/* ═══════════════════════════════════════════════════════════
-   Toast
-   ═══════════════════════════════════════════════════════════ */
-let toastTimer = null;
-function toast(msg, kind = '') {
-  toastEl.textContent = msg;
-  toastEl.className = 'show ' + kind;
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastEl.className = ''; }, 3000);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Boot
-   ═══════════════════════════════════════════════════════════ */
-try {
-  initThree();
-} catch (e) {
-  console.error('[mockup] initThree failed:', e);
-  toast('3D engine failed to start: ' + (e.message || e), 'err');
-  throw e;
-}
-initBgCtx();
-sizeFrame();
 
 /* Initialize mobile tab + re-sync on viewport changes (orientation, etc.) */
 setActiveTab('model');
