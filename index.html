@@ -217,8 +217,10 @@ body{
 .tools-wrap{position:relative;flex-shrink:0;}
 .tools-caret{font-size:9px;margin-left:4px;opacity:.8;}
 #tools-btn[aria-expanded="true"]{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+/* Use position:fixed so the menu escapes the topbar's overflow:hidden. The IIFE
+   sets `left`/`top` from the button's bounding rect on open. */
 .tools-menu{
-  position:absolute;top:calc(100% + 6px);right:0;min-width:260px;z-index:1000;
+  position:fixed;min-width:260px;z-index:1000;
   background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
   box-shadow:var(--shadow-2);padding:6px;display:flex;flex-direction:column;gap:2px;
 }
@@ -1400,6 +1402,20 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="logo">Low Poly<span>3D</span></div>
   <div class="vdiv"></div>
   <button class="tbtn" id="upload-btn">📂 Upload</button>
+  <!-- RJS UPDATE — Tools dropdown (3D Mockup Generator, etc.). Sits next to Upload so it's always visible even when the topbar overflows. -->
+  <div class="tools-wrap" id="tools-wrap">
+    <button class="tbtn" id="tools-btn" title="Open auxiliary tools" aria-haspopup="true" aria-expanded="false">🧰 Tools <span class="tools-caret" aria-hidden="true">▾</span></button>
+    <div class="tools-menu" id="tools-menu" role="menu" hidden>
+      <button class="tools-menu-item" id="open-mockup-generator" role="menuitem">
+        <span class="tools-menu-ico">🖼</span>
+        <span class="tools-menu-text">
+          <span class="tools-menu-title">3D Model Mockups</span>
+          <span class="tools-menu-sub">Image &amp; video mockups with animations</span>
+        </span>
+      </button>
+      <!-- Future tools land here as additional buttons -->
+    </div>
+  </div>
   <button class="tbtn purple" id="demo-btn"><span class="demo-spinner" aria-hidden="true"></span>Demo</button>
   <button class="tbtn warn hide-xs" id="clear-btn">Clear</button>
   <div class="vdiv"></div>
@@ -1513,21 +1529,6 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="install-btn" title="Install this app to your device" hidden>⬇ Install</button>
   <div class="vdiv"></div>
   <button class="tbtn" id="upload3d-btn" title="Open GLB, glTF, FBX, OBJ, STL, DAE files">📦 Upload 3D</button>
-  <div class="vdiv"></div>
-  <!-- RJS UPDATE — Tools dropdown: opens auxiliary tools (3D Mockup Generator, etc.) -->
-  <div class="tools-wrap" id="tools-wrap">
-    <button class="tbtn" id="tools-btn" title="Open auxiliary tools" aria-haspopup="true" aria-expanded="false">🧰 Tools <span class="tools-caret" aria-hidden="true">▾</span></button>
-    <div class="tools-menu" id="tools-menu" role="menu" hidden>
-      <button class="tools-menu-item" id="open-mockup-generator" role="menuitem">
-        <span class="tools-menu-ico">🖼</span>
-        <span class="tools-menu-text">
-          <span class="tools-menu-title">3D Model Mockups</span>
-          <span class="tools-menu-sub">Image &amp; video mockups with animations</span>
-        </span>
-      </button>
-      <!-- Future tools land here as additional buttons -->
-    </div>
-  </div>
   <div class="vdiv"></div>
   <button class="tbtn hide-xs" id="convert-ts-btn" title="Experimental — not yet implemented">🧪 Convert to TS</button>
   <button class="tbtn hide-xs" id="ts-btn">Save .ts</button>
@@ -18293,11 +18294,25 @@ document.getElementById('upload3d-btn').addEventListener('click',()=>document.ge
   const btn = document.getElementById('tools-btn');
   const menu = document.getElementById('tools-menu');
   if(!btn || !menu) return;
+  const placeMenu = () => {
+    // Position the fixed menu just below the button, right-aligned to it.
+    const r = btn.getBoundingClientRect();
+    menu.style.top  = (r.bottom + 6) + 'px';
+    menu.style.left = (r.right - Math.max(menu.offsetWidth, 260)) + 'px';
+  };
   const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded','false'); };
-  const open  = () => { menu.hidden = false; btn.setAttribute('aria-expanded','true'); };
+  const open  = () => {
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded','true');
+    // Place after the menu becomes visible so offsetWidth is correct.
+    placeMenu();
+  };
   btn.addEventListener('click', e => { e.stopPropagation(); menu.hidden ? open() : close(); });
   document.addEventListener('click', e => { if(!menu.hidden && !e.target.closest('#tools-wrap')) close(); });
   document.addEventListener('keydown', e => { if(e.key === 'Escape') close(); });
+  // Reposition on scroll/resize while open
+  window.addEventListener('resize', () => { if(!menu.hidden) placeMenu(); });
+  window.addEventListener('scroll', () => { if(!menu.hidden) placeMenu(); }, true);
   const mock = document.getElementById('open-mockup-generator');
   if(mock){
     mock.addEventListener('click', () => {
