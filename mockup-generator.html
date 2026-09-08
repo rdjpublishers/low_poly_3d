@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>3D Model Mockup Generator — Low Poly 3D</title>
 <meta name="description" content="Drop a GLB / glTF, set a background, choose an aspect ratio, and download image or video mockups. Auto-detect animations and export them as MP4." />
 <link rel="icon" type="image/png" href="Logo.png" />
@@ -284,14 +284,112 @@
   .panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
   .panel::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
+  /* ===== Mobile tab bar (hidden on desktop) ===== */
+  #tab-bar {
+    display: none;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    gap: 4px;
+    z-index: 30;
+  }
+  .tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 4px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font: 500 10px inherit;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+    min-height: 48px;       /* iOS HIG / Material touch target */
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab-btn:hover, .tab-btn:active { background: var(--surface2); }
+  .tab-btn.active {
+    background: rgba(108, 99, 255, .12);
+    color: var(--accent2);
+  }
+  .tab-btn .tab-ico { font-size: 18px; line-height: 1; }
+  .tab-btn .tab-label { font-size: 10px; }
+
+  /* Touch target sizing for everything on mobile */
+  @media (max-width: 768px) {
+    .tbtn, .seg-btn, .tab-btn { min-height: 44px; }
+    .seg-btn { min-height: 40px; }
+    .dropzone { min-height: 80px; }
+  }
+
   /* ===== Responsive ===== */
+  /* Tablet — narrow panels */
   @media (max-width: 1100px) {
     #layout { grid-template-columns: 240px 1fr 280px; }
   }
-  @media (max-width: 900px) {
-    #layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: calc(100vh - var(--top-h)); }
-    .panel { max-height: 35vh; border-right: 0; border-bottom: 1px solid var(--border); }
-    .panel.right { border-bottom: 0; border-top: 1px solid var(--border); }
+  /* Mobile — stack + bottom tabs */
+  @media (max-width: 768px) {
+    :root { --top-h: 48px; }
+    /* Topbar: hide subtitle, shrink padding */
+    #topbar { padding: 0 8px; gap: 6px; }
+    .brand-sub { display: none; }
+    .brand-title { font-size: 13px; }
+    .brand-mark { width: 24px; height: 24px; font-size: 12px; }
+    #back-btn { padding: 0 8px; font-size: 11px; }
+    #back-btn .back-text { display: none; }
+    #back-btn .back-icon { display: inline !important; }
+    #upload-btn { padding: 0 10px; font-size: 11px; }
+    #reset-view-btn { padding: 0 8px; font-size: 11px; }
+    #stage-info { display: none; }
+
+    /* Use flex column so the tab bar always sits in viewport. */
+    body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+    #topbar { flex: 0 0 auto; }
+    /* Layout: stage takes whatever's left; panel is a fixed-height drawer at bottom. */
+    #layout {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    /* Make the stage fill the available space, then panels stack at the bottom. */
+    #stage {
+      flex: 1 1 auto;
+      min-height: 0;
+      order: 1;
+    }
+    .panel {
+      max-height: 40dvh;
+      flex: 0 0 auto;
+      border-right: 0;
+      border-top: 1px solid var(--border);
+      display: none;            /* hidden by default; tab controls which is visible */
+      overflow-y: auto;
+      order: 2;
+    }
+    .panel.right { border-top: 1px solid var(--border); }
+    .panel.active { display: block; }
+
+    /* Bottom tab bar */
+    #tab-bar { display: flex; flex: 0 0 auto; }
+  }
+  /* Tiny phones */
+  @media (max-width: 480px) {
+    .tbtn { height: 36px; padding: 0 8px; font-size: 11px; }
+    .control label { font-size: 10px; }
+    .panel-section { padding: 10px 10px 4px; }
+    .dropzone { padding: 14px 8px; }
+    .dropzone-ico { font-size: 22px; margin-bottom: 4px; }
+    .seg-btn { padding: 8px 0; font-size: 11px; }
+    .anim-row { padding: 10px; }
+  }
+  /* Very wide screens — slightly bigger panels */
+  @media (min-width: 1600px) {
+    #layout { grid-template-columns: 320px 1fr 360px; }
   }
 </style>
 </head>
@@ -307,7 +405,7 @@
     </div>
   </div>
   <div class="vdiv"></div>
-  <button class="tbtn" id="back-btn" title="Back to the Low Poly 3D tool">← Back to Low Poly 3D</button>
+  <button class="tbtn" id="back-btn" title="Back to the Low Poly 3D tool"><span class="back-text">← Back to Low Poly 3D</span><span class="back-icon" style="display:none">←</span></button>
   <div class="vdiv"></div>
   <button class="tbtn primary" id="upload-btn">📦 Upload 3D Model</button>
   <input type="file" id="file-input" accept=".glb,.gltf" style="display:none" />
@@ -321,7 +419,7 @@
 
   <!-- ========== LEFT: Model + Background ========== -->
   <aside class="panel" id="left-panel">
-    <div class="panel-section">
+    <div class="panel-section" data-tab="model">
       <div class="panel-title">3D Model <span class="badge">GLB / glTF</span></div>
       <div class="dropzone" id="dropzone">
         <div class="dropzone-ico">📦</div>
@@ -338,7 +436,7 @@
       </div>
     </div>
 
-    <div class="panel-section">
+    <div class="panel-section" data-tab="bg">
       <div class="panel-title">Background</div>
       <div class="control">
         <label>Type</label>
@@ -402,7 +500,7 @@
       </div>
     </div>
 
-    <div class="panel-section">
+    <div class="panel-section" data-tab="model">
       <div class="panel-title">Composition</div>
       <div class="control">
         <label>Lighting preset</label>
@@ -447,7 +545,7 @@
 
   <!-- ========== RIGHT: Format + Animations + Export ========== -->
   <aside class="panel right">
-    <div class="panel-section">
+    <div class="panel-section" data-tab="format">
       <div class="panel-title">Output Format</div>
       <div class="control">
         <label>Aspect ratio</label>
@@ -471,7 +569,7 @@
       </div>
     </div>
 
-    <div class="panel-section">
+    <div class="panel-section" data-tab="format">
       <div class="panel-title">Image Export</div>
       <button class="tbtn primary" id="download-image" style="width:100%; justify-content:center" disabled>
         🖼 Download Image (PNG)
@@ -479,8 +577,15 @@
       <div class="hint">Renders at the chosen aspect ratio, exactly the size you see.</div>
     </div>
 
-    <div class="panel-section">
-      <div class="panel-title">Video Export</div>
+    <div class="panel-section" data-tab="format">
+      <div class="panel-title">Video / GIF Export</div>
+      <div class="control">
+        <label>Format</label>
+        <div class="seg-group" id="format-group">
+          <button class="seg-btn active" data-val="video">🎬 Video</button>
+          <button class="seg-btn" data-val="gif">🎞 GIF</button>
+        </div>
+      </div>
       <div class="control">
         <label>Speed <span class="val" id="speed-val">1×</span></label>
         <div class="seg-group" id="speed-group">
@@ -491,13 +596,13 @@
           <button class="seg-btn" data-val="2.5">2.5×</button>
         </div>
       </div>
-      <button class="tbtn" id="download-video-idle" style="width:100%; justify-content:center; margin-top:4px" disabled>
+      <button class="tbtn" id="download-idle" style="width:100%; justify-content:center; margin-top:4px" disabled>
         🎬 Download Idle Video
       </button>
-      <div class="hint">Records the current pose (no animation) for 4 seconds. Useful as a static clip.</div>
+      <div class="hint" id="idle-hint">Records the current pose (no animation) for 4 seconds. Useful as a static clip.</div>
     </div>
 
-    <div class="panel-section">
+    <div class="panel-section" data-tab="anim">
       <div class="panel-title">
         Animations
         <span class="badge" id="anim-count">0</span>
@@ -508,17 +613,40 @@
       </div>
       <div id="anim-list" class="anim-list"></div>
       <div id="anim-export-actions" class="anim-actions" style="display:none">
-        <button class="tbtn" id="download-selected" disabled>⬇ Selected</button>
-        <button class="tbtn primary" id="download-all">⬇ All</button>
+        <button class="tbtn" id="download-selected" disabled>⬇ Selected (MP4)</button>
+        <button class="tbtn primary" id="download-all">⬇ All (MP4)</button>
       </div>
       <div class="hint" id="anim-hint" style="margin-top:8px">
-        Click a row to preview. Use checkboxes to queue multiple animations — they'll be stitched into one MP4 in order.
+        Click a row to preview. Use checkboxes to queue multiple animations — they'll be stitched into one file in order. The Format selector above chooses MP4 or GIF.
       </div>
     </div>
   </aside>
 </div>
 
+<!-- Mobile-only bottom tab bar. On desktop it's hidden via CSS. -->
+<nav id="tab-bar" aria-label="Sections">
+  <button class="tab-btn active" data-tab="model">
+    <span class="tab-ico">🎲</span>
+    <span class="tab-label">Model</span>
+  </button>
+  <button class="tab-btn" data-tab="bg">
+    <span class="tab-ico">🎨</span>
+    <span class="tab-label">Background</span>
+  </button>
+  <button class="tab-btn" data-tab="format">
+    <span class="tab-ico">🖼</span>
+    <span class="tab-label">Format</span>
+  </button>
+  <button class="tab-btn" data-tab="anim">
+    <span class="tab-ico">🎞</span>
+    <span class="tab-label">Animations</span>
+  </button>
+</nav>
+
 <div id="toast"></div>
+
+<!-- ====== gif.js — client-side GIF encoder (used by the GIF export path) ====== -->
+<script src="https://unpkg.com/gif.js@0.2.0/dist/gif.js"></script>
 
 <!-- ====== Three.js (matches the version used in low_poly_3d) ====== -->
 <script type="importmap">
@@ -582,7 +710,8 @@ const bgImgOpacityVal = $('bg-img-opacity-val');
 const lightingPreset = $('lighting-preset');
 const autoFrameChk = $('auto-frame');
 const downloadImageBtn = $('download-image');
-const downloadIdleVideoBtn = $('download-video-idle');
+const downloadIdleBtn = $('download-idle');
+const idleHintEl = $('idle-hint');
 const animEmpty = $('anim-empty');
 const animListEl = $('anim-list');
 const animCount = $('anim-count');
@@ -617,6 +746,7 @@ const state = {
   aspect: '4:3',
   longEdge: 1280,
   speed: 1.0,
+  exportFormat: 'video',  // 'video' | 'gif'
   isRecording: false,
   cancelRecording: false,
   pauseMainLoop: false,
@@ -924,7 +1054,7 @@ function onModelLoaded(gltf, name) {
 
   resetViewBtn.disabled = false;
   downloadImageBtn.disabled = false;
-  downloadIdleVideoBtn.disabled = false;
+  downloadIdleBtn.disabled = false;
   renderAnimList();
   toast(`Loaded ${name}`, 'ok');
 }
@@ -1016,7 +1146,12 @@ function renderAnimList() {
 
   const dlSel = $('download-selected');
   dlSel.disabled = state.selectedAnims.size === 0;
-  dlSel.textContent = `⬇ Selected (${state.selectedAnims.size})`;
+  // Preserve the count badge while letting the format label (MP4/GIF) update.
+  // We re-run updateFormatLabels so the base text reflects the current format.
+  updateFormatLabels();
+  // Then re-apply the count badge for the Selected button.
+  const isGif = state.exportFormat === 'gif';
+  dlSel.textContent = `⬇ Selected (${state.selectedAnims.size} · ${isGif ? 'GIF' : 'MP4'})`;
 }
 
 function escapeHtml(s) {
@@ -1053,13 +1188,13 @@ function previewAnimation(idx, rowEl) {
 $('download-selected').addEventListener('click', async () => {
   if (state.selectedAnims.size === 0) return;
   const order = state.animations.map((_, i) => i).filter(i => state.selectedAnims.has(i));
-  await recordAnimSequence(order, `mockup_selected_${Date.now()}.mp4`);
+  await recordAnimSequence(order, `mockup_selected_${Date.now()}.${getExportExt()}`);
 });
 
 $('download-all').addEventListener('click', async () => {
   if (state.animations.length === 0) return;
   const order = state.animations.map((_, i) => i);
-  await recordAnimSequence(order, `mockup_all_${Date.now()}.mp4`);
+  await recordAnimSequence(order, `mockup_all_${Date.now()}.${getExportExt()}`);
 });
 
 /* ═══════════════════════════════════════════════════════════
@@ -1185,6 +1320,75 @@ downloadImageBtn.addEventListener('click', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════
+   Format toggle (Video / GIF) — controls the destination of every
+   "Download" button on this page. Both formats share the same
+   onTick-driven render + composite loop; only the sink differs.
+   ═══════════════════════════════════════════════════════════ */
+const formatGroup = $('format-group');
+formatGroup.querySelectorAll('.seg-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    state.exportFormat = btn.dataset.val;
+    formatGroup.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    updateFormatLabels();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   Mobile tab bar — only does anything on small viewports.
+   On desktop all sections are visible and the tab bar is hidden.
+   ═══════════════════════════════════════════════════════════ */
+const tabBar = $('tab-bar');
+const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+function setActiveTab(tabName) {
+  if (!tabBar) return;
+  // Update tab buttons
+  tabBar.querySelectorAll('.tab-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.tab === tabName);
+  });
+  // Show/hide panel sections matching the tab.
+  // On desktop this is a no-op because all sections are visible by default.
+  if (isMobile()) {
+    document.querySelectorAll('.panel-section').forEach((s) => {
+      s.style.display = s.dataset.tab === tabName ? '' : 'none';
+    });
+    // Show the panel wrapper that contains the active sections.
+    const left = document.getElementById('left-panel');
+    const right = document.querySelector('.panel.right');
+    const targetTabs = new Set([tabName]);
+    const leftHas = !!left && left.querySelector(`.panel-section[data-tab="${tabName}"]`);
+    const rightHas = !!right && right.querySelector(`.panel-section[data-tab="${tabName}"]`);
+    if (left)  left.classList.toggle('active', !!leftHas);
+    if (right) right.classList.toggle('active', !!rightHas);
+  }
+}
+
+if (tabBar) {
+  tabBar.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+  });
+}
+
+function updateFormatLabels() {
+  const isGif = state.exportFormat === 'gif';
+  if (downloadIdleBtn) {
+    downloadIdleBtn.textContent = isGif ? '🎞 Download Idle GIF' : '🎬 Download Idle Video';
+  }
+  if (idleHintEl) {
+    idleHintEl.textContent = isGif
+      ? 'Records the current pose (no animation) as an animated GIF for 4 seconds.'
+      : 'Records the current pose (no animation) for 4 seconds. Useful as a static clip.';
+  }
+  const dlSel = $('download-selected');
+  const dlAll = $('download-all');
+  if (dlSel) dlSel.textContent = `⬇ Selected (${isGif ? 'GIF' : 'MP4'})`;
+  if (dlAll) dlAll.textContent = `⬇ All (${isGif ? 'GIF' : 'MP4'})`;
+}
+updateFormatLabels();
+
+function getExportExt() { return state.exportFormat === 'gif' ? 'gif' : 'mp4'; }
+
+/* ═══════════════════════════════════════════════════════════
    Video recording via MediaRecorder
    ═══════════════════════════════════════════════════════════ */
 function getRecorderMime() {
@@ -1201,8 +1405,12 @@ function getRecorderMime() {
   return '';
 }
 
-function downloadIdleVideo() {
+function downloadIdle() {
   if (!state.model) { toast('Load a model first', 'err'); return; }
+  if (state.exportFormat === 'gif' && typeof GIF === 'undefined') {
+    toast('GIF encoder failed to load. Check your network and reload.', 'err');
+    return;
+  }
   // Stop any animation, use current pose
   if (state.activeAction) { state.activeAction.stop(); state.activeAction = null; }
   document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
@@ -1214,6 +1422,7 @@ function downloadIdleVideo() {
   const totalDuration = 4.0;
   recordCanvas({
     duration: totalDuration,
+    format: state.exportFormat,
     onTick: (t) => {
       const angle = t * 0.5; // slow orbit
       const r = startCam.distanceTo(startTarget);
@@ -1226,13 +1435,17 @@ function downloadIdleVideo() {
       );
       camera.lookAt(startTarget);
     },
-    filename: `mockup_idle_${Date.now()}.mp4`,
+    filename: `mockup_idle_${Date.now()}.${getExportExt()}`,
   });
 }
-downloadIdleVideoBtn.addEventListener('click', downloadIdleVideo);
+downloadIdleBtn.addEventListener('click', downloadIdle);
 
 async function recordAnimSequence(order, filename) {
   if (!state.model || !order.length) return;
+  if (state.exportFormat === 'gif' && typeof GIF === 'undefined') {
+    toast('GIF encoder failed to load. Check your network and reload.', 'err');
+    return;
+  }
   if (state.activeAction) { state.activeAction.stop(); state.activeAction = null; }
   document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
 
@@ -1253,6 +1466,7 @@ async function recordAnimSequence(order, filename) {
 
   await recordCanvas({
     duration: totalDuration,
+    format: state.exportFormat,
     onTick: (t) => {
       // Translate wall-clock to virtual animation time (the chosen speed is how fast the animation plays)
       const animT = t * state.speed;
@@ -1304,58 +1518,38 @@ async function recordAnimSequence(order, filename) {
   document.querySelectorAll('.anim-row.playing').forEach((el) => el.classList.remove('playing'));
 }
 
-async function recordCanvas({ duration, onTick, filename }) {
+async function recordCanvas({ duration, onTick, filename, format = 'video' }) {
   if (state.isRecording) { toast('Already recording…', 'err'); return; }
   state.isRecording = true;
   state.cancelRecording = false;
   state.pauseMainLoop = true; // pause the main animate() so it doesn't fight our seek
   recIndicator.classList.add('on');
 
-  // Composite canvas that the MediaRecorder will capture
+  // Composite canvas — we render to it every frame and either feed it
+  // to MediaRecorder (video) or push frames to gif.js (gif).
   const capture = document.createElement('canvas');
   capture.width = renderCanvas.width;
   capture.height = renderCanvas.height;
   const cctx = capture.getContext('2d');
-  const fps = 30;
-  const stream = capture.captureStream(fps);
 
-  const mime = getRecorderMime();
-  let recorder;
-  try {
-    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 });
-  } catch (e) {
-    toast('MediaRecorder failed: ' + e.message, 'err');
-    state.isRecording = false;
-    state.pauseMainLoop = false;
-    recIndicator.classList.remove('on');
-    return;
+  // ── set up the sink for the chosen format ─────────────────────────
+  let sink;        // { add(canvas), finish(): Promise<Blob>, abort() }
+  if (format === 'gif') {
+    sink = makeGifSink(capture);
+  } else {
+    sink = makeVideoSink(capture);
   }
-  const chunks = [];
-  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: mime || 'video/webm' });
-    const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-    const finalName = filename.endsWith('.mp4') ? filename.replace('.mp4', '.' + ext) : filename;
-    downloadBlob(blob, finalName);
-    state.isRecording = false;
-    state.pauseMainLoop = false;
-    recIndicator.classList.remove('on');
-    toast(`Video saved (${ext.toUpperCase()})`, 'ok');
-  };
-  recorder.onerror = (e) => {
-    console.error('Recorder error', e);
-    state.isRecording = false;
-    state.pauseMainLoop = false;
-    recIndicator.classList.remove('on');
-    toast('Recording error: ' + (e.error?.name || 'unknown'), 'err');
-  };
 
   const start = performance.now();
   const totalMs = duration * 1000;
+  let lastFrameTime = 0;
+  const targetFps = format === 'gif' ? 18 : 30;   // GIF: 18 fps is the sweet spot for size vs smoothness
+  const minFrameGap = 1000 / targetFps;
 
   function tick(now) {
     if (state.cancelRecording) {
-      if (recorder.state !== 'inactive') recorder.stop();
+      sink.abort();
+      finishRecording();
       return;
     }
     const t = (now - start) / 1000;
@@ -1368,22 +1562,95 @@ async function recordCanvas({ duration, onTick, filename }) {
     cctx.drawImage(bgCanvas, 0, 0);
     cctx.drawImage(renderCanvas, 0, 0);
 
+    // Push a frame to the sink (rate-limited)
+    if (now - lastFrameTime >= minFrameGap) {
+      sink.add(cctx);
+      lastFrameTime = now;
+    }
+
     if (elapsed >= totalMs) {
       // Hold last frame for one more render then stop
       cctx.drawImage(bgCanvas, 0, 0);
       cctx.drawImage(renderCanvas, 0, 0);
-      if (recorder.state !== 'inactive') recorder.stop();
+      sink.add(cctx);
+      sink.finish().then((blob) => {
+        const ext = format === 'gif' ? 'gif' : (blob.type.includes('mp4') ? 'mp4' : 'webm');
+        const finalName = filename.replace(/\.(mp4|webm|gif)$/i, '.' + ext);
+        downloadBlob(blob, finalName);
+        toast(`${format === 'gif' ? 'GIF' : 'Video'} saved (${ext.toUpperCase()})`, 'ok');
+        finishRecording();
+      });
       return;
     }
     requestAnimationFrame(tick);
   }
 
-  recorder.start();
+  function finishRecording() {
+    state.isRecording = false;
+    state.pauseMainLoop = false;
+    recIndicator.classList.remove('on');
+  }
+
   // Render first frame
   renderer.render(scene, camera);
   cctx.drawImage(bgCanvas, 0, 0);
   cctx.drawImage(renderCanvas, 0, 0);
+  sink.add(cctx);
+  lastFrameTime = performance.now();
   requestAnimationFrame(tick);
+}
+
+/* ── MediaRecorder sink (MP4 / WebM) ─────────────────────────────── */
+function makeVideoSink(capture) {
+  const fps = 30;
+  const stream = capture.captureStream(fps);
+  const mime = getRecorderMime();
+  let recorder;
+  try {
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 });
+  } catch (e) {
+    toast('MediaRecorder failed: ' + e.message, 'err');
+    throw e;
+  }
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  return {
+    add() { /* captureStream is continuous, nothing to push */ },
+    finish() {
+      return new Promise((resolve) => {
+        recorder.onstop = () => {
+          resolve(new Blob(chunks, { type: mime || 'video/webm' }));
+        };
+        if (recorder.state !== 'inactive') recorder.stop();
+      });
+    },
+    abort() { try { if (recorder.state !== 'inactive') recorder.stop(); } catch(e){} },
+  };
+}
+
+/* ── gif.js sink ─────────────────────────────────────────────────── */
+function makeGifSink(capture) {
+  // gif.js: workers, quality, repeat, dither
+  const gif = new GIF({
+    workers: 2,
+    quality: 10,                // 1 = best, 30 = worst
+    width: capture.width,
+    height: capture.height,
+    workerScript: 'https://unpkg.com/gif.js@0.2.0/dist/gif.worker.js',
+    dither: 'FloydSteinberg-serpentine',
+  });
+  let finished = false;
+  return {
+    add(canvas) { gif.addFrame(canvas, { copy: true, delay: 1000 / 18 }); },
+    finish() {
+      return new Promise((resolve, reject) => {
+        gif.on('finished', (blob) => { finished = true; resolve(blob); });
+        gif.on('abort', () => { finished = true; reject(new Error('GIF aborted')); });
+        gif.render();
+      });
+    },
+    abort() { try { if (!finished) gif.abort(); } catch(e){} },
+  };
 }
 
 function downloadBlob(blob, filename) {
@@ -1446,7 +1713,7 @@ clearModelBtn.addEventListener('click', () => {
   stageInfo.textContent = 'No model loaded';
   resetViewBtn.disabled = true;
   downloadImageBtn.disabled = true;
-  downloadIdleVideoBtn.disabled = true;
+  downloadIdleBtn.disabled = true;
   renderAnimList();
   toast('Model cleared');
 });
@@ -1507,6 +1774,24 @@ try {
 }
 initBgCtx();
 sizeFrame();
+
+/* Initialize mobile tab + re-sync on viewport changes (orientation, etc.) */
+setActiveTab('model');
+window.addEventListener('resize', () => {
+  sizeFrame();
+  // When crossing the mobile breakpoint, restore the desktop layout
+  // or re-apply the active mobile tab.
+  if (!isMobile()) {
+    // Show all panel sections
+    document.querySelectorAll('.panel-section').forEach((s) => { s.style.display = ''; });
+    document.getElementById('left-panel')?.classList.remove('active');
+    document.querySelector('.panel.right')?.classList.remove('active');
+  } else {
+    // Reapply the currently-active tab
+    const active = tabBar?.querySelector('.tab-btn.active')?.dataset.tab || 'model';
+    setActiveTab(active);
+  }
+});
 </script>
 </body>
 </html>
