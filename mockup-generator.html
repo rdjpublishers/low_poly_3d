@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3D Model Mockup Generator — Low Poly 3D</title>
+<meta name="description" content="Drop a GLB / glTF, set a background, choose an aspect ratio, and download image or video mockups. Auto-detect animations and export them as MP4." />
+<link rel="icon" type="image/png" href="Logo.png" />
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111118;
+    --surface2: #18181f;
+    --surface3: #1f1f28;
+    --border: #252532;
+    --border2: #2e2e40;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --accent3: #4fc3f7;
+    --good: #4ade80;
+    --warn: #f87171;
+    --gold: #ffd700;
+    --text: #eaeaf4;
+    --text2: #b6b6d0;
+    --muted: #7070a0;
+    --radius: 9px;
+    --radius-sm: 6px;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, .55);
+    --top-h: 54px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ===== Top bar ===== */
+  #topbar {
+    height: var(--top-h);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; margin-right: 6px; }
+  .brand-mark {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 14px;
+    box-shadow: 0 0 0 1px rgba(108, 99, 255, .4);
+  }
+  .brand-title { font-weight: 700; font-size: 14px; }
+  .brand-sub { color: var(--muted); font-size: 11px; }
+  .vdiv { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+  .tbtn {
+    height: 32px; padding: 0 12px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text2); font: 500 12px inherit; cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s, transform .15s;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tbtn:hover { border-color: var(--accent2); color: var(--accent2); transform: translateY(-1px); }
+  .tbtn:active { transform: translateY(0); }
+  .tbtn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+  .tbtn.primary:hover { background: #7c74ff; }
+  .tbtn.ghost { background: transparent; }
+  .tbtn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+  #stage-info {
+    margin-left: auto;
+    color: var(--muted);
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface2);
+  }
+  #stage-info b { color: var(--accent2); font-weight: 600; }
+
+  /* ===== Layout ===== */
+  #layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    height: calc(100vh - var(--top-h));
+  }
+
+  /* ===== Left panel — model + background ===== */
+  .panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .panel.right { border-right: 0; border-left: 1px solid var(--border); }
+  .panel-section { padding: 14px 14px 6px; border-bottom: 1px solid var(--border); }
+  .panel-section:last-child { border-bottom: 0; }
+  .panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--muted);
+    margin: 0 0 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .panel-title .badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text2); padding: 1px 7px; border-radius: 10px;
+    font-size: 10px; letter-spacing: 0; text-transform: none;
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--radius);
+    background: var(--surface2);
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent2); background: rgba(108, 99, 255, .08); }
+  .dropzone-ico { font-size: 28px; margin-bottom: 6px; }
+  .dropzone-text { color: var(--text2); font-size: 12px; }
+  .dropzone-text b { color: var(--accent2); }
+  .dropzone-hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .file-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 8px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .file-row .file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-row button { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; }
+  .file-row button:hover { color: var(--warn); }
+
+  /* ===== Controls ===== */
+  .control { margin-bottom: 10px; }
+  .control label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--text2); margin-bottom: 4px;
+  }
+  .control label .val { color: var(--accent2); font-family: 'Cascadia Code', 'Consolas', monospace; }
+  .control input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .control input[type="color"] {
+    width: 100%; height: 30px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface2);
+    padding: 2px; cursor: pointer;
+  }
+  .control input[type="text"], .control input[type="number"], .control select {
+    width: 100%; height: 30px; padding: 0 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius-sm); font: inherit;
+  }
+  .seg-group {
+    display: flex; gap: 4px; padding: 3px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+  }
+  .seg-group .seg-btn {
+    flex: 1; padding: 6px 0; background: transparent; border: 0;
+    color: var(--text2); font: 500 11px inherit; cursor: pointer;
+    border-radius: 4px; transition: background .15s, color .15s;
+  }
+  .seg-group .seg-btn:hover { color: var(--text); }
+  .seg-group .seg-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  .row { display: flex; gap: 6px; }
+  .row > * { flex: 1; }
+
+  .checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; }
+  .checkbox-row input { accent-color: var(--accent); }
+
+  .hint { color: var(--muted); font-size: 11px; line-height: 1.4; margin-top: 4px; }
+
+  /* ===== Stage / canvas ===== */
+  #stage {
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #stage-frame {
+    position: relative;
+    background: #111;
+    box-shadow: 0 0 0 1px var(--border2), 0 12px 60px -12px rgba(0, 0, 0, .8);
+    overflow: hidden;
+    /* width/height set by JS based on chosen ratio */
+  }
+  #render-canvas, #bg-canvas {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+  #bg-canvas { z-index: 0; }
+  #render-canvas { z-index: 1; }
+
+  .stage-empty {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--muted); gap: 8px; pointer-events: none;
+  }
+  .stage-empty .ico { font-size: 56px; opacity: .35; }
+  .stage-empty .txt { font-size: 13px; }
+
+  #stage-hint {
+    position: absolute; left: 12px; bottom: 12px;
+    color: rgba(255, 255, 255, .55); font-size: 11px;
+    background: rgba(0, 0, 0, .35); padding: 5px 9px; border-radius: 6px;
+    pointer-events: none; backdrop-filter: blur(4px);
+    z-index: 10;
+  }
+  #rec-indicator {
+    position: absolute; top: 12px; right: 12px;
+    display: none; align-items: center; gap: 6px;
+    background: rgba(220, 38, 38, .9); color: #fff;
+    padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    z-index: 10;
+  }
+  #rec-indicator.on { display: inline-flex; }
+  #rec-indicator::before {
+    content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+  /* ===== Right panel — animations & export ===== */
+  .anim-empty {
+    text-align: center; color: var(--muted); padding: 18px 0;
+    font-size: 12px; line-height: 1.5;
+  }
+  .anim-empty .ico { font-size: 32px; opacity: .35; margin-bottom: 6px; }
+
+  .anim-list { display: flex; flex-direction: column; gap: 4px; }
+  .anim-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    cursor: pointer; transition: border-color .12s, background .12s;
+  }
+  .anim-row:hover { border-color: var(--border2); background: var(--surface3); }
+  .anim-row.selected { border-color: var(--accent); background: rgba(108, 99, 255, .12); }
+  .anim-row.playing { border-color: var(--accent3); }
+  .anim-row .anim-idx {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text2); font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .anim-row.selected .anim-idx { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .anim-row .anim-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .anim-row .anim-dur { color: var(--muted); font-size: 10px; font-family: monospace; }
+  .anim-row .anim-play {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent3); color: #08131a; border: 0;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0;
+  }
+  .anim-row .anim-play:hover { background: #6ed0f5; }
+  .anim-row.playing .anim-play { background: var(--warn); color: #fff; }
+
+  .anim-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .anim-actions .tbtn { flex: 1; justify-content: center; }
+
+  /* ===== Toast ===== */
+  #toast {
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    background: var(--surface3); border: 1px solid var(--border2); color: var(--text);
+    padding: 8px 14px; border-radius: var(--radius-sm); font-size: 12px;
+    box-shadow: var(--shadow-2); opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 9999; max-width: 80vw;
+  }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: var(--warn); color: var(--warn); }
+  #toast.ok { border-color: var(--good); color: var(--good); }
+
+  /* ===== Scrollbar ===== */
+  .panel::-webkit-scrollbar { width: 8px; }
+  .panel::-webkit-scrollbar-track { background: transparent; }
+  .panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  .panel::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    #layout { grid-template-columns: 240px 1fr 280px; }
+  }
+  @media (max-width: 900px) {
+    #layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: calc(100vh - var(--top-h)); }
+    .panel { max-height: 35vh; border-right: 0; border-bottom: 1px solid var(--border); }
+    .panel.right { border-bottom: 0; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====== TOP BAR ====== -->
+<div id="topbar">
+  <div class="brand">
+    <div class="brand-mark">M</div>
+    <div>
+      <div class="brand-title">3D Model Mockup Generator</div>
+      <div class="brand-sub">Image &amp; video mockups · animations · MP4 export</div>
+    </div>
+  </div>
+  <div class="vdiv"></div>
+  <button class="tbtn" id="back-btn" title="Back to the Low Poly 3D tool">← Back to Low Poly 3D</button>
+  <div class="vdiv"></div>
+  <button class="tbtn primary" id="upload-btn">📦 Upload 3D Model</button>
+  <input type="file" id="file-input" accept=".glb,.gltf" style="display:none" />
+  <div class="vdiv"></div>
+  <button class="tbtn" id="reset-view-btn" disabled>🎯 Reset View</button>
+  <div id="stage-info">No model loaded</div>
+</div>
+
+<!-- ====== LAYOUT ====== -->
+<div id="layout">
+
+  <!-- ========== LEFT: Model + Background ========== -->
+  <aside class="panel" id="left-panel">
+    <div class="panel-section">
+      <div class="panel-title">3D Model <span class="badge">GLB / glTF</span></div>
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-ico">📦</div>
+        <div class="dropzone-text">Drop a <b>.glb</b> or <b>.gltf</b> here</div>
+        <div class="dropzone-hint">or click to browse</div>
+      </div>
+      <div id="model-info" style="display:none">
+        <div class="file-row">
+          <span style="font-size:14px">🎲</span>
+          <span class="file-name" id="model-name">model.glb</span>
+          <button id="clear-model" title="Remove model">✕</button>
+        </div>
+        <div class="hint" id="model-stats"></div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Background</div>
+      <div class="control">
+        <label>Type</label>
+        <div class="seg-group" id="bg-type-group">
+          <button class="seg-btn active" data-type="color">🎨 Color</button>
+          <button class="seg-btn" data-type="gradient">🌈 Gradient</button>
+          <button class="seg-btn" data-type="image">🖼 Image</button>
+        </div>
+      </div>
+
+      <div id="bg-color-controls">
+        <div class="control">
+          <label>Solid color <span class="val" id="bg-color-val">#1a1d24</span></label>
+          <input type="color" id="bg-color" value="#1a1d24" />
+        </div>
+      </div>
+
+      <div id="bg-gradient-controls" style="display:none">
+        <div class="control">
+          <label>Color A <span class="val" id="bg-grad-a-val">#6c63ff</span></label>
+          <input type="color" id="bg-grad-a" value="#6c63ff" />
+        </div>
+        <div class="control">
+          <label>Color B <span class="val" id="bg-grad-b-val">#4fc3f7</span></label>
+          <input type="color" id="bg-grad-b" value="#4fc3f7" />
+        </div>
+        <div class="control">
+          <label>Angle <span class="val" id="bg-grad-angle-val">135°</span></label>
+          <input type="range" id="bg-grad-angle" min="0" max="360" value="135" />
+        </div>
+      </div>
+
+      <div id="bg-image-controls" style="display:none">
+        <div class="control">
+          <label>Image</label>
+          <input type="file" id="bg-image-input" accept="image/*" style="display:none" />
+          <button class="tbtn" id="bg-image-pick" style="width:100%; justify-content:center">📁 Choose image…</button>
+        </div>
+        <div class="hint" id="bg-image-name" style="margin-bottom:8px">No image selected</div>
+        <div class="control">
+          <label>Scale <span class="val" id="bg-img-scale-val">100%</span></label>
+          <input type="range" id="bg-img-scale" min="10" max="400" value="100" />
+        </div>
+        <div class="control">
+          <label>Position X <span class="val" id="bg-img-x-val">50%</span></label>
+          <input type="range" id="bg-img-x" min="-200" max="200" value="0" />
+        </div>
+        <div class="control">
+          <label>Position Y <span class="val" id="bg-img-y-val">50%</span></label>
+          <input type="range" id="bg-img-y" min="-200" max="200" value="0" />
+        </div>
+        <div class="control">
+          <label>Blur <span class="val" id="bg-img-blur-val">0px</span></label>
+          <input type="range" id="bg-img-blur" min="0" max="40" value="0" />
+        </div>
+        <div class="control">
+          <label>Opacity <span class="val" id="bg-img-opacity-val">100%</span></label>
+          <input type="range" id="bg-img-opacity" min="0" max="100" value="100" />
+        </div>
+        <button class="tbtn ghost" id="bg-image-clear" style="width:100%">✕ Clear image</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Composition</div>
+      <div class="control">
+        <label>Lighting preset</label>
+        <select id="lighting-preset">
+          <option value="studio">Studio (3-point)</option>
+          <option value="bright">Bright soft</option>
+          <option value="dramatic">Dramatic</option>
+          <option value="outdoor">Outdoor</option>
+          <option value="dark">Dark moody</option>
+          <option value="neutral">Neutral</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>Shadow</label>
+        <div class="seg-group" id="shadow-group">
+          <button class="seg-btn" data-val="off">Off</button>
+          <button class="seg-btn active" data-val="on">On</button>
+        </div>
+      </div>
+      <div class="control">
+        <label>Auto-frame model</label>
+        <label class="checkbox-row" style="display:block">
+          <input type="checkbox" id="auto-frame" checked /> Fit camera to model on load
+        </label>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========== STAGE ========== -->
+  <main id="stage">
+    <div id="stage-frame">
+      <canvas id="bg-canvas"></canvas>
+      <canvas id="render-canvas"></canvas>
+    </div>
+    <div class="stage-empty" id="stage-empty">
+      <div class="ico">🎲</div>
+      <div class="txt">Drop a GLB or glTF to start</div>
+    </div>
+    <div id="stage-hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+    <div id="rec-indicator">REC</div>
+  </main>
+
+  <!-- ========== RIGHT: Format + Animations + Export ========== -->
+  <aside class="panel right">
+    <div class="panel-section">
+      <div class="panel-title">Output Format</div>
+      <div class="control">
+        <label>Aspect ratio</label>
+        <div class="seg-group" id="ratio-group">
+          <button class="seg-btn" data-val="1:1">1:1</button>
+          <button class="seg-btn" data-val="16:9">16:9</button>
+          <button class="seg-btn" data-val="9:16">9:16</button>
+          <button class="seg-btn active" data-val="4:3">4:3</button>
+          <button class="seg-btn" data-val="3:4">3:4</button>
+        </div>
+      </div>
+      <div class="control">
+        <label>Resolution <span class="val" id="resolution-val">1920×1440</span></label>
+        <select id="resolution">
+          <option value="640">SD · 640 long edge</option>
+          <option value="1280" selected>HD · 1280 long edge</option>
+          <option value="1920">Full HD · 1920 long edge</option>
+          <option value="2560">2K · 2560 long edge</option>
+          <option value="3840">4K · 3840 long edge</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Image Export</div>
+      <button class="tbtn primary" id="download-image" style="width:100%; justify-content:center" disabled>
+        🖼 Download Image (PNG)
+      </button>
+      <div class="hint">Renders at the chosen aspect ratio, exactly the size you see.</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Video Export</div>
+      <div class="control">
+        <label>Speed <span class="val" id="speed-val">1×</span></label>
+        <div class="seg-group" id="speed-group">
+          <button class="seg-btn" data-val="0.5">0.5×</button>
+          <button class="seg-btn active" data-val="1">1×</button>
+          <button class="seg-btn" data-val="1.5">1.5×</button>
+          <button class="seg-btn" data-val="2">2×</button>
+          <button class="seg-btn" data-val="2.5">2.5×</button>
+        </div>
+      </div>
+      <button class="tbtn" id="download-video-idle" style="width:100%; justify-content:center; margin-top:4px" disabled>
+        🎬 Download Idle Video
+      </button>
+      <div class="hint">Records the current pose (no animation) for 4 seconds. Useful as a static clip.</div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">
+        Animations
+        <span class="badge" id="anim-count">0</span>
+      </div>
+      <div id="anim-empty" class="anim-empty">
+        <div class="ico">🎞</div>
+        <div>Load a model with animations to see them here.</div>
+      </div>
+      <div id="anim-list" class="anim-list"></div>
+      <div id="anim-export-actions" class="anim-actions" style="display:none">
+        <button class="tbtn" id="download-selected" disabled>⬇ Selected</button>
+        <button class="tbtn primary" id="download-all">⬇ All</button>
+      </div>
+      <div class="hint" id="anim-hint" style="margin-top:8px">
+        Click a row to preview. Use checkboxes to queue multiple animations — they'll be stitched into one MP4 in order.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div id="toast"></div>
+
+<!-- ====== Three.js (matches the version used in low_poly_3d) ====== -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ═══════════════════════════════════════════════════════════
+   DOM refs
+   ═══════════════════════════════════════════════════════════ */
+const $ = (id) => document.getElementById(id);
+
+const dropzone = $('dropzone');
+const fileInput = $('file-input');
+const modelInfo = $('model-info');
+const modelName = $('model-name');
+const modelStats = $('model-stats');
+const clearModelBtn = $('clear-model');
+const resetViewBtn = $('reset-view-btn');
+const backBtn = $('back-btn');
+const stageInfo = $('stage-info');
+const stageEmpty = $('stage-empty');
+const stageFrame = $('stage-frame');
+const renderCanvas = $('render-canvas');
+const bgCanvas = $('bg-canvas');
+const recIndicator = $('rec-indicator');
+const toastEl = $('toast');
+
+const bgColor = $('bg-color');
+const bgColorVal = $('bg-color-val');
+const bgGradA = $('bg-grad-a');
+const bgGradB = $('bg-grad-b');
+const bgGradAVal = $('bg-grad-a-val');
+const bgGradBVal = $('bg-grad-b-val');
+const bgGradAngle = $('bg-grad-angle');
+const bgGradAngleVal = $('bg-grad-angle-val');
+const bgImageInput = $('bg-image-input');
+const bgImagePick = $('bg-image-pick');
+const bgImageName = $('bg-image-name');
+const bgImageClear = $('bg-image-clear');
+const bgImgScale = $('bg-img-scale');
+const bgImgScaleVal = $('bg-img-scale-val');
+const bgImgX = $('bg-img-x');
+const bgImgXVal = $('bg-img-x-val');
+const bgImgY = $('bg-img-y');
+const bgImgYVal = $('bg-img-y-val');
+const bgImgBlur = $('bg-img-blur');
+const bgImgBlurVal = $('bg-img-blur-val');
+const bgImgOpacity = $('bg-img-opacity');
+const bgImgOpacityVal = $('bg-img-opacity-val');
+const lightingPreset = $('lighting-preset');
+const autoFrameChk = $('auto-frame');
+const downloadImageBtn = $('download-image');
+const downloadIdleVideoBtn = $('download-video-idle');
+const animEmpty = $('anim-empty');
+const animListEl = $('anim-list');
+const animCount = $('anim-count');
+const animExportActions = $('anim-export-actions');
+const animHint = $('anim-hint');
+const speedVal = $('speed-val');
+const resolutionSel = $('resolution');
+const resolutionVal = $('resolution-val');
+
+/* ═══════════════════════════════════════════════════════════
+   State
+   ═══════════════════════════════════════════════════════════ */
+const state = {
+  model: null,            // THREE.Object3D (group with animations)
+  animations: [],         // Array<THREE.AnimationClip>
+  mixer: null,            // THREE.AnimationMixer
+  activeAction: null,
+  selectedAnims: new Set(),
+  shadowOn: true,
+  bgType: 'color',
+  bgColor: '#1a1d24',
+  bgGradA: '#6c63ff',
+  bgGradB: '#4fc3f7',
+  bgGradAngle: 135,
+  bgImage: null,          // HTMLImageElement
+  bgImageDataUrl: null,
+  bgImgScale: 100,
+  bgImgX: 0,
+  bgImgY: 0,
+  bgImgBlur: 0,
+  bgImgOpacity: 100,
+  aspect: '4:3',
+  longEdge: 1280,
+  speed: 1.0,
+  isRecording: false,
+  cancelRecording: false,
+  pauseMainLoop: false,
+  sceneBgColor: 0x111111,
+};
+
+let renderer, scene, camera, controls, pmremGen, envTexture;
+let bgCtx = null;
+
+/* ═══════════════════════════════════════════════════════════
+   Renderer + scene setup
+   ═══════════════════════════════════════════════════════════ */
+function initThree() {
+  renderer = new THREE.WebGLRenderer({
+    canvas: renderCanvas,
+    antialias: true,
+    alpha: true,        // transparent so background canvas shows through
+    preserveDrawingBuffer: true,  // needed for image export
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = state.shadowOn;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  scene = new THREE.Scene();
+  scene.background = null;
+
+  camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000);
+  camera.position.set(2.2, 1.6, 3.0);
+  camera.lookAt(0, 0, 0);
+
+  controls = new OrbitControls(camera, renderCanvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(0, 0, 0);
+
+  // PMREM env for PBR
+  pmremGen = new THREE.PMREMGenerator(renderer);
+  pmremGen.compileEquirectangularShader();
+  envTexture = pmremGen.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = envTexture;
+
+  // Contact shadow plane
+  const shadowGeo = new THREE.PlaneGeometry(20, 20);
+  const shadowMat = new THREE.ShadowMaterial({ opacity: 0.32, color: 0x000000 });
+  const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowPlane.rotation.x = -Math.PI / 2;
+  shadowPlane.position.y = -0.001;
+  shadowPlane.name = '__mockup_shadow_plane__';
+  shadowPlane.receiveShadow = true;
+  scene.add(shadowPlane);
+
+  applyLightingPreset('studio');
+}
+
+function applyLightingPreset(name) {
+  // Clear existing lights
+  scene.children.filter(c => c.isLight).forEach(l => scene.remove(l));
+
+  const add = (light) => {
+    light.castShadow = state.shadowOn;
+    scene.add(light);
+  };
+
+  switch (name) {
+    case 'studio': {
+      add(new THREE.DirectionalLight(0xffffff, 1.0));
+      const k = scene.children.filter(c => c.isLight).slice(-1)[0];
+      k.position.set(3, 5, 4);
+      add(new THREE.DirectionalLight(0xb6cfff, 0.5));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(-3, 3, -2);
+      add(new THREE.DirectionalLight(0xffe0b3, 0.35));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(0, -2, 3);
+      add(new THREE.AmbientLight(0xffffff, 0.25));
+      break;
+    }
+    case 'bright': {
+      add(new THREE.DirectionalLight(0xffffff, 1.1));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(2, 4, 3);
+      add(new THREE.HemisphereLight(0xddeeff, 0xfff2d6, 0.7));
+      add(new THREE.AmbientLight(0xffffff, 0.3));
+      break;
+    }
+    case 'dramatic': {
+      add(new THREE.DirectionalLight(0xffffff, 1.4));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(4, 6, 2);
+      add(new THREE.DirectionalLight(0x6b73ff, 0.25));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(-4, 2, -3);
+      add(new THREE.AmbientLight(0xffffff, 0.08));
+      break;
+    }
+    case 'outdoor': {
+      add(new THREE.DirectionalLight(0xfff5d1, 1.2));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(5, 8, 3);
+      add(new THREE.HemisphereLight(0x9fc8ff, 0xb0976a, 0.6));
+      add(new THREE.AmbientLight(0xffffff, 0.15));
+      break;
+    }
+    case 'dark': {
+      add(new THREE.DirectionalLight(0xa5b8ff, 0.6));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(3, 5, 2);
+      add(new THREE.DirectionalLight(0xff9966, 0.25));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(-2, 1, -3);
+      add(new THREE.AmbientLight(0xffffff, 0.05));
+      break;
+    }
+    case 'neutral': {
+      add(new THREE.DirectionalLight(0xffffff, 0.85));
+      scene.children.filter(c => c.isLight).slice(-1)[0].position.set(2, 4, 3);
+      add(new THREE.AmbientLight(0xffffff, 0.45));
+      break;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Background canvas (separate from 3D canvas)
+   ═══════════════════════════════════════════════════════════ */
+function initBgCtx() {
+  bgCtx = bgCanvas.getContext('2d');
+}
+
+function renderBackground() {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (!w || !h) return;
+  bgCtx.clearRect(0, 0, w, h);
+
+  if (state.bgType === 'color') {
+    bgCtx.fillStyle = state.bgColor;
+    bgCtx.fillRect(0, 0, w, h);
+  } else if (state.bgType === 'gradient') {
+    const ang = (state.bgGradAngle * Math.PI) / 180;
+    const cx = w / 2, cy = h / 2;
+    const r = Math.hypot(w, h) / 2;
+    const x0 = cx - Math.cos(ang) * r, y0 = cy - Math.sin(ang) * r;
+    const x1 = cx + Math.cos(ang) * r, y1 = cy + Math.sin(ang) * r;
+    const g = bgCtx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, state.bgGradA);
+    g.addColorStop(1, state.bgGradB);
+    bgCtx.fillStyle = g;
+    bgCtx.fillRect(0, 0, w, h);
+  } else if (state.bgType === 'image' && state.bgImage) {
+    bgCtx.save();
+    if (state.bgImgBlur > 0) {
+      bgCtx.filter = `blur(${state.bgImgBlur}px)`;
+    }
+    const img = state.bgImage;
+    const scale = state.bgImgScale / 100;
+    // Cover by default, then scale
+    const baseScale = Math.max(w / img.width, h / img.height);
+    const finalScale = baseScale * scale;
+    const dw = img.width * finalScale;
+    const dh = img.height * finalScale;
+    const dx = (w - dw) / 2 + (state.bgImgX / 100) * w;
+    const dy = (h - dh) / 2 + (state.bgImgY / 100) * h;
+    bgCtx.globalAlpha = state.bgImgOpacity / 100;
+    bgCtx.drawImage(img, dx, dy, dw, dh);
+    bgCtx.restore();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Sizing
+   ═══════════════════════════════════════════════════════════ */
+function parseAspect(a) {
+  const [w, h] = a.split(':').map(Number);
+  return { w, h };
+}
+
+function getLongEdgeDims() {
+  const { w, h } = parseAspect(state.aspect);
+  const long = state.longEdge;
+  if (w >= h) return { w: long, h: Math.round((long * h) / w) };
+  return { h: long, w: Math.round((long * w) / h) };
+}
+
+function sizeFrame() {
+  const container = $('stage');
+  const contW = container.clientWidth - 24;
+  const contH = container.clientHeight - 24;
+  const { w, h } = parseAspect(state.aspect);
+  const ratio = w / h;
+  // Fit frame inside container
+  let fw = contW, fh = contW / ratio;
+  if (fh > contH) { fh = contH; fw = contH * ratio; }
+  fw = Math.floor(fw); fh = Math.floor(fh);
+
+  stageFrame.style.width = fw + 'px';
+  stageFrame.style.height = fh + 'px';
+
+  // Canvas display size
+  renderCanvas.style.width = fw + 'px';
+  renderCanvas.style.height = fh + 'px';
+  bgCanvas.style.width = fw + 'px';
+  bgCanvas.style.height = fh + 'px';
+
+  // Canvas internal resolution = longEdge dims
+  const outDims = getLongEdgeDims();
+  renderCanvas.width = outDims.w;
+  renderCanvas.height = outDims.h;
+  bgCanvas.width = outDims.w;
+  bgCanvas.height = outDims.h;
+
+  if (camera) {
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+
+  // Stage info chip
+  resolutionVal.textContent = `${outDims.w}×${outDims.h}`;
+
+  renderBackground();
+  if (renderer) renderer.setSize(outDims.w, outDims.h, false);
+}
+
+window.addEventListener('resize', sizeFrame);
+
+/* ═══════════════════════════════════════════════════════════
+   Model loading
+   ═══════════════════════════════════════════════════════════ */
+const loader = new GLTFLoader();
+
+function loadModelFromFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'glb' && ext !== 'gltf') {
+    toast('Only .glb and .gltf are supported', 'err');
+    return;
+  }
+
+  // Reset previous
+  if (state.model) {
+    scene.remove(state.model);
+    disposeObject(state.model);
+    state.model = null;
+  }
+  if (state.mixer) { state.mixer.stopAllAction(); state.mixer = null; }
+  state.activeAction = null;
+  state.animations = [];
+  state.selectedAnims.clear();
+  renderAnimList();
+  stageInfo.textContent = 'Loading…';
+  toast(`Loading ${file.name}…`);
+
+  const url = URL.createObjectURL(file);
+  loader.load(
+    url,
+    (gltf) => {
+      URL.revokeObjectURL(url);
+      onModelLoaded(gltf, file.name);
+    },
+    undefined,
+    (err) => {
+      URL.revokeObjectURL(url);
+      console.error(err);
+      toast('Failed to load model: ' + (err.message || err), 'err');
+      stageInfo.textContent = 'Load failed';
+    }
+  );
+}
+
+function onModelLoaded(gltf, name) {
+  const root = gltf.scene || gltf;
+  root.name = 'MockupModel';
+  scene.add(root);
+
+  state.model = root;
+  state.animations = gltf.animations || [];
+
+  // Build mixer
+  state.mixer = new THREE.AnimationMixer(root);
+  state.mixer.addEventListener('finished', () => {
+    // Clear playing marker
+    document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
+  });
+
+  // Apply shadow flags
+  root.traverse((c) => {
+    if (c.isMesh) {
+      c.castShadow = state.shadowOn;
+      c.receiveShadow = state.shadowOn;
+    }
+  });
+
+  // Frame camera
+  if (autoFrameChk.checked) fitCameraToObject(root, 1.3);
+
+  // Count stats
+  let meshCount = 0, triCount = 0;
+  root.traverse((c) => {
+    if (c.isMesh && c.geometry) {
+      meshCount++;
+      const g = c.geometry;
+      const idx = g.index;
+      triCount += idx ? idx.count / 3 : (g.attributes.position?.count || 0) / 3;
+    }
+  });
+  modelName.textContent = name;
+  modelStats.innerHTML = `🎲 ${meshCount} meshes · ${formatNum(Math.round(triCount))} tris`;
+  modelInfo.style.display = 'block';
+  stageEmpty.style.display = 'none';
+  stageInfo.innerHTML = `<b>${name}</b> · ${state.animations.length} animation${state.animations.length === 1 ? '' : 's'}`;
+
+  resetViewBtn.disabled = false;
+  downloadImageBtn.disabled = false;
+  downloadIdleVideoBtn.disabled = false;
+  renderAnimList();
+  toast(`Loaded ${name}`, 'ok');
+}
+
+function disposeObject(obj) {
+  obj.traverse((c) => {
+    if (c.isMesh) {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) {
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach(m => {
+          for (const k in m) {
+            const v = m[k];
+            if (v && v.isTexture) v.dispose();
+          }
+          m.dispose();
+        });
+      }
+    }
+  });
+}
+
+function fitCameraToObject(obj, padding = 1.2) {
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  let camDist = (maxDim / 2) / Math.tan(fov / 2);
+  camDist *= padding;
+  // Offset camera at a slight angle
+  const dir = new THREE.Vector3(0.85, 0.55, 1.0).normalize();
+  camera.position.copy(center.clone().add(dir.multiplyScalar(camDist)));
+  controls.target.copy(center);
+  camera.near = Math.max(0.001, camDist / 1000);
+  camera.far = camDist * 200;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function formatNum(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+  return String(n);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Animation list
+   ═══════════════════════════════════════════════════════════ */
+function renderAnimList() {
+  animCount.textContent = state.animations.length;
+  if (!state.animations.length) {
+    animEmpty.style.display = 'block';
+    animListEl.innerHTML = '';
+    animExportActions.style.display = 'none';
+    return;
+  }
+  animEmpty.style.display = 'none';
+  animExportActions.style.display = 'flex';
+  animListEl.innerHTML = state.animations.map((clip, i) => {
+    const dur = clip.duration.toFixed(2);
+    const selected = state.selectedAnims.has(i);
+    return `
+      <div class="anim-row ${selected ? 'selected' : ''}" data-idx="${i}">
+        <input type="checkbox" ${selected ? 'checked' : ''} style="accent-color: var(--accent); cursor:pointer" />
+        <div class="anim-idx">${i + 1}</div>
+        <div class="anim-name" title="${escapeHtml(clip.name)}">${escapeHtml(clip.name || 'Animation ' + (i + 1))}</div>
+        <div class="anim-dur">${dur}s</div>
+        <button class="anim-play" title="Preview">▶</button>
+      </div>
+    `;
+  }).join('');
+
+  // Wire up
+  animListEl.querySelectorAll('.anim-row').forEach(row => {
+    const idx = parseInt(row.dataset.idx, 10);
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.anim-play')) return;
+      if (state.selectedAnims.has(idx)) state.selectedAnims.delete(idx);
+      else state.selectedAnims.add(idx);
+      renderAnimList();
+    });
+    row.querySelector('.anim-play').addEventListener('click', (e) => {
+      e.stopPropagation();
+      previewAnimation(idx, row);
+    });
+  });
+
+  const dlSel = $('download-selected');
+  dlSel.disabled = state.selectedAnims.size === 0;
+  dlSel.textContent = `⬇ Selected (${state.selectedAnims.size})`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function previewAnimation(idx, rowEl) {
+  if (!state.mixer || !state.animations[idx]) return;
+  const clip = state.animations[idx];
+
+  // Toggle: if already playing this one → stop
+  if (state.activeAction && state.activeAction.getClip() === clip && state.activeAction.isRunning()) {
+    state.activeAction.stop();
+    state.activeAction = null;
+    document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
+    return;
+  }
+
+  // Stop any current
+  if (state.activeAction) state.activeAction.stop();
+  document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
+
+  state.activeAction = state.mixer.clipAction(clip);
+  state.activeAction.reset();
+  state.activeAction.setEffectiveTimeScale(state.speed);
+  state.activeAction.setLoop(THREE.LoopOnce, 1);
+  state.activeAction.clampWhenFinished = true;
+  state.activeAction.play();
+
+  rowEl.classList.add('playing');
+  rowEl.querySelector('.anim-play').textContent = '■';
+}
+
+$('download-selected').addEventListener('click', async () => {
+  if (state.selectedAnims.size === 0) return;
+  const order = state.animations.map((_, i) => i).filter(i => state.selectedAnims.has(i));
+  await recordAnimSequence(order, `mockup_selected_${Date.now()}.mp4`);
+});
+
+$('download-all').addEventListener('click', async () => {
+  if (state.animations.length === 0) return;
+  const order = state.animations.map((_, i) => i);
+  await recordAnimSequence(order, `mockup_all_${Date.now()}.mp4`);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   Background UI
+   ═══════════════════════════════════════════════════════════ */
+$('bg-type-group').querySelectorAll('.seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = btn.dataset.type;
+    state.bgType = t;
+    $('bg-type-group').querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+    $('bg-color-controls').style.display = t === 'color' ? 'block' : 'none';
+    $('bg-gradient-controls').style.display = t === 'gradient' ? 'block' : 'none';
+    $('bg-image-controls').style.display = t === 'image' ? 'block' : 'none';
+    renderBackground();
+  });
+});
+
+bgColor.addEventListener('input', () => {
+  state.bgColor = bgColor.value;
+  bgColorVal.textContent = state.bgColor;
+  renderBackground();
+});
+bgGradA.addEventListener('input', () => { state.bgGradA = bgGradA.value; bgGradAVal.textContent = state.bgGradA; renderBackground(); });
+bgGradB.addEventListener('input', () => { state.bgGradB = bgGradB.value; bgGradBVal.textContent = state.bgGradB; renderBackground(); });
+bgGradAngle.addEventListener('input', () => {
+  state.bgGradAngle = +bgGradAngle.value;
+  bgGradAngleVal.textContent = state.bgGradAngle + '°';
+  renderBackground();
+});
+bgImagePick.addEventListener('click', () => bgImageInput.click());
+bgImageInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      state.bgImage = img;
+      state.bgImageDataUrl = reader.result;
+      bgImageName.textContent = f.name;
+      renderBackground();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+});
+bgImageClear.addEventListener('click', () => {
+  state.bgImage = null;
+  state.bgImageDataUrl = null;
+  bgImageInput.value = '';
+  bgImageName.textContent = 'No image selected';
+  renderBackground();
+});
+bgImgScale.addEventListener('input', () => { state.bgImgScale = +bgImgScale.value; bgImgScaleVal.textContent = state.bgImgScale + '%'; renderBackground(); });
+bgImgX.addEventListener('input', () => { state.bgImgX = +bgImgX.value; bgImgXVal.textContent = (50 + state.bgImgX / 2) + '%'; renderBackground(); });
+bgImgY.addEventListener('input', () => { state.bgImgY = +bgImgY.value; bgImgYVal.textContent = (50 + state.bgImgY / 2) + '%'; renderBackground(); });
+bgImgBlur.addEventListener('input', () => { state.bgImgBlur = +bgImgBlur.value; bgImgBlurVal.textContent = state.bgImgBlur + 'px'; renderBackground(); });
+bgImgOpacity.addEventListener('input', () => { state.bgImgOpacity = +bgImgOpacity.value; bgImgOpacityVal.textContent = state.bgImgOpacity + '%'; renderBackground(); });
+
+/* ═══════════════════════════════════════════════════════════
+   Format UI
+   ═══════════════════════════════════════════════════════════ */
+$('ratio-group').querySelectorAll('.seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.aspect = btn.dataset.val;
+    $('ratio-group').querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+    sizeFrame();
+  });
+});
+resolutionSel.addEventListener('change', () => {
+  state.longEdge = +resolutionSel.value;
+  sizeFrame();
+});
+$('speed-group').querySelectorAll('.seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.speed = +btn.dataset.val;
+    $('speed-group').querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+    speedVal.textContent = state.speed + '×';
+    if (state.activeAction) state.activeAction.setEffectiveTimeScale(state.speed);
+  });
+});
+$('shadow-group').querySelectorAll('.seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.shadowOn = btn.dataset.val === 'on';
+    $('shadow-group').querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+    if (renderer) {
+      renderer.shadowMap.enabled = state.shadowOn;
+      const plane = scene.getObjectByName('__mockup_shadow_plane__');
+      if (plane) plane.visible = state.shadowOn;
+      if (state.model) {
+        state.model.traverse(c => {
+          if (c.isMesh) { c.castShadow = state.shadowOn; c.receiveShadow = state.shadowOn; }
+        });
+      }
+    }
+  });
+});
+lightingPreset.addEventListener('change', () => applyLightingPreset(lightingPreset.value));
+
+/* ═══════════════════════════════════════════════════════════
+   Image download
+   ═══════════════════════════════════════════════════════════ */
+downloadImageBtn.addEventListener('click', () => {
+  if (!state.model) { toast('Load a model first', 'err'); return; }
+  // Render fresh
+  renderBackground();
+  if (renderer) renderer.render(scene, camera);
+
+  // Composite bg + render onto a temp canvas
+  const out = document.createElement('canvas');
+  out.width = renderCanvas.width;
+  out.height = renderCanvas.height;
+  const octx = out.getContext('2d');
+  octx.drawImage(bgCanvas, 0, 0);
+  octx.drawImage(renderCanvas, 0, 0);
+
+  out.toBlob((blob) => {
+    if (!blob) { toast('Image export failed', 'err'); return; }
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    downloadBlob(blob, `mockup_${state.aspect.replace(':', 'x')}_${ts}.png`);
+    toast('Image downloaded', 'ok');
+  }, 'image/png');
+});
+
+/* ═══════════════════════════════════════════════════════════
+   Video recording via MediaRecorder
+   ═══════════════════════════════════════════════════════════ */
+function getRecorderMime() {
+  const candidates = [
+    'video/mp4;codecs=h264',
+    'video/mp4',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const m of candidates) {
+    if (MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return '';
+}
+
+function downloadIdleVideo() {
+  if (!state.model) { toast('Load a model first', 'err'); return; }
+  // Stop any animation, use current pose
+  if (state.activeAction) { state.activeAction.stop(); state.activeAction = null; }
+  document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
+  if (state.mixer) { state.mixer.stopAllAction(); state.mixer.update(0); }
+
+  // 4-second clip with slow orbit
+  const startCam = camera.position.clone();
+  const startTarget = controls.target.clone();
+  const totalDuration = 4.0;
+  recordCanvas({
+    duration: totalDuration,
+    onTick: (t) => {
+      const angle = t * 0.5; // slow orbit
+      const r = startCam.distanceTo(startTarget);
+      const dir = startCam.clone().sub(startTarget).normalize();
+      const c = Math.cos(angle), s = Math.sin(angle);
+      camera.position.set(
+        startTarget.x + (dir.x * c - dir.z * s) * r,
+        startCam.y,
+        startTarget.z + (dir.x * s + dir.z * c) * r
+      );
+      camera.lookAt(startTarget);
+    },
+    filename: `mockup_idle_${Date.now()}.mp4`,
+  });
+}
+downloadIdleVideoBtn.addEventListener('click', downloadIdleVideo);
+
+async function recordAnimSequence(order, filename) {
+  if (!state.model || !order.length) return;
+  if (state.activeAction) { state.activeAction.stop(); state.activeAction = null; }
+  document.querySelectorAll('.anim-row.playing').forEach(el => el.classList.remove('playing'));
+
+  // Pre-build actions for every clip in the sequence
+  const actions = order.map((i) => {
+    const a = state.mixer.clipAction(state.animations[i]);
+    a.reset();
+    a.setEffectiveTimeScale(1);
+    a.setLoop(THREE.LoopRepeat, Infinity);
+    a.clampWhenFinished = true;
+    a.paused = true;
+    a.play();
+    return { action: a, clip: state.animations[i], origIdx: i };
+  });
+
+  // Total duration in real-time seconds
+  const totalDuration = actions.reduce((s, a) => s + a.clip.duration, 0) / state.speed + 0.05;
+
+  await recordCanvas({
+    duration: totalDuration,
+    onTick: (t) => {
+      // Translate wall-clock to virtual animation time (the chosen speed is how fast the animation plays)
+      const animT = t * state.speed;
+      let consumed = 0;
+      let activeIdx = -1;
+      let activeLocalT = 0;
+      for (let k = 0; k < actions.length; k++) {
+        const a = actions[k];
+        if (animT < consumed + a.clip.duration) {
+          activeIdx = k;
+          activeLocalT = animT - consumed;
+          break;
+        }
+        consumed += a.clip.duration;
+      }
+      // If we've gone past the last clip, hold the last one at its end
+      if (activeIdx < 0) {
+        activeIdx = actions.length - 1;
+        activeLocalT = actions[activeIdx].clip.duration;
+      }
+
+      for (let k = 0; k < actions.length; k++) {
+        const a = actions[k];
+        if (k === activeIdx) {
+          a.action.paused = false;
+          a.action.time = activeLocalT;
+          a.action.paused = true; // hold, then we drive it explicitly
+        } else {
+          // park inactive actions at time 0 (won't contribute to the pose)
+          a.action.paused = true;
+          a.action.time = 0;
+        }
+      }
+      // Apply the seek by zero-time updating the mixer
+      if (state.mixer) state.mixer.update(0);
+
+      // Highlight current row
+      const curOrig = actions[activeIdx].origIdx;
+      const rows = animListEl.querySelectorAll('.anim-row');
+      rows.forEach((r) => r.classList.remove('playing'));
+      const curRow = animListEl.querySelector(`[data-idx="${curOrig}"]`);
+      if (curRow) curRow.classList.add('playing');
+    },
+    filename,
+  });
+
+  // Cleanup
+  actions.forEach((a) => a.action.stop());
+  document.querySelectorAll('.anim-row.playing').forEach((el) => el.classList.remove('playing'));
+}
+
+async function recordCanvas({ duration, onTick, filename }) {
+  if (state.isRecording) { toast('Already recording…', 'err'); return; }
+  state.isRecording = true;
+  state.cancelRecording = false;
+  state.pauseMainLoop = true; // pause the main animate() so it doesn't fight our seek
+  recIndicator.classList.add('on');
+
+  // Composite canvas that the MediaRecorder will capture
+  const capture = document.createElement('canvas');
+  capture.width = renderCanvas.width;
+  capture.height = renderCanvas.height;
+  const cctx = capture.getContext('2d');
+  const fps = 30;
+  const stream = capture.captureStream(fps);
+
+  const mime = getRecorderMime();
+  let recorder;
+  try {
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : { videoBitsPerSecond: 8_000_000 });
+  } catch (e) {
+    toast('MediaRecorder failed: ' + e.message, 'err');
+    state.isRecording = false;
+    state.pauseMainLoop = false;
+    recIndicator.classList.remove('on');
+    return;
+  }
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: mime || 'video/webm' });
+    const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+    const finalName = filename.endsWith('.mp4') ? filename.replace('.mp4', '.' + ext) : filename;
+    downloadBlob(blob, finalName);
+    state.isRecording = false;
+    state.pauseMainLoop = false;
+    recIndicator.classList.remove('on');
+    toast(`Video saved (${ext.toUpperCase()})`, 'ok');
+  };
+  recorder.onerror = (e) => {
+    console.error('Recorder error', e);
+    state.isRecording = false;
+    state.pauseMainLoop = false;
+    recIndicator.classList.remove('on');
+    toast('Recording error: ' + (e.error?.name || 'unknown'), 'err');
+  };
+
+  const start = performance.now();
+  const totalMs = duration * 1000;
+
+  function tick(now) {
+    if (state.cancelRecording) {
+      if (recorder.state !== 'inactive') recorder.stop();
+      return;
+    }
+    const t = (now - start) / 1000;
+    const elapsed = now - start;
+
+    if (onTick) onTick(Math.min(t, duration));
+
+    // Render 3D, then composite over background
+    renderer.render(scene, camera);
+    cctx.drawImage(bgCanvas, 0, 0);
+    cctx.drawImage(renderCanvas, 0, 0);
+
+    if (elapsed >= totalMs) {
+      // Hold last frame for one more render then stop
+      cctx.drawImage(bgCanvas, 0, 0);
+      cctx.drawImage(renderCanvas, 0, 0);
+      if (recorder.state !== 'inactive') recorder.stop();
+      return;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  recorder.start();
+  // Render first frame
+  renderer.render(scene, camera);
+  cctx.drawImage(bgCanvas, 0, 0);
+  cctx.drawImage(renderCanvas, 0, 0);
+  requestAnimationFrame(tick);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   File input + dropzone
+   ═══════════════════════════════════════════════════════════ */
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) loadModelFromFile(f);
+  e.target.value = '';
+});
+$('upload-btn').addEventListener('click', () => fileInput.click());
+
+// Drag & drop
+['dragenter', 'dragover'].forEach(ev => {
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+});
+['dragleave', 'drop'].forEach(ev => {
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); });
+});
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) loadModelFromFile(f);
+});
+
+// Whole-window drop also picks up a GLB
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  if (e.target.closest('#dropzone')) return; // already handled
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && /\.(glb|gltf)$/i.test(f.name)) loadModelFromFile(f);
+});
+
+clearModelBtn.addEventListener('click', () => {
+  if (state.model) {
+    scene.remove(state.model);
+    disposeObject(state.model);
+    state.model = null;
+  }
+  if (state.mixer) { state.mixer.stopAllAction(); state.mixer = null; }
+  state.activeAction = null;
+  state.animations = [];
+  state.selectedAnims.clear();
+  modelInfo.style.display = 'none';
+  stageEmpty.style.display = 'flex';
+  stageInfo.textContent = 'No model loaded';
+  resetViewBtn.disabled = true;
+  downloadImageBtn.disabled = true;
+  downloadIdleVideoBtn.disabled = true;
+  renderAnimList();
+  toast('Model cleared');
+});
+
+resetViewBtn.addEventListener('click', () => {
+  if (state.model) fitCameraToObject(state.model, 1.3);
+});
+
+backBtn.addEventListener('click', () => {
+  // Try to go back to index.html in the same folder; fall back to history
+  const here = location.pathname.replace(/[^/]*$/, '');
+  location.href = here + 'index.html';
+});
+
+try {
+  initThree();
+} catch (e) {
+  console.error('[mockup] initThree failed:', e);
+  throw e;
+}
+initBgCtx();
+sizeFrame();
+
+/* ═══════════════════════════════════════════════════════════
+   Render loop
+   ═══════════════════════════════════════════════════════════ */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  if (state.pauseMainLoop) return; // recording is driving render + mixer manually
+  const dt = clock.getDelta();
+  if (state.mixer) state.mixer.update(dt);
+  controls.update();
+  if (renderer && state.model) renderer.render(scene, camera);
+}
+animate();
+
+/* ═══════════════════════════════════════════════════════════
+   Toast
+   ═══════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg, kind = '') {
+  toastEl.textContent = msg;
+  toastEl.className = 'show ' + kind;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.className = ''; }, 3000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Boot
+   ═══════════════════════════════════════════════════════════ */
+try {
+  initThree();
+} catch (e) {
+  console.error('[mockup] initThree failed:', e);
+  toast('3D engine failed to start: ' + (e.message || e), 'err');
+  throw e;
+}
+initBgCtx();
+sizeFrame();
+</script>
+</body>
+</html>

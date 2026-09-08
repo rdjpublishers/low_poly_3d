@@ -213,6 +213,28 @@ body{
 .tbtn.purple:hover{background:#b9a8fc;border-color:#b9a8fc;}
 .tbtn.active{background:var(--accent2);color:#fff;border-color:var(--accent2);font-weight:700;}
 .tbtn.active:hover{background:var(--accent2);color:#fff;}
+/* RJS UPDATE — Tools dropdown (in topbar) */
+.tools-wrap{position:relative;flex-shrink:0;}
+.tools-caret{font-size:9px;margin-left:4px;opacity:.8;}
+#tools-btn[aria-expanded="true"]{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+.tools-menu{
+  position:absolute;top:calc(100% + 6px);right:0;min-width:260px;z-index:1000;
+  background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);
+  box-shadow:var(--shadow-2);padding:6px;display:flex;flex-direction:column;gap:2px;
+}
+.tools-menu[hidden]{display:none;}
+.tools-menu-item{
+  display:flex;align-items:flex-start;gap:10px;width:100%;
+  padding:9px 10px;border-radius:var(--radius-sm);border:0;background:transparent;
+  color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:13px;
+  text-align:left;cursor:pointer;transition:background .12s,color .12s;
+}
+.tools-menu-item:hover{background:var(--surface2);color:var(--accent2);}
+.tools-menu-ico{font-size:18px;line-height:1;flex-shrink:0;margin-top:1px;}
+.tools-menu-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.tools-menu-title{font-weight:600;font-size:13px;}
+.tools-menu-sub{font-size:11px;color:var(--muted);font-weight:400;}
+.tools-menu-item:hover .tools-menu-sub{color:var(--text2);}
 #spacer{flex:1;}
 #status-pill{
   font-family:'Space Mono',monospace;font-size:10px;padding:4px 10px;border-radius:20px;
@@ -1491,6 +1513,21 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="install-btn" title="Install this app to your device" hidden>⬇ Install</button>
   <div class="vdiv"></div>
   <button class="tbtn" id="upload3d-btn" title="Open GLB, glTF, FBX, OBJ, STL, DAE files">📦 Upload 3D</button>
+  <div class="vdiv"></div>
+  <!-- RJS UPDATE — Tools dropdown: opens auxiliary tools (3D Mockup Generator, etc.) -->
+  <div class="tools-wrap" id="tools-wrap">
+    <button class="tbtn" id="tools-btn" title="Open auxiliary tools" aria-haspopup="true" aria-expanded="false">🧰 Tools <span class="tools-caret" aria-hidden="true">▾</span></button>
+    <div class="tools-menu" id="tools-menu" role="menu" hidden>
+      <button class="tools-menu-item" id="open-mockup-generator" role="menuitem">
+        <span class="tools-menu-ico">🖼</span>
+        <span class="tools-menu-text">
+          <span class="tools-menu-title">3D Model Mockups</span>
+          <span class="tools-menu-sub">Image &amp; video mockups with animations</span>
+        </span>
+      </button>
+      <!-- Future tools land here as additional buttons -->
+    </div>
+  </div>
   <div class="vdiv"></div>
   <button class="tbtn hide-xs" id="convert-ts-btn" title="Experimental — not yet implemented">🧪 Convert to TS</button>
   <button class="tbtn hide-xs" id="ts-btn">Save .ts</button>
@@ -18250,6 +18287,29 @@ function load3DFile(file, opts){
 }
 
 document.getElementById('upload3d-btn').addEventListener('click',()=>document.getElementById('file3d-input').click());
+
+// RJS UPDATE — Tools dropdown (toggle + open the 3D Mockup Generator)
+(function(){
+  const btn = document.getElementById('tools-btn');
+  const menu = document.getElementById('tools-menu');
+  if(!btn || !menu) return;
+  const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded','false'); };
+  const open  = () => { menu.hidden = false; btn.setAttribute('aria-expanded','true'); };
+  btn.addEventListener('click', e => { e.stopPropagation(); menu.hidden ? open() : close(); });
+  document.addEventListener('click', e => { if(!menu.hidden && !e.target.closest('#tools-wrap')) close(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') close(); });
+  const mock = document.getElementById('open-mockup-generator');
+  if(mock){
+    mock.addEventListener('click', () => {
+      close();
+      // Resolve the mockup file relative to the current index.html so
+      // it works whether the user is on the /low_poly_3d/ subpath or
+      // serving from a flat folder.
+      const here = location.pathname.replace(/[^/]*$/, '');
+      location.href = here + 'mockup-generator.html';
+    });
+  }
+})();
 // LBL MULTI-FILE UPDATE — accept several 3D files at once. The first
 // file replaces the scene (matches the original "Upload 3D" semantics)
 // and every subsequent file is appended in a row, with the camera
