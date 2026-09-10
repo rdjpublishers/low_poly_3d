@@ -19460,9 +19460,10 @@ function __acesBuildPanel() {
       <button id="aces-close" style="background:none;border:0;color:#888;font-size:16px;cursor:pointer">✕</button>
     </div>
     <div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.4">
-      PART 90 — anyCreature Engine Surface. Per-vertex AO + L1-L8 OKLab shading
-      stack + 15 mechanical checks (BLOCK / warn / info). <b>Opt-in</b>: your
-      model is not modified until you click <b>Apply</b>.
+      PART 90-100 — anyCreature Engine Surface + 3D Modeling Style.
+      Per-vertex AO + L1-L8 OKLab shading stack + 25 checks (15 legality
+      BLOCK, 10 style ADVISE). <b>Opt-in</b>: your model is not modified
+      until you click <b>Apply</b>.
     </div>
     <div id="aces-config" style="margin-bottom:12px;padding:10px;background:#11141a;border:1px solid #232730;border-radius:4px">
       <label style="display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="aces-cfg-ao" checked> <span>Per-vertex AO bake (raycast)</span></label>
@@ -19485,7 +19486,43 @@ function __acesBuildPanel() {
       <button id="aces-apply-btn" style="flex:1;background:#233a23;border:1px solid #3a5a3a;color:#a8e6a8;padding:6px;border-radius:3px;cursor:pointer">✓ Apply</button>
     </div>
     <div id="aces-status" style="font-size:11px;color:#888;margin-bottom:8px">ready</div>
-    <div id="aces-report" style="font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#0a0c10;border:1px solid #1a1e26;padding:8px;max-height:50vh;overflow-y:auto;white-space:pre-wrap"></div>
+    <div id="aces-report" style="font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#0a0c10;border:1px solid #1a1e26;padding:8px;max-height:40vh;overflow-y:auto;white-space:pre-wrap"></div>
+    <details style="margin-top:12px;font-size:11px;color:#888">
+      <summary style="cursor:pointer;color:#9fc3ff">📚 3D Modeling Style Reference (PART 96-98)</summary>
+      <div style="margin:8px 0;padding:8px;background:#0e1116;border:1px solid #1a1e26;border-radius:3px;line-height:1.5">
+        <b>Form beats obedience, everywhere.</b> Ariescar's 3D modeling
+        doctrine + spec language + 5-stage pipeline, verified against
+        the anyCreature engine source. An AI can read these and produce
+        a working anyCreature spec.
+        <div style="margin-top:6px">
+          <a href="./public/aces/3d-style-doctrine.md" target="_blank" rel="noopener" style="color:#9fc3ff;text-decoration:none;display:block;padding:3px 0">📜 PART 96 — 3D Style Doctrine</a>
+          <a href="./public/aces/3d-spec-language.md" target="_blank" rel="noopener" style="color:#9fc3ff;text-decoration:none;display:block;padding:3px 0">📐 PART 97 — 3D Spec Language (verified JSON schema)</a>
+          <a href="./public/aces/3d-pipeline-cards.md" target="_blank" rel="noopener" style="color:#9fc3ff;text-decoration:none;display:block;padding:3px 0">🎯 PART 98 — 5-Stage Pipeline Cards</a>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1a1e26">
+          <b>The 5 iron laws:</b> form beats obedience · never grade your own thumbnails ·
+          same symptom failed twice = no third tweak · the signature part gets real
+          geometry at LOW · engine floors block builds.
+        </div>
+        <div style="margin-top:6px">
+          <b>The 9-slot brief:</b> identity · feel · height · signature ·
+          mass hierarchy · two focals · stance · attack · value plan.
+        </div>
+        <div style="margin-top:6px">
+          <b>The 6:3:1 hierarchy:</b> primary 60% · secondary 30% · tertiary 10%.
+        </div>
+        <div style="margin-top:6px">
+          <b>The 7 part types:</b> curve · eye · spike · fin · membrane · hand · paw.
+        </div>
+        <div style="margin-top:6px">
+          <b>The 4 join verbs:</b> insert · extrude · snap · place.
+        </div>
+        <div style="margin-top:6px">
+          <b>The 5 colour norms:</b> one main saturated · one secondary ·
+          accent &lt; 5% · saturated area 10-34% · no crush to black.
+        </div>
+      </div>
+    </details>
   `;
   document.body.appendChild(p);
   p.classList.add('open');

@@ -3898,3 +3898,186 @@ The importmap also lists them as bare specifiers in case a
 future caller wants to use them through ESM. The 🛡 ACES button
 + the "🧪 Calibrate" link are added to the top toolbar near
 the 🔺 Tris and 📚 Recipes buttons.
+
+---
+
+# v1.27 / v8.19 — 3D Modeling Style + Spec Language integration (PART 96-100) — OPT-IN reference + OPT-IN checks
+
+The ACES integration (v1.26 / PART 90-95) ported the anyCreature
+**engine surface** — the OKLab L1-L8 stack, the per-vertex AO bake, the
+15 mechanical checks. This round ports the anyCreature **3D modeling
+style guide** — the 5-card pipeline, the 9-slot brief, the 6:3:1
+hierarchy, the full spec schema (palette, sections, volumes with named
+concave profiles, the 7 part types, the 4 join verbs, the 3 canonical
+animations), the value plan, the dullness flags, and the triangle
+budget. The new checks are advisory by default; they catch the
+mistakes that block the eyeball but rarely break the geometry.
+
+The 5 new PARTs:
+
+  - **PART 96 — 3D Modeling Style Doctrine** (`public/aces/3d-style-doctrine.md`).
+    Ariescar's design doctrine, ported to the LBL spec. Form beats
+    obedience, everywhere. The 10 iron laws, the 6:3:1 hierarchy, the
+    9-slot brief, mass thirds, focal contrast, the 5 colour norms,
+    the scale discipline (24 px reads FEEL, 48 px reads IDENTITY,
+    200 px+ reads SURFACE), the dullness flags. Every rule has a
+    documented break. This file is the WHAT and WHY; the next two are
+    the HOW.
+
+  - **PART 97 — 3D Spec Language** (`public/aces/3d-spec-language.md`).
+    The full anyCreature JSON schema, verified against the actual
+    engine source on 2026-09-10 (engine/core/compile.js, relative.js,
+    section.js, anim.js, skeleton.js, checks.js, contract.js). Every
+    key documented is read by the engine. The 7 part types (curve,
+    eye, spike, fin, membrane, hand, paw) are each given a full
+    per-field table with defaults from the source. The 4 join verbs
+    (insert, extrude, snap, place) are spelled out. The volume
+    profile options (exp, bias, roll, section, sharp) are spelled
+    out. The animation track keys (rx/ry/rz/tx/ty/tz) and gait
+    templates (biped, quadruped, hexapod) are spelled out. The output
+    contract — the 6 rules every GLB must satisfy — is spelled out.
+    An AI reading this file can produce a spec that compiles.
+
+  - **PART 98 — 3D Pipeline Cards** (`public/aces/3d-pipeline-cards.md`).
+    The 5-stage pipeline (START → LOW → MID → HIGH → SHIP) ported as a
+    reference. Stage 0 START: the 10 iron laws. Stage 1 LOW: the
+    ONE required question (thin order: 3 directions; specific order:
+    "which is the star"), the 9-slot brief, the 7 engine-local traps,
+    Gate 1 RECOGNISED (3 of 4 views, identity view mandatory), Gate 2
+    PUNCHIER (3 pushes, 1 round, incumbent may win). Stage 2 MID: edit
+    vocabulary, hands and feet, joins, stage-end gate. Stage 3 HIGH:
+    the 5 colour norms, the 3 canonical animations, materials
+    format. Stage 4 SHIP: red lines, gate stamp, ONE question, closing
+    ledger. Every stage has a clear gate; the gate is MECHANICAL
+    (machine-checkable) where possible, HUMAN (LLM-judged) where it
+    must be.
+
+  - **PART 99 — 3D Modeling Style Checks** (extension to
+    `public/aces/aces-checks.js`). 10 new advisory checks ported from
+    `harness/claims.json` and `harness/maskmetrics.py`:
+    - `value_order`        every material sorted by OKLab lightness —
+                           value plan computed, not eyeballed
+    - `contrast_adjacent`  a part must separate in colour from what
+                           it sits on (under 0.10 OKLab = one mass)
+    - `share_hierarchy`    primary:secondary:tertiary ≈ 60:30:10,
+                           tolerance ±15% — no dominance = no story
+    - `focal_contrast`     two focal parts' shares must differ by ≥2×
+                           — equal-weight focals ping-pong the eye
+    - `saturation_area`    10-34% of frame highly saturated — below =
+                           grey lump, above = no spotlight
+    - `thinnest_px48`      width of thinnest feature at 48 px. < 3px =
+                           invisible to the blind reader
+    - `sq_fill`            silhouette in a 1:1 frame. < 0.15 = thin
+                           ghost, > 0.50 = blob
+    - `mirror_sym`         IoU with own horizontal flip. FRONT view
+                           may be high; TOP view should be low
+    - `straight_max`       longest constant-slope run on the
+                           boundary. Plank-limb detector
+    - `tri_budget`         triangle count band (default 4000-9000)
+    - `bright_floor`       "dark" reads by VALUE STEPS, not by making
+                           everything dark
+    Every check reads `spec.claims[]` (a copy of anyCreature's
+    `claims.json` schema — `part_exists`, `part_signature`, `tri_budget`,
+    etc.) and surfaces the result as either `info:` (pass) or
+    `warn:` (advisory). **Advisories never stop a build.** The full
+    roster matches the anyCreature `gates.json` (renamed where the
+    names overlap with existing PARTs to avoid collision).
+
+  - **PART 100 — Calibration Specimens** (extension to
+    `public/aces/calibration-fixtures.js`). The 3 calibration meshes
+    now exercise the new style checks too. The icosahedron + 5-segment
+    chain reports `sq_fill: 21.4%` (healthy), `mirror_sym: 60%` (top
+    view), `straight_max: 95%` (plank-limb — an advisory on a smooth
+    mass). The box_50_50 reports `mirror_sym: 100%` (BLOCK-adjacent
+    warning, still advisory). The faceted sphere reports its own
+    plank-limbs. All three continue to behave as expected (1 pass, 2
+    block on the legality gates) — the new style checks add INFORMATION
+    about the model, not new BLOCKS.
+
+The single most important rule:
+
+  PART 96-100 is a REFERENCE, not a rule. The LBL spec's PART 1
+  geometry primitives, PART 45 CS2 PBR profile, PART 67 modifier
+  stack, PART 74 procedural texturing, and PART 75-89 procedural
+  rigging all continue to work. An AI that reads PART 97 can write a
+  spec in the anyCreature format, and the engine compiles it. An AI
+  that reads PART 98 can run the 5-stage pipeline. The 10 style
+  checks in PART 99 light up the ACES panel's "report" view but
+  never refuse a build.
+
+## Why this is an UPGRADE, not a downgrade
+
+The anyCreature 3D modeling style is the most articulate public
+art-direction language for low-poly 3D creatures on the web. It names
+the 6:3:1 hierarchy, the 9-slot brief, the 4 join verbs, the 7 part
+types, the 5 colour norms, the value plan, the dullness flags. The
+LBL spec is a much larger system (a complete 3D scene builder with
+30k+ lines of code and 119 commits), but the ART-DIRECTION layer
+was thinner than the technical layer. This round adds the art
+direction at the same fidelity the technical layer has had since
+v1.0.
+
+The 3 reference files (PART 96-98) are perfect for an AI to ingest:
+verified against the actual engine source, every key documented is
+read by the engine, every default taken from the source. The 10
+style checks (PART 99) are advisory by default — they catch the
+mistakes that block the eyeball but rarely break the geometry, and
+the existing 15 legality checks (PART 93) continue to BLOCK the
+build when geometry is broken.
+
+## File layout
+
+```
+public/aces/
+├── README.md                      one page   Overview + API
+├── aces-oklab.js                  PART 91.1 — OKLab + value noise
+├── aces-normals.js                PART 91.2 — angle-weighted + crease
+├── aces-ao.js                     PART 91 — per-vertex AO bake
+├── aces-shade.js                  PART 92 — L1-L8 stack
+├── aces-checks.js                 PART 93+99 — 25 mechanical + style checks
+├── aces-bones.js                  PART 94 — public bone-name + extras
+├── aces-engine.js                 PART 90 — orchestrator
+├── calibration.html               PART 95 — self-check page
+├── calibration-fixtures.js        PART 95+100 — 3 sample meshes
+├── 3d-style-doctrine.md           PART 96 — form beats obedience
+├── 3d-spec-language.md            PART 97 — full anyCreature JSON schema
+└── 3d-pipeline-cards.md           PART 98 — the 5-stage pipeline
+```
+
+The 3 reference files (PART 96-98) are loaded into the ACES panel as
+expandable sections so the user can read the spec without leaving
+the page. The 10 style checks (PART 99) are wired into the ACES
+`run()` and surface in the existing report panel alongside the
+legality checks.
+
+## How an AI uses this
+
+The most natural use of PART 97 + PART 98:
+
+1. Read PART 98 (the 5-stage pipeline) to know WHAT to produce.
+2. Read PART 97 (the spec language) to know the JSON shape.
+3. Run stage 1 LOW: ask the ONE question, expand the brief into
+   the 9 slots, design the silhouette.
+4. Compile the spec against PART 97. The engine produces a GLB.
+5. Run PART 99's style checks via the ACES button. The advisory
+   numbers tell you what to push next.
+6. Continue to stage 2 MID (parts), stage 3 HIGH (colour + 3 anims),
+   stage 4 SHIP (delivery).
+
+The LBL factory's existing PART 1 covers the geometry primitives
+(boxes, spheres, lathes, extrudes) that anyCreature does not need.
+For creature subjects the LBL factory should output the
+anyCreature-compatible `volumes` and `parts` from PART 97; for
+non-creature subjects it falls back to the primitive-based approach.
+
+## Credits
+
+- **Ariescar (anyCreature 1.3.1, MIT)** — the doctrine, the 5-stage
+  pipeline, the 9-slot brief, the 6:3:1 hierarchy, the value plan,
+  the dullness flags, the 7 part types, the 4 join verbs, the
+  gait templates, the full claims sheet, the output contract. All
+  original to that project.
+- **Björn Ottosson** — OKLab.
+- **Möller & Trumbore** — ray-triangle intersection.
+- **RDJ Publishers** — ported to the LBL spec as PART 96-100.
+  Verified against the engine source on 2026-09-10.

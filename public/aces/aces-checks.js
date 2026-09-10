@@ -1,15 +1,14 @@
 // ACES — mechanical checks (compile-time gate system).
 //
-// 14 named checks, three log channels:
-//   BLOCK  build stops, exit 1 — geometry is not geometry, an attack that
-//          never reaches, a mirrored twin collapsed past 30%, etc.
-//   warn   build proceeds — measure for the human's judgment (part overlap,
-//          soft_mass on declared-soft volumes, etc.)
-//   info   numbers the compiler narrates (where the curve bent, how far a
-//          plate conformed, how many verts AO touched).
+// 25 named checks in two groups:
+//   A) LEGAlITY (block when broken) — geometry is not geometry, an attack
+//      that never reaches, a mirrored twin collapsed past 30%, etc.
+//   B) STYLE (advise when off) — 6:3:1 hierarchy, focal contrast, saturated
+//      area, value order, contrast adjacent, dullness flags, triangle
+//      budget. A number that says the eye will ping-pong is worth
+//      reading and is not worth a rebuild. **Advice never stops a build.**
 //
-// The full list, with the symptom each one kills:
-//
+// A. Legality checks (BLOCK):
 //   mesh_integrity      bind pose has folded tris (twist/breakage)
 //   root_containment    every vertex is inside the root chain's bounds
 //   part_attachment     every part's host is reachable + close enough
@@ -35,6 +34,39 @@
 //                       skin can show an edge at the chosen smooth angle,
 //                       and below 10% the masses render as smooth beans
 //
+// B. Style claims (ADVISE — value, hierarchy, focal, dullness, budget):
+//   value_order         every material sorted by OKLab lightness — the
+//                       value plan computed, not eyeballed
+//   contrast_adjacent   a part must separate in colour from the thing it
+//                       SITS ON (under 0.10 OKLab = one mass)
+//   share_hierarchy     primary:secondary:tertiary ≈ 60:30:10, tolerance
+//                       ±15% — no dominance means no story
+//   focal_contrast      two focal parts' shares must differ by ≥2× —
+//                       equal-weight focals ping-pong the eye
+//   saturation_area     HSV S ≥ 0.50 on the UNLIT baked colour — 10–34%
+//                       of the frame. Below = grey lump, above = no spotlight
+//   thinnest_px48       width of the thinnest feature at 48px. < 3px =
+//                       invisible
+//   sq_fill             silhouette in a 1:1 frame — <0.15 = thin ghost,
+//                       >0.50 = blob
+//   mirror_sym          IoU with own horizontal flip — front view allowed
+//                       high, side/top should be low
+//   straight_max        longest constant-slope run on the boundary —
+//                       plank-limb detector
+//   tri_budget          triangle count band 4000-9000 default
+//   bright_floor        beauty render's median luminance — "dark" reads by
+//                       value steps, not by making everything dark
+//
+// Three log channels:
+//   BLOCK  build stops, exit 1 — geometry is not geometry, an attack that
+//          never reaches, a mirrored twin collapsed past 30%, etc.
+//   warn   build proceeds — measure for the human's judgment (part overlap,
+//          soft_mass on declared-soft volumes, etc.)
+//   info   numbers the compiler narrates (where the curve bent, how far a
+//          plate conformed, how many verts AO touched).
+//
+// The full `gates.json` equivalent lives at the top of this file.
+//
 // Author: Ariescar (anyCreature) ported to the RDJ low_poly_3d browser
 // surface. Operates on plain {V, F, ...} mesh records and a { joints, index }
 // skeleton, both forms the existing low_poly_3d renderer can produce.
@@ -46,6 +78,12 @@ const normals = (typeof require !== 'undefined' && typeof module !== 'undefined'
   : (typeof window !== 'undefined' ? window.ACES_normals : null);
 
 const { foldCount, creaseShare } = normals;
+
+const oklab = (typeof require !== 'undefined' && typeof module !== 'undefined')
+  ? require('./aces-oklab.js')
+  : (typeof window !== 'undefined' ? window.ACES_oklab : null);
+
+const { lin2oklab, oklab2lin, hex2lab, hex2lin } = oklab;
 
 const V3 = {
   sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
@@ -618,6 +656,512 @@ function chk_part_seat(ctx) {
   return out;
 }
 
+// ── style claims (PART 99 — 3D modeling style) ─────────────────────────
+//
+// Every check below is ADVISORY unless a stage declaration escalates it.
+// A number that says the eye will ping-pong is worth reading and is not
+// worth a rebuild. Taste is advice. Correctness is a gate.
+
+// oklab colour distance for value_order + contrast_adjacent
+function oklabDist(a, b) {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+// value_order — every material sorted by OKLab lightness. The value plan,
+// computed instead of eyeballed. The brief is the only thing that says
+// what SHOULD be brightest; the engine reports what IS.
+function chk_value_order(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  const spec = ctx.spec || {};
+  const palette = spec.palette || {};
+  const rows = [];
+  for (const [name, p] of Object.entries(palette)) {
+    const c = hex2lin(p.color || '#888888');
+    const L = lin2oklab(c)[0];
+    rows.push({ name, L, c });
+  }
+  if (!rows.length) {
+    out.info.push('value_order: no palette, skipped');
+    return out;
+  }
+  rows.sort((a, b) => b.L - a.L);
+  out.info.push('value_order: ' + rows.map((r) => `${r.name}=${r.L.toFixed(2)}`).join(' / '));
+  // Two masses at the same lightness compete and neither owns the eye.
+  // A 0.04 OKLab gap is one notch below the contrast_adjacent floor.
+  let comp = 0;
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (rows[i].L - rows[i + 1].L < 0.04) comp++;
+  }
+  if (comp) {
+    out.warns.push(`value_order: ${comp} material pair(s) are within 0.04 OKLab lightness — they read as the same mass in the lighting. Either darken/lighten one or merge the materials.`);
+  }
+  return out;
+}
+
+// contrast_adjacent — a part must separate in colour from the thing it
+// SITS ON. Under 0.10 OKLab they read as one mass. The spec is checked for
+// declared `touch` connections + (host chain → part) pairings.
+function chk_contrast_adjacent(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  const spec = ctx.spec || {};
+  const palette = spec.palette || {};
+  const adj = (a, b) => {
+    if (!a || !b) return 1;
+    const ca = hex2lin(palette[a] && palette[a].color || '#888888');
+    const cb = hex2lin(palette[b] && palette[b].color || '#888888');
+    return oklabDist(lin2oklab(ca), lin2oklab(cb));
+  };
+  let checked = 0, fused = 0;
+  // volumes ↔ each part that lists that chain as host
+  const volumes = spec.volumes || [];
+  const parts = spec.parts || [];
+  for (const p of parts) {
+    const hostMat = p.host;
+    // best-match host material is the volume whose chain is `host`; fallback
+    // to the part's own chain. Pull a part-material name from the part.
+    const partMat = p.material;
+    let hostPalette = null;
+    for (const v of volumes) if (v.chain === hostMat && v.material) hostPalette = v.material;
+    if (!hostPalette) {
+      // touch connections
+      for (const [a, b] of spec.touch || []) {
+        if (a === hostMat || b === hostMat) {
+          for (const v of volumes) {
+            if ((v.chain === a || v.chain === b) && v.material) { hostPalette = v.material; break; }
+          }
+        }
+      }
+    }
+    if (!hostPalette || !partMat || hostPalette === partMat) continue;
+    const d = adj(hostPalette, partMat);
+    checked++;
+    if (d < 0.10) fused++;
+  }
+  if (checked && fused) {
+    out.warns.push(`contrast_adjacent: ${fused}/${checked} part↔host pairs are within 0.10 OKLab — they read as one mass. Adjust the part colour OR the host's arc band so the part separates.`);
+  } else if (checked) {
+    out.info.push(`contrast_adjacent: every part separates from its host by ≥ 0.10 OKLab (${checked} pair(s) checked)`);
+  } else {
+    out.info.push('contrast_adjacent: no part/host pairs found in spec, skipped');
+  }
+  return out;
+}
+
+// share_hierarchy — primary:secondary:tertiary ≈ 60:30:10, tolerance ±15%.
+// Without dominance the silhouette has no story.
+function chk_share_hierarchy(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  const claims = (ctx.spec && ctx.spec.claims) || [];
+  const c = claims.find((c) => c.type === 'share_hierarchy');
+  if (!c) {
+    out.info.push('share_hierarchy: no share_hierarchy claim in spec, skipped (declare one to enable)');
+    return out;
+  }
+  // We don't have a rendered view here; we compute the share by mesh area in
+  // the bind pose (sum of triangle area per group) and call that the tq share.
+  // The judge.mjs in anyCreature re-renders with a per-material id buffer to
+  // get exact pixel shares; this is a fast approximation.
+  const groups = new Map();
+  for (const m of ctx.meshes) {
+    const k = m.material || '?';
+    let area = 0;
+    for (const f of m.F || []) {
+      if (f.length < 3) continue;
+      const [a, b, c] = f;
+      const va = m.V[a], vb = m.V[b], vc = m.V[c];
+      const ab = V3.sub(vb, va);
+      const ac = V3.sub(vc, va);
+      area += 0.5 * V3.len(V3.cross(ab, ac));
+    }
+    groups.set(k, (groups.get(k) || 0) + area);
+  }
+  const total = [...groups.values()].reduce((a, b) => a + b, 0) || 1;
+  const sum = (keys) => keys.reduce((a, k) => a + (groups.has(k) ? groups.get(k) / total : 0), 0);
+  const P = sum(c.primary || []);
+  const S = sum(c.secondary || []);
+  const T = sum(c.tertiary || []);
+  const tot = P + S + T;
+  if (!tot) { out.info.push('share_hierarchy: primary/secondary/tertiary groups all 0, skipped'); return out; }
+  const got = [P / tot, S / tot, T / tot];
+  const want = [0.6, 0.3, 0.1];
+  const tol = c.tolerance ?? 0.15;
+  const off = got.map((g, i) => Math.abs(g - want[i]));
+  if (Math.max(...off) > tol) {
+    out.warns.push(`share_hierarchy: primary/secondary/tertiary = ${got.map((x) => (x * 100).toFixed(0)).join(':')} (target 60:30:10, tolerance ±${(tol * 100).toFixed(0)}%) — no dominance, the frame is split evenly`);
+  } else {
+    out.info.push(`share_hierarchy: ${got.map((x) => (x * 100).toFixed(0)).join(':')} (target 60:30:10, within tolerance)`);
+  }
+  return out;
+}
+
+// focal_contrast — the two focal parts' shares must differ by ≥ 2×.
+// Equal weight = ping-pong.
+function chk_focal_contrast(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  const claims = (ctx.spec && ctx.spec.claims) || [];
+  const c = claims.find((c) => c.type === 'focal_contrast');
+  if (!c) {
+    out.info.push('focal_contrast: no focal_contrast claim in spec, skipped (declare one to enable)');
+    return out;
+  }
+  const groups = new Map();
+  for (const m of ctx.meshes) {
+    const k = m.material || '?';
+    let area = 0;
+    for (const f of m.F || []) {
+      if (f.length < 3) continue;
+      const [a, b, c] = f;
+      const va = m.V[a], vb = m.V[b], vc = m.V[c];
+      area += 0.5 * V3.len(V3.cross(V3.sub(vb, va), V3.sub(vc, va)));
+    }
+    groups.set(k, (groups.get(k) || 0) + area);
+  }
+  const total = [...groups.values()].reduce((a, b) => a + b, 0) || 1;
+  const A = (groups.get(c.a) || 0) / total;
+  const B = (groups.get(c.b) || 0) / total;
+  const hi = Math.max(A, B), lo = Math.min(A, B);
+  const min_ratio = c.min_ratio ?? 2;
+  if (lo > 0 && hi / lo < min_ratio) {
+    out.warns.push(`focal_contrast: "${c.a}" ${(A * 100).toFixed(1)}% vs "${c.b}" ${(B * 100).toFixed(1)}% — need ≥ ${min_ratio}× apart. The eye ping-pongs between them; open up the dominance gap.`);
+  } else {
+    out.info.push(`focal_contrast: "${c.a}" ${(A * 100).toFixed(1)}% / "${c.b}" ${(B * 100).toFixed(1)}% — ${lo > 0 ? (hi / lo).toFixed(2) : '∞'}× ratio`);
+  }
+  return out;
+}
+
+// saturation_area — share of the frame carrying HSV S ≥ 0.50 on the UNLIT
+// baked colour. Default band 10-34%. Below = grey lump, above = no spotlight.
+function chk_saturation_area(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  // The judge.mjs in anyCreature uses an id buffer + 4-view render; here we
+  // approximate by measuring the highest-saturation material in the palette
+  // and computing its share of the mesh.
+  const palette = (ctx.spec && ctx.spec.palette) || {};
+  const sats = Object.entries(palette).map(([k, p]) => {
+    const c = hex2lin(p.color || '#888888');
+    const [r, g, b] = lin2oklab(c); // not what we want — oklab chroma is hypot(a,b)
+    return { name: k, color: p.color || '#888888', s: srgbSaturation(c) };
+  });
+  if (!sats.length) { out.info.push('saturation_area: no palette, skipped'); return out; }
+  sats.sort((a, b) => b.s - a.s);
+  // Approximate share: every mesh whose material is in the top-saturated
+  // entries contributes its area.
+  const highSats = new Set(sats.filter((s) => s.s >= 0.5).map((s) => s.name));
+  let total = 0, high = 0;
+  for (const m of ctx.meshes) {
+    let area = 0;
+    for (const f of m.F || []) {
+      if (f.length < 3) continue;
+      const [a, b, c] = f;
+      area += 0.5 * V3.len(V3.cross(V3.sub(m.V[b], m.V[a]), V3.sub(m.V[c], m.V[a])));
+    }
+    total += area;
+    if (highSats.has(m.material)) high += area;
+  }
+  const share = total ? high / total : 0;
+  const c = { min: 0.10 };
+  const pct = share * 100;
+  const lo = (c.min ?? 0.10) * 100;
+  if (pct < lo) {
+    out.warns.push(`saturation_area: only ${pct.toFixed(1)}% of the frame is highly saturated (need ≥ ${lo.toFixed(0)}%) — the creature reads as a grey mass. Raise the saturation of a mass that deserves the attention, do not tint everything.`);
+  } else {
+    out.info.push(`saturation_area: ${pct.toFixed(1)}% of frame highly saturated (band 10-34% — current is ${pct < 34 ? 'within' : 'above the soft cap; saturation stops reading as a spotlight when it covers this much'})`);
+  }
+  return out;
+}
+
+function srgbSaturation(lin) {
+  // approximation: sRGB value, max-min, then sat = (max-min)/max if max>0
+  const srgb = lin.map((v) => Math.pow(Math.max(0, Math.min(1, v)), 1 / 2.2));
+  const mx = Math.max(...srgb);
+  const mn = Math.min(...srgb);
+  return mx > 0 ? (mx - mn) / mx : 0;
+}
+
+// thinnest_px48 — width of the thinnest feature on the 48px thumbnail the
+// reader sees. Under 3 px = invisible. Computed on the silhouette mask
+// (top-down projection of the Y axis). 48 px = the reader's thumbnail.
+function chk_thinnest_px48(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  if (!ctx.meshes.length) { out.info.push('thinnest_px48: no meshes, skipped'); return out; }
+  // Project to XZ (top-down view), build a 48x48 mask, find protrusions.
+  const { lo, hi } = bbox(ctx.meshes);
+  const sx = (hi[0] - lo[0]) || 1;
+  const sz = (hi[2] - lo[2]) || 1;
+  const PX = 48;
+  const mask = new Uint8Array(PX * PX);
+  for (const m of ctx.meshes) {
+    for (const f of m.F || []) {
+      if (f.length < 3) continue;
+      for (const e of [[0, 1], [1, 2], [2, 0]]) {
+        const a = m.V[f[e[0]]], b = m.V[f[e[1]]];
+        const x0 = Math.max(0, Math.min(PX - 1, Math.floor((a[0] - lo[0]) / sx * PX)));
+        const z0 = Math.max(0, Math.min(PX - 1, Math.floor((a[2] - lo[2]) / sz * PX)));
+        const x1 = Math.max(0, Math.min(PX - 1, Math.floor((b[0] - lo[0]) / sx * PX)));
+        const z1 = Math.max(0, Math.min(PX - 1, Math.floor((b[2] - lo[2]) / sz * PX)));
+        // Bresenham
+        let dx = Math.abs(x1 - x0), sx_ = x0 < x1 ? 1 : -1;
+        let dy = -Math.abs(z1 - z0), sy_ = z0 < z1 ? 1 : -1;
+        let err = dx + dy;
+        let x = x0, z = z0;
+        while (true) {
+          mask[z * PX + x] = 1;
+          if (x === x1 && z === z1) break;
+          const e2 = 2 * err;
+          if (e2 >= dy) { err += dy; x += sx_; }
+          if (e2 <= dx) { err += dx; z += sy_; }
+        }
+      }
+      // fill triangle (very simple — barycentric)
+      const v0 = m.V[f[0]], v1 = m.V[f[1]], v2 = m.V[f[2]];
+      const x0 = Math.max(0, Math.min(PX - 1, Math.floor((v0[0] - lo[0]) / sx * PX)));
+      const z0 = Math.max(0, Math.min(PX - 1, Math.floor((v0[2] - lo[2]) / sz * PX)));
+      const x1 = Math.max(0, Math.min(PX - 1, Math.floor((v1[0] - lo[0]) / sx * PX)));
+      const z1 = Math.max(0, Math.min(PX - 1, Math.floor((v1[2] - lo[2]) / sz * PX)));
+      const x2 = Math.max(0, Math.min(PX - 1, Math.floor((v2[0] - lo[0]) / sx * PX)));
+      const z2 = Math.max(0, Math.min(PX - 1, Math.floor((v2[2] - lo[2]) / sz * PX)));
+      const minx = Math.min(x0, x1, x2), maxx = Math.max(x0, x1, x2);
+      const minz = Math.min(z0, z1, z2), maxz = Math.max(z0, z1, z2);
+      for (let z = minz; z <= maxz; z++) {
+        for (let x = minx; x <= maxx; x++) {
+          if (pointInTri(x, z, [x0, z0], [x1, z1], [x2, z2])) mask[z * PX + x] = 1;
+        }
+      }
+    }
+  }
+  // Distance transform: find the thinnest 1-pixel-wide corridor
+  const dt = new Float32Array(PX * PX);
+  // first pass: top-left to bottom-right
+  for (let z = 0; z < PX; z++) for (let x = 0; x < PX; x++) {
+    const i = z * PX + x;
+    if (mask[i]) {
+      dt[i] = 1 + Math.min(
+        x > 0 ? dt[i - 1] : Infinity,
+        z > 0 ? dt[i - PX] : Infinity,
+        x > 0 && z > 0 ? dt[i - PX - 1] : Infinity,
+        x < PX - 1 && z > 0 ? dt[i - PX + 1] : Infinity,
+      );
+    }
+  }
+  // second pass: bottom-right to top-left
+  for (let z = PX - 1; z >= 0; z--) for (let x = PX - 1; x >= 0; x--) {
+    const i = z * PX + x;
+    if (mask[i]) {
+      dt[i] = Math.min(dt[i], 1 + Math.min(
+        x < PX - 1 ? dt[i + 1] : Infinity,
+        z < PX - 1 ? dt[i + PX] : Infinity,
+        x < PX - 1 && z < PX - 1 ? dt[i + PX + 1] : Infinity,
+        x > 0 && z < PX - 1 ? dt[i + PX - 1] : Infinity,
+      ));
+    }
+  }
+  // minimum non-zero
+  let thinnest = Infinity;
+  for (let i = 0; i < dt.length; i++) if (dt[i] > 0 && dt[i] < thinnest) thinnest = dt[i];
+  // px48 is the actual width in pixels
+  const px48 = thinnest === Infinity ? 0 : Math.round(thinnest * 2);
+  if (px48 < 3) {
+    out.warns.push(`thinnest_px48: thinnest feature measures ${px48}px on the 48px thumbnail (< 3px = invisible to the blind reader). Thicken it or drop it.`);
+  } else {
+    out.info.push(`thinnest_px48: thinnest feature is ${px48}px on the 48px thumbnail (≥ 3px = visible)`);
+  }
+  return out;
+}
+
+function pointInTri(px, pz, a, b, c) {
+  const d = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  if (Math.abs(d) < 1e-9) return false;
+  const u = ((px - a[0]) * (c[1] - a[1]) - (pz - a[1]) * (c[0] - a[0])) / d;
+  const v = ((b[0] - a[0]) * (pz - a[1]) - (b[1] - a[1]) * (px - a[0])) / d;
+  return u >= 0 && v >= 0 && u + v <= 1;
+}
+
+// sq_fill — silhouette in a 1:1 frame. 0.20-0.40 healthy. <0.15 = thin ghost,
+// >0.50 = blob.
+function chk_sq_fill(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  // We use the same projection as thinnest_px48 (top-down)
+  if (!ctx.meshes.length) { out.info.push('sq_fill: no meshes, skipped'); return out; }
+  const { lo, hi } = bbox(ctx.meshes);
+  const diagXZ = Math.hypot(hi[0] - lo[0], hi[2] - lo[2]) || 1;
+  const PX = 64;
+  const mask = new Uint8Array(PX * PX);
+  for (const m of ctx.meshes) for (const f of m.F || []) {
+    if (f.length < 3) continue;
+    const v0 = m.V[f[0]], v1 = m.V[f[1]], v2 = m.V[f[2]];
+    const x0 = Math.max(0, Math.min(PX - 1, Math.floor((v0[0] - lo[0]) / diagXZ * PX + PX / 2)));
+    const z0 = Math.max(0, Math.min(PX - 1, Math.floor((v0[2] - lo[2]) / diagXZ * PX + PX / 2)));
+    const x1 = Math.max(0, Math.min(PX - 1, Math.floor((v1[0] - lo[0]) / diagXZ * PX + PX / 2)));
+    const z1 = Math.max(0, Math.min(PX - 1, Math.floor((v1[2] - lo[2]) / diagXZ * PX + PX / 2)));
+    const x2 = Math.max(0, Math.min(PX - 1, Math.floor((v2[0] - lo[0]) / diagXZ * PX + PX / 2)));
+    const z2 = Math.max(0, Math.min(PX - 1, Math.floor((v2[2] - lo[2]) / diagXZ * PX + PX / 2)));
+    const minx = Math.min(x0, x1, x2), maxx = Math.max(x0, x1, x2);
+    const minz = Math.min(z0, z1, z2), maxz = Math.max(z0, z1, z2);
+    for (let z = minz; z <= maxz; z++) {
+      for (let x = minx; x <= maxx; x++) {
+        if (pointInTri(x, z, [x0, z0], [x1, z1], [x2, z2])) mask[z * PX + x] = 1;
+      }
+    }
+  }
+  let area = 0;
+  for (let i = 0; i < mask.length; i++) if (mask[i]) area++;
+  // Square-crop to the smaller of width/height, then fill
+  // Simpler: re-fill a square of side = max(w,h) with the mask, then divide.
+  // Here we approximate by reporting mask area / PX².
+  const fill = area / (PX * PX);
+  if (fill < 0.15) {
+    out.warns.push(`sq_fill: ${(fill * 100).toFixed(1)}% — the silhouette is too thin in its own frame (healthy 20-40%). Either the model is too narrow for its declared height or a pole has folded flat.`);
+  } else if (fill > 0.50) {
+    out.warns.push(`sq_fill: ${(fill * 100).toFixed(1)}% — the silhouette is a blob (healthy 20-40%). It has no direction; it is a pose, not a creature.`);
+  } else {
+    out.info.push(`sq_fill: ${(fill * 100).toFixed(1)}% (healthy 20-40%)`);
+  }
+  return out;
+}
+
+// mirror_sym — IoU with own horizontal flip. FRONT view may be symmetric;
+// side / top should be low.
+function chk_mirror_sym(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  if (!ctx.meshes.length) { out.info.push('mirror_sym: no meshes, skipped'); return out; }
+  const { lo, hi } = bbox(ctx.meshes);
+  const sx = (hi[0] - lo[0]) || 1, sz = (hi[2] - lo[2]) || 1;
+  const PX = 64;
+  // Top-down projection
+  const a = new Uint8Array(PX * PX);
+  const b = new Uint8Array(PX * PX);
+  for (const m of ctx.meshes) for (const f of m.F || []) {
+    if (f.length < 3) continue;
+    for (const v of f) {
+      const x = Math.max(0, Math.min(PX - 1, Math.floor((m.V[v][0] - lo[0]) / sx * PX)));
+      const z = Math.max(0, Math.min(PX - 1, Math.floor((m.V[v][2] - lo[2]) / sz * PX)));
+      a[z * PX + x] = 1;
+    }
+  }
+  for (let z = 0; z < PX; z++) for (let x = 0; x < PX; x++) b[z * PX + (PX - 1 - x)] = a[z * PX + x];
+  let inter = 0, uni = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] && b[i]) inter++;
+    if (a[i] || b[i]) uni++;
+  }
+  const iou = uni ? inter / uni : 0;
+  if (iou > 0.85) {
+    out.warns.push(`mirror_sym: top-down view is ${(iou * 100).toFixed(0)}% symmetric with its own flip — even the top view should stagger. Front view may be symmetric, top view should not.`);
+  } else {
+    out.info.push(`mirror_sym: top-down view is ${(iou * 100).toFixed(0)}% symmetric (front view may be high, top view should be low)`);
+  }
+  return out;
+}
+
+// straight_max — longest constant-slope run on the boundary, as a fraction
+// of that boundary's length. Plank-limb detector.
+function chk_straight_max(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  if (!ctx.meshes.length) { out.info.push('straight_max: no meshes, skipped'); return out; }
+  const { lo, hi } = bbox(ctx.meshes);
+  const sx = (hi[0] - lo[0]) || 1, sy = (hi[1] - lo[1]) || 1;
+  const PX = 64;
+  const mask = new Uint8Array(PX * PX);
+  for (const m of ctx.meshes) for (const f of m.F || []) {
+    if (f.length < 3) continue;
+    for (const e of [[0, 1], [1, 2], [2, 0]]) {
+      const a = m.V[f[e[0]]], b = m.V[f[e[1]]];
+      const x0 = Math.max(0, Math.min(PX - 1, Math.floor((a[0] - lo[0]) / sx * PX)));
+      const y0 = Math.max(0, Math.min(PX - 1, Math.floor((a[1] - lo[1]) / sy * PX)));
+      const x1 = Math.max(0, Math.min(PX - 1, Math.floor((b[0] - lo[0]) / sx * PX)));
+      const y1 = Math.max(0, Math.min(PX - 1, Math.floor((b[1] - lo[1]) / sy * PX)));
+      lineOnMask(mask, PX, x0, y0, x1, y1);
+    }
+  }
+  // top + bottom per column
+  let best = 0;
+  for (let x = 0; x < PX; x++) {
+    const col = [];
+    for (let y = 0; y < PX; y++) if (mask[y * PX + x]) col.push(y);
+    if (col.length < 4) continue;
+    const topRun = longestConstSlope(col);
+    if (topRun / col.length > best) best = topRun / col.length;
+  }
+  if (best > 0.4) {
+    out.warns.push(`straight_max: longest constant-slope run is ${(best * 100).toFixed(0)}% of the boundary length — plank-limb detector triggered. Break it with a small radius step or a sharp profile row.`);
+  } else {
+    out.info.push(`straight_max: longest constant-slope run is ${(best * 100).toFixed(0)}% of the boundary length (healthy < 40%)`);
+  }
+  return out;
+}
+
+function lineOnMask(mask, PX, x0, y0, x1, y1) {
+  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+  let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  let x = x0, y = y0;
+  while (true) {
+    mask[y * PX + x] = 1;
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x += sx; }
+    if (e2 <= dx) { err += dx; y += sy; }
+  }
+}
+function longestConstSlope(arr) {
+  let best = 1, cur = 1, slope = null;
+  for (let i = 1; i < arr.length; i++) {
+    const s = arr[i] - arr[i - 1];
+    if (s === slope) cur++;
+    else { slope = s; cur = 2; }
+    if (cur > best) best = cur;
+  }
+  return best;
+}
+
+// tri_budget — triangle count band. Default 4000-9000 (anyCreature claim).
+// Cheap creatures can lower it; boss creatures are judged at this.
+function chk_tri_budget(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  const claims = (ctx.spec && ctx.spec.claims) || [];
+  const c = claims.find((c) => c.type === 'tri_budget');
+  if (!c) { out.info.push('tri_budget: no tri_budget claim in spec, skipped (declare one to enable)'); return out; }
+  let tris = 0;
+  for (const m of ctx.meshes) {
+    let n = 0;
+    for (const f of m.F || []) {
+      if (f.length === 3) n++;
+      else if (f.length === 4) n += 2;
+    }
+    tris += n;
+  }
+  if (tris < c.min || tris > c.max) {
+    out.warns.push(`tri_budget: triangle count ${tris} is outside the budget band ${c.min}-${c.max}`);
+  } else {
+    out.info.push(`tri_budget: ${tris} triangles (band ${c.min}-${c.max})`);
+  }
+  return out;
+}
+
+// bright_floor — beauty render's median luminance. Cheap proxy: average
+// brightness of the palette. A "dark" creature reads by VALUE STEPS, not
+// by making everything dark.
+function chk_bright_floor(ctx) {
+  const out = { blocks: [], warns: [], info: [] };
+  const palette = (ctx.spec && ctx.spec.palette) || {};
+  const style = (ctx.spec && ctx.spec.style) || '';
+  const isDark = /dark|night|black/i.test(style);
+  if (!Object.keys(palette).length) { out.info.push('bright_floor: no palette, skipped'); return out; }
+  let sum = 0, n = 0;
+  for (const p of Object.values(palette)) {
+    const c = hex2lin(p.color || '#888888');
+    const L = lin2oklab(c)[0];
+    sum += L; n++;
+  }
+  const meanL = n ? sum / n : 0;
+  if (isDark && meanL > 0.25) {
+    out.warns.push(`bright_floor: style='${style}' (dark) but palette mean OKLab lightness is ${meanL.toFixed(2)} — a "dark" creature reads by VALUE STEPS between its masses, not by making everything dark.`);
+  } else {
+    out.info.push(`bright_floor: palette mean OKLab lightness ${meanL.toFixed(2)}${isDark ? ` (style='${style}')` : ''}`);
+  }
+  return out;
+}
+
 const CHECKS = {
   mesh_integrity: chk_mesh_integrity,
   root_containment: chk_root_containment,
@@ -634,6 +1178,18 @@ const CHECKS = {
   part_overlap: chk_part_overlap,
   part_seat: chk_part_seat,
   soft_mass: chk_soft_mass,
+  // PART 99 — 3D modeling style claims
+  value_order: chk_value_order,
+  contrast_adjacent: chk_contrast_adjacent,
+  share_hierarchy: chk_share_hierarchy,
+  focal_contrast: chk_focal_contrast,
+  saturation_area: chk_saturation_area,
+  thinnest_px48: chk_thinnest_px48,
+  sq_fill: chk_sq_fill,
+  mirror_sym: chk_mirror_sym,
+  straight_max: chk_straight_max,
+  tri_budget: chk_tri_budget,
+  bright_floor: chk_bright_floor,
 };
 
 const CHECK_ORDER = [
@@ -652,6 +1208,18 @@ const CHECK_ORDER = [
   'part_overlap',
   'part_seat',
   'soft_mass',
+  // PART 99 — 3D modeling style claims (run after the legality gates)
+  'value_order',
+  'contrast_adjacent',
+  'share_hierarchy',
+  'focal_contrast',
+  'saturation_area',
+  'thinnest_px48',
+  'sq_fill',
+  'mirror_sym',
+  'straight_max',
+  'tri_budget',
+  'bright_floor',
 ];
 
 // runChecks(ctx) → { fails:[], warns:[], info:[], perCheck:{name:{blocks,warns,info,passed}} }

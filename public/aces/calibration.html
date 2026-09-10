@@ -71,9 +71,22 @@
 <p class="subtitle">
   Three sample models. One must build, two must be blocked. The ruler
   separates good from bad on your machine. The first run takes a couple of
-  seconds (AO + L1-L8 stack + 15 mechanical checks on each); repeat runs are
-  cached.
+  seconds (AO + L1-L8 stack + <b>25 checks</b> on each — 15 legality BLOCK,
+  10 style ADVISE); repeat runs are cached.
 </p>
+
+<div class="ruler" style="flex-direction:column;align-items:flex-start;gap:6px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="dot red" id="ruler-dot"></span>
+    <span class="label" id="ruler-label">calibrating…</span>
+  </div>
+  <div style="font-size:11px;color:#888">
+    <a href="./3d-style-doctrine.md" target="_blank" rel="noopener" style="color:#9fc3ff">PART 96 — 3D Style Doctrine</a> ·
+    <a href="./3d-spec-language.md" target="_blank" rel="noopener" style="color:#9fc3ff">PART 97 — 3D Spec Language</a> ·
+    <a href="./3d-pipeline-cards.md" target="_blank" rel="noopener" style="color:#9fc3ff">PART 98 — 5-Stage Pipeline</a> ·
+    <a href="./README.md" target="_blank" rel="noopener" style="color:#9fc3ff">README</a>
+  </div>
+</div>
 
 <div class="ruler">
   <span class="dot red" id="ruler-dot"></span>
@@ -211,6 +224,18 @@ async function runCalibration() {
     let html = `<h3>${escapeHtml(fix.name)}</h3>`;
     html += `<div class="verdict ${verdictClass}">expecting ${escapeHtml(fix.expect)} → ${verdictText}</div>`;
     html += `<div style="font-size:12px;color:#888;margin-top:4px">${report.summary.meshCount} mesh(es), ${report.summary.failCount} BLOCK, ${report.summary.warnCount} warn, ${report.summary.ms}ms</div>`;
+    // PART 99 — also surface the style claims
+    const styleKeys = ['value_order', 'contrast_adjacent', 'sq_fill', 'mirror_sym', 'straight_max', 'thinnest_px48', 'saturation_area', 'tri_budget', 'bright_floor'];
+    const styleLines = [];
+    for (const k of styleKeys) {
+      const c = report.perCheck && report.perCheck[k];
+      if (!c) continue;
+      const line = (c.warns[0] || c.info[0] || '').trim();
+      if (line) styleLines.push(`${k}: ${line.slice(0, 110)}`);
+    }
+    if (styleLines.length) {
+      html += `<div style="font-size:11px;color:#888;margin-top:6px;padding:6px;background:#0e1116;border-left:2px solid #2a3a52;border-radius:2px"><b>style claims (PART 99):</b><br>${styleLines.map(escapeHtml).join('<br>')}</div>`;
+    }
     html += '<pre>' + escapeHtml(report.info.join('\n')) + '</pre>';
     card.innerHTML = html;
     if (verdict.ok) pass++;
