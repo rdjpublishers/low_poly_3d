@@ -24,6 +24,66 @@ CHANGELOG
     13 → 30. No new mandatory fields; no removed rules;
     no model that doesn't opt in loads any differently.
     Bumped from v1.24 to v1.25.
+  v1.26 (2026-09-10) -- ACES ENGINE SURFACE (anyCreature
+    Engine Surface, NEW OPT-IN CAPABILITY BUNDLE,
+    PART 90-95). The renderer integrates the anyCreature
+    1.3.1 engine surface verbatim as opt-in modules under
+    public/aces/ (aces-engine.js, aces-oklab.js,
+    aces-normals.js, aces-ao.js, aces-shade.js,
+    aces-checks.js, aces-bones.js). The single entry point
+    is window.ACES.run(ctx); it reads the live Three.js
+    scene, runs a 6-stage pipeline (crease split -> AO
+    bake -> L1-L8 OKLab stack -> L8 normal softening ->
+    15 mechanical checks -> write back), and writes the
+    result back to the live BufferGeometry. The .ts
+    factory does NOT need to change the class shape to
+    opt in: the engine runs ON TOP of whatever the class
+    constructs (any Group / Scene the `new` + method
+    sequence produces). PART 90-95 below documents the
+    engine surface so the factory can produce code that
+    the engine compiles cleanly. A blueprint that follows
+    PART 96-100 (3D Modeling Style) is automatically
+    friendly to the engine's mechanical checks (no
+    faceted body -> no faceted_body BLOCK; proper 6:3:1
+    hierarchy -> no soft_mass BLOCK; declared touch
+    connections -> no touch BLOCK; etc.). PART 45 / 67
+    / 68-71 / 72 / 73 / 74 / 75-89 stacks continue to
+    work unchanged. No existing PART is removed,
+    weakened, or relabelled. Bumped from v1.25 to v1.26.
+
+  v1.27 (2026-09-10) -- 3D MODELING STYLE INTEGRATION
+    (anyCreature art-direction language, PART 96-100,
+    NEW REFERENCE). The 3D modeling style is the WHAT
+    -- what a TypeScript module should LOOK like so the
+    rendered model reads as a creature people remember.
+    The integration inlines the 3D modeling doctrine
+    into THIS spec file (PART 96-100 below) and adds 10
+    advisory style checks (value_order, contrast_adjacent,
+    share_hierarchy, focal_contrast, saturation_area,
+    thinnest_px48, sq_fill, mirror_sym, straight_max,
+    tri_budget) that light up the ACES panel's report
+    view but never refuse a build. PART 96 is the 5 iron
+    laws, the 6:3:1 hierarchy, the 9-slot brief, the 5
+    colour norms, the scale discipline (24 px reads FEEL,
+    48 px reads IDENTITY, 200 px+ reads SURFACE), the
+    dullness flags. PART 97 is the anyCreature JSON
+    shape (palette, sections, joints, joints_R, chains,
+    attach, mirror, touch, volumes, parts, animations)
+    -- the factory MAY write a runtime that reads an
+    anyCreature spec and constructs the class; the
+    existing `new + method` .ts format continues to
+    work. PART 98 is the 10 advisory style checks.
+    PART 99 is the 4 join verbs (insert, extrude, snap,
+    place). PART 100 is the 5-stage pipeline (LOW / MID
+    / HIGH / SHIP) with mechanical gates at every stage.
+    The single most important rule: PART 96-100 is the
+    style the AI factory should follow, not a list of
+    syntax rules. A blueprint that satisfies PART 96-100
+    is automatically friendly to PART 90-95's renderer
+    checks. A blueprint that violates PART 96-100 may
+    still render but will be tamer than the user
+    wanted. Bumped from v1.26 to v1.27.
+
 
   v1.24 (2026-09-06) — PROCEDURAL TEXTURING & SHADING TECHNIQUES
     (OPT-IN CAPABILITY BUNDLE — PART 74). Mirrors the v1.24
@@ -18509,3 +18569,1332 @@ OVERVIEW
   texture, not a renderer change.
 
 ================================================================================
+
+================================================================================
+v8.18 (2026-09-10) — ACES ENGINE SURFACE (anyCreature Engine Surface, NEW
+  OPT-IN CAPABILITY BUNDLE, PART 90-95). Source: Ariescar's
+  anyCreature 1.3.1 (MIT, https://github.com/Ariescar/anyCreature). The
+  engine surface is the compile-time pipeline that turns a JSON
+  spec into a skinned, animated, vertex-coloured, AO-baked GLB
+  with 15 mechanical checks. The renderer integrates the surface
+  verbatim as opt-in modules under public/aces/. The AI factory
+  should produce specs that compile cleanly against the engine
+  — which means following PART 96-100 (3D Modeling Style). Summary:
+    - PART 90 — ACES orchestrator (window.ACES.run). Single
+      entry point; reads the live Three.js scene, runs the
+      6-stage pipeline (crease split → AO bake → L1-L8 stack
+      → L8 normal softening → 15 mechanical checks → write
+      back). Opt-in via the ACES button in the top
+      toolbar. The model ships unchanged until the user
+      clicks Apply.
+    - PART 91 — Per-vertex AO bake. Raycast hemisphere with
+      golden-angle cosine-weighted kernel, uniform-grid
+      accelerated Moller-Trumbore, ~10-30ms for 5k-vert
+      models. Recorded to m.AO[vi] for downstream consumers.
+      Configurable: samples (16), strength (0.59), radius
+      (60% of diagonal), multiply (true).
+    - PART 92 — L1-L8 OKLab shading stack. 8 layers, each a
+      pure function of position and classification (flesh,
+      hard, fx). L1 seam-safe flesh colour, L2 pattern, L3
+      top-to-bottom ramp, L4 boost (brighter AND more
+      saturated up top, identity below y0), L5 hardware
+      bleed, L6 hardware shadow, L7 flesh body shadow, L8
+      bone-field normal softening (flesh only — the only
+      layer that leaves COLOR_0 and goes into NORMAL).
+      Defaults are the values a measured run settled on
+      against six real creatures.
+    - PART 93 — 15 mechanical checks (BLOCK / warn / info):
+      mesh_integrity, root_containment, part_attachment,
+      touch, balance, size (+/- 15% declared height),
+      proportion (50:50 dead rhythm), limb_clearance,
+      anim_integrity (CPU-skin sample, edge stretch <= 3x),
+      attack_reach (1/2 body span), faceted_body (BLOCK
+      faceted:true on volume), mirror_distortion (>30%
+      collapse), part_overlap, part_seat, soft_mass
+      (<8% of skin can show an edge = smooth bean).
+    - PART 94 — Public bone-name convention (LArm1Sh,
+      RFrontLeg1Kn) + embedded source_spec in GLB
+      asset.extras. Every ACES pass writes its own
+      authored spec (re-editable, re-compilable) + a
+      parts manifest (transplantable between creatures).
+    - PART 95 — Calibration self-check page. Red/green
+      ruler: 1 pass, 2 block. Prints "calibrate OK" on
+      success. Browser-runnable at
+      /public/aces/calibration.html.
+  Zero downgrades. The PART 45 / 67 / 68-71 / 72 / 73 / 74
+  / 75-89 stacks still work; the WebGL SSAOPass and the
+  multi-style shading presets still work; the existing
+  GLTFExporter pipeline still works. ACES adds the
+  compile-time gate system, OKLab L4 brighten+saturate,
+  raycast AO, and angle-weighted crease splitting.
+
+  How the AI factory uses this: PART 90-95 describes the
+  RENDERER capabilities. The factory should produce
+  blueprints that the renderer can compile. The 3D
+  modeling style rules (PART 96-100) are the WHAT -- what
+  the spec should LOOK like so the renderer's checks pass
+  and the result reads correctly. A blueprint that
+  follows PART 96-100 is automatically friendly to PART
+  90-95's checks (no faceted body -> no faceted_body BLOCK;
+  proper 6:3:1 hierarchy -> no soft_mass BLOCK; declared
+  touch connections -> no touch BLOCK; etc.).
+================================================================================
+
+
+v8.19 (2026-09-10) -- 3D MODELING STYLE INTEGRATION (anyCreature
+  art-direction language, PART 96-100, NEW REFERENCE). Source:
+  Ariescar's anyCreature 1.3.1 cards/, harness/claims.json, and
+  harness/maskmetrics.py. The 3D modeling style is the WHAT
+  -- what a spec should LOOK like so the rendered model
+  reads as a creature people remember. The integration adds
+  10 advisory style checks (value_order, contrast_adjacent,
+  share_hierarchy, focal_contrast, saturation_area,
+  thinnest_px48, sq_fill, mirror_sym, straight_max,
+  tri_budget) and inlines the 3D modeling doctrine into
+  THIS spec file (PART 96-100 below). Summary:
+    - PART 96 -- 3D Modeling Style Doctrine. Form beats
+      obedience, everywhere. The 10 iron laws, the 6:3:1
+      hierarchy, the 9-slot brief, the 5 colour norms,
+      the scale discipline (24 px reads FEEL, 48 px
+      reads IDENTITY, 200 px+ reads SURFACE), the
+      dullness flags. The AI factory MUST follow these
+      rules.
+    - PART 97 -- 3D Spec Language (anyCreature JSON shape).
+      The factory's output for creature subjects MAY use
+      the anyCreature format (palette, sections,
+      volumes, parts, joins, animations). The full per-
+      field reference lives in this file (PART 97 below).
+    - PART 98 -- 3D Modeling Style Checks (advisory). 10
+      new style checks light up the ACES panel's "report"
+      view but never refuse a build. They catch the
+      mistakes that block the eyeball but rarely break
+      the geometry. The existing 15 legality checks
+      (PART 93) continue to BLOCK the build when
+      geometry is broken.
+    - PART 99 -- 4 Join Verbs. Every part declares HOW it
+      meets the body: insert (sinks in), extrude (grows
+      out), snap (lies on), place (free). The 7 part
+      types (curve, eye, spike, fin, membrane, hand, paw)
+      each take a default join; override when the design
+      needs it.
+    - PART 100 -- 5-Stage Pipeline (LOW/MID/HIGH/SHIP).
+      The AI factory should follow the 5 stages: stage 1
+      LOW produces the silhouette and the 9-slot brief;
+      stage 2 MID produces all parts; stage 3 HIGH
+      produces colour + 3 canonical animations; stage 4
+      SHIP delivers. The 3 gates (RECOGNISED, PUNCHIER,
+      all-claims-pass) are described in PART 100 below.
+  The single most important rule: PART 96-100 is the
+  style the AI factory should follow, not a list of
+  syntax rules. A blueprint that satisfies PART 96-100
+  is automatically friendly to PART 90-95's renderer
+  checks. A blueprint that violates PART 96-100 may
+  still render but will be tamer than the user wanted.
+  Bumped from v8.18 to v8.19.
+
+================================================================================
+PART 90 -- ACES ENGINE SURFACE (RENDERER CAPABILITY, OPT-IN)
+================================================================================
+
+The renderer integrates the anyCreature 1.3.1 engine
+surface as opt-in modules under public/aces/. The AI
+factory does NOT need to produce anyCreature-format
+specs to satisfy PART 90 -- the existing LBL JSON / JS
+/ TS output formats continue to work. PART 90
+describes what the renderer can do ON TOP of the
+existing pipeline.
+
+  90.0  The single entry point is `window.ACES.run(ctx)`.
+        Reads the current Three.js scene, extracts
+        plain mesh records, runs the 6-stage pipeline,
+        writes results back to the live BufferGeometry.
+        See 90.6 for the per-spec adapter.
+
+  90.1  Module map (all under public/aces/):
+        - aces-oklab.js     OKLab color math, value
+                            noise, smoothstep, chroma-edge
+                            walk (12-iter bisection)
+        - aces-normals.js   Angle-weighted vertex
+                            normals + smooth_angle crease
+                            splitting
+        - aces-ao.js        Per-vertex AO bake (raycast
+                            hemisphere, uniform grid)
+        - aces-shade.js     L1-L8 OKLab shading stack
+        - aces-checks.js    15 mechanical checks + 10
+                            style claims
+        - aces-bones.js     Public bone-name convention
+                            (LArm1Sh) + GLB extras
+        - aces-engine.js    Orchestrator (window.ACES)
+
+  90.2  How a user activates ACES: click ACES in
+        the top toolbar. The side panel has a config
+        (smooth_angle, AO strength) and two buttons:
+        Report (no changes) and Apply. The model
+        ships unchanged until the user clicks Apply.
+
+  90.3  AI factory guidance: the AI does NOT need to
+        generate anyCreature-format JSON. The ACES
+        engine runs ON TOP of whatever blueprint the
+        factory produces. The factory's only job
+        regarding PART 90 is to produce a blueprint
+        that the renderer's geometry pipeline (PART 1-
+        89) can compile; the ACES engine then adds the
+        quality pass on top.
+
+  90.4  6-stage pipeline (read by ACES.run):
+        1. For every Mesh / SkinnedMesh in the scene,
+           extract {V, F, C, N, skin, color, material,
+           part, chain, partType, smoothAngle, faceted,
+           soft, doubleSided}.
+        2. Optional crease split (smooth_angle) -->
+           angle-weighted vertex normals.
+        3. Per-vertex AO bake (raycast hemisphere) -->
+           vertex-colour x AO.
+        4. L1-L8 OKLab shading stack (seam-safe, ramp,
+           boost, bleed, shadows).
+        5. L8 bone-field NORMAL softening (flesh only).
+        6. Mechanical checks (BLOCK / warn / info) +
+           10 style claims (PART 98).
+
+  90.5  Output: COLOR_0 carries the baked shading;
+        NORMAL carries the L8-softened result. POSITION
+        is NEVER touched.
+
+  90.6  Per-spec adapter (anyCreature format -> Three.js
+        scene). The factory MAY emit an anyCreature
+        spec in addition to the LBL blueprint, in
+        userData.sourceSpec. The renderer's
+        `aces.bones.assetExtras(spec, opts)` writes
+        asset.extras with harness stamp + source_spec
+        + parts manifest on the exported GLB.
+
+  90.7  The 5 sub-bundles (90-95) are detailed below
+        as PART 91-95.
+
+================================================================================
+PART 91 -- PER-VERTEX AMBIENT OCCLUSION BAKE (RENDERER CAPABILITY)
+================================================================================
+
+The renderer can bake per-vertex AO at compile time via
+raycast hemisphere. Opt-in via the ACES panel (AO
+checkbox). The result is written to COLOR_0 and to
+m.AO[vi] for downstream consumers.
+
+  91.1  Algorithm: casts short hemisphere rays from
+        every vertex against the whole creature,
+        deterministic golden-angle cosine-weighted
+        kernel (16 samples), uniform-grid accelerated
+        Moller-Trumbore. ~10-30ms for 5k-vert models.
+
+  91.2  Defaults: samples = 16, strength = 0.59,
+        radius = 60% of model diagonal, multiply =
+        true. When multiply is true the AO darkens
+        COLOR_0; when false, the AO is written to
+        m.AO[vi] only and downstream consumers apply
+        it.
+
+  91.3  Why this matters for the AI factory: a
+        blueprint that the AO bake cannot run on
+        (e.g. massive single mesh, no indices) will
+        skip AO gracefully. A blueprint with a
+        well-formed triangulation (clean, no
+        duplicate verts) AO bakes correctly.
+
+  91.4  Per-vertex AO is the L6/L7 layer of the L1-L8
+        shading stack (PART 92). Hardware darkens by
+        AO only (gamma 0.7); flesh darkens by AO
+        times the horizontal light ring (gamma 1.95).
+
+================================================================================
+PART 92 -- L1-L8 OKLab SHADING STACK (RENDERER CAPABILITY)
+================================================================================
+
+The renderer applies 8 layers of OKLab vertex-colour
+shading at compile time. Every layer is a pure
+function of position and classification (flesh, hard,
+fx -- eyes take no layer, no shadow).
+
+  92.0  OKLab, not RGB. OKLab is the only colour
+        space where L (lightness) and chroma are
+        independent. A measured run had every RGB
+        blend mode's delta-chroma negative while
+        gaining lightness. The L4 boost
+        (brighter AND more saturated up top) is
+        impossible in any RGB blend mode and is
+        trivial in OKLab: L' = L + dL*w, chroma' =
+        chroma * (1 + (dC-1)*w).
+
+  92.1  L1 -- seam-safe flesh colour. Position-based
+        spatial smoothing across parts. The radius
+        is tied to the mesh's own median edge length
+        (NOT a fixed fraction of the diagonal). Two
+        coincident points on either side of a
+        junction get the same colour by construction.
+
+  92.2  L2 -- pattern. Deterministic value noise,
+        flesh only. Skipped when no pattern.color is
+        declared.
+
+  92.3  L3 -- top-to-bottom ramp. Multiplied over
+        everything but features. Three colours
+        (bottom / mid / top), one position (pm) for
+        the mid band.
+
+  92.4  L4 -- boost. Brighter AND more saturated up
+        top, identity below y0. Chroma walks back
+        to the sRGB gamut edge by 12-iteration
+        bisection (0.03% error) instead of clamping
+        per channel. Clamping per channel would
+        TURN THE HUE.
+
+  92.5  L5 -- hardware bleed. Hard edges darken the
+        flesh around them by a Gaussian falloff.
+        Default radius 0.025 of the diagonal.
+
+  92.6  L6 -- hardware shadow. AO only, gamma 0.7.
+        Skipped for flesh (L7 handles that).
+
+  92.7  L7 -- flesh body shadow. Horizontal light
+        ring (4 lights at 4 deg rotation, 17 deg
+        elevation) times AO, gamma 1.95.
+
+  92.8  L8 -- bone-field NORMAL softening. Flesh only,
+        alpha 0.9. The only layer that leaves
+        COLOR_0 and goes into the file's NORMAL --
+        the user's lighting reacts to it. A
+        direction check (dot > 0) prevents the
+        blend from crossing to the back of the
+        surface.
+
+  92.9  The factory does not need to write the L1-L8
+        config -- the defaults are the values a
+        measured run settled on against six real
+        creatures, and they are correct for almost
+        every subject. Override only when the
+        design needs it.
+
+================================================================================
+PART 93 -- 15 MECHANICAL CHECKS (BLOCK / WARN / INFO)
+================================================================================
+
+Every blueprint the AI factory produces is checked
+by the renderer's mechanical-check engine. The
+checks have three log channels: BLOCK (build
+refuses), warn (measure for human judgment), info
+(compiler narration). The full roster:
+
+  93.1  mesh_integrity       BLOCK   bind pose has
+                                      folded tris
+                                      (twist/breakage)
+  93.2  root_containment     warn    vertices drift too
+                                      far from the root
+                                      joint
+  93.3  part_attachment      warn    a part's host is
+                                      unknown
+  93.4  touch                warn    declared touch
+                                      connections are too
+                                      far apart
+  93.5  balance              warn    mass centroid falls
+                                      outside the support
+                                      polygon
+  93.6  size                 BLOCK   declared height is
+                                      > 15% off the build
+  93.7  proportion           BLOCK   50:50 dead rhythm
+                                      (a single >= 50%
+                                      chain segment with
+                                      no companion)
+  93.8  limb_clearance       warn    L/R chain pair
+                                      joints closer than
+                                      5% of H
+  93.9  anim_integrity       BLOCK   animations fold
+                                      tris or over-stretch
+                                      edges (> 3x)
+  93.10 attack_reach         BLOCK   an attack animation
+                                      does not lunge
+                                      >= 1/2 body span
+  93.11 faceted_body         BLOCK   `faceted: true` on
+                                      a volume (bodies
+                                      are smooth-shaded)
+  93.12 mirror_distortion    BLOCK   mirrored twin
+                                      collapsed past 30%
+  93.13 part_overlap         warn    two parts share
+                                      > 30% of bbox
+  93.14 part_seat            warn    a part has no
+                                      vertex near its host
+                                      (within 10% of H)
+  93.15 soft_mass            BLOCK   only < 8% of the
+                                      skin can show an
+                                      edge (a smooth bean)
+
+  93.16 The factory guidance: a blueprint that
+        satisfies PART 96-100 (3D modeling style)
+        is automatically friendly to PART 93's
+        checks. The 6:3:1 hierarchy avoids
+        soft_mass BLOCK; the declared touch
+        connections avoid touch BLOCK; the proper
+        insert/extrude/snap joins avoid part_seat
+        BLOCK; the smooth_angle override on
+        volumes avoids soft_mass BLOCK; the
+        declared joints form a balanced skeleton
+        that avoids balance warn.
+
+================================================================================
+PART 94 -- PUBLIC BONE-NAME CONVENTION + EMBEDDED SOURCE_SPEC
+================================================================================
+
+When a skeleton is present, the renderer exports
+bone names under the LArm1Sh / RFrontLeg1Kn
+convention. Internal spec names stay authoring-side;
+the export map is applied only at GLB-write time
+so animations and skins (index-based) are
+untouched.
+
+  94.1  Structural pattern: every exported bone
+        starting with L or R conforms to
+        ^[LR][A-Z][A-Za-z]*\d+[A-Z][a-z]$.
+
+  94.2  Two-letter joint tag dictionary (20 tags):
+        Sh (shoulder), El (elbow), Wr (wrist),
+        Ha (hand), Fg (finger), Tb (thumb),
+        Hp (hip), Kn (knee), An (ankle), To (toe),
+        Ft (foot), Pw (paw), Th (thigh), Sn (shin),
+        Cl (claw), Rt (root), Md (mid), Tp (tip),
+        Bs (base), En (end). Fallback: positional
+        Ja, Jb, ... Jz.
+
+  94.3  Every ACES pass writes asset.extras on
+        the exported GLB with:
+        - harness             the harness stamp
+        - harness_version     the version
+        - spec                the spec basename
+        - source_spec         the PRISTINE authored
+                              spec (re-editable,
+                              re-compilable)
+        - parts               manifest of every
+                              volume + part
+                              (transplantable)
+        - checks              per-check pass/warn
+                              summary
+
+================================================================================
+PART 95 -- CALIBRATION SELF-CHECK
+================================================================================
+
+The renderer exposes a self-check page at
+/public/aces/calibration.html. The red/green ruler
+proves the checks separate good from bad on the
+user's machine.
+
+  95.1  Three sample meshes:
+        - sphere_green: icosahedron + 5-segment
+          chain -> must PASS
+        - box_50_50: two equal stacked segments ->
+          must BLOCK on proportion
+        - faceted_body: a faceted sphere -> must
+          BLOCK on faceted_body + soft_mass
+
+  95.2  The page prints "calibrate OK" when all 3
+        behave as expected. If any case does the
+        wrong thing the user knows the checks are
+        misconfigured on their machine.
+
+  95.3  The factory guidance: this is a
+        self-verification tool, not a factory
+        output. The factory does not need to
+        generate calibration meshes.
+
+================================================================================
+PART 96 -- 3D MODELING STYLE DOCTRINE (THE ART-DIRECTION RULES)
+================================================================================
+
+The single most important rule: form beats obedience,
+everywhere. Every rule below can be broken, and the
+breaks are where the personality lives.
+
+>>> v8.19 STATUS: PART 96 is the ART-DIRECTION layer the
+>>> factory must follow. A blueprint that satisfies
+>>> PART 96 is automatically friendly to PART 93's
+>>> checks. PART 96 is not a list of "do this" -- it is
+>>> a list of "do this WHEN the alternative makes the
+>>> form tamer".
+
+  96.1  THE FIVE IRON LAWS (ALWAYS ON).
+
+       96.1.1  Form beats obedience. Every rule
+               exists to protect form quality. If
+               following a rule makes the model
+               tamer, the rule loses. Edits whose
+               only purpose are to make a number
+               match a declaration are forbidden.
+
+       96.1.2  Never grade your own thumbnails.
+               The session that designed the model
+               is the worst judge. The factory must
+               produce specs that a stranger
+               (a context-free reader) can read
+               without bias.
+
+       96.1.3  Same symptom failed twice = no
+               third tweak. A round tests THREE
+               ideas, not one. Three builds cost
+               seconds; three reads cost 3x a
+               read.
+
+       96.1.4  The signature part gets real
+               geometry at LOW. Budget follows
+               6:3:1: the 6-level element gets
+               6-level geometry (PART 96.4).
+
+       96.1.5  Engine floors block builds. BLOCK:
+               = refused. Fix and rebuild; a
+               refused build costs no round.
+
+  96.2  THE 9-SLOT BRIEF (PRESENCE-CHECKED,
+        NEVER CONTENT-CHECKED).
+
+       The factory expands the user's order
+       itself, in one pass, before building.
+       The 9 slots are the inputs every
+       downstream ruler reads. Fill all 9,
+       in one short block, then freeze it:
+
+         1. identity        "reads as: X" -- the
+                              noun a stranger says
+         2. feel            one phrase: heavy /
+                              fast / sharp /
+                              floating
+         3. height          real-world metres
+         4. signature       ONE named part, and
+                              which view carries it
+         5. mass hierarchy  primary / secondary /
+                              detail
+         6. two focals      dominant + runner-up
+         7. stance          how the weight is
+                              planted
+         8. attack          what strikes
+         9. value plan      dominant colour,
+                              secondary, accent <5%
+
+       Two rules that decide whether the brief
+       is worth anything:
+
+         (a) Discard the first three ideas. The
+             first things that arrive for any
+             model word are the tropes everyone
+             has seen. Name them, throw them out,
+             take the fourth.
+         (b) Commit to ONE exaggeration and pay
+             for it everywhere. Pick a single
+             extreme and let it distort the
+             hierarchy, the stance, the attack
+             and the colour plan. Nine moderate
+             slots make a shapeless model; eight
+             ordinary slots serving one violent
+             decision make a model people
+             remember.
+
+  96.3  THE 6:3:1 HIERARCHY (MASS DISTRIBUTION).
+
+       A silhouette needs ONE mass that clearly
+       leads, ONE that supports, and detail that
+       stays detail:
+
+         - primary mass: 60% of the frame. The
+           body. The thing a stranger sees first.
+         - secondary mass: 30% of the frame. The
+           signature part, the weaponised
+           anatomy, the part the user said the
+           model was for.
+         - tertiary detail: 10% of the frame.
+           Spikes, claws, frills -- the texture
+           that makes the silhouette stick.
+
+       An even spread reads as no hierarchy at
+       all. Two focal points of equal weight
+       ping-pong the eye and neither one wins.
+
+  96.4  THE 5 COLOUR NORMS (VALUE PLAN).
+
+         (1) ONE high-saturation MAIN colour,
+             spent on the signature part.
+         (2) ONE secondary colour for the big
+             masses -- quieter than the main.
+         (3) The ACCENT stays under 5% of the
+             surface (eye glow, claw tips).
+             One accent temperature, not two.
+         (4) Saturated area: 10%-34% of the
+             frame. Below = grey mass, above =
+             no spotlight.
+         (5) Brightness floor -- do not crush to
+             black. A "dark" model reads by VALUE
+             STEPS between its masses, not by
+             making everything dark.
+
+  96.5  SCALE DISCIPLINE (WHAT EACH PIXEL COUNT
+        READS).
+
+         - 24 px reads FEEL (heavy/fast/sharp/
+           floating). A 24 px thumbnail is what
+           the first impression lands on.
+         - 48 px reads IDENTITY (what model). A
+           48 px thumbnail is what the blind
+           reader sees.
+         - 200 px+ reads SURFACE (fur, scale,
+           shine).
+
+  96.6  DULLNESS FLAGS (MEASURES, NOT BAD).
+
+         - sq_fill      silhouette in a 1:1
+                        frame. 0.20-0.40 healthy.
+                        < 0.15 = thin ghost,
+                        > 0.50 = blob.
+         - mirror_sym   IoU with own horizontal
+                        flip. Front view may be
+                        high; side / top should
+                        be low.
+         - straight_max longest constant-slope
+                        run on the boundary. Plank-
+                        limb detector. < 0.4 of
+                        side.
+         - thinnest_px48 thinnest feature on the
+                        48 px thumbnail. < 3 px =
+                        invisible.
+         - compactness  perimeter^2/4piA. 1 = disc,
+                        higher = spikier. 1.5-4
+                        healthy.
+
+  96.7  ENGINE-LOCAL TRAPS (PIT-MAP, NOT
+        DESIGN RULES).
+
+         - Anatomically independent masses get
+           their OWN volumes, overlapping their
+           neighbours (mane, shoulder, chest
+           slab, head). Radius wiggle inside one
+           tube reads as soft sausage.
+         - NO ROUNDED SAUSAGES -- and the default
+           IS a sausage. A volume's wall angle is
+           360/sides, and smooth_angle (default
+           50) welds every edge under it: 9 sides
+           = 40 deg, 16 sides = 22 deg. The lever
+           is smooth_angle ON THE VOLUME, set
+           under its wall angle. The factory MUST
+           lower smooth_angle on low-side-count
+           volumes (PART 97) to avoid soft_mass
+           BLOCK.
+         - Wings spread flat in one plane
+           vanish from the side -- give them
+           sweep-back.
+         - The bind pose IS the pose. Plant the
+           weight.
+         - Curved things (tusks, trunks, horns)
+           are curve; membranes (wings, frills,
+           sails) are membrane. Don't fake
+           either with straight spikes or flat
+           plates.
+         - Parts meet the body by a JOIN
+           (PART 99), not by luck.
+         - Bends belong to JOINTS. An arm that
+           must flex needs its elbow joint placed
+           where the bend lives.
+
+================================================================================
+PART 97 -- 3D SPEC LANGUAGE (anyCreature JSON SHAPE)
+================================================================================
+
+The factory MAY emit an anyCreature-format JSON spec
+for creature subjects. The format is verified against
+the anyCreature engine source. Every key documented is
+read by the engine.
+
+  97.0  TOP-LEVEL KEYS.
+
+         {
+           "name":   "<archetype name>",
+           "height": <metres, ground to crown>,
+           "palette": {...},            // PART 97.1
+           "sections": {...},           // PART 97.2
+           "smooth_angle": <degrees>,   // default 50
+           "shading": {...},            // L1-L8 (use defaults)
+           "build": "rigid",            // PART 97.3
+           "joints": {...},             // PART 97.4
+           "joints_R": {...},           // PART 97.5
+           "chains": {...},             // PART 97.6
+           "attach": {...},             // PART 97.7
+           "mirror": [...],             // PART 97.8
+           "touch":  [...],             // PART 97.9
+           "volumes": [...],            // PART 97.10
+           "parts":   [...],            // PART 97.11
+           "animations": {...},         // PART 97.12
+           "style":  "heavy",           // optional
+           "ao":     true,              // PART 91
+           "embed_spec": true,          // PART 94
+           "keep_uv": false,            // optional
+           "qa_isolate": false          // optional
+         }
+
+  97.1  PALETTE. One material per part.
+
+         "palette": {
+           "skin_torso":  { "color": "#8a8a80",
+                            "rough": 0.95,
+                            "metal": 0 },
+           "fur_head":    { "color": "#b5561f",
+                            "rough": 0.95 },
+           ...
+         }
+
+         Material names identify parts (the area
+         rulers look up parts by material name).
+         "color" is hex sRGB. "rough" and "metal"
+         are 0..1. metal > 0.2 is a warn (renders
+         near-black without an environment map).
+
+  97.2  SECTIONS. Named 2D outlines (CONCAVE
+        allowed). Referenced from volume profile
+        rows via the `section` field.
+
+         "sections": {
+           "flute":  [[1,0],[0.6,0.4],[0.7,0.7],
+                      [0.55,0.9],[0.4,0.7],
+                      [0.3,0.5]],
+           "bark":   [[1,0],[0.95,0.1],
+                      [0.7,0.4],[0.6,0.5],
+                      [0.5,0.4],[0.45,0.15],
+                      [0.5,0]],
+           "circle": [[1,0],[0.7,0.7],[0,1],
+                      [-0.7,0.7],[-1,0],
+                      [-0.7,-0.7],[0,-1],
+                      [0.7,-0.7]]
+         }
+
+         Concave relief (bark flutes, crescents,
+         star sections) must be built as real
+         geometry -- a texture can darken a groove
+         but never moves the silhouette.
+
+  97.3  BUILD. "rigid" lifts the faceted_body
+        BLOCK. Robots / constructs / golems /
+        vehicles ONLY. Leave unset for organic
+        creatures.
+
+  97.4  JOINTS. Absolute [x,y,z] OR relational
+        {from, fwd, up, side, dir, len, ground}.
+        y up, z forward, x right. Resolution is
+        order-independent (iterates to fixed
+        point); cycles throw.
+
+         "joints": {
+           "Hips":   [0, 0.87, -0.42],
+           "Spine":  { "from": "Hips", "fwd": 0.47,
+                       "up": 0.01 },
+           "Nose":   { "from": "Muzzle",
+                       "fwd": 0.14, "up": -0.02 },
+           "TailTip":{ "from": "Tail2",
+                       "dir": [0,-0.9,-0.35],
+                       "len": 0.34 },
+           "LToe":   { "from": "LWrist",
+                       "fwd": 0.14,
+                       "ground": 0.035 }
+         }
+
+         "ground" overrides Y after the offset
+         (for feet). "dir" + "len" form: from +
+         normalize(dir) * len.
+
+  97.5  JOINTS_R. Optional right-side pose
+        overrides. A FEW CENTIMETRES ONLY (a few
+        % of the limb's length). Large offsets
+        shear the mirrored volume; past 35% the
+        right thigh collapses. For genuinely
+        different pose, take the limb OUT of
+        mirror and author it as its own chain.
+
+         "joints_R": {
+           "RElbow": { "from": "Chest",
+                       "side": -0.3, "up": 0.25 }
+         }
+
+  97.6  CHAINS. Ordered list of joint names.
+
+         "chains": {
+           "body":   ["Rump", "Hips", "Spine",
+                      "Chest", "NeckB", "Neck2"],
+           "head":   ["HeadRoot", "Skull", "Brow",
+                      "Muzzle", "Nose"],
+           "tail":   ["TailRoot", "Tail1", "Tail2",
+                      "TailTip"],
+           "LFront": ["LFrontRoot", "LFrontElbow",
+                      "LFrontWrist",
+                      "LFrontToe"]
+         }
+
+  97.7  ATTACH. Every non-root chain -> its host
+        joint. A chain not in `attach` is a root
+        chain. A loose joint (not in any chain)
+        must be in `attach`; L* loose joints get
+        an auto R* twin.
+
+         "attach": {
+           "head":   "Neck2",
+           "tail":   "Hips",
+           "LFront": "Chest"
+         }
+
+  97.8  MIRROR. Chains to auto-duplicate across
+        X. Animation tracks on L* are duplicated
+        to R* with axis flip (ry, rz, tx negate)
+        and an optional `mirror_phase` shift.
+
+         "mirror": ["LFront", "LBack"]
+
+  97.9  TOUCH. Declared connections MUST overlap
+        or BLOCK. Symmetric.
+
+         "touch": [["body", "tail"],
+                   ["head", "Neck2"]]
+
+  97.10 VOLUMES. Tube meshes along a chain.
+
+         "volumes": [{
+           "chain":    "body",                 // required
+           "material": "fur_body",             // required
+           "frame":    "up",                   // auto|up|ground
+           "sides":    16,                     // default 12
+           "ring_step": 0.055,                // optional
+           "caps":     ["dome", "dome"],       // fan|ngon|none|dome
+           "profile":  [                       // rows: [t, w, h, opts?]
+             [0.000, 0.140, 0.160],
+             [0.620, 0.210, 0.340,
+              { "bias": -0.2, "sharp": true }],
+             [1.000, 0.175, 0.200]
+           ],
+           "colors": {                         // arc bands
+             "arcs": [
+               { "from": 0, "to": 52,
+                 "color": "#3d382d" },
+               { "from": 128, "to": 180,
+                 "color": "#c9c1ae" }
+             ]
+           },
+           "smooth_angle": 17,                // per-volume
+           "soft":   false,                   // soft_mass opt-out
+           "shade":  "flesh",                 // flesh|hard|fx
+           "faceted": false                   // BLOCKS faceted_body
+         }]
+
+         Profile row options:
+           { "exp": 2-6 }      superellipse (2 =
+                                ellipse, 3-6 =
+                                boxy slab, 1.2-
+                                1.6 = diamond)
+           { "bias": +/-0.3 }  vertical asymmetry
+                                (+ = egg, - = keel)
+           { "roll": radians } rotate section in
+                                its plane
+           { "section": name } reference a named
+                                section from
+                                spec.sections
+           { "sharp": true }   hard silhouette
+                                break; only bites
+                                when radius STEPS
+                                across it (>= 15%)
+
+         The factory MUST:
+           - Use 8-16 sides per volume (12 default)
+           - LOWER smooth_angle on low-side-count
+             volumes (9 sides = 40 deg, so smooth
+             <= 30 deg to avoid soft_mass BLOCK)
+           - Declare colors.arcs (0 deg = spine,
+             180 deg = belly) for value contrast
+           - Set "shade": "flesh" for organic
+             volumes, "hard" for machine volumes
+           - NEVER set "faceted": true on a
+             volume (BLOCKS the build)
+
+  97.11 PARTS. 7 supported types. Every part
+        reads at minimum `type`, `material`, and
+        a host.
+
+         97.11.1  CURVE -- horn, tusk, trunk,
+                   tentacle, whip. Curved tapering
+                   tube with per-segment steering.
+
+                   {
+                     "type":     "curve",
+                     "host":     "Brow",
+                     "material": "tusk",
+                     "mirrored": true,
+                     "join":     "insert",
+                     "offset":   [0.06, 0, 0.1],
+                     "dir":      [0.3, -0.6, 0.7],
+                     "sides":    8,
+                     "faceted":  false,
+                     "segments": [
+                       { "len": 0.10, "r": 0.035,
+                         "ahead": 20 },
+                       { "len": 0.10, "r": 0.028,
+                         "rise":  35 },
+                       { "len": 0.08, "r": 0.015,
+                         "rise":  30,
+                         "taper": true }
+                     ]
+                   }
+
+                   Steering keys per segment
+                   (degrees, applied on the
+                   current heading, ADDS UP):
+                     rise/fall  pitch heading +/- Y
+                     ahead/behind  yaw heading +/- Z
+                     left/right  roll heading +/- X
+                     coil  swing in carried plane
+                            (rings, spirals)
+                     taper  pinch the far end
+                            (r -> r x 0.3)
+
+                   The compiler reports the
+                   accumulated total: "info: curve
+                   '...': steering accumulated to
+                   123 deg". Read that line.
+
+         97.11.2  EYE -- both eyes from one entry,
+                   always on the forward hemisphere
+                   of the host.
+
+                   {
+                     "type":     "eye",
+                     "host":     "Brow",
+                     "material": "eye",
+                     "size":     0.028,
+                     "forward":  [0, 0, 1],
+                     "up":       [0, 1, 0],
+                     "spread":   0.15,
+                     "anchor":   { "chain": "head",
+                                   "t": 0.4,
+                                   "around": 62 }
+                   }
+
+                   With anchor, eyes ride ON the
+                   volume surface at `around`
+                   degrees from the host section's
+                   spine (0 = spine, 90 = side,
+                   180 = belly on a body chain;
+                   on a vertical chain the same
+                   numbers point elsewhere -- 90 =
+                   FRONT, 180 = OUTER).
+
+         97.11.3  SPIKE -- simple cone, fixed
+                   heading.
+
+                   {
+                     "type":     "spike",
+                     "host":     "Spine3",
+                     "material": "spike",
+                     "offset":   [0, 0.05, 0],
+                     "dir":      [0, 1, 0],
+                     "sides":    6,
+                     "segments": [
+                       { "len": 0.15, "r": 0.04 },
+                       { "len": 0.05, "r": 0.005 }
+                     ]
+                   }
+
+         97.11.4  FIN -- flat plate with thickness,
+                   optional anchor to volume
+                   surface.
+
+                   {
+                     "type":      "fin",
+                     "host":      "Skull",
+                     "material":  "plate",
+                     "thickness": 0.02,
+                     "mirrored":  true,
+                     "udir":      [0, 0, 1],
+                     "vdir":      [0, 1, 0],
+                     "points":    [[0, 0],
+                                   [0.10, 0.02],
+                                   [0.05, 0.15]],
+                     "anchor":    { "chain": "head",
+                                   "t": 0.4,
+                                   "around": 60 },
+                     "conform":   true,
+                     "faceted":   true
+                   }
+
+                   "conform" defaults true: the
+                   host surface normal wins. Set
+                   false to keep the spec's
+                   direction.
+
+         97.11.5  MEMBRANE -- stretched sheet
+                   between rib joint-chains (wings,
+                   frills, sails, webbed feet).
+
+                   {
+                     "type":      "membrane",
+                     "name":      "wing",
+                     "material":  "wing_skin",
+                     "mirrored":  true,
+                     "cusp":      0.25,
+                     "along":     8,
+                     "across":    3,
+                     "trailing":  "cusp",
+                     "ribs":      [
+                       { "chain": "LFront" },
+                       { "chain": "LFing2" },
+                       { "chain": "LFing3" },
+                       { "chain": "LTrail" }
+                     ]
+                   }
+
+                   The LAST rib has to come back to
+                   the body. Leave it out at the
+                   far end and the silhouette never
+                   encloses -- reads as spread
+                   fingers, not one sheet. The
+                   compiler warns when the root
+                   gap exceeds 35% of the
+                   membrane's own reach.
+
+         97.11.6  HAND -- real palm + 4 fingers +
+                   opposable thumb. NO improvising
+                   from spheres.
+
+                   {
+                     "type":     "hand",
+                     "host":     "LWrist",
+                     "material": "skin_hand",
+                     "mirrored": true,
+                     "size":     0.17,
+                     "dir":      [0.1, -0.9, 0.35],
+                     "up":       [0, 0, 1],
+                     "curl":     0.35,
+                     "spread":   0.5,
+                     "fingers":  4,
+                     "thumb":    true,
+                     "fist":     false,
+                     "join":     "extrude"
+                   }
+
+         97.11.7  PAW -- flattened ellipsoid pad
+                   with flat sole + optional toes.
+                   Feet stop reading as bread loaves.
+
+                   {
+                     "type":     "paw",
+                     "host":     "LToe",
+                     "material": "skin_paw",
+                     "mirrored": true,
+                     "size":     [0.30, 0.25, 0.20],
+                     "sides":    10,
+                     "toes":     4
+                   }
+
+  97.12 ANIMATIONS. Always: idle, move, attack.
+        rx/ry/rz = rotation degrees around local
+        X/Y/Z (XYZ order). tx/ty/tz = translation
+        offset. Keys: [fraction (0..1), value],
+        auto-interpolated linearly.
+
+         "animations": {
+           "idle":   { "duration": 1.6, "loop": true,
+                       "tracks": {
+                         "Chest": { "ry":
+                           [[0, 0], [0.5, 4],
+                            [1, 0]] }
+                       } },
+           "move":   { "duration": 0.95, "loop": true,
+                       "mirror_phase": 0.5,
+                       "tracks": {
+                         "LFrontRoot": { "rx":
+                           [[0, -26], [0.5, 28],
+                            [1, -26]] }
+                       } },
+           "attack": { "duration": 0.7,
+                       "loop": false,
+                       "tracks": {
+                         "Chest": { "rx":
+                           [[0, 0], [0.25, -14],
+                            [0.5, 22], [1, 0]] },
+                         "Root":  { "tz":
+                           [[0, 0], [0.25, -0.1],
+                            [0.5, 0.9], [1, 0]] }
+                       } }
+         }
+
+         ATTACK MUST COMMIT FORWARD (attack_reach
+         BLOCK). Two ways to satisfy:
+           REACH: something ends up >= 15% of the
+                  body span past the bind-pose
+                  front
+           SWING: some part travels forward >= 45%
+                  of its own length
+         Plant on the spot, wind a foreleg or
+         tail BACK, then sweep FORWARD. A
+         sideways sweep does not count.
+
+         Gait templates:
+           Biped    (2 legs): mirror_phase 0.5
+                   (opposite phase)
+           Quadruped (4 legs): DIAGONAL pairs.
+                   Front-left moves with back-
+                   right; offset the back pair's
+                   keys by half a cycle relative
+                   to the front pair, then
+                   mirror_phase 0.5.
+           Hexapod / Octoped (6 / 8 legs):
+                   alternating tripods /
+                   tetrapods. Two leg groups,
+                   one offset half a cycle.
+                   Adjacent legs must never move
+                   in sync.
+
+  97.13 OUTPUT CONTRACT. Every GLB the engine
+        writes satisfies these rules (the same
+        checks run inside a server or Worker):
+          - Two chunks, no trailing bytes. JSON
+            (0x4E4F534A) + BIN (0x004E4942).
+          - No external URIs. Every bufferView
+            points into the in-file BIN.
+          - No textures. Colour is per-vertex
+            (COLOR_0). No images / textures /
+            samplers.
+          - Semantic material names -- one per
+            distinct signature.
+          - Convention bone names -- exported
+            bones starting with L/R conform to
+            ^[LR][A-Z][A-Za-z]*\d+[A-Z][a-z]$.
+          - Embedded source_spec --
+            asset.extras.source_spec is the
+            PRISTINE authored spec.
+
+  97.14 NON-CREATURE SUBJECTS. The factory's
+        existing PART 1 (LBL blueprint format)
+        covers non-creature subjects (furniture,
+        buildings, vehicles, weapons). Use LBL
+        primitives + PART 67 modifier stack. The
+        anyCreature format (PART 97) is for
+        creatures only.
+
+================================================================================
+PART 98 -- 10 STYLE CLAIMS (ADVISORY, NEVER BLOCK)
+================================================================================
+
+The renderer adds 10 advisory style checks on
+top of the 15 mechanical checks (PART 93).
+Advisories never stop a build. They catch the
+mistakes that block the eyeball but rarely break
+the geometry. The full roster:
+
+  98.1   value_order        every material sorted by
+                           OKLab lightness -- value
+                           plan computed, not
+                           eyeballed. Two materials
+                           within 0.04 OKLab L
+                           read as the same mass.
+
+  98.2   contrast_adjacent  a part must separate in
+                           colour from what it sits
+                           on (>= 0.10 OKLab). Under
+                           that they read as one
+                           mass.
+
+  98.3   share_hierarchy    primary:secondary:
+                           tertiary ~ 60:30:10,
+                           tolerance +/-15%. No
+                           dominance = no story.
+
+  98.4   focal_contrast     two focal parts' shares
+                           must differ by >= 2x.
+                           Equal-weight ping-pongs
+                           the eye.
+
+  98.5   saturation_area    10-34% of the frame
+                           highly saturated. Below
+                           = grey lump, above = no
+                           spotlight.
+
+  98.6   thinnest_px48      thinnest feature >= 3 px
+                           on the 48 px thumbnail.
+                           < 3 px = invisible.
+
+  98.7   sq_fill            silhouette in a 1:1
+                           frame. 0.20-0.40
+                           healthy. < 0.15 = thin
+                           ghost, > 0.50 = blob.
+
+  98.8   mirror_sym         top-down view is
+                           symmetric with its own
+                           flip. FRONT may be high;
+                           TOP should be low.
+
+  98.9   straight_max       longest constant-slope
+                           run on the boundary.
+                           Plank-limb detector.
+
+  98.10  tri_budget         triangle count band
+                           (default 4000-9000).
+
+  98.11  bright_floor       "dark" reads by VALUE
+                           STEPS, not by crushing
+                           to black.
+
+  98.12  AI factory guidance: PART 98 is
+        advisory. A blueprint that triggers a
+        warn is still buildable. The factory's
+        own goal is to satisfy PART 96 (style
+        doctrine) so that PART 98's warnings
+        stay clean.
+
+================================================================================
+PART 99 -- THE 4 JOIN VERBS (HOW EVERY PART MEETS THE BODY)
+================================================================================
+
+For every hosted part, the factory MUST pick the
+join first. Undeclared parts still get measured,
+and the join is a colour decision too: a part
+that is FLESH of its host continues the host's
+material colour at its base; a hard colour
+break at the junction reads as equipment, not
+anatomy.
+
+  99.1  INSERT. The part SINKS into the mass
+        (tusks into jaw, horns into skull, claws
+        into fingertips). The engine BLOCKs
+        unless the base ring is >= 60% buried.
+        Aim `offset` back INTO the host volume,
+        not at its surface.
+
+        USE FOR: tusks, horns, claws, fangs,
+        embedded armour rivets.
+
+  99.2  EXTRUDE. The part GROWS out of the skin
+        (a trunk from the face, a tail spike from
+        the tail). The base centre must sit
+        inside a body. Match the base radius to
+        the local host radius so the skin flows
+        into the part instead of stepping.
+
+        USE FOR: trunks, tails, spikes, ear
+        pinnae, hand/finger bases.
+
+  99.3  SNAP. The part LIES ON the surface
+        (plates, scutes, brows, fins). The
+        `anchor` + conform already do this;
+        declare `"join":"snap"` and the engine
+        insists the anchor exists.
+
+        USE FOR: scutes, plates, fins, eye
+        ridges, brow ridges, shoulder pads.
+
+  99.4  PLACE. Deliberately detached (a floating
+        rune, an orbiting shard, a held torch).
+        Rare; say why in the spec `_notes`.
+
+        USE FOR: equipment held in the hand,
+        magical auras, particle emitters.
+
+  99.5  The factory's defaults: volumes default
+        to "snap" (they lie on the chain).
+        Parts default to "place" (deferred to
+        the part to declare). The factory
+        should EXPLICITLY set the join verb on
+        every part -- implicit placement is
+        the most common source of "floating
+        parts" bugs.
+
+================================================================================
+PART 100 -- THE 5-STAGE PIPELINE (LOW / MID / HIGH / SHIP)
+================================================================================
+
+The factory should follow the 5 stages when
+producing a creature. Each stage has a clear
+gate; the gate is MECHANICAL (machine-checkable)
+where possible, HUMAN (LLM-judged) where it
+must be.
+
+>>> v8.19 PIPELINE -- when the factory produces a
+>>> creature blueprint, it should walk through
+>>> these 5 stages IN ORDER. The mechanical checks
+>>> in PART 93 enforce the geometry gates; the
+>>> style claims in PART 98 surface the art-
+>>> direction gates.
+
+  100.1  STAGE 0 -- START (ALWAYS-ON RULES).
+
+          Apply the 5 iron laws (PART 96.1) from
+          the very first line of the spec.
+          Discard the first three ideas
+          (PART 96.2a). Commit to ONE exaggeration
+          (PART 96.2b).
+
+  100.2  STAGE 1 -- LOW (SILHOUETTE, BIG FORMS).
+
+          Output: joints + chains + attach + the
+          primary volumes. The body's overall
+          mass distribution. No parts yet, no
+          animations, no colour detail.
+
+          Stage-end gate: build green + the 6:3:1
+          hierarchy holds (PART 96.3, 98.3) +
+          soft_mass passes (PART 93.15) +
+          proportion passes (PART 93.7).
+
+  100.3  STAGE 2 -- MID (PARTS, FLAT COLOUR).
+
+          Output: every part -- ears, horns, claws,
+          eyes, fins, shell spikes, paws -- riding
+          bones LOW already placed, or anchored
+          to volume surfaces. No material detail,
+          no animation.
+
+          Stage-end gate: build green + part_exists
+          (every brief chain has a part with that
+          material) + share_hierarchy +
+          focal_contrast + thinnest_px48 + the 4
+          join verbs are declared on every part
+          (PART 99).
+
+  100.4  STAGE 3 -- HIGH (COLOUR + 3 ANIMATIONS).
+
+          Output: the 5 colour norms (PART 96.4)
+          applied + 3 canonical animations
+          (PART 97.12): idle, move, attack.
+
+          Stage-end gate: anim_named (idle + move
+          + attack all present), anim_integrity
+          (no folded tris, edge stretch <= 3x),
+          attack_reach (>= 1/2 body span REACH or
+          >= 45% SWING), value_order (every
+          material in OKLab L order), bright_floor
+          (the dark creature reads by VALUE STEPS).
+
+  100.5  STAGE 4 -- SHIP (DELIVERY).
+
+          Output: a skinned, animated,
+          vertex-coloured, AO-baked GLB +
+          embedded source_spec (PART 94) +
+          every stage's claims report.
+
+          Stage-end gate: output_contract
+          (two chunks, no external URIs, no
+          textures, semantic material names,
+          convention bone names, embedded
+          source_spec).
+
+  100.6  STAGE ORDERING IS A DATA PROPERTY,
+        NOT A CODE BRANCH. The factory is free
+        to produce all 5 stages in one pass, or
+        one stage at a time. The mechanical
+        checks run after every pass.
+
+  100.7  The factory does NOT need to emit
+        anyCreature-format JSON to satisfy
+        PART 100. The existing LBL blueprint
+        format works. PART 100's stages are
+        guidance for the factory's process, not
+        a syntax requirement.
+
+================================================================================
+END OF PART 90-100
+================================================================================
+
