@@ -3818,23 +3818,21 @@ The 5 new PARTs:
     and paste it into creature B's spec without re-prompting
     the AI.
 
-  - **PART 95 — calibration self-check page**
-    (`public/aces/calibration.html` + `calibration-fixtures.js`).
-    The red/green ruler that proves the checks separate good
-    from bad on your machine. 3 sample meshes:
-    - sphere_green: icosahedron + 5-segment chain → must PASS
-    - box_50_50: two equal stacked segments → must BLOCK on
-      proportion
-    - faceted_body: a faceted sphere → must BLOCK on
-      faceted_body + soft_mass
-    The page prints `calibrate OK` when all 3 behave as
-    expected. From `aces-checks.js`: "engine floors are not
-    style opinions; they are the failures that survive review
-    and ship broken."
+  - **PART 95 — calibration self-check page** — REMOVED in
+    v1.27.1. Originally `public/aces/calibration.html` +
+    `calibration-fixtures.js`, a red/green ruler that proved
+    the checks separate good from bad on the user's machine.
+    Removed because the 3 sample meshes (sphere_green,
+    box_50_50, faceted_body) duplicated the same checks
+    already wired into the ACES panel's Report button. The
+    user can run ACES Report on any real model and see the
+    same check results; the standalone self-check page is
+    not part of the AI factory pipeline. The 7 engine
+    modules (PART 90-94) are unaffected.
 
 The single most important rule:
 
-  PART 90-95 is an EXTRA CAPABILITY, not a rule. The .ts /
+  PART 90-94 is an EXTRA CAPABILITY, not a rule. The .ts /
   .json / .js factory uses a feature WHEN the user clicks the
   🛡 ACES button (PART 90.4) and chooses Report (no changes)
   or Apply. Models that never get a click ship unchanged —
@@ -3885,9 +3883,7 @@ public/aces/
 ├── aces-shade.js                  PART 92 — L1-L8 stack
 ├── aces-checks.js                 PART 93 — 15 mechanical checks
 ├── aces-bones.js                  PART 94 — public bone-name + extras
-├── aces-engine.js                 PART 90 — orchestrator
-├── calibration.html               PART 95 — self-check page
-└── calibration-fixtures.js        PART 95 — 3 sample meshes
+└── aces-engine.js                 PART 90 — orchestrator
 ```
 
 The 6 sub-modules + the orchestrator are loaded by `index.html`
@@ -3895,14 +3891,16 @@ via `<script>` tags in the head (BEFORE the module script so
 they can populate `window.ACES_*` for `aces-engine.js` to read).
 The importmap also lists them as bare specifiers in case a
 future caller wants to use them through ESM. The 🛡 ACES button
-+ the "🧪 Calibrate" link are added to the top toolbar near
-the 🔺 Tris and 📚 Recipes buttons.
+is added to the top toolbar near the 🔺 Tris and 📚 Recipes
+buttons. PART 95 (calibration self-check page) was removed in
+v1.27.1 — the same check results are available from ACES Report
+on any real model.
 
 ---
 
 # v1.27 / v8.19 — 3D Modeling Style + Spec Language integration (PART 96-100) — OPT-IN reference + OPT-IN checks
 
-The ACES integration (v1.26 / PART 90-95) ported the anyCreature
+The ACES integration (v1.26 / PART 90-94) ported the anyCreature
 **engine surface** — the OKLab L1-L8 stack, the per-vertex AO bake, the
 15 mechanical checks. This round ports the anyCreature **3D modeling
 style guide** — the 5-card pipeline, the 9-slot brief, the 6:3:1
@@ -3980,9 +3978,9 @@ The 5 new PARTs (PART 96-100, INLINED into the 6 .txt spec files):
     EXPLICITLY set the join verb on every part — implicit placement
     is the most common source of "floating parts" bugs.
 
-  - **PART 100 — 5-Stage Pipeline + Calibration** (inlined in all 6
-    .txt spec files). The 5-stage pipeline (START → LOW → MID → HIGH
-    → SHIP) ported as a reference. Stage 0 START: the 5 iron laws
+  - **PART 100 — 5-Stage Pipeline** (inlined in all 6 .txt spec
+    files). The 5-stage pipeline (START → LOW → MID → HIGH →
+    SHIP) ported as a reference. Stage 0 START: the 5 iron laws
     + discard the first 3 ideas + commit to ONE exaggeration. Stage
     1 LOW: the 9-slot brief, the 6:3:1 hierarchy, the engine-local
     traps, Gate 1 RECOGNISED (3 of 4 views, identity view mandatory).
@@ -3991,9 +3989,7 @@ The 5 new PARTs (PART 96-100, INLINED into the 6 .txt spec files):
     animations, materials format. Stage 4 SHIP: red lines, gate
     stamp, ONE question, closing ledger. Every stage has a clear
     gate; the gate is MECHANICAL (machine-checkable) where possible,
-    HUMAN (LLM-judged) where it must be. The 3 calibration meshes
-    in `public/aces/calibration-fixtures.js` exercise the new style
-    checks too.
+    HUMAN (LLM-judged) where it must be.
 
   - **PART 99 — 3D Modeling Style Checks** (extension to
     `public/aces/aces-checks.js`). 10 new advisory checks ported from
@@ -4067,23 +4063,24 @@ public/aces/
 ├── aces-normals.js                PART 91.2 — angle-weighted + crease
 ├── aces-ao.js                     PART 91 — per-vertex AO bake
 ├── aces-shade.js                  PART 92 — L1-L8 stack
-├── aces-checks.js                 PART 93+99 — 25 mechanical + style checks
+├── aces-checks.js                 PART 93+98 — 25 mechanical + style checks
 ├── aces-bones.js                  PART 94 — public bone-name + extras
-├── aces-engine.js                 PART 90 — orchestrator
-├── calibration.html               PART 95 — self-check page
-└── calibration-fixtures.js        PART 95+100 — 3 sample meshes
+└── aces-engine.js                 PART 90 — orchestrator
 ```
 
-The 7 engine modules + calibration are the only files in
-`public/aces/`. The PART 96-100 3D modeling style content is
-inlined into all 6 .txt spec files at the repo root, so an AI
-reading any one spec file sees the full pipeline (PART 1 through
-PART 100) end-to-end. The ACES panel's reference section (in
-`index.html`) shows a one-line summary of the 5 iron laws, the
-9-slot brief, the 6:3:1 hierarchy, the 7 part types, the 4 join
-verbs, the 5 colour norms, and the scale discipline. The 10 style
-checks (PART 98) are wired into the ACES `run()` and surface in
-the existing report panel alongside the legality checks.
+The 7 engine modules are the only files in `public/aces/`. The
+PART 96-100 3D modeling style content is inlined into all 6 .txt
+spec files at the repo root, so an AI reading any one spec file
+sees the full pipeline (PART 1 through PART 100) end-to-end. The
+ACES panel's reference section (in `index.html`) shows a one-line
+summary of the 5 iron laws, the 9-slot brief, the 6:3:1 hierarchy,
+the 7 part types, the 4 join verbs, the 5 colour norms, and the
+scale discipline. The 10 style checks (PART 98) are wired into
+the ACES `run()` and surface in the existing report panel
+alongside the legality checks. The 🛡 ACES button (Report / Apply)
+is the user entry point; the standalone calibration page
+(PART 95) was removed in v1.27.1 as the same check results are
+available from ACES Report on any real model.
 
 ## How an AI uses this
 

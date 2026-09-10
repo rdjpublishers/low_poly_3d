@@ -87,7 +87,7 @@ CHANGELOG
     any differently. Bumped from v1.24 to v1.25.
   v1.26 (2026-09-10) -- ACES ENGINE SURFACE (anyCreature
     Engine Surface, NEW OPT-IN CAPABILITY BUNDLE,
-    PART 90-95). The renderer integrates the anyCreature
+    PART 90-94). The renderer integrates the anyCreature
     1.3.1 engine surface verbatim as opt-in modules under
     public/aces/ (aces-engine.js, aces-oklab.js,
     aces-normals.js, aces-ao.js, aces-shade.js,
@@ -100,7 +100,7 @@ CHANGELOG
     factory does NOT need to change the class shape to
     opt in: the engine runs ON TOP of whatever the class
     constructs (any Group / Scene the `new` + method
-    sequence produces). PART 90-95 below documents the
+    sequence produces). PART 90-94 below documents the
     engine surface so the factory can produce code that
     the engine compiles cleanly. A blueprint that follows
     PART 96-100 (3D Modeling Style) is automatically
@@ -140,7 +140,7 @@ CHANGELOG
     The single most important rule: PART 96-100 is the
     style the AI factory should follow, not a list of
     syntax rules. A blueprint that satisfies PART 96-100
-    is automatically friendly to PART 90-95's renderer
+    is automatically friendly to PART 90-94's renderer
     checks. A blueprint that violates PART 96-100 may
     still render but will be tamer than the user
     wanted. Bumped from v1.26 to v1.27.
@@ -22252,7 +22252,7 @@ PART 89 — v1.25 / v8.17 SUMMARY (THE ONE-PARAGRAPH VERSION)
 
 ================================================================================
 v8.18 (2026-09-10) — ACES ENGINE SURFACE (anyCreature Engine Surface, NEW
-  OPT-IN CAPABILITY BUNDLE, PART 90-95). Source: Ariescar's
+  OPT-IN CAPABILITY BUNDLE, PART 90-94). Source: Ariescar's
   anyCreature 1.3.1 (MIT, https://github.com/Ariescar/anyCreature). The
   engine surface is the compile-time pipeline that turns a JSON
   spec into a skinned, animated, vertex-coloured, AO-baked GLB
@@ -22297,18 +22297,8 @@ v8.18 (2026-09-10) — ACES ENGINE SURFACE (anyCreature Engine Surface, NEW
       asset.extras. Every ACES pass writes its own
       authored spec (re-editable, re-compilable) + a
       parts manifest (transplantable between creatures).
-    - PART 95 — Calibration self-check page. Red/green
-      ruler: 1 pass, 2 block. Prints "calibrate OK" on
-      success. Browser-runnable at
-      /public/aces/calibration.html.
-  Zero downgrades. The PART 45 / 67 / 68-71 / 72 / 73 / 74
-  / 75-89 stacks still work; the WebGL SSAOPass and the
-  multi-style shading presets still work; the existing
-  GLTFExporter pipeline still works. ACES adds the
-  compile-time gate system, OKLab L4 brighten+saturate,
-  raycast AO, and angle-weighted crease splitting.
 
-  How the AI factory uses this: PART 90-95 describes the
+  How the AI factory uses this: PART 90-94 describes the
   RENDERER capabilities. The factory should produce
   blueprints that the renderer can compile. The 3D
   modeling style rules (PART 96-100) are the WHAT -- what
@@ -22367,7 +22357,7 @@ v8.19 (2026-09-10) -- 3D MODELING STYLE INTEGRATION (anyCreature
   The single most important rule: PART 96-100 is the
   style the AI factory should follow, not a list of
   syntax rules. A blueprint that satisfies PART 96-100
-  is automatically friendly to PART 90-95's renderer
+  is automatically friendly to PART 90-94's renderer
   checks. A blueprint that violates PART 96-100 may
   still render but will be tamer than the user wanted.
   Bumped from v8.18 to v8.19.
@@ -22656,34 +22646,7 @@ untouched.
         - checks              per-check pass/warn
                               summary
 
-================================================================================
-PART 95 -- CALIBRATION SELF-CHECK
-================================================================================
 
-The renderer exposes a self-check page at
-/public/aces/calibration.html. The red/green ruler
-proves the checks separate good from bad on the
-user's machine.
-
-  95.1  Three sample meshes:
-        - sphere_green: icosahedron + 5-segment
-          chain -> must PASS
-        - box_50_50: two equal stacked segments ->
-          must BLOCK on proportion
-        - faceted_body: a faceted sphere -> must
-          BLOCK on faceted_body + soft_mass
-
-  95.2  The page prints "calibrate OK" when all 3
-        behave as expected. If any case does the
-        wrong thing the user knows the checks are
-        misconfigured on their machine.
-
-  95.3  The factory guidance: this is a
-        self-verification tool, not a factory
-        output. The factory does not need to
-        generate calibration meshes.
-
-================================================================================
 PART 96 -- 3D MODELING STYLE DOCTRINE (THE ART-DIRECTION RULES)
 ================================================================================
 

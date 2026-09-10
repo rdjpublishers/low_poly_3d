@@ -36,7 +36,7 @@ function triangulate(F) {
 // Bake AO into a list of mesh objects of the shape:
 //   { V: [[x,y,z]...], F: [[i0,i1,i2]...], C?: [[r,g,b]...], color?: "#rrggbb" }
 // The supplied C arrays ARE MUTATED in place. AO factor is also written to
-// m.AO[vi] for downstream consumers (L6/L7 shading, calibration, debug).
+// m.AO[vi] for downstream consumers (L6/L7 shading, debug).
 //
 // cfg keys:
 //   samples   — hemisphere ray count (default 16)
