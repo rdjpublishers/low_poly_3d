@@ -1536,6 +1536,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div class="vdiv"></div>
   <button class="tbtn" id="upload3d-btn" title="Open GLB, glTF, FBX, OBJ, STL, DAE files">📦 Upload 3D</button>
   <div class="vdiv"></div>
+  <button class="tbtn hide-xs" id="sample-anycreature-btn" title="Load the bundled anyCreature 1.3.1 design-card sample (quadruped_light)">🐺 Sample Spec</button>
+  <div class="vdiv"></div>
   <button class="tbtn hide-xs" id="convert-ts-btn" title="Experimental — not yet implemented">🧪 Convert to TS</button>
   <button class="tbtn hide-xs" id="ts-btn">Save .ts</button>
   <button class="tbtn hide-xs" id="obj-btn">OBJ</button>
@@ -2087,7 +2089,8 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     "aces-shade": "./public/aces/aces-shade.js",
     "aces-checks": "./public/aces/aces-checks.js",
     "aces-bones": "./public/aces/aces-bones.js",
-    "aces-engine": "./public/aces/aces-engine.js"
+    "aces-engine": "./public/aces/aces-engine.js",
+    "anycreature-compiler": "./public/rig/anycreature-compiler.js"
   }
 }
 </script>
@@ -2153,6 +2156,38 @@ import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 // stays on the same THREE instance as the rest of the renderer.
 import * as __threeRigHelpers from 'three-rig-helpers';
 window.__threeRigHelpers = __threeRigHelpers;
+
+// ============================================================================
+// PART 97 — anyCreature 1.3.1 spec compiler (the "design card" format).
+// Specs of this shape (top-level joints/chains/volumes/parts/animations,
+// NOT the LBL blueprint `objects` shape) are routed through
+// `compileAnyCreature` which produces a THREE.Group that the rest of
+// the renderer can mount via addTsModelToScene() unchanged. See
+// public/rig/anycreature-compiler.js for the full implementation.
+// ============================================================================
+import { compileAnyCreature as __compileAnyCreature } from 'anycreature-compiler';
+window.__compileAnyCreature = __compileAnyCreature;
+
+// Detect whether a parsed object looks like an anyCreature spec. The
+// heuristic is conservative: the LBL blueprint format is the default,
+// so we only flip to anycreature when the spec clearly DOESN'T have
+// the blueprint's `objects` array AND it DOES have at least two of the
+// three anycreature-specific top-level keys (joints+chains, volumes,
+// animations). This avoids misrouting the rare blueprint that happens
+// to mention "joints" somewhere inside an object.
+function __lblLooksLikeAnycreature(data){
+  if(!data || typeof data !== 'object') return false;
+  if(Array.isArray(data.objects)) return false; // explicit LBL blueprint
+  if(data.userData && (data.userData.useTemplateSkeleton || data.userData.rigGraph)) return false;
+  let hits = 0;
+  if(data.joints && typeof data.joints === 'object') hits++;
+  if(Array.isArray(data.chains) || (data.chains && typeof data.chains === 'object')) hits++;
+  if(Array.isArray(data.volumes)) hits++;
+  if(Array.isArray(data.parts)) hits++;
+  if(data.animations && typeof data.animations === 'object') hits++;
+  if(data.palette && typeof data.palette === 'object') hits++;
+  return hits >= 2;
+}
 
 // ============================================================================
 // PART 90 — ACES (anyCreature Engine Surface) module load.
@@ -14317,6 +14352,30 @@ async function validateAndBuild(json, source){
     await validateAndBuildTs(json, source);
     return;
   }
+  // LBL UPDATE — PART 97 (anyCreature 1.3.1 spec). When the input parses
+  // as JSON and the resulting object looks like the anyCreature "design
+  // card" shape (top-level joints/chains/volumes/animations/palette and
+  // no `objects` array), hand it to compileAnyCreature instead of the
+  // LBL blueprint pipeline. The compiler returns a THREE.Group; we feed
+  // it through the same addTsModelToScene path TS factories use so the
+  // rest of the renderer (anim player, T-Pose, inspector, GLB export)
+  // works unchanged.
+  let __anycreaturePreparsed = null;
+  if(typeof json === 'string'){
+    const __t = json.trim();
+    if(__t.startsWith('{')){
+      try{
+        const __d = JSON.parse(stripJsonComments(json));
+        if(__lblLooksLikeAnycreature(__d)) __anycreaturePreparsed = __d;
+      }catch(_){ /* fall through to the normal LBL branch */ }
+    }
+  } else if(json && typeof json === 'object'){
+    if(__lblLooksLikeAnycreature(json)) __anycreaturePreparsed = json;
+  }
+  if(__anycreaturePreparsed){
+    await __lblCompileAndMountAnycreature(__anycreaturePreparsed, source);
+    return;
+  }
   try{
     // v7.7 PART 49.1/49.A — parse the proportion declaration from the RAW
     // text FIRST, before stripJsonComments() (called just below, inside
@@ -14405,6 +14464,75 @@ async function validateAndBuild(json, source){
 
 function updateAllValLogs(html){
   ['val-log','mob-val-log'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+}
+
+// LBL UPDATE — PART 97 (anyCreature 1.3.1 spec) mount path. Compile the
+// spec into a THREE.Group with __compileAnyCreature (see
+// public/rig/anycreature-compiler.js) and feed it to addTsModelToScene
+// so the renderer mounts it exactly like a TS factory model — the
+// animation player picks up the AnimationClips we compiled, the
+// inspector / T-Pose / GLB export all work unchanged.
+async function __lblCompileAndMountAnycreature(spec, source){
+  setStatus('compiling anyCreature…', true);
+  updateAllValLogs(`<span class="info">→ anyCreature spec detected (${source||'pasted'}) — compiling…</span>`);
+  try{
+    const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const result = window.__compileAnyCreature(spec);
+    const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if(!result || !result.group){
+      const errs = (result && result.log) ? result.log.filter(l => l.level === 'error').map(l => l.text).join('; ') : 'unknown error';
+      throw new Error('compileAnyCreature returned no group: ' + errs);
+    }
+    // Format the build log for the validator panel.
+    const lines = [];
+    lines.push(`<span class="ok">✓ anyCreature spec compiled (${source||'pasted'}) in ${Math.round(t1-t0)} ms</span>`);
+    for(const l of result.log){
+      const cls = l.level === 'error' ? 'err' : (l.level === 'warn' ? 'warn' : 'info');
+      const icon = l.level === 'error' ? '✗' : (l.level === 'warn' ? '⚠' : '→');
+      lines.push(`<span class="${cls}">${icon} ${l.text}</span>`);
+    }
+    if(result.bones && result.bones.bonesByName){
+      lines.push(`<span class="ok">✓ bones: ${Object.keys(result.bones.bonesByName).length}</span>`);
+    }
+    lines.push(`<span class="ok">✓ ${result.group.children.length} mesh(es) in scene</span>`);
+    if(result.runtime && result.runtime.animations && result.runtime.animations.clips.length){
+      lines.push(`<span class="ok">✓ ${result.runtime.animations.clips.length} animation(s): ${result.runtime.animations.clips.map(c=>c.name).join(', ')}</span>`);
+    } else {
+      lines.push(`<span class="info">→ no animations in spec — static model</span>`);
+    }
+    updateAllValLogs(lines.join('<br>'));
+    // PART 75.1 — SkinnedMesh requires a valid bounding sphere so
+    // three.js doesn't frustum-cull the model away. Recompute it
+    // explicitly; the auto-compute on first render sometimes doesn't
+    // account for the bone-driven vertex offsets. Also update bone
+    // matrices + skeleton so the bind is consistent with the final
+    // scene-graph state.
+    result.group.traverse(n => {
+      if (n.isMesh && n.geometry) {
+        n.geometry.computeBoundingSphere();
+        n.geometry.computeBoundingBox();
+        if (n.skeleton) n.skeleton.update();
+      }
+    });
+    // Mount via the TS-model path. The compiler already wired
+    // userData.sculptRuntime / userData.tick / userData.animations so
+    // the renderer treats this compiled model identically to a
+    // hand-written TS factory.
+    addTsModelToScene(result.group, {
+      source: source || 'anycreature-spec',
+      factoryName: spec.name || 'anycreature',
+      mod: { default: function(){ return result.group; } },
+      text: '(anycreature spec)',
+    });
+    setStatus('anyCreature loaded', true);
+    toast(`Loaded ${spec.name || 'anyCreature spec'} (${result.group.children.length} meshes)`);
+  }catch(e){
+    console.error('[anycreature]', e);
+    const stack = (e && e.stack) ? e.stack.split('\n').slice(0, 6).join('\n') : '(no stack)';
+    updateAllValLogs(`<span class="err">✗ anyCreature compile failed: ${e.message}</span><br><pre style="font-size:10px;opacity:0.7;white-space:pre-wrap;">${stack}</pre>`);
+    setStatus('anycreature error', false);
+    toast('anyCreature spec failed — see validation log', 'err');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -18315,6 +18443,29 @@ function load3DFile(file, opts){
 }
 
 document.getElementById('upload3d-btn').addEventListener('click',()=>document.getElementById('file3d-input').click());
+
+// LBL UPDATE — PART 97 (anyCreature 1.3.1 sample loader). One click
+// fetches the bundled quadruped_light.json, hands it to
+// __lblCompileAndMountAnycreature, and the model shows up exactly
+// like a drop. Useful for verifying the feature is wired up without
+// having to find a design card on disk.
+document.getElementById('sample-anycreature-btn').addEventListener('click', async () => {
+  const bases = ['public/rig/specs/', '/public/rig/specs/', './public/rig/specs/'];
+  let lastErr = null;
+  for (const base of bases) {
+    try {
+      const r = await fetch(base + 'quadruped_light.json', { cache: 'no-store' });
+      if (!r.ok) { lastErr = `HTTP ${r.status} at ${base}`; continue; }
+      const text = await r.text();
+      let spec;
+      try { spec = JSON.parse(text); } catch (e) { lastErr = `JSON parse error: ${e.message}`; continue; }
+      await __lblCompileAndMountAnycreature(spec, 'sample:quadruped_light');
+      return;
+    } catch (e) { lastErr = e.message; }
+  }
+  toast('Could not load sample spec — ' + (lastErr || 'unknown error'), 'err');
+  console.error('[anycreature-sample]', lastErr);
+});
 
 // RJS UPDATE — Tools dropdown (toggle + open the 3D Mockup Generator)
 (function(){
