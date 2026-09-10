@@ -3726,3 +3726,175 @@ const ANTI_PATTERN_CHECKS = [ /* E1 - E50 */ ]; // 50 total
 // E47 (quality tier), E48 (diagnostic first-move),
 // E49 (tube-network), E50 (implicit-SDF schema).
 ```
+
+---
+
+# v1.26 / v8.18 — ACES (anyCreature Engine Surface) integration (PART 90-94) — OPT-IN capability bundle
+
+Ariescar's anyCreature (1.3.1, MIT) is one of the cleanest open 3D
+creature engines on the public web, and the cleanest documented
+*quality-gate* engine. Its compile-time pipeline (OKLab-based L1-L8
+shading stack, per-vertex AO bake, angle-weighted crease split,
+15 mechanical checks with BLOCK / warn / info channels) catches
+exactly the failures the rest of the LBL spec documents but does
+not enforce. This round ports the engine surface into the RDJ
+renderer as a new OPT-IN capability bundle.
+
+The 5 new PARTs:
+
+  - **PART 90 — ACES orchestrator** (`public/aces/aces-engine.js`).
+    Single entry point: `window.ACES.run(ctx)`. Reads the current
+    Three.js scene, extracts plain `{V, F, C, N, skin, color,
+    material, part, chain, partType, smoothAngle, faceted, soft}`
+    mesh records, runs the 6-stage pipeline, writes results back
+    to the live BufferGeometry (POSITION untouched, COLOR_0
+    carries the baked shading, NORMAL carries the L8-softened
+    result). Zero modifications until the user clicks Apply.
+
+  - **PART 91 — per-vertex AO bake** (`public/aces/aces-ao.js`).
+    Casts short hemisphere rays from every vertex against the
+    whole creature (uniform-grid accelerated Möller–Trumbore),
+    deterministic golden-angle cosine-weighted kernel, multiplies
+    the occlusion into COLOR_0 AND records it to `m.AO[vi]` for
+    downstream consumers (L6/L7 shading, calibration, debug).
+    Configurable: `samples` (default 16), `strength` (default
+    0.59), `radius` (default 60% of model diagonal), `multiply`
+    (default true). Browser-safe: no Three.js dependency, no
+    worker, runs in ~10-30ms for 5k-vertex models.
+
+  - **PART 92 — L1-L8 OKLab shading stack** (`public/aces/aces-shade.js`).
+    8 layers, each a pure function of position and classification.
+    L1 seam-safe flesh colour (position-based spatial smoothing
+    tied to the mesh's own median edge length, not a fixed
+    fraction of the diagonal — the lab measured why: at 3% of
+    diagonal the radius-to-edge ratio ran 1.1-1.7 across six
+    creatures and the leftover seam ranked in exact inverse
+    order). L2 deterministic value-noise pattern (flesh only).
+    L3 top-to-bottom ramp multiplied over everything in OKLab
+    (L and chroma are independent in OKLab, so the ramp is
+    just two numbers, not a blend mode). L4 boost — brighter
+    AND more saturated up top, identity below y0; chroma walks
+    back to the sRGB gamut edge by 12-iteration bisection
+    (0.03% error) instead of clamping per channel (which TURN
+    THE HUE). L5 hardware bleed (sharp-edge design preserved
+    on the hardware, just darkened around it). L6 hardware
+    shadow (AO only, gamma=0.7). L7 flesh body shadow
+    (horizontal light ring × AO). L8 bone-field NORMAL
+    softening (flesh only, the only layer that leaves COLOR_0
+    and goes into the file's NORMAL — the user's lighting
+    reacts to it).
+
+  - **PART 93 — 15 mechanical checks** (`public/aces/aces-checks.js`).
+    Three log channels: BLOCK (build refuses), warn (measure
+    for human judgment), info (compiler narration). The full
+    roster, with the symptom each one kills:
+    - mesh_integrity      BLOCK    bind pose has folded tris
+    - root_containment    warn     vertices drift too far from root
+    - part_attachment     warn     a part's host is unknown
+    - touch               warn     declared touch connections are too far
+    - balance             warn     mass centroid outside support polygon
+    - size                BLOCK    declared height > 15% off
+    - proportion          BLOCK    50:50 dead-rhythm chain segment
+    - limb_clearance      warn     L/R chain pair joints < 5% of H apart
+    - anim_integrity      BLOCK    animations fold tris or over-stretch
+    - attack_reach        BLOCK    an attack does not lunge half a body span
+    - faceted_body        BLOCK    `faceted: true` on a volume
+    - mirror_distortion   BLOCK    mirrored twin collapsed past 30%
+    - part_overlap        warn     two parts share > 30% of bbox
+    - part_seat           warn     a part has no vertex near its host
+    - soft_mass           BLOCK    only < 8% of skin can show an edge
+    The roster matches anyCreature's gates.json (renamed where
+    the names overlap with existing PARTs to avoid collision).
+
+  - **PART 94 — public bone-name convention + embedded source_spec**
+    (`public/aces/aces-bones.js`). The same `LArm1Sh` /
+    `RFrontLeg1Kn` pattern anyCreature uses. Internal joint
+    names stay authoring-side; the export map is applied at
+    GLB-write time only. `assetExtras(spec, opts)` builds the
+    `asset.extras` payload every ACES pass writes: harness
+    stamp, source_spec (re-editable), parts manifest
+    (transplantable), per-check pass/warn summary. A future
+    `aces/graft.js` could pull a part from creature A's GLB
+    and paste it into creature B's spec without re-prompting
+    the AI.
+
+  - **PART 95 — calibration self-check page**
+    (`public/aces/calibration.html` + `calibration-fixtures.js`).
+    The red/green ruler that proves the checks separate good
+    from bad on your machine. 3 sample meshes:
+    - sphere_green: icosahedron + 5-segment chain → must PASS
+    - box_50_50: two equal stacked segments → must BLOCK on
+      proportion
+    - faceted_body: a faceted sphere → must BLOCK on
+      faceted_body + soft_mass
+    The page prints `calibrate OK` when all 3 behave as
+    expected. From `aces-checks.js`: "engine floors are not
+    style opinions; they are the failures that survive review
+    and ship broken."
+
+The single most important rule:
+
+  PART 90-95 is an EXTRA CAPABILITY, not a rule. The .ts /
+  .json / .js factory uses a feature WHEN the user clicks the
+  🛡 ACES button (PART 90.4) and chooses Report (no changes)
+  or Apply. Models that never get a click ship unchanged —
+  exactly like PART 45 / 67 / 68-71 / 72 / 73 / 74 / 75-89.
+  The golden rule from PART 74 carries over verbatim:
+  "Form beats obedience, everywhere."
+
+## Why this is an UPGRADE, not a downgrade
+
+Ariescar's measured run settled on these values against six real
+creatures; every removed control was removed because it
+MEASURED as dead. The OKLab L1-L8 stack is one of two public
+colour stacks that can brighten AND saturate in a single layer
+(the other is HSL with explicit hue preservation, and it is
+strictly worse for vertex colours). The mechanical checks
+catch the same failures the LBL spec warns against in PART 21
+("a flat-folded tris check") and PART 65.4 ("a soft-mass
+warning") — but they BLOCK the build instead of just warning,
+which is what the rest of the LBL spec has been asking for.
+
+What low_poly_3d already had that ACES does NOT replace:
+- The PART 74 procedural texturing stack (microRoughnessMap,
+  punctateMaps, striateMaps, heightToNormal, etc.)
+- The PART 67 modifier stack (taper / twist / bend / spherize
+  / inflate / applyNoise)
+- The PART 45 CS2 PBR profile (iridescence, wear, etc.)
+- The PART 75-89 procedural rigging / skin-weights
+- The PART 33 multi-style shading presets (toon, cel, retro-PSX)
+- The existing WebGL SSAOPass and look-dev lights
+- The existing screen-space outline + back-face expansion outline
+- The existing GLTFExporter pipeline (animations, skinning,
+  buffer views, the "empty track" and "dangling bufferView"
+  repairs)
+
+ACES adds the things those don't have: a compile-time gate
+system, OKLab L4 brighten+saturate, raycast AO (the SSAOPass
+is screen-space and reads on the wrong axis for vertex colours
+that ship in the GLB), angle-weighted crease splitting (vs
+flat face-normals), and the public bone-name convention.
+
+## File layout
+
+```
+public/aces/
+├── README.md                      this file's overview (one page)
+├── aces-oklab.js                  PART 91.1 — OKLab + value noise
+├── aces-normals.js                PART 91.2 — angle-weighted + crease
+├── aces-ao.js                     PART 91 — per-vertex AO bake
+├── aces-shade.js                  PART 92 — L1-L8 stack
+├── aces-checks.js                 PART 93 — 15 mechanical checks
+├── aces-bones.js                  PART 94 — public bone-name + extras
+├── aces-engine.js                 PART 90 — orchestrator
+├── calibration.html               PART 95 — self-check page
+└── calibration-fixtures.js        PART 95 — 3 sample meshes
+```
+
+The 6 sub-modules + the orchestrator are loaded by `index.html`
+via `<script>` tags in the head (BEFORE the module script so
+they can populate `window.ACES_*` for `aces-engine.js` to read).
+The importmap also lists them as bare specifiers in case a
+future caller wants to use them through ESM. The 🛡 ACES button
++ the "🧪 Calibrate" link are added to the top toolbar near
+the 🔺 Tris and 📚 Recipes buttons.

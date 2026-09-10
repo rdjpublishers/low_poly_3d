@@ -1459,6 +1459,13 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
        (50,000-tri soft cap + un-merged sub-mesh detection + meta.trisBudget overrun). -->
   <button class="tbtn hide-xs" id="tris-btn" title="PART 35 — triangle-first geometry inspector. Shows total triangles / vertices / draw calls + a per-mesh breakdown. Soft cap: 50,000 tris.">🔺 Tris</button>
   <button class="tbtn hide-xs" id="recipes-btn" title="Starter Recipes — built-in blueprints, no AI needed">📚 Recipes</button>
+  <!-- PART 90 — ACES (anyCreature Engine Surface) integration.
+       OPT-IN quality pass: per-vertex AO bake, L1-L8 OKLab shading stack,
+       angle-weighted crease splitting, mechanical checks (BLOCK / warn / info).
+       Does NOT modify the loaded model until the user clicks — the panel
+       shows the gate results first, then applies on user confirmation. -->
+  <button class="tbtn hide-xs" id="aces-btn" title="PART 90 — ACES quality pass. Per-vertex AO + L1-L8 OKLab shading stack + 15 mechanical checks (BLOCK / warn / info). Opt-in, never modifies your model until you click Apply.">🛡 ACES</button>
+  <a class="tbtn hide-xs" id="aces-calibrate-link" href="./public/aces/calibration.html" target="_blank" rel="noopener" title="PART 92 — ACES calibration self-check (red/green ruler). Three sample models, must pass / must block — proof the checks separate good from bad on your machine.">🧪 Calibrate</a>
   <div class="vdiv"></div>
   <!-- LBL update F4 — animation controls moved out of the topbar into a
        floating panel anchored to the bottom of the viewport (see
@@ -2074,7 +2081,14 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.3/build/index.module.js",
     "three-bvh-csg": "https://cdn.jsdelivr.net/npm/three-bvh-csg@0.0.16/build/index.module.js",
     "three-rig-helpers": "./public/rig/three-rig-helpers.js",
-    "fflate": "https://unpkg.com/fflate@0.8.2/esm/browser.js"
+    "fflate": "https://unpkg.com/fflate@0.8.2/esm/browser.js",
+    "aces-oklab": "./public/aces/aces-oklab.js",
+    "aces-normals": "./public/aces/aces-normals.js",
+    "aces-ao": "./public/aces/aces-ao.js",
+    "aces-shade": "./public/aces/aces-shade.js",
+    "aces-checks": "./public/aces/aces-checks.js",
+    "aces-bones": "./public/aces/aces-bones.js",
+    "aces-engine": "./public/aces/aces-engine.js"
   }
 }
 </script>
@@ -2140,6 +2154,20 @@ import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 // stays on the same THREE instance as the rest of the renderer.
 import * as __threeRigHelpers from 'three-rig-helpers';
 window.__threeRigHelpers = __threeRigHelpers;
+
+// ============================================================================
+// PART 90 — ACES (anyCreature Engine Surface) module load.
+// The 6 sub-modules (aces-oklab / aces-normals / aces-ao / aces-shade /
+// aces-checks / aces-bones) were loaded as <script> tags BEFORE the module
+// script so they could populate window.ACES_*. aces-engine.js is also
+// pre-loaded and exposes window.ACES.run(ctx) — the single entry point for
+// the quality pass. The renderer wires its #aces-btn click to that entry
+// point further down (PART 90.4).
+//
+// We DO NOT call ACES.run automatically. Every pass is opt-in: a model
+// without a click on the ACES button ships unchanged. This matches the
+// behaviour of every other PART bundle (45, 67, 68-71, 72, 73, 74, 75-89).
+// ============================================================================
 
 // ============================================================================
 // PART 75-89 — v1.25 / v8.17 RENDERER-SIDE STUBS
@@ -19401,6 +19429,179 @@ lblRenderRecipesPanel();
 document.getElementById('recipes-btn').addEventListener('click', ()=>{
   document.getElementById('recipes-panel').classList.toggle('open');
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// PART 90.4 — ACES button wire-up. Opens the ACES panel; on Apply, runs the
+// quality pass against the current scene. On Report, just shows the gates.
+// ────────────────────────────────────────────────────────────────────────────
+const acesBtn = document.getElementById('aces-btn');
+if (acesBtn) {
+  acesBtn.addEventListener('click', () => {
+    if (!window.ACES) {
+      console.warn('[ACES] modules failed to load — public/aces/ subdir missing?');
+      alert('ACES modules not loaded. Make sure /public/aces/ is served alongside index.html.');
+      return;
+    }
+    let panel = document.getElementById('aces-panel');
+    if (!panel) panel = __acesBuildPanel();
+    panel.classList.toggle('open');
+  });
+}
+
+// PART 90.5 — Build the ACES panel dynamically (lazy — only when first opened).
+function __acesBuildPanel() {
+  const p = document.createElement('div');
+  p.id = 'aces-panel';
+  p.className = 'side-panel';
+  p.style.cssText = 'position:absolute;right:0;top:0;width:380px;max-height:100vh;overflow-y:auto;background:#0a0c10;color:#eaeaea;border-left:1px solid #2a2e36;padding:14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;z-index:50;display:none;';
+  p.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <strong>🛡 ACES — Quality Pass</strong>
+      <button id="aces-close" style="background:none;border:0;color:#888;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.4">
+      PART 90 — anyCreature Engine Surface. Per-vertex AO + L1-L8 OKLab shading
+      stack + 15 mechanical checks (BLOCK / warn / info). <b>Opt-in</b>: your
+      model is not modified until you click <b>Apply</b>.
+    </div>
+    <div id="aces-config" style="margin-bottom:12px;padding:10px;background:#11141a;border:1px solid #232730;border-radius:4px">
+      <label style="display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="aces-cfg-ao" checked> <span>Per-vertex AO bake (raycast)</span></label>
+      <label style="display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="aces-cfg-stack" checked> <span>L1-L8 OKLab shading stack</span></label>
+      <label style="display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="aces-cfg-l8" checked> <span>L8 bone-field normal soften (flesh only)</span></label>
+      <label style="display:flex;align-items:center;gap:6px;margin:4px 0"><input type="checkbox" id="aces-cfg-split" checked> <span>Crease split at smooth_angle</span></label>
+      <label style="display:flex;align-items:center;gap:6px;margin:4px 0">
+        <span>smooth_angle</span>
+        <input type="number" id="aces-cfg-deg" value="50" min="0" max="180" step="1" style="width:60px;background:#0a0c10;border:1px solid #2a2e36;color:#eaeaea;padding:2px 4px">
+        <span style="color:#888;font-size:11px">degrees</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;margin:4px 0">
+        <span>stiffness</span>
+        <input type="number" id="aces-cfg-strength" value="0.59" min="0" max="1" step="0.01" style="width:60px;background:#0a0c10;border:1px solid #2a2e36;color:#eaeaea;padding:2px 4px">
+        <span style="color:#888;font-size:11px">AO max darkening</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="aces-report-btn" style="flex:1;background:#1d2632;border:1px solid #2a3a52;color:#9fc3ff;padding:6px;border-radius:3px;cursor:pointer">📋 Report (no changes)</button>
+      <button id="aces-apply-btn" style="flex:1;background:#233a23;border:1px solid #3a5a3a;color:#a8e6a8;padding:6px;border-radius:3px;cursor:pointer">✓ Apply</button>
+    </div>
+    <div id="aces-status" style="font-size:11px;color:#888;margin-bottom:8px">ready</div>
+    <div id="aces-report" style="font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#0a0c10;border:1px solid #1a1e26;padding:8px;max-height:50vh;overflow-y:auto;white-space:pre-wrap"></div>
+  `;
+  document.body.appendChild(p);
+  p.classList.add('open');
+  document.getElementById('aces-close').addEventListener('click', () => p.classList.remove('open'));
+  document.getElementById('aces-report-btn').addEventListener('click', () => __acesRun(true));
+  document.getElementById('aces-apply-btn').addEventListener('click', () => __acesRun(false));
+  return p;
+}
+
+function __acesFmtReport(rep) {
+  if (!rep) return '(no report)';
+  const lines = [];
+  lines.push(`# ACES — ${rep.summary.meshCount} mesh(es), ${rep.summary.failCount} BLOCK, ${rep.summary.warnCount} warn — ${rep.summary.ok ? 'PASS' : 'BLOCKED'} (${rep.summary.ms}ms)`);
+  lines.push('');
+  for (const [name, r] of Object.entries(rep.perCheck || {})) {
+    const tag = r.passed ? (r.warns && r.warns.length ? 'WARN' : 'PASS') : 'BLOCK';
+    lines.push(`[${tag}] ${name}`);
+    for (const w of r.warns || []) lines.push(`   warn: ${w}`);
+    for (const b of r.blocks || []) lines.push(`   BLOCK: ${b}`);
+    for (const i of r.info || []) lines.push(`   info: ${i}`);
+  }
+  lines.push('');
+  lines.push('── compiler narration ──');
+  for (const i of rep.info || []) lines.push(i);
+  return lines.join('\n');
+}
+
+function __acesRun(reportOnly) {
+  const status = document.getElementById('aces-status');
+  const out = document.getElementById('aces-report');
+  if (!window.ACES) {
+    status.textContent = 'ACES modules not loaded';
+    out.textContent = 'window.ACES missing — check that /public/aces/ is being served';
+    return;
+  }
+  const scene = (typeof sceneGroup !== 'undefined') ? sceneGroup : (typeof scene !== 'undefined' ? scene : null);
+  if (!scene) {
+    status.textContent = 'no scene to operate on';
+    out.textContent = 'sceneGroup / scene not found — load a model first';
+    return;
+  }
+  status.textContent = reportOnly ? 'analysing…' : 'applying…';
+  out.textContent = '';
+
+  // Build the class map from the loaded model's userData + a few conventions.
+  const classMap = new Map();
+  scene.traverse((obj) => {
+    if (obj.isMesh || obj.isSkinnedMesh) {
+      const mat = (obj.material && obj.material.name) || '';
+      const k = obj.userData && obj.userData.part ? obj.userData.part : (obj.userData && obj.userData.chain ? obj.userData.chain : mat);
+      if (!k) return;
+      if (/eye|iris|pupil|teeth|tongue/i.test(mat)) classMap.set(k, 'fx');
+      else if (obj.userData && obj.userData.partType && /spike|curve|membrane|fin/i.test(obj.userData.partType)) classMap.set(k, 'hard');
+      else if (obj.userData && obj.userData.part) classMap.set(k, 'hard');
+      else classMap.set(k, 'flesh');
+    }
+  });
+
+  const split = document.getElementById('aces-cfg-split').checked;
+  const ao = document.getElementById('aces-cfg-ao').checked;
+  const stack = document.getElementById('aces-cfg-stack').checked;
+  const l8 = document.getElementById('aces-cfg-l8').checked;
+  const deg = parseFloat(document.getElementById('aces-cfg-deg').value) || 50;
+  const strength = parseFloat(document.getElementById('aces-cfg-strength').value) || 0.59;
+
+  // The OKLab default config — pattern opt-in (user paints a colour, we apply it).
+  // Users can edit this JSON to taste: the values are the settled defaults
+  // from the anyCreature measured run.
+  const shading = stack ? {
+    seam: { radius_edges: 3, min_frac: 0.030 },
+    pattern: { color: null, sharpness: 0.45, amount: 1.0, scale: 0.06 },
+    ramp: { bottom: '#001370', mid: '#cfcfcf', top: '#fffcf0', p0: 0.0, pm: 0.31, wm: 0.08, p1: 1.0, chroma: 1.0, amount: 1.0 },
+    boost: { y0: 0.0, y1: 0.4, gamma: 0.3, dL: 0.03, dC: 1.5, amount: 1.0, target: 'all' },
+    bleed: { radius: 0.025, sharpness: 0.35, amount: 0.45 },
+    hardsh: { amount: 0.54, gamma: 0.7 },
+    bodysh: { lights: 4, rot: 4, elev: 17, amount: 0.2, gamma: 1.95 },
+    normals: l8 ? { flesh: 0.9 } : { flesh: 0 },
+  } : null;
+
+  const ctx = {
+    scene: scene,
+    shading: shading,
+    ao: ao ? { samples: 16, strength: strength, multiply: true } : false,
+    smoothAngle: deg,
+    classMap: classMap,
+    spec: {
+      volumes: [],
+      parts: [],
+      chains: {},
+      attach: {},
+      shading: shading,
+    },
+    onReport: (r) => {
+      window.ACES.lastReport = r;
+      out.textContent = __acesFmtReport(r);
+      const ok = r.summary.failCount === 0;
+      status.style.color = ok ? '#a8e6a8' : '#e88a8a';
+      status.textContent = ok
+        ? `PASS — ${r.summary.warnCount} warn, ${r.summary.meshCount} mesh(es), ${r.summary.ms}ms`
+        : `BLOCKED — ${r.summary.failCount} critical issue(s)`;
+    },
+  };
+
+  try {
+    const r = window.ACES.run(ctx);
+    if (!r.ok) {
+      status.textContent = 'error';
+      status.style.color = '#e88a8a';
+      out.textContent = (r.error || 'unknown error') + '\n\nThe report could not be generated — your scene was not modified.';
+    }
+  } catch (e) {
+    status.textContent = 'threw';
+    status.style.color = '#e88a8a';
+    out.textContent = 'ACES.run threw: ' + e.message + '\n\nStack: ' + e.stack;
+  }
+}
 
 // ───────────────────────────────────────────────────────────────────────
 // H10 — "PROMPT PARSER" (keywords → recipe + color, quick-spawn)

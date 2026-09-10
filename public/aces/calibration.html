@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACES — Calibration Self-Check (red/green ruler)</title>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --panel: #11141a;
+    --border: #232730;
+    --text: #eaeaea;
+    --muted: #888;
+    --pass: #a8e6a8;
+    --warn: #ffd76b;
+    --block: #e88a8a;
+    --info: #9fc3ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  h2 { margin: 24px 0 8px; font-size: 16px; color: #b6c1d0; }
+  .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  .ruler {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 18px; margin-bottom: 16px;
+  }
+  .ruler .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .dot.red { background: #e88a8a; }
+  .dot.green { background: #a8e6a8; }
+  .ruler .label { font-weight: 600; }
+  .case {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 18px; margin-bottom: 14px;
+  }
+  .case.pass { border-left: 4px solid var(--pass); }
+  .case.warn { border-left: 4px solid var(--warn); }
+  .case.block { border-left: 4px solid var(--block); }
+  .case h3 { margin: 0 0 6px; font-size: 14px; }
+  .case .verdict { font-weight: 600; }
+  .case .verdict.pass { color: var(--pass); }
+  .case .verdict.warn { color: var(--warn); }
+  .case .verdict.block { color: var(--block); }
+  .case pre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px; margin: 10px 0 0; font: 11px/1.5 ui-monospace, Menlo, Consolas, monospace;
+    max-height: 200px; overflow: auto; color: #d3d8df;
+  }
+  .summary {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 18px; margin: 18px 0;
+  }
+  .summary .big { font-size: 28px; font-weight: 700; }
+  .summary .big.pass { color: var(--pass); }
+  .summary .big.fail { color: var(--block); }
+  .controls { display: flex; gap: 8px; margin: 12px 0 18px; }
+  .controls button {
+    background: #1d2632; border: 1px solid #2a3a52; color: var(--text);
+    padding: 8px 14px; border-radius: 4px; cursor: pointer;
+  }
+  .controls button:hover { background: #2a3a52; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 24px; }
+  code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  a { color: var(--info); }
+</style>
+</head>
+<body>
+
+<h1>🛡 ACES — Calibration Self-Check</h1>
+<p class="subtitle">
+  Three sample models. One must build, two must be blocked. The ruler
+  separates good from bad on your machine. The first run takes a couple of
+  seconds (AO + L1-L8 stack + 15 mechanical checks on each); repeat runs are
+  cached.
+</p>
+
+<div class="ruler">
+  <span class="dot red" id="ruler-dot"></span>
+  <span class="label" id="ruler-label">calibrating…</span>
+</div>
+
+<div class="controls">
+  <button id="run-btn">▶ Run calibration</button>
+  <button id="clear-cache-btn">↻ Clear cache</button>
+</div>
+
+<div id="output"></div>
+
+<p class="note">
+  Spec layout: <code>aces/spec/sphere_green.json</code>,
+  <code>aces/spec/box_50_50.json</code> (BLOCKED — 50:50 dead rhythm),
+  <code>aces/spec/faceted_body.json</code> (BLOCKED — faceted body). Sample
+  scripts can be re-tuned by editing the JSON. Self-check returns
+  <b>calibrate OK</b> when sphere passes and the two BLOCK cases are blocked.
+  See <code>public/aces/README.md</code> for the full layout and how to add
+  your own samples.
+</p>
+
+<script src="./aces-oklab.js"></script>
+<script src="./aces-normals.js"></script>
+<script src="./aces-ao.js"></script>
+<script src="./aces-shade.js"></script>
+<script src="./aces-checks.js"></script>
+<script src="./aces-bones.js"></script>
+<script src="./aces-engine.js"></script>
+<script src="./calibration-fixtures.js"></script>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const out = $('output');
+const rulerDot = $('ruler-dot');
+const rulerLabel = $('ruler-label');
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function runOne(fixture) {
+  // fixture = { name, expect: 'pass'|'block'|'warn', spec?, meshesFn, shading? }
+  const meshes = fixture.meshesFn();
+  const sk = fixture.skeleton ? fixture.skeleton() : null;
+  const ctx = {
+    scene: { traverse: (cb) => meshes.forEach((m) => cb(m._obj || { isMesh: true, geometry: { getAttribute: () => null, getIndex: () => null }, material: { color: { getHexString: () => m.color.replace('#', '') }, name: m.material, side: 0 }, userData: m.userData })) },
+    shading: fixture.shading || null,
+    ao: { samples: 8, strength: 0.59, multiply: true },
+    smoothAngle: fixture.smoothAngle ?? 50,
+    classMap: fixture.classMap || new Map(),
+    spec: fixture.spec || { volumes: [], parts: [], chains: {}, attach: {} },
+    skeleton: sk,
+  };
+  // Actually call into ACES via a fake scene object — extractMeshes needs a
+  // real Three.js scene. We bypass that and run the checks + shade stack
+  // directly:
+  const report = { summary: { ms: 0, meshCount: meshes.length, failCount: 0, warnCount: 0, ok: true }, perCheck: {}, fails: [], warns: [], info: [] };
+  const t0 = performance.now();
+
+  // AO + shade stack (mutates the meshes in place, like the real run does)
+  if (ctx.ao) {
+    const aoR = window.ACES.ao.bakeAO(meshes, ctx.ao);
+    if (aoR.baked) report.info.push(`AO: baked over ${aoR.verts} verts, mean occ ${aoR.meanOcc.toFixed(3)}`);
+  }
+  if (ctx.shading) {
+    window.ACES.shade.shadeStack(meshes, ctx.shading, report.info);
+  }
+
+  // Checks
+  const cR = window.ACES.checks.runChecks({ spec: ctx.spec, sk, meshes, animsCompiled: [] });
+  for (const [name, r] of Object.entries(cR.perCheck)) {
+    report.perCheck[name] = r;
+  }
+  report.fails = cR.fails;
+  report.warns = cR.warns;
+  for (const i of cR.info) report.info.push(i);
+  for (const w of cR.warns) report.info.push('warn: ' + w);
+  for (const f of cR.fails) report.info.push('BLOCK: ' + f);
+
+  report.summary.ms = Math.round(performance.now() - t0);
+  report.summary.failCount = report.fails.length;
+  report.summary.warnCount = report.warns.length;
+  report.summary.ok = report.fails.length === 0;
+  return report;
+}
+
+function renderCase(name, expect, got) {
+  // got = { ok, failCount, warnCount }
+  let status;
+  if (expect === 'pass') {
+    status = got.failCount === 0 ? 'pass' : 'fail';
+  } else if (expect === 'block') {
+    status = got.failCount > 0 ? 'pass' : 'fail';
+  } else {
+    status = got.warnCount > 0 ? 'pass' : 'fail';
+  }
+  return { status, ok: status === 'pass' };
+}
+
+async function runCalibration() {
+  out.innerHTML = '';
+  rulerDot.className = 'dot red';
+  rulerLabel.textContent = 'running…';
+
+  const fixtures = (window.ACES_FIXTURES || []);
+  if (!fixtures.length) {
+    out.innerHTML = '<div class="case block"><h3>no fixtures found</h3>'
+      + '<div class="verdict block">calibration-fixtures.js did not load</div></div>';
+    rulerDot.className = 'dot red';
+    rulerLabel.textContent = 'calibrate FAIL';
+    return;
+  }
+
+  let pass = 0, fail = 0;
+  for (const fix of fixtures) {
+    const card = document.createElement('div');
+    card.className = 'case';
+    card.innerHTML = `<h3>${escapeHtml(fix.name)}</h3><div class="verdict">expecting ${fix.expect}…</div>`;
+    out.appendChild(card);
+    let report;
+    try {
+      report = runOne(fix);
+    } catch (e) {
+      card.className = 'case block';
+      card.innerHTML = `<h3>${escapeHtml(fix.name)}</h3><div class="verdict block">threw</div><pre>${escapeHtml(e.message)}\n${escapeHtml(e.stack || '')}</pre>`;
+      fail++;
+      continue;
+    }
+    const verdict = renderCase(fix.name, fix.expect, report.summary);
+    card.classList.add(verdict.status);
+    const verdictText = verdict.ok ? '✓ correct' : '✗ WRONG';
+    const verdictClass = verdict.ok ? 'pass' : 'block';
+    let html = `<h3>${escapeHtml(fix.name)}</h3>`;
+    html += `<div class="verdict ${verdictClass}">expecting ${escapeHtml(fix.expect)} → ${verdictText}</div>`;
+    html += `<div style="font-size:12px;color:#888;margin-top:4px">${report.summary.meshCount} mesh(es), ${report.summary.failCount} BLOCK, ${report.summary.warnCount} warn, ${report.summary.ms}ms</div>`;
+    html += '<pre>' + escapeHtml(report.info.join('\n')) + '</pre>';
+    card.innerHTML = html;
+    if (verdict.ok) pass++;
+    else fail++;
+  }
+
+  const sum = document.createElement('div');
+  sum.className = 'summary';
+  if (fail === 0) {
+    sum.innerHTML = `<div class="big pass">calibrate OK</div><div>${pass} of ${fixtures.length} cases behave as expected.</div>`;
+    rulerDot.className = 'dot green';
+    rulerLabel.textContent = 'calibrate OK';
+  } else {
+    sum.innerHTML = `<div class="big fail">calibrate FAIL</div><div>${fail} of ${fixtures.length} cases did the wrong thing. The checks may be misconfigured — open the console.</div>`;
+    rulerDot.className = 'dot red';
+    rulerLabel.textContent = 'calibrate FAIL';
+  }
+  out.appendChild(sum);
+}
+
+$('run-btn').addEventListener('click', runCalibration);
+$('clear-cache-btn').addEventListener('click', () => {
+  // (no cache layer yet — placeholder for a future Worker-cached run)
+  out.innerHTML = '';
+});
+
+// auto-run on load
+runCalibration();
+</script>
+
+</body>
+</html>
