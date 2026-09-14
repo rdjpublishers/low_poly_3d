@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.17 — IMAGE-TO-JSON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.20 — IMAGE-TO-JSON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 >>> v8.17 RIGGING — If the model needs ANY rigging or
@@ -9,13 +9,19 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 >>> The image-to-JSON path inherits the same v8.17
 >>> opt-in capability bundle.
 ================================================================================
-NOTE — a third input format exists alongside JSON and JS: for a richer,
-code-only output that produces an actual Three.js Group from a reference
-image (real geometry code, per-frame tick()/VFX animation, and richer
-runtime hooks via userData.sculptRuntime), see Image_To_Ts.txt (whose own
-master is Prompt_To_Ts.txt). That is a different contract entirely — a
-hand-authored .ts factory module, not this blueprint DSL — and is
-documented separately.
+NOTE — three other input formats exist alongside this image-to-JSON
+blueprint DSL. (1) JS blueprint — the same shape, code-only
+(Prompt_To_Js.txt / Image_To_Js.txt). (2) TS factory — a hand-
+authored .ts module that exports a THREE.Group directly (real
+geometry code, per-frame tick()/VFX, richer runtime hooks via
+userData.sculptRuntime; see Prompt_To_Ts.txt / Image_To_Ts.txt).
+(3) anyCreature 1.3.1 "design card" JSON — a relational-joint-
+graph spec (joints / chains / volumes / parts / animations /
+palette, NO `objects` array) that the renderer now compiles via
+public/rig/anycreature-compiler.js. See PART 97 of the Prompt_To
+_*.txt master specs for the full per-field reference and PART
+97.RENDERER for how the JSON loader detects and mounts this
+format.
 
 This document is the IMAGE-INPUT fork of Prompt_To_Json.txt (formerly
 LBL_v6_Master_Specification.txt). The JSON format, renderer, and every
@@ -22215,6 +22221,109 @@ v8.19 (2026-09-10) -- 3D MODELING STYLE INTEGRATION (anyCreature
   still render but will be tamer than the user wanted.
   Bumped from v8.18 to v8.19.
 
+
+v8.20 (2026-09-14) — ANYCREATURE 1.3.1 SPEC COMPILER + AUTO-ACES
+  ON MOUNT (RUNTIME BRIDGE, PART 90.8 + PART 97.RENDERER +
+  PART 97.10-12 CLARIFICATIONS, NEW RUNTIME). The PART 97
+  spec format and the PART 90 ACES engine were both
+  documented and shipped in v8.18/v8.19, but the JSON
+  loader had no compiler wired up between them — dropping
+  a design card with top-level `joints` / `chains` /
+  `volumes` / `parts` / `animations` / `palette` (and no
+  `objects` array) just hit "Missing 'objects' array" and
+  bailed. v8.20 closes that gap in two commits. The image-
+  to-JSON path inherits the same PART 97 / PART 90.8 /
+  PART 97.RENDERER sections from the Prompt_To_*.txt
+  master specs (they are duplicated verbatim in PART 90 /
+  PART 97 of this file). Summary:
+    - PART 97.RENDERER (new section, leading PART 97)
+      — documents how the JSON loader detects the
+      anyCreature format (heuristic: no `objects` array
+      AND >= 2 of {joints, chains, volumes, parts,
+      animations, palette} at the top level), that
+      detection runs inside validateAndBuild() BEFORE
+      the LBL blueprint path, that the compiled result
+      is mounted via addTsModelToScene (so the existing
+      animation player / T-Pose / inspector / GLB
+      export all work unchanged), and that
+      userData.sculptRuntime / userData.tick /
+      userData.animations are wired by the compiler
+      so the runtime hooks the rest of the renderer
+      expects are already in place.
+    - PART 97.10 (volumes, REFINED) — documents the
+      chain-sampling behaviour: the spec says "the
+      renderer sweeps N rings along the chain" but the
+      v2 implementation runs the polyline through a
+      uniform Catmull-Rom spline FIRST (density = 8
+      points per source segment, skipped for 2-point
+      polylines) then re-samples by arc length. This
+      is what makes legs / body flow smoothly through
+      joints instead of showing visible beads at every
+      chain vertex. The factory SHOULD aim for 4+ joint
+      chains (root / elbow / wrist / toe minimum) so
+      the spline has curvature to interpolate.
+    - PART 97.11 (parts, REFINED) — clarifies the eye
+      part: the spec says "an eye is a small gold
+      sphere at the brow" but the v2 implementation
+      wraps the gold sclera in a THREE.Group with a
+      smaller black pupil sphere embedded along the
+      forward axis. Both meshes carry
+      userData.partType='eye' so the ACES class map
+      tags them as `fx` (no L1-L8 stack, no shadow)
+      — otherwise the gold iris would desaturate into
+      a generic flesh colour under the OKLab ramp.
+      The factory SHOULD set the eye material to a
+      saturated hue (gold, copper, emerald, etc.) so
+      the pupil stays the only dark element.
+    - PART 97.12 (animations, KNOWN V1 LIMITATION) —
+      the compiler currently emits volumes and parts
+      as regular THREE.Mesh, NOT SkinnedMesh. The bone
+      hierarchy IS in the scene graph so track names
+      resolve and the animation player lists the clips,
+      but the geometry is not deformed — the model
+      ships in its bind pose. The proper skinned-mesh
+      follow-up requires detecting the renderer's
+      gizmo-anchor re-parent and rebinding AFTER the
+      wrap, not at compile time. Marked as "v2 of the
+      compiler".
+    - PART 90.8 (new section) — documents the
+      auto-apply ACES quality pass on anyCreature
+      mount. anyCreature design cards are authored to
+      the anyCreature 1.3.1 reference rendering style
+      — the L1-L8 stack + AO bake is what gives the
+      body its proper value contrast and the legs
+      their smooth read. The renderer auto-triggers
+      window.ACES.run ONCE on mount with the same
+      shading defaults the ACES panel would apply.
+      The user can still re-run with different
+      settings via the ACES panel — auto-ACES is just
+      the baseline. ~800ms on a 13-mesh wolf spec.
+    - PART 90.8 also documents the ACES module
+      loader. The six sub-modules (aces-oklab /
+      aces-normals / aces-ao / aces-shade /
+      aces-checks / aces-bones) and the engine are
+      loaded via dynamic import() inside a non-
+      blocking IIFE at the top of the main module
+      script. Top-level await would freeze page init
+      while the modules load; the IIFE fires them in
+      the background and console.logs when ready.
+      window.ACES becomes non-undefined ~1s after
+      page load on a cold cache.
+    - PART 90.8 also documents the new toolbar entry
+      "🐺 Sample Spec". One click fetches
+      public/rig/specs/quadruped_light.json (bundled
+      canonical anyCreature sample) and mounts it via
+      the same path as a drop. Useful for verifying the
+      feature is wired up without having to find a
+      design card on disk. The file is bundled so the
+      demo works fully offline.
+  Bumped from v8.19 to v8.20. No PART 1-89, no format
+  reference tables, no existing cross-reference is
+  touched. PART 90.8 is the only new PART 9x section;
+  PART 97.RENDERER is the only new PART 9x lead-in
+  section. PART 97.10 / 97.11 / 97.12 are clarifications
+  of already-documented fields, not new fields.
+
 ================================================================================
 PART 90 -- ACES ENGINE SURFACE (RENDERER CAPABILITY, OPT-IN)
 ================================================================================
@@ -22293,6 +22402,100 @@ existing pipeline.
 
   90.7  The 5 sub-bundles (90-95) are detailed below
         as PART 91-95.
+
+  90.8  AUTO-APPLY ON ANYCREATURE MOUNT (v8.20 NEW).
+
+       90.8.1  ANYCREATURE DESIGN CARDS ARE AUTHORED
+               TO A SPECIFIC SHADING STYLE. The
+               anyCreature 1.3.1 reference rendering
+               (the look the cards in
+               anyCreature/cards/ are designed
+               against) is the L1-L8 OKLab stack + the
+               per-vertex AO bake. That stack is what
+               gives the body its proper value
+               contrast (dark back / light belly) and
+               the legs their continuous read instead
+               of a row of per-ring beads. The 6-
+               stage ACES pipeline (PART 90.4) is the
+               single source of that look.
+
+       90.8.2  AUTO-TRIGGER ON MOUNT. The renderer
+               auto-runs window.ACES.run ONCE on mount
+               of any anyCreature-compiled model
+               (PART 97.RENDERER). The shading config
+               passed to ACES.run is the same set of
+               defaults the ACES panel would apply
+               (seam radius 3 edges, AO strength 0.59,
+               ramp bottom #001370 / mid #cfcfcf / top
+               #fffcf0, L4 boost y0=0 y1=0.4 dL=0.03
+               dC=1.5, L5 bleed radius 0.025, L6 hard
+               shadow amount 0.54 gamma 0.7, L7 flesh
+               shadow 4 lights at 4 deg rot / 17 deg
+               elev, L8 flesh normal alpha 0.9,
+               smooth_angle 50 deg). ~800ms on the
+               bundled 13-mesh wolf spec on a cold
+               cache.
+
+       90.8.3  WHY AUTO-TRIGGER (NOT A BUTTON
+               CLICK). ACES is shipped as opt-in via
+               the 🛡 button for every other model
+               shape. anyCreature is different because
+               the design cards are visually authored
+               TO the ACES output — without the L1-L8
+               stack the body reads as flat and the
+               legs as beaded. Forcing the user to
+               click Apply after every drop would mean
+               the first 800ms of every anyCreature
+               mount looks subtly wrong. The auto-
+               trigger is the baseline; the user can
+               still re-run with different settings
+               via the ACES panel afterwards.
+
+       90.8.4  ACES MODULE LOADER. The 6 sub-modules
+               (aces-oklab / aces-normals / aces-ao /
+               aces-shade / aces-checks / aces-bones)
+               and the engine (aces-engine) are loaded
+               via dynamic import() inside a non-
+               blocking IIFE at the top of the main
+               module script. Top-level await would
+               freeze page init while the modules
+               load; the IIFE fires them in the
+               background and console.logs
+               "aces: ready" when window.ACES is
+               non-undefined. On a cold cache this is
+               ~1s after page load; on a warm cache
+               the IIFE resolves in < 50ms. The
+               mount-triggered ACES.run (90.8.2) is
+               guarded with a `window.ACES &&
+               window.ACES.run` check so the auto-
+               trigger silently no-ops if the modules
+               haven't finished loading yet — the
+               user can re-click the ACES button
+               once they are.
+
+       90.8.5  SAMPLE SPEC TOOLBAR ENTRY. A new
+               toolbar button "🐺 Sample Spec" (id
+               sample-anycreature-btn) fetches
+               public/rig/specs/quadruped_light.json
+               (the bundled canonical anyCreature
+               sample) and mounts it through the
+               same compile-and-mount path as a
+               drop. Useful for verifying the
+               compiler + ACES auto-pass is wired
+               up correctly without having to find a
+               design card on disk. The sample is
+               bundled, so the button works fully
+               offline (no network fetch needed
+               beyond the asset itself). One click,
+               one model, full pipeline.
+
+       90.8.6  DOES NOT FIRE FOR LBL / TS FACTORY
+               OUTPUTS. The auto-ACES trigger is
+               scoped strictly to the anyCreature
+               mount path (PART 97.RENDERER). LBL
+               blueprint drops and TS factory drops
+               are unaffected — ACES is still opt-
+               in via the 🛡 button for those.
 
 ================================================================================
 PART 91 -- PER-VERTEX AMBIENT OCCLUSION BAKE (RENDERER CAPABILITY)
@@ -22702,6 +22905,240 @@ for creature subjects. The format is verified against
 the anyCreature engine source. Every key documented is
 read by the engine.
 
+  97.RENDERER  RUNTIME — HOW THE JSON LOADER DETECTS
+               AND MOUNTS THIS FORMAT (v8.20 NEW).
+
+               97.RENDERER.1  FORMAT DETECTION. The
+                              JSON loader runs
+                              `__lblLooksLikeAnycreature
+                              (data)` inside validateAnd
+                              Build() BEFORE the LBL
+                              blueprint path. The
+                              heuristic is conservative
+                              — the LBL blueprint format
+                              is the default, so we
+                              flip to anyCreature ONLY
+                              when:
+
+                                (a) the parsed object has
+                                    NO top-level
+                                    `objects` array
+                                    (explicit LBL
+                                    blueprint marker),
+                                    AND
+                                (b) the parsed object has
+                                    no userData.
+                                    useTemplateSkeleton /
+                                    userData.rigGraph
+                                    flag (explicit TS-
+                                    factory-routed
+                                    marker), AND
+                                (c) >= 2 of the following
+                                    6 top-level keys are
+                                    present: joints (object)
+                                    / chains (array or
+                                    object) / volumes
+                                    (array) / parts (array)
+                                    / animations (object) /
+                                    palette (object).
+
+                              Two hits are enough to
+                              rule out a random LBL
+                              blueprint that happens to
+                              mention "joints" or
+                              "palette" somewhere in
+                              one of its objects — the
+                              probability of two of
+                              those six keys landing at
+                              the top level by accident
+                              is essentially zero.
+
+               97.RENDERER.2  MOUNT PATH. On a positive
+                              detection the loader
+                              calls
+                              `__lblCompileAndMountAny
+                              creature(spec, source)`.
+                              That function:
+                                - runs
+                                  __compileAnyCreature
+                                  (public/rig/
+                                  anycreature-compiler
+                                  .js) to produce a
+                                  THREE.Group with
+                                  bones / volumes /
+                                  parts / animations,
+                                - computes bounding
+                                  spheres + bounding
+                                  boxes on every
+                                  geometry so three.js's
+                                  frustum culling
+                                  doesn't drop the
+                                  model on first render,
+                                - mounts the group via
+                                  addTsModelToScene --
+                                  THE SAME ENTRY POINT
+                                  TS factory models
+                                  use -- so the existing
+                                  animation player / T-
+                                  Pose / inspector / GLB
+                                  export / any other
+                                  TS-model hook all
+                                  work unchanged.
+
+               97.RENDERER.3  RUNTIME WIRING (WHY THE
+                              TS-MODEL PATH JUST
+                              WORKS). The compiler
+                              wires three
+                              userData hooks on the
+                              returned root group,
+                              matching the TS factory
+                              contract exactly:
+                                - userData.sculptRuntime
+                                  = { type:
+                                  'anycreature',
+                                  animations: { clips,
+                                  mixer, actions },
+                                  update(dt), setAnimation
+                                  (idx), dispose() }
+                                - userData.tick = (dt)
+                                  => runtime.update(dt)
+                                - userData.animations =
+                                  [THREE.AnimationClip,
+                                  ...]
+                              It ALSO traverses the
+                              group setting
+                              userData.isPickable=true
+                              and userData.partName on
+                              every Mesh (matching
+                              PART 30.7's pickable
+                              contract). The renderer
+                              sees the compiled model
+                              as identical to a hand-
+                              written TS factory.
+
+               97.RENDERER.4  AUTO-ACES TRIGGER. After
+                              the mount, the loader
+                              calls window.ACES.run
+                              ONCE on the freshly
+                              mounted sceneGroup --
+                              see PART 90.8 for the
+                              full description, the
+                              shading defaults passed
+                              to ACES.run, and the
+                              module-loader note. The
+                              auto-trigger is scoped
+                              strictly to the
+                              anyCreature mount path;
+                              LBL / TS mounts are
+                              unaffected.
+
+               97.RENDERER.5  THE COMPILER'S JOB. The
+                              compiler (public/rig/
+                              anycreature-compiler.js)
+                              does, in order:
+                                1. resolveJoints —
+                                   turn the
+                                   relational joint
+                                   graph (from / up /
+                                   fwd / side / dir /
+                                   len / ground) into
+                                   absolute world-
+                                   space positions,
+                                   fixed-point iterated
+                                   to handle dependency
+                                   order, cycles throw.
+                                2. applyMirror --
+                                   duplicate every L*
+                                   chain in spec.mirror
+                                   as R*, X axis
+                                   flipped, joints re-
+                                   parented along the
+                                   mirrored chain.
+                                3. buildBoneHierarchy
+                                   -- convert resolved
+                                   joints into a real
+                                   THREE.Bone tree so
+                                   the AnimationMixer
+                                   can find the
+                                   joints.
+                                4. buildVolumes --
+                                   sweep a tube mesh
+                                   along each chain,
+                                   honoring profile
+                                   rows' exp / bias /
+                                   roll / sharp + per-
+                                   volume arc color
+                                   bands + caps. See
+                                   PART 97.10 below for
+                                   the Catmull-Rom
+                                   smoothing
+                                   behaviour.
+                                5. buildParts -- the
+                                   7 part types (curve
+                                   / eye / spike / fin
+                                   / membrane / hand /
+                                   paw), each anchored
+                                   to a host joint
+                                   (and optionally to
+                                   a specific chain t
+                                   + around angle on a
+                                   volume surface).
+                                   See PART 97.11 below
+                                   for the v2 eye
+                                   shape.
+                                6. compileAnimations --
+                                   turn spec.
+                                   animations.
+                                   {idle,move,attack,..}
+                                   into real THREE.
+                                   AnimationClip /
+                                   KeyframeTrack objects
+                                   bound to the
+                                   resolved joint
+                                   names. Track names
+                                   resolve against the
+                                   bone tree even
+                                   though the meshes
+                                   are NOT skinned --
+                                   see PART 97.12
+                                   below for the v1
+                                   limitation and the
+                                   v2 plan.
+                                7. wireRuntime --
+                                   drop userData.
+                                   sculptRuntime /
+                                   userData.tick /
+                                   userData.animations
+                                   on the returned
+                                   group, exactly the
+                                   way the TS factory
+                                   models do.
+
+               97.RENDERER.6  WHY THIS MATTERS FOR
+                              THE FACTORY. Before
+                              v8.20, dropping a design
+                              card with top-level
+                              `joints` / `chains` /
+                              `volumes` / `parts` /
+                              `animations` / `palette`
+                              hit the LBL blueprint
+                              path, which immediately
+                              bailed with "Missing
+                              'objects' array". The
+                              design card format was
+                              documented (PART 97)
+                              but had no mount path.
+                              After v8.20 the format
+                              is first-class: the AI
+                              factory MAY emit it for
+                              creature subjects, the
+                              renderer mounts it, and
+                              the ACES auto-pass
+                              makes it look the way
+                              the design cards in
+                              anyCreature/cards/
+                              were authored to look.
+
   97.0  TOP-LEVEL KEYS.
 
          {
@@ -22907,6 +23344,47 @@ read by the engine.
            - NEVER set "faceted": true on a
              volume (BLOCKS the build)
 
+         CHAIN-SAMPLING BEHAVIOUR (v8.20 NEW, the v2
+         implementation -- PART 97.RENDERER.5 step 4).
+         The spec says "the renderer sweeps N rings
+         along the chain"; the v2 implementation
+         samples rings by the following pipeline:
+           (1) WALK the chain to its world-space
+               polyline (a flat array of THREE.Vector3
+               positions, one per chain joint).
+           (2) SMOOTH. If the polyline has 3+ control
+               points (i.e. a chain with 3+ joints),
+               run it through a uniform Catmull-Rom
+               spline FIRST, density = 8 points per
+               source segment (so a 4-joint chain
+               becomes a 25-point spline). The spline
+               carries the curvature of the original
+               polyline through every segment instead
+               of bending sharply at the joints.
+               2-point polylines skip the spline
+               entirely (no curvature to interpolate,
+               a straight tube is what we want).
+           (3) ARC-LENGTH RESAMPLE. Walk the
+               smoothed polyline, compute the
+               cumulative arc length, distribute the
+               N sample rings UNIFORMLY by arc length
+               (not bunched at sharp joints).
+         Net effect: each volume is a single
+         continuous tube per volume, not a row of
+         visible beads at every chain vertex. The
+         improvement is most visible on the legs --
+         a quadruped has 4 joints per leg chain
+         (root / elbow / wrist / toe), which without
+         the spline produces 3 visible kinks per
+         leg.
+         The factory SHOULD aim for 4+ joint chains
+         (root / elbow / wrist / toe minimum) on
+         legs and body so the spline has real
+         curvature to interpolate. A 2-joint chain
+         (root / tip only) is allowed but the
+         smoothing is a no-op and the tube reads as
+         straight.
+
   97.11 PARTS. 7 supported types. Every part
         reads at minimum `type`, `material`, and
         a host.
@@ -22977,6 +23455,42 @@ read by the engine.
                    on a vertical chain the same
                    numbers point elsewhere -- 90 =
                    FRONT, 180 = OUTER).
+
+                   V2 IMPLEMENTATION (v8.20 NEW). The
+                   spec describes a single gold
+                   sphere of `size` radius; the v2
+                   implementation builds a Group of
+                   TWO meshes:
+                     (a) SCLERA -- a low-poly
+                         IcosahedronGeometry of
+                         radius = `size`, positioned
+                         at hostPos + offset,
+                         flat-shaded in the eye
+                         material's colour (the
+                         gold).
+                     (b) PUPIL -- a smaller black
+                         IcosahedronGeometry of
+                         radius = size * 0.45,
+                         embedded along the
+                         forward axis at offset
+                         size * 0.55 (so it sits
+                         ~flush with the front
+                         face of the sclera,
+                         protruding 10% of the
+                         radius past the surface).
+                   BOTH meshes carry
+                   userData.partType='eye'. The
+                   ACES class map tags both as
+                   `fx` -- NO L1-L8 stack, NO
+                   shadow. Without the `fx` tag
+                   the OKLab ramp would desaturate
+                   the gold iris into a generic
+                   flesh colour. The factory
+                   SHOULD set the eye material to
+                   a saturated hue (gold, copper,
+                   emerald, etc.) so the pupil
+                   stays the only dark element on
+                   the model.
 
          97.11.3  SPIKE -- simple cone, fixed
                    heading.
@@ -23090,6 +23604,60 @@ read by the engine.
         X/Y/Z (XYZ order). tx/ty/tz = translation
         offset. Keys: [fraction (0..1), value],
         auto-interpolated linearly.
+
+        V1 LIMITATION (v8.20 KNOWN ISSUE). The
+        compiler currently emits volumes and
+        parts as regular THREE.Mesh, NOT as
+        THREE.SkinnedMesh. The bone hierarchy
+        IS in the scene graph -- every chain
+        joint is a real THREE.Bone -- so:
+          - the AnimationMixer can find the
+            joints by name,
+          - the compiled AnimationClips have
+            valid KeyframeTracks with
+            "[jointName].quaternion" /
+            "[jointName].position" names,
+          - the renderer's animation player
+            lists the clips in the panel,
+          - track names RESOLVE on play
+            (no "missing joint" warnings).
+        BUT the volumes / parts are NOT bound
+        to the bones (no skinIndices /
+        skinWeights, no THREE.Skeleton), so
+        the geometry is NOT deformed -- the
+        model ships in its BIND POSE on
+        playback. The clips play, the bones
+        rotate, the meshes stay put. This is
+        the v1 limitation.
+
+        Why v1 ships this way. The renderer's
+        gizmo-anchor wrap re-parents the model
+        after bind (it adds the gizmo as a
+        sibling under sceneGroup and re-
+        anchors the model's transform). A
+        SkinnedMesh's bind matrix is computed
+        at compile time against the WORLD
+        matrix of each bone; if the parent is
+        reparented AFTER bind, the matrices
+        are stale and the model renders
+        "broken" (vertices teleport to a
+        wrong location). The proper fix is
+        to detect the wrap and rebind AFTER
+        the wrap, not at compile time. That
+        detection is the v2 of the compiler.
+
+        Marked as "v2 of the compiler". The
+        v1 behaviour is acceptable for the
+        static-snapshot use case (a user
+        loading the sample spec, looking at
+        it in T-Pose, exporting the GLB) but
+        is NOT acceptable for the "watch it
+        walk" use case. The factory MAY
+        continue to author anyCreature
+        animations; they will be present and
+        selectable in the panel, but their
+        playback will not visibly deform the
+        mesh until v2 ships.
 
          "animations": {
            "idle":   { "duration": 1.6, "loop": true,

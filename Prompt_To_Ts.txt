@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.25 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.28 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 >>> v8.17 RIGGING QUICK-START — If the model needs ANY
@@ -2420,6 +2420,27 @@ itself is side-effect-free and importable from a test without a DOM:
     // …build…
     return root;
   }
+
+--------------------------------------------------------------------------
+4.4 — ANYCREATURE 1.3.1 AUTO-MOUNT (v8.20) [EXTERNAL INTEGRATION]
+--------------------------------------------------------------------------
+The renderer ALSO accepts anyCreature 1.3.1 design-card JSON (the
+"design card" shape documented in PART 97 of the JSON/JS specs —
+top-level `joints` / `chains` / `volumes` / `parts` / `animations`
+/ `palette`, NO `objects` array). When the JSON loader detects
+that shape it routes the spec through `__compileAnyCreature` and
+mounts the compiled THREE.Group via the same `addTsModelToScene`
+path TS factories use. The TS factory contract this file
+describes is not invoked for anyCreature specs — the JSON
+compiler produces its own THREE.Group with its own
+userData.sculptRuntime / userData.tick / userData.animations.
+TS factory output and anyCreature-compiled output live in
+the SAME scene graph (they share gizmo, animation player, T-Pose,
+GLB export, ACES quality pass). One click on the toolbar's
+"🐺 Sample Spec" button mounts the bundled
+`public/rig/specs/quadruped_light.json` so the demo works fully
+offline. The compiler is documented in PART 97 of the JSON/JS
+specs; this section is just the cross-reference for the TS author.
 
 ================================================================================
 PART 5 — VFX / ANIMATION: the `tick(dt, elapsed)` CONTRACT
@@ -22361,6 +22382,119 @@ v8.19 (2026-09-10) -- 3D MODELING STYLE INTEGRATION (anyCreature
   checks. A blueprint that violates PART 96-100 may
   still render but will be tamer than the user wanted.
   Bumped from v8.18 to v8.19.
+
+
+v8.20 (2026-09-14) — ANYCREATURE 1.3.1 SPEC COMPILER + AUTO-ACES
+  ON MOUNT (RUNTIME BRIDGE, PART 90.8 + PART 97.RENDERER +
+  PART 97.10-12 CLARIFICATIONS, NEW RUNTIME). The PART 97
+  spec format and the PART 90 ACES engine were both
+  documented and shipped in v8.18/v8.19, but the JSON
+  loader had no compiler wired up between them — dropping
+  a design card with top-level `joints` / `chains` /
+  `volumes` / `parts` / `animations` / `palette` (and no
+  `objects` array) just hit "Missing 'objects' array" and
+  bailed. v8.20 closes that gap in two commits. The TS
+  factory contract described in THIS file (Prompt_To_Ts.txt)
+  is NOT invoked for anyCreature specs — the JSON compiler
+  produces its own THREE.Group with its own runtime hooks.
+  TS factory output and anyCreature-compiled output live in
+  the SAME scene graph (they share gizmo, animation player,
+  T-Pose, GLB export, ACES quality pass). Summary:
+    - PART 97.RENDERER (new section, leading PART 97,
+      documented in the JSON/JS specs) -- documents how
+      the JSON loader detects the anyCreature format
+      (heuristic: no `objects` array AND >= 2 of
+      {joints, chains, volumes, parts, animations,
+      palette} at the top level), that detection runs
+      inside validateAndBuild() BEFORE the LBL blueprint
+      path, that the compiled result is mounted via
+      addTsModelToScene (so the existing animation player
+      / T-Pose / inspector / GLB export all work
+      unchanged), and that userData.sculptRuntime /
+      userData.tick / userData.animations are wired by
+      the compiler so the runtime hooks the rest of the
+      renderer expects are already in place.
+    - PART 97.10 (volumes, REFINED) -- documents the
+      chain-sampling behaviour: the spec says "the
+      renderer sweeps N rings along the chain" but the
+      v2 implementation runs the polyline through a
+      uniform Catmull-Rom spline FIRST (density = 8
+      points per source segment, skipped for 2-point
+      polylines) then re-samples by arc length. This
+      is what makes legs / body flow smoothly through
+      joints instead of showing visible beads at every
+      chain vertex. The factory SHOULD aim for 4+ joint
+      chains (root / elbow / wrist / toe minimum) so
+      the spline has curvature to interpolate.
+    - PART 97.11 (parts, REFINED) -- clarifies the eye
+      part: the spec says "an eye is a small gold
+      sphere at the brow" but the v2 implementation
+      wraps the gold sclera in a THREE.Group with a
+      smaller black pupil sphere embedded along the
+      forward axis. Both meshes carry
+      userData.partType='eye' so the ACES class map
+      tags them as `fx` (no L1-L8 stack, no shadow)
+      -- otherwise the gold iris would desaturate into
+      a generic flesh colour under the OKLab ramp.
+      The factory SHOULD set the eye material to a
+      saturated hue (gold, copper, emerald, etc.) so
+      the pupil stays the only dark element.
+    - PART 97.12 (animations, KNOWN V1 LIMITATION) --
+      the compiler currently emits volumes and parts
+      as regular THREE.Mesh, NOT SkinnedMesh. The bone
+      hierarchy IS in the scene graph so track names
+      resolve and the animation player lists the clips,
+      but the geometry is not deformed -- the model
+      ships in its bind pose. The proper skinned-mesh
+      follow-up requires detecting the renderer's
+      gizmo-anchor re-parent and rebinding AFTER the
+      wrap, not at compile time. Marked as "v2 of the
+      compiler".
+    - PART 90.8 (new section, documented in the JSON/JS
+      specs) -- documents the auto-apply ACES quality
+      pass on anyCreature mount. anyCreature design
+      cards are authored to the anyCreature 1.3.1
+      reference rendering style -- the L1-L8 stack + AO
+      bake is what gives the body its proper value
+      contrast and the legs their smooth read. The
+      renderer auto-triggers window.ACES.run ONCE on
+      mount with the same shading defaults the ACES
+      panel would apply. The user can still re-run with
+      different settings via the ACES panel -- auto-ACES
+      is just the baseline. ~800ms on a 13-mesh wolf
+      spec.
+    - PART 90.8 also documents the ACES module loader.
+      The six sub-modules (aces-oklab / aces-normals /
+      aces-ao / aces-shade / aces-checks / aces-bones)
+      and the engine are loaded via dynamic import()
+      inside a non-blocking IIFE at the top of the main
+      module script. Top-level await would freeze page
+      init while the modules load; the IIFE fires them
+      in the background and console.logs when ready.
+      window.ACES becomes non-undefined ~1s after page
+      load on a cold cache.
+    - PART 90.8 also documents the new toolbar entry
+      "🐺 Sample Spec". One click fetches
+      public/rig/specs/quadruped_light.json (bundled
+      canonical anyCreature sample) and mounts it via
+      the same path as a drop. Useful for verifying the
+      feature is wired up without having to find a
+      design card on disk. The file is bundled so the
+      demo works fully offline.
+    - PART 4.4 (new section, "ANYCREATURE 1.3.1 AUTO-
+      MOUNT [EXTERNAL INTEGRATION]") -- the 1-paragraph
+      cross-reference for TS authors. anyCreature
+      specs are detected and compiled by the JSON
+      loader, NOT by the TS factory contract this file
+      describes; the two output paths share the scene
+      graph, the animation player, the ACES panel, and
+      the GLB export.
+  Bumped from v8.19 to v8.20. The TS factory contract
+  in PARTs 1-12 is unchanged. The new content is
+  documentation-only (cross-references to the JSON/JS
+  specs' new PART 90.8 / PART 97.RENDERER sections +
+  the 1-paragraph integration mention in PART 4.4).
+  No TS factory runtime hook shape changes.
 
 ================================================================================
 PART 90 -- ACES ENGINE SURFACE (RENDERER CAPABILITY, OPT-IN)
