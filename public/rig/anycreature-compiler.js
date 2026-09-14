@@ -287,16 +287,67 @@ function chainToPolyline(chain, positions) {
   return pts;
 }
 
+// 3D uniform Catmull-Rom spline evaluation. Given 4 control points
+// p0..p3 and a parameter t in [0, 1], returns the interpolated point
+// between p1 and p2 (the segment p1→p2). Ghost endpoints (clamped) are
+// passed in by the caller for the boundary segments.
+function uniformCatmullRom3D(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t2 * t;
+  const x = 0.5 * (
+    (2 * p1.x) +
+    (-p0.x + p2.x) * t +
+    (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+    (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+  );
+  const y = 0.5 * (
+    (2 * p1.y) +
+    (-p0.y + p2.y) * t +
+    (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+    (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+  );
+  const z = 0.5 * (
+    (2 * p1.z) +
+    (-p0.z + p2.z) * t +
+    (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 +
+    (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3
+  );
+  return new THREE.Vector3(x, y, z);
+}
+
 // Sample N points along a poly-line by arc length. Returns an array of
 // { pos, tangent, normal, binormal } frames in object space. The frames
 // use the parallel-transport method (Frenet fails on inflection chains).
+//
+// When the polyline has 3+ control points we run it through a uniform
+// Catmull-Rom spline so the resulting tube curves smoothly through the
+// joints (instead of bending sharply at every chain segment). Two-point
+// polylines stay straight — there's no curvature to interpolate.
 function samplePolyline(pts, sampleCount) {
   if (pts.length < 2 || sampleCount < 2) return [];
-  // Compute cumulative arc length.
+  const useSpline = pts.length >= 3;
+  // First pass: build a smoothed polyline with `density` points per
+  // source segment, so the curvature is captured. The downstream
+  // arc-length resampling then distributes rings uniformly along the
+  // curve (not bunched at sharp joints).
+  const density = useSpline ? 8 : 1;
+  const splinePts = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (!useSpline) { splinePts.push(pts[i].clone()); continue; }
+    for (let j = 0; j < density; j++) {
+      const u = j / density;
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      splinePts.push(uniformCatmullRom3D(p0, p1, p2, p3, u));
+    }
+  }
+  splinePts.push(pts[pts.length - 1].clone());
+  // Cumulative arc length on the smoothed polyline.
   const segs = [];
   let total = 0;
-  for (let i = 0; i + 1 < pts.length; i++) {
-    const a = pts[i], b = pts[i + 1];
+  for (let i = 0; i + 1 < splinePts.length; i++) {
+    const a = splinePts[i], b = splinePts[i + 1];
     const l = a.distanceTo(b);
     segs.push({ a, b, len: l, cumStart: total });
     total += l;
@@ -757,54 +808,62 @@ function buildSpike(part, hostPos, mat) {
 }
 
 function buildEye(part, hostPos, mat, chains, positions) {
-  // Always creates BOTH eyes (mirrored) unless the spec explicitly
-  // disables mirroring. The eye size is `part.size` (radius). The eye
-  // is placed at hostPos + small offset along the local "forward".
+  // Build the eye as a small Group containing:
+  //   1. An outer sclera sphere in the eye material colour (gold) at
+  //      `part.size` radius — this is the visible "eye" at the spec'd
+  //      size.
+  //   2. A small inner pupil sphere (black) embedded inside the sclera
+  //      at ~30% of the radius, offset along the forward axis. This
+  //      is what gives the eye its visible-from-a-distance character
+  //      — without a pupil, a 2.8cm gold sphere at the brow reads as
+  //      a paint smudge, not an eye.
+  // The group is oriented so local +Y is the eye's "forward" (looking
+  // direction); the caller applies the host-bone bind so the eye
+  // follows the head bone.
   const size = part.size || 0.03;
   const offset = part.offset ? new THREE.Vector3(part.offset[0], part.offset[1], part.offset[2]) : new THREE.Vector3(0, 0, 0);
   const fwd = part.forward ? new THREE.Vector3(part.forward[0], part.forward[1], part.forward[2]).normalize() : new THREE.Vector3(0, 0, 1);
   const eyePos = hostPos.clone().add(offset);
-  // Build a small sphere-ish disc facing the forward direction.
-  const segments = 12, rings = 6;
-  const posArr = [], nrmArr = [], colArr = [], idxArr = [];
-  for (let r = 0; r <= rings; r++) {
-    const phi = (r / rings) * Math.PI;
-    for (let s = 0; s <= segments; s++) {
-      const theta = (s / segments) * Math.PI * 2;
-      const x = Math.sin(phi) * Math.cos(theta) * size;
-      const y = Math.cos(phi) * size;
-      const z = Math.sin(phi) * Math.sin(theta) * size;
-      // Orient: local Y -> fwd
-      const upRef = Math.abs(fwd.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-      const u = new THREE.Vector3().crossVectors(fwd, upRef).normalize();
-      const v = new THREE.Vector3().crossVectors(fwd, u).normalize();
-      const p = eyePos.clone()
-        .addScaledVector(fwd, y)
-        .addScaledVector(u, x)
-        .addScaledVector(v, z);
-      const n = new THREE.Vector3().addScaledVector(fwd, y).addScaledVector(u, x).addScaledVector(v, z).normalize();
-      posArr.push(p.x, p.y, p.z);
-      nrmArr.push(n.x, n.y, n.z);
-      colArr.push(mat.color.r, mat.color.g, mat.color.b);
-    }
-  }
-  for (let r = 0; r < rings; r++) {
-    for (let s = 0; s < segments; s++) {
-      const a = r * (segments + 1) + s;
-      const b = a + 1;
-      const c = (r + 1) * (segments + 1) + s;
-      const d = c + 1;
-      idxArr.push(a, c, b, b, c, d);
-    }
-  }
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
-  geom.setAttribute('normal', new THREE.Float32BufferAttribute(nrmArr, 3));
-  geom.setAttribute('color', new THREE.Float32BufferAttribute(colArr, 3));
-  geom.setIndex(idxArr);
-  const m = new THREE.Mesh(geom, mat);
-  m.name = 'eye';
-  return m;
+  const group = new THREE.Group();
+  group.name = 'eye';
+  // 1. Sclera: a low-poly icosahedron scaled to the spec's size. We use
+  //    a flat-shaded material so the facets read as "low poly eye",
+  //    not a smooth ball.
+  const scleraGeom = new THREE.IcosahedronGeometry(size, 0);
+  scleraGeom.translate(eyePos.x, eyePos.y, eyePos.z);
+  // Sclera material: copy the eye material, but push roughness + use
+  // flatShading so the facets stand out.
+  const scleraMat = new THREE.MeshStandardMaterial({
+    color: mat.color,
+    roughness: mat.roughness,
+    metalness: mat.metalness,
+    flatShading: true,
+  });
+  const sclera = new THREE.Mesh(scleraGeom, scleraMat);
+  sclera.name = 'eye_sclera';
+  // userData lets the ACES class map recognise this as an fx (no
+  // shading layers / shadow), so the L1-L8 stack doesn't desaturate
+  // the gold iris.
+  sclera.userData = { part: 'eye', partType: 'eye' };
+  group.add(sclera);
+  // 2. Pupil: a small black sphere embedded in the sclera, offset
+  //    along the forward axis so it sits flush with the front face.
+  const pupilRadius = size * 0.45;
+  const pupilOffset = size * 0.55; // protrude slightly past the sclera
+  const pupilPos = eyePos.clone().addScaledVector(fwd, pupilOffset);
+  const pupilGeom = new THREE.IcosahedronGeometry(pupilRadius, 0);
+  pupilGeom.translate(pupilPos.x, pupilPos.y, pupilPos.z);
+  const pupilMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#0a0a0a'),
+    roughness: 0.4,
+    metalness: 0.0,
+    flatShading: true,
+  });
+  const pupil = new THREE.Mesh(pupilGeom, pupilMat);
+  pupil.name = 'eye_pupil';
+  pupil.userData = { part: 'eye', partType: 'eye' };
+  group.add(pupil);
+  return group;
 }
 
 function buildFin(part, hostPos, mat) {

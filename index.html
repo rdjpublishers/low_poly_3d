@@ -2097,6 +2097,37 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// LBL UPDATE — eagerly import the ACES (anyCreature Engine Surface)
+// sub-modules so window.ACES is available for the auto-ACES trigger
+// the anyCreature compiler uses. These are modules (not classic
+// <script> tags) because each sub-module declares `const api`,
+// `const hex2lin` etc. at the top level, which would collide in the
+// shared classic-script global scope. The files attach their
+// exports to window.ACES_*/window.ACES from inside, so the
+// downstream ACES.run() path keeps working unchanged.
+//
+// IMPORTANT: do NOT `await` these imports at module top level — they
+// would block the rest of the page init (scene / OrbitControls /
+// TransformControls / model-store) until each one resolves. The page
+// would show "no scene" / "Waiting for JSON..." until the slowest
+// module lands. Fire them in the background and surface a console
+// log when they're ready.
+(async () => {
+  try {
+    await import('aces-oklab');
+    await import('aces-normals');
+    await import('aces-ao');
+    await import('aces-shade');
+    await import('aces-checks');
+    await import('aces-bones');
+    await import('aces-engine');
+    console.log('[LBL] ACES engine surface loaded — window.ACES =', !!window.ACES);
+  } catch (e) {
+    console.warn('[LBL] ACES modules failed to load:', e && e.message);
+  }
+})();
+
 // LBL update H2 — transform gizmo (drag objects in viewport)
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
@@ -14526,6 +14557,56 @@ async function __lblCompileAndMountAnycreature(spec, source){
     });
     setStatus('anyCreature loaded', true);
     toast(`Loaded ${spec.name || 'anyCreature spec'} (${result.group.children.length} meshes)`);
+    // PART 97 (anyCreature) — auto-trigger ACES quality pass. The
+    // renderer ships ACES as opt-in (the 🛡 button), but anyCreature
+    // design cards are authored to a specific shading style (the
+    // anyCreature 1.3.1 reference) and the L1-L8 stack + AO bake is
+    // what makes the body read with proper value contrast and the
+    // legs look like a single continuous tube instead of a row of
+    // beads. Apply it automatically once on mount; the user can
+    // still re-run with different settings via the ACES panel.
+    //
+    // We call window.ACES.run directly (rather than __acesRun, which
+    // also writes to the ACES panel DOM that isn't open at this
+    // point). Same shading defaults as the panel would apply.
+    if(window.ACES && window.ACES.run && typeof sceneGroup !== 'undefined'){
+      try{
+        // Build the class map (matches what __acesRun does).
+        const classMap = new Map();
+        sceneGroup.traverse((obj) => {
+          if(obj.isMesh || obj.isSkinnedMesh){
+            const mat = (obj.material && obj.material.name) || '';
+            const k = (obj.userData && obj.userData.part) || (obj.userData && obj.userData.chain) || mat;
+            if(!k) return;
+            if(/eye|iris|pupil|teeth|tongue/i.test(mat)) classMap.set(k, 'fx');
+            else if(obj.userData && obj.userData.partType && /spike|curve|membrane|fin/i.test(obj.userData.partType)) classMap.set(k, 'hard');
+            else if(obj.userData && obj.userData.part) classMap.set(k, 'hard');
+            else classMap.set(k, 'flesh');
+          }
+        });
+        const rep = window.ACES.run({
+          scene: sceneGroup,
+          shading: {
+            seam: { radius_edges: 3, min_frac: 0.030 },
+            pattern: { color: null, sharpness: 0.45, amount: 1.0, scale: 0.06 },
+            ramp: { bottom: '#001370', mid: '#cfcfcf', top: '#fffcf0', p0: 0.0, pm: 0.31, wm: 0.08, p1: 1.0, chroma: 1.0, amount: 1.0 },
+            boost: { y0: 0.0, y1: 0.4, gamma: 0.3, dL: 0.03, dC: 1.5, amount: 1.0, target: 'all' },
+            bleed: { radius: 0.025, sharpness: 0.35, amount: 0.45 },
+            hardsh: { amount: 0.54, gamma: 0.7 },
+            bodysh: { lights: 4, rot: 4, elev: 17, amount: 0.2, gamma: 1.95 },
+            normals: { flesh: 0.9 },
+          },
+          ao: { samples: 16, strength: 0.59, multiply: true },
+          smoothAngle: 50,
+          classMap: classMap,
+          spec: { volumes: [], parts: [], chains: {}, attach: {}, shading: null },
+          onReport: (r) => {
+            window.ACES.lastReport = r;
+            console.log('[anycreature] ACES pass:', r.summary);
+          },
+        });
+      }catch(e){ console.warn('[anycreature-aces]', e); }
+    }
   }catch(e){
     console.error('[anycreature]', e);
     const stack = (e && e.stack) ? e.stack.split('\n').slice(0, 6).join('\n') : '(no stack)';
