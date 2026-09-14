@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
 <meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.24 (TS path) and v8.16 (JSON/JS path) with 10 opt-in architectural features, 36 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30, 6 PART 67 opt-in validators E31 modifier stack order / E32 UV projection sanity / E33 modifier stack safety / E34 converge direction / E35 recolor roles / E36 preflight check), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider), PART 67 OPT-IN CAPABILITY BUNDLE (7 new cross-primitive shape generators makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix + 6 deform modifiers taper / twist / bend / spherize / inflate / applyNoise dispatched by applyModifierStack + 3 UV projections via projectUV + 1 vertex-channel helper fillVertexChannel + 1 convergeFaces helper + 1 recolorByPalette runtime swap + 1 placeChain chain placement + 1 applyMaterialAnimation time-driven material keyframes + 1 preflightCheck safety budget — especially useful for weapons, blades, and metal-finish subjects), and PART 74 OPT-IN CAPABILITY BUNDLE (procedural texturing & shading techniques: 6 noise helpers mulberry32 / fnv1a / valueNoise2D / fbm2D / voronoi2D / domainWarpFBM + 3 procedural micro-texture generators microRoughnessMap / punctateMaps / striateMaps with Sobel-with-wrap-around tile-safety + 5 height-to-X conversions heightToNormal / heightToRoughness / heightToAO / heightToCurvature / cavityDirt + 4 PBR creature recipes chitin / elytra / membrane / velvet with clearcoat-capped-at-0.55 + 4 loft-based organic geometry helpers loft / spindle / segmentedAbdomen / surfaceDecorationAlongCurvedBody + 1 hex-facet helper facetHeightField via triangular-lattice Voronoi + 3 cross-cutting tricks domainWarpFBM / slopeBlur / makeTileableSquare / makeTileablePeriodic + 4 procedural pattern helpers makeBricksPattern / makeTruchetPattern / makeCairoPattern / makeSplatterPattern + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane, and any model whose reference surface has identifiable material micro-structure). PART 45, PART 67, and PART 74 are EXTRA CAPABILITIES — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
-<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.24, LBL v8.16, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.24 v8.16, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments"/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.24, LBL v8.16, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.24 v8.16, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments, PART 100-143 44-Technique Modeling Bundle Primitive BMesh Procedural Parametric Generative SDF Voxel CSG Boolean L-System Fractal NURBS Non-Manifold Subdivision Remeshing Retopology Decimation Triangulation Quad Smoothing Sculpting Displace SMPL Blendshapes ShapeKeys MorphTargets LBS DQS ImplicitSkinning DeltaMush CageDeformation MuscleSim SoftBody Hair AutoRig PBRNodes ProceduralTex UVUnwrap Baking TexturePainting AtlasPacking LOD Instancing GeometryNodes PhysicsSim, MakePrimitive BmeshFromGeometry ProceduralGenerate MakeParametric GenerativeGrow SdfEvaluate VoxelCarve CsgUnion LSystem FractalMandelbulb MakeNurbsCurve DetectNonManifold SubdivideCatmullClark IsotropicRemesh AutoRetopologize QemDecimate Triangulate Quadify LaplacianSmooth SculptBrush DisplaceSurface SmplSkeleton MakeBlendshape ShapeKeyStore ComputeLBS ComputeDQS ImplicitSkin DeltaMush CageDeform MuscleSim SoftBodySim HairStrands AutoRig PbrMaterialGraph ProceduralTextureCanvas UvUnwrap BakeMap PaintTexture PackAtlases GenerateLOD MakeInstanced GeoNodesEvaluate PhysicsStep"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -1465,6 +1465,10 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
        Does NOT modify the loaded model until the user clicks — the panel
        shows the gate results first, then applies on user confirmation. -->
   <button class="tbtn hide-xs" id="aces-btn" title="PART 90 — ACES quality pass. Per-vertex AO + L1-L8 OKLab shading stack + 15 mechanical checks (BLOCK / warn / info). Opt-in, never modifies your model until you click Apply.">🛡 ACES</button>
+  <!-- v1.25 / v8.17 PART 100-143 — MT 44-Technique Modeling Bundle button.
+       Opens a panel listing all 44 helpers (core / mesh / organic / materials
+       / advanced) with one-click self-test + per-mesh dispatch. -->
+  <button class="tbtn hide-xs" id="mt-btn" title="PART 100-143 — 44-Technique Modeling Bundle (MT.run / MT.selfTest / MT.applyToScene). 12 core + 9 mesh + 13 organic + 6 materials + 4 advanced techniques, all deterministic.">🧰 MT</button>
   <div class="vdiv"></div>
   <!-- LBL update F4 — animation controls moved out of the topbar into a
        floating panel anchored to the bottom of the viewport (see
@@ -1521,9 +1525,9 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
   <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
   <!-- RJS UPDATE 14 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
-       TS factories target v1.24 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects + PART 74 procedural texturing & shading techniques OPT-IN capability bundle: 6 noise helpers + 3 procedural micro-texture generators + 5 height-to-X conversions + 4 PBR creature recipes (chitin / elytra / membrane / velvet) + 4 loft-based organic geometry helpers + 1 hex-facet helper + 3 cross-cutting tricks + 4 procedural pattern helpers + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane), JSON/JS blueprints target v8.16 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67 + PART 74).
+       TS factories target v1.24 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects + PART 74 procedural texturing & shading techniques OPT-IN capability bundle: 6 noise helpers + 3 procedural micro-texture generators + 5 height-to-X conversions + 4 PBR creature recipes (chitin / elytra / membrane / velvet) + 4 loft-based organic geometry helpers + 1 hex-facet helper + 3 cross-cutting tricks + 4 procedural pattern helpers + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane), PART 100-143 44-Technique Modeling Bundle (12 core modeling techniques Primitive / BMesh / Procedural / Parametric / Generative / SDF / Voxel / CSG / L-System / Fractal / NURBS / Non-Manifold + 9 mesh quality techniques Subdivision / Remeshing / Retopology / Decimation / Triangulation / Quad Conversion / Smoothing / Sculpting API / Displace+Noise + 13 human/organic techniques SMPL-X / Blendshapes / Shape Keys / Morph Targets / LBS / DQS / Implicit Skinning / Delta Mush / Cage Deformation / Muscle Sim / Soft Body / Hair / Auto-Rigging + 6 materials & UV techniques PBR Material Nodes / Procedural Texturing / UV Unwrapping / Baking / Texture Painting / Atlas Packing + 4 optimization & advanced techniques LOD / Instancing / Geometry Nodes / Physics Sim, all deterministic per PART 74 contract, zero external assets, opt-in via window.MT catalog, fully integrated with the ACES PART 90 quality pass), JSON/JS blueprints target v8.16 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67 + PART 74).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 36 anti-patterns from PART 32/65/38/39/40/41/42/43/44/45/67. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.24 TS / v8.16 JSON-JS). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), and PART 74 OPT-IN validators are intentionally NOT added (PART 74's new helpers are covered by the existing E19 PBR + UV completeness, E20 hard-constraint, E22 detail-inventory compliance, and the extended PART 21 validation checklist — see PART 74.10.4) as non-blocking warnings. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), and PART 74 (procedural texturing & shading techniques) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.24 / v8.16</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.27 TS / v8.19 JSON-JS, with PART 100-143 44-Technique Modeling Bundle). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), PART 74 OPT-IN validators (covered by E19/E20/E22 + extended PART 21 checklist — see PART 74.10.4) as non-blocking warnings, and PART 100-143 OPT-IN 44-Technique Modeling Bundle helpers exposed on window.MT (12 CORE + 9 MESH + 13 ORGANIC + 6 MATERIALS + 4 ADVANCED) for catalog-driven scene authoring. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), PART 74 (procedural texturing & shading techniques), and PART 100-143 (44-Technique Modeling Bundle) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.27 / v8.19</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -2090,7 +2094,14 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
     "aces-checks": "./public/aces/aces-checks.js",
     "aces-bones": "./public/aces/aces-bones.js",
     "aces-engine": "./public/aces/aces-engine.js",
-    "anycreature-compiler": "./public/rig/anycreature-compiler.js"
+    "anycreature-compiler": "./public/rig/anycreature-compiler.js",
+    "mt-noise": "./public/modeling/mt-noise.js",
+    "mt-core-modeling": "./public/modeling/mt-core-modeling.js",
+    "mt-mesh-quality": "./public/modeling/mt-mesh-quality.js",
+    "mt-organic": "./public/modeling/mt-organic.js",
+    "mt-materials-uv": "./public/modeling/mt-materials-uv.js",
+    "mt-advanced": "./public/modeling/mt-advanced.js",
+    "mt-engine": "./public/modeling/mt-engine.js"
   }
 }
 </script>
@@ -2126,7 +2137,25 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   } catch (e) {
     console.warn('[LBL] ACES modules failed to load:', e && e.message);
   }
-})();
+  // LBL UPDATE — eagerly import the 44-Technique Modeling Bundle (PART 100-143)
+  // (window.MT) so it's available for ACES auto-trigger / Rig panel / etc.
+  // Same loading rationale as ACES above: don't block scene init by awaiting
+  // at module top-level.
+  (async () => {
+    try {
+      await import('mt-noise');
+      await import('mt-core-modeling');
+      await import('mt-mesh-quality');
+      await import('mt-organic');
+      await import('mt-materials-uv');
+      await import('mt-advanced');
+      await import('mt-engine');
+      console.log('[LBL] 44-Technique Modeling Bundle loaded — window.MT =', !!window.MT,
+                  '| catalog entries =', window.MT && window.MT.catalog ? window.MT.catalog.length : 0);
+    } catch (e) {
+      console.warn('[LBL] MT modules failed to load:', e && e.message);
+    }
+  })();
 
 // LBL update H2 — transform gizmo (drag objects in viewport)
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -19870,6 +19899,105 @@ function __acesRun(reportOnly) {
     status.style.color = '#e88a8a';
     out.textContent = 'ACES.run threw: ' + e.message + '\n\nStack: ' + e.stack;
   }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// PART 100-143 — MT 44-Technique Modeling Bundle (panel + button wire-up).
+// Mirrors the ACES panel: lazy-build on first open, list the 44 techniques,
+// and offer a self-test + per-technique dispatch against the current scene.
+// Same opt-in contract — nothing happens unless the user clicks Apply.
+// ───────────────────────────────────────────────────────────────────────
+const mtBtn = document.getElementById('mt-btn');
+if (mtBtn) {
+  mtBtn.addEventListener('click', () => {
+    if (!window.MT) {
+      console.warn('[MT] modules failed to load — public/modeling/ subdir missing?');
+      alert('MT modules not loaded. Make sure /public/modeling/ is served alongside index.html.');
+      return;
+    }
+    let panel = document.getElementById('mt-panel');
+    if (!panel) panel = __mtBuildPanel();
+    panel.classList.toggle('open');
+    panel.style.display = panel.classList.contains('open') ? 'block' : 'none';
+  });
+}
+
+function __mtBuildPanel() {
+  const p = document.createElement('div');
+  p.id = 'mt-panel';
+  p.className = 'side-panel';
+  p.style.cssText = 'position:absolute;right:0;top:0;width:420px;max-height:100vh;overflow-y:auto;background:#0a0c10;color:#eaeaea;border-left:1px solid #2a2e36;padding:14px;font:13px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;z-index:50;display:none;';
+  const groups = { CORE: [], MESH: [], ORGANIC: [], MATERIALS: [], ADVANCED: [] };
+  for (const t of window.MT.catalog) groups[t.group].push(t);
+  function _section(name, items) {
+    return `<details open style="margin-bottom:8px"><summary style="cursor:pointer;color:#9fc3ff;font-weight:bold">${name} (${items.length})</summary><div style="margin:6px 0;padding:6px;background:#11141a;border:1px solid #1a1e26;border-radius:3px">` +
+      items.map(t => `<div style="padding:4px 0;border-bottom:1px solid #1a1e26"><b style="color:#a8e6a8">#${t.n}</b> <span>${t.name}</span><br><span style="color:#888;font-size:11px">${t.description}</span><br><span style="color:#6f9ec9;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px">MT.core.${t.fn} / MT.mesh.${t.fn} / MT.organic.${t.fn} / MT.materials.${t.fn} / MT.advanced.${t.fn}</span></div>`).join('') +
+      `</div></details>`;
+  }
+  p.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <strong>🧰 MT — 44-Technique Modeling</strong>
+      <button id="mt-close" style="background:none;border:0;color:#888;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.4">
+      <b>PART 100-143</b> — Complete 3D modeling vocabulary in the browser.
+      12 core + 9 mesh quality + 13 organic + 6 materials + 4 advanced.
+      Deterministic (PART 74-aligned), zero external assets, zero network.
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="mt-selftest-btn" style="flex:1;background:#1d2632;border:1px solid #2a3a52;color:#9fc3ff;padding:6px;border-radius:3px;cursor:pointer">🧪 Run self-test</button>
+      <button id="mt-openconsole-btn" style="flex:1;background:#233a23;border:1px solid #3a5a3a;color:#a8e6a8;padding:6px;border-radius:3px;cursor:pointer">📟 console</button>
+    </div>
+    <div id="mt-status" style="font-size:11px;color:#888;margin-bottom:8px">ready (window.MT.loaded with ${window.MT.catalog.length} entries)</div>
+    <div id="mt-output" style="font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#0a0c10;border:1px solid #1a1e26;padding:8px;max-height:40vh;overflow-y:auto;white-space:pre-wrap"></div>
+    ${_section('CORE MODELING', groups.CORE)}
+    ${_section('MESH QUALITY', groups.MESH)}
+    ${_section('HUMAN / ORGANIC', groups.ORGANIC)}
+    ${_section('MATERIALS & UV', groups.MATERIALS)}
+    ${_section('OPTIMIZATION & ADVANCED', groups.ADVANCED)}
+    <div style="margin-top:10px;padding:10px;background:#0e1116;border:1px solid #1a1e26;border-radius:3px;font-size:11px;color:#888;line-height:1.4">
+      <b>Usage</b>: from the browser console, call any helper directly:<br>
+      <code style="color:#9fc3ff">MT.core.makePrimitive('sphere', {size:1, detail:2})</code><br>
+      <code style="color:#9fc3ff">MT.mesh.subdivideCatmullClark(geom, 2)</code><br>
+      <code style="color:#9fc3ff">MT.organic.smplBuild()</code><br>
+      <code style="color:#9fc3ff">MT.advanced.makeInstanced(geom, 1000, {distribution:'random', seed:7})</code><br>
+      Or run <code style="color:#9fc3ff">MT.selfTest()</code> to verify the bundle.
+    </div>
+  `;
+  document.body.appendChild(p);
+  document.getElementById('mt-close').addEventListener('click', () => {
+    p.classList.remove('open');
+    p.style.display = 'none';
+  });
+  document.getElementById('mt-selftest-btn').addEventListener('click', () => {
+    const out = document.getElementById('mt-output');
+    const status = document.getElementById('mt-status');
+    out.textContent = 'running self-test…';
+    status.textContent = 'running…';
+    status.style.color = '#9fc3ff';
+    setTimeout(() => {
+      try {
+        const r = window.MT.selfTest();
+        const lines = r.log.map(l => {
+          if (l.status === 'OK') return `  ✓ ${l.name}`;
+          return `  ✗ ${l.name}: ${l.error}`;
+        });
+        out.textContent = `${r.passed} passed / ${r.failed} failed\n` + lines.join('\n');
+        status.textContent = r.failed === 0 ? `${r.passed}/${r.log.length} OK` : `${r.failed} failure(s)`;
+        status.style.color = r.failed === 0 ? '#a8e6a8' : '#e8c93f';
+      } catch (e) {
+        out.textContent = 'self-test threw: ' + e.message;
+        status.textContent = 'error';
+        status.style.color = '#e88a8a';
+      }
+    }, 50);
+  });
+  document.getElementById('mt-openconsole-btn').addEventListener('click', () => {
+    const out = document.getElementById('mt-output');
+    out.textContent = 'window.MT loaded:\n' +
+      Object.keys(window.MT).map(k => `  ${k}: ${typeof window.MT[k]}`).join('\n');
+  });
+  return p;
 }
 
 // ───────────────────────────────────────────────────────────────────────

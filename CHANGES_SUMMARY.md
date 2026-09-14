@@ -4113,3 +4113,133 @@ non-creature subjects it falls back to the primitive-based approach.
 - **Möller & Trumbore** — ray-triangle intersection.
 - **RDJ Publishers** — ported to the LBL spec as PART 96-100.
   Verified against the engine source on 2026-09-10.
+
+---
+
+# v1.27 / v8.19 — 44-Technique Modeling Bundle (PART 100-143) — OPT-IN capability bundle
+
+The renderer now ships a **complete 3D modeling vocabulary** as a
+seventh opt-in capability bundle, derived from the maintainer's
+"44 3D-Modeling Techniques" working notebook (compiled 2026-09-14).
+The bundle adds **44 named helpers** covering CORE / MESH QUALITY /
+HUMAN-ORGANIC / MATERIALS-UV / OPTIMIZATION-ADVANCED technique
+groups, all exposed on `window.MT` (mirroring the ACES PART 90
+pattern). Same determinism contract as PART 74 — `mulberry32` PRNG,
+`fnv1a` sub-seed derivation, identical output for identical input
+on every reload.
+
+```
+public/modeling/
+├── mt-noise.js              PART 100 — PRNG + 2D/3D noise helpers
+├── mt-core-modeling.js      PART 101-112 — 12 core techniques
+├── mt-mesh-quality.js       PART 113-121 — 9 mesh-quality techniques
+├── mt-organic.js            PART 122-134 — 13 human/organic techniques
+├── mt-materials-uv.js       PART 135-140 — 6 materials/UV techniques
+├── mt-advanced.js           PART 141-144 — 4 optimization/advanced
+└── mt-engine.js             PART 143 — orchestrator + catalog + self-test
+```
+
+## The 44 techniques
+
+| #  | Group | Technique | Module entry |
+|----|-------|-----------|--------------|
+| 1  | CORE | Primitive Modeling | `MT.core.makePrimitive` |
+| 2  | CORE | BMesh Modeling | `MT.core.bmeshFromGeometry` + `bmeshOp` |
+| 3  | CORE | Procedural Modeling | `MT.core.proceduralGenerate` |
+| 4  | CORE | Parametric Modeling | `MT.core.makeParametric` |
+| 5  | CORE | Generative Modeling | `MT.core.generativeGrow` |
+| 6  | CORE | SDF Modeling | `MT.core.sdfEvaluate` + `sdfMarch` |
+| 7  | CORE | Voxel Modeling | `MT.core.voxelCarve` + `marchingCubesFromVoxels` |
+| 8  | CORE | CSG / Boolean | `MT.core.csgUnion`/`Subtract`/`Intersect` (via three-bvh-csg) |
+| 9  | CORE | L-System | `MT.core.lSystem` + `lSystemInterpret` |
+| 10 | CORE | Fractal Modeling | `MT.core.fractalMandelbulb` + `fractalMenger` |
+| 11 | CORE | NURBS / Curves | `MT.core.makeNurbsCurve` + `makeCatmullRom` |
+| 12 | CORE | Non-Manifold | `MT.core.detectNonManifold` + `fixNonManifold` |
+| 13 | MESH | Subdivision Surface | `MT.mesh.subdivideCatmullClark` |
+| 14 | MESH | Remeshing | `MT.mesh.isotropicRemesh` |
+| 15 | MESH | Retopology | `MT.mesh.autoRetopologize` |
+| 16 | MESH | Decimation | `MT.mesh.qemDecimate` (QEM) |
+| 17 | MESH | Triangulation | `MT.mesh.triangulate` (ear-clipping) |
+| 18 | MESH | Quad Conversion | `MT.mesh.quadify` |
+| 19 | MESH | Smoothing | `MT.mesh.laplacianSmooth` + `taubinSmooth` |
+| 20 | MESH | Sculpting API | `MT.mesh.sculptBrush` (pull/push/grab/pinch/flatten) |
+| 21 | MESH | Displace + Noise | `MT.mesh.displaceSurface` |
+| 22 | ORGANIC | SMPL / SMPL-X / STAR | `MT.organic.smplSkeleton` + `smplBuild` + `smplApplyShape` |
+| 23 | ORGANIC | Blendshapes | `MT.organic.makeBlendshape` |
+| 24 | ORGANIC | Shape Keys | `MT.organic.shapeKeyStore` + `shapeKeyEvaluate` |
+| 25 | ORGANIC | Morph Targets | `MT.organic.morphTargetCompute` |
+| 26 | ORGANIC | Linear Blend Skinning | `MT.organic.computeLBS` + `lbsSkin` |
+| 27 | ORGANIC | Dual Quaternion Skinning | `MT.organic.computeDQS` + `dqsSkin` |
+| 28 | ORGANIC | Implicit Skinning | `MT.organic.implicitSkin` |
+| 29 | ORGANIC | Delta Mush | `MT.organic.deltaMush` |
+| 30 | ORGANIC | Cage Deformation | `MT.organic.buildCage` + `cageDeform` |
+| 31 | ORGANIC | Muscle Simulation | `MT.organic.muscleSim` (Hill-type) |
+| 32 | ORGANIC | Soft Body Simulation | `MT.organic.softBodySim` (Verlet) |
+| 33 | ORGANIC | Hair System | `MT.organic.hairStrands` |
+| 34 | ORGANIC | Auto-Rigging | `MT.organic.autoRig` (3D thinning) |
+| 35 | MATERIALS | PBR Material Nodes | `MT.materials.pbrMaterialGraph` |
+| 36 | MATERIALS | Procedural Texturing | `MT.materials.proceduralTextureCanvas` |
+| 37 | MATERIALS | UV Unwrapping | `MT.materials.uvUnwrap` (planar/box/LSCM) |
+| 38 | MATERIALS | Baking | `MT.materials.bakeMap` (normal/AO/curvature) |
+| 39 | MATERIALS | Texture Painting | `MT.materials.paintTexture` |
+| 40 | MATERIALS | Atlas Packing | `MT.materials.packAtlases` (MaxRects BSSF) |
+| 41 | ADVANCED | LOD Generation | `MT.advanced.generateLOD` |
+| 42 | ADVANCED | Instancing | `MT.advanced.makeInstanced` |
+| 43 | ADVANCED | Geometry Nodes | `MT.advanced.geoNodesEvaluate` |
+| 44 | ADVANCED | Physics Simulation | `MT.advanced.physicsStep` + `buildClothWorld` + `buildFluidWorld` |
+
+## UI
+
+A new `🧰 MT` button is added next to the existing `🛡 ACES`
+button. The MT panel:
+- Shows the full 44-entry catalog grouped by family
+- Has a `🧪 Run self-test` button (16 of the techniques are
+  exercised by `window.MT.selfTest()`)
+- Has a `📟 console` button to dump `window.MT` to the side panel
+- Documents the equivalent console call for every helper
+
+## Integration points
+
+- New import-map entries: `mt-noise`, `mt-core-modeling`,
+  `mt-mesh-quality`, `mt-organic`, `mt-materials-uv`,
+  `mt-advanced`, `mt-engine`.
+- Eagerly imported after the ACES bundle so `window.MT` is
+  available by the time the user clicks the button.
+- The `MT.run(n, target, opts)` dispatcher accepts the technique
+  by number, name, or function name.
+- `MT.applyToScene(n, scene, opts)` walks every Mesh /
+  SkinnedMesh in a scene and applies the technique.
+- `MT.selfTest()` runs 16 representative sanity checks and
+  prints a passed/failed summary.
+
+## Compliance
+
+- No new PART 32/65 anti-pattern flags added.
+- Determinism contract preserved (same seed → same output).
+- Zero external assets (no .pkl / .npz / .fbx).
+- No new network requirements (all helpers run client-side).
+- Mirrors the ACES opt-in contract: nothing changes unless
+  the user calls a helper or the MT UI button.
+
+## Companion doc
+
+See `public/modeling/MODELING_TECHNIQUES_v143.md` for the full
+renderer-side annex with usage examples, determinism contract,
+and module map.
+
+## Credits
+
+- **Chris Lömker** — NURBS / Cox-de-Boor.
+- **Jos Stam** — L-system turtle interpretation.
+- **Michael Garland, Paul Heckbert** — quadric error metrics
+  (decimation).
+- **Lloyd, Loop, Schaefer** — subdivision surfaces
+  (Catmull-Clark, Loop).
+- **SMPL authors** (Loper et al.) — statistical body model
+  (canonical 24-joint topology re-implemented here).
+- **Verlet** — physics integrator.
+- **Ton Roosendaal, Brecht Van Lommel** — Blender BMesh /
+  Geometry Nodes reference.
+- **Quilez, Iñigo** — value / FBM / voronoi reference.
+- **RDJ Publishers** — bundled into LBL as PART 100-143.
+  Verified against upstream references 2026-09-14.
