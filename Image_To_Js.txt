@@ -3,6 +3,17 @@ LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.22 — IMAGE-TO-JS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v8.21) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v8.21 pass (2026-09-14).
   PART 145-152 (v8.22) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
+  PART 153-166 (v8.22 / v1.31) -- IMAGE-DRIVEN FACTORY DEFAULTS added to Image_To_Ts.txt (MT helper defaults, ACES auto-trigger, MAT_DB semantic lookup, style-lock flatShading+outline, imageToWorld mapping, IoU check, SDF+MarchingCubes trigger, CSG recipes, MT.core.loft, instanced rivets, PMREM/HDRI auto-enable, detail inventory, 11-step recipe with ACES, 3-variant ranking). The 4 sibling spec files (Image_To_Js.txt / Image_To_Json.txt / Prompt_To_Js.txt / Prompt_To_Json.txt) REFERENCE PART 153-166 from Image_To_Ts.txt rather than duplicating it.
+================================================================================
+>>> v1.31 / v8.22 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
+>>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
+>>> documented in MODELING_TECHNIQUES_v143.md and CHANGES_v130.md.
+>>> PART 153-166 (image-driven factory defaults) is canonically
+>>> documented in Image_To_Ts.txt. This file references those
+>>> documents; see them for the full technique vocabulary and
+>>> pipeline steps. De-duplication saves ~4-5 MB across the 4
+>>> sibling spec files.
+>>>
 ================================================================================
 >>> v8.17 RIGGING — If the model needs ANY rigging or
 >>> animation, also see the v8.17 cross-ref in the

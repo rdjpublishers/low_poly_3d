@@ -21284,3 +21284,291 @@ additive guidance for the AI factory.
 ================================================================================
 END OF PART 145-152
 ================================================================================
+
+================================================================================
+PART 153 — IMAGE-DRIVEN FACTORY TECHNIQUE DEFAULTS (NEW IN v1.31 / v8.22)
+================================================================================
+
+For image-driven .ts factories, ALWAYS use MT.* helpers instead of
+authoring BufferGeometry by hand. The MT helpers produce cleaner
+topology, better UVs, and ACES-friendly geometry.
+
+Specifically:
+  - Body / head / hands → MT.core.makePrimitive('box'|'sphere', opts)
+    + bevel + flatShading: true
+  - Limbs (arms / legs) → MT.core.loft (profile loft, PART 74.5)
+  - Hats / bowls → MT.core.makeLathe (PART 146.2) or LatheGeometry
+  - Belts / straps → MT.core.makeExtrude (ExtrudeGeometry)
+  - Hooks / curved tubes → MT.core.makeNurbsCurve + TubeGeometry
+  - Rivets / repeated small meshes → MT.advanced.makeInstanced
+  - Skeleton → MT.organic.autoRig (PART 134) OR named pivot Groups
+    (PART 148.4)
+  - Materials → look up in MAT_DB by semantic name first
+
+Fall back to hand-authored BufferGeometry ONLY when:
+  - The MT helper doesn't exist for the specific shape
+  - The shape is custom (a logo, a sigil, a name plate)
+  - The MT helper produces wrong topology for the reference
+
+================================================================================
+PART 154 — AUTO-TRIGGER ACES (NEW IN v1.31 / v8.22)
+================================================================================
+
+After construction, the AI factory MUST call window.ACES.run() if
+window.ACES is available:
+
+  if (typeof window.ACES !== 'undefined' && window.ACES.run) {
+    const report = window.ACES.run({
+      scene: root,
+      spec: { /* LBL-format spec, if any */ },
+      shading: { /* OKLab shading stack */ },
+      checksOpts: { /* ACES check options */ },
+    });
+    console.log('[LBL] ACES auto-trigger:', report.summary);
+  }
+
+The factory does not need to handle ACES failures — ACES surfaces
+warnings as console messages, never throws. The AI should READ the
+ACES report and fix any 'BLOCK' warnings.
+
+================================================================================
+PART 155 — PBR PRESET TABLE FOR IMAGE-DRIVEN FACTORIES (NEW IN v1.31 / v8.22)
+================================================================================
+
+For every material in the model, look up MAT_DB by semantic name
+FIRST. If MAT_DB doesn't have a matching preset, invent custom PBR.
+
+Common semantic names → MAT_DB keys:
+  pirate_hat_fabric   → MAT_DB.fabric_red (or custom 0xb22a2a, r 0.55, m 0.05)
+  pirate_hat_trim     → MAT_DB.gold (custom 0xd8a338, r 0.28, m 0.85)
+  dark_armor          → MAT_DB.gunmetal (custom 0x2f3238, r 0.62, m 0.32)
+  leather_belt        → MAT_DB.leather (custom 0x8a2222, r 0.78, m 0.05)
+  glowing_eye         → emissive: EYE_GLOW, emissiveIntensity: 3.5
+  polished_metal      → MAT_DB.brushed_steel or custom
+  hook_metal          → MAT_DB.brushed_steel
+  skull_bone          → MAT_DB.bone (custom 0xefe6d4)
+
+Override MAT_DB values when the image shows a different specific
+color (use `meta.colorOverrides` to record the override).
+
+================================================================================
+PART 156 — STYLE LOCK → FLAT-SHADING / OUTLINE TRIGGERS (NEW IN v1.31 / v8.22)
+================================================================================
+
+PART 156.1 — for style ∈ {flat-low-poly, voxel, isometric-flat,
+            anime-cel, chunky-mascot}, every material MUST set
+            `flatShading: true`.
+PART 156.2 — for style ∈ {pbr-realistic, hand-painted, photoreal},
+            leave flatShading off.
+PART 156.3 — for chunky-mascot style, the test viewer / lookDevLights
+            MUST enable `outlineMode = 'screenspace'` and add an
+            OutlinePass (or rely on the renderer's screenspace
+            outline at index.html:3054).
+PART 156.4 — for chunky-mascot style, set `scene.toneMapping =
+            THREE.NoToneMapping` (the renderer already does this
+            per LBL_TONE_MAP_BY_STYLE, but the AI author can
+            verify).
+
+================================================================================
+PART 157 — IMAGE-TO-WORLD MAPPING HELPER (NEW IN v1.31 / v8.22)
+================================================================================
+
+For every pivot position from the reference image, use:
+
+  function imageToWorld(nx, ny, modelHeight, imageWidth, imageHeight) {
+    const SX = modelHeight / imageHeight;  // square pixels
+    const SY = modelHeight / imageHeight;
+    const CX = 0;                           // model x-axis centered
+    const CY = modelHeight;                 // y=0 at bottom, y=H at top
+    return {
+      x: (nx - imageWidth / 2) * SX,
+      y: (CY - ny) * SY,
+      z: 0
+    };
+  }
+
+Sample key landmarks (head_crown, head_chin, shoulder_top, hip_top,
+foot_bottom, arm_out, hook_tip) from the image at known pixel
+coordinates, convert via imageToWorld, and use those coordinates
+as the literal pivot positions. This is the SINGLE HIGHEST-LEVERAGE
+FIX for the "parts not in the right place" problem.
+
+================================================================================
+PART 158 — SILHOUETTE IoU CHECK (NEW IN v1.31 / v8.22)
+================================================================================
+
+After construction, call:
+
+  if (window.lblSpec && window.lblSpec.helpers &&
+      window.lblSpec.helpers.compareToReference) {
+    const report = window.lblSpec.helpers.compareToReference(root, refImg);
+    console.log('[LBL] silhouette IoU =', report.iou, '|',
+                report.suggestions);
+  }
+
+Target IoU: 0.85+ for chunky characters. If below, fix proportions
+and re-run.
+
+================================================================================
+PART 159 — SDF + MARCHING CUBES TRIGGER (NEW IN v1.31 / v8.22)
+================================================================================
+
+TRIGGER: if a model has more than 3 parts that touch at their
+boundaries (head + body, body + arms, head + arms, etc.), use
+SDF + MarchingCubes to merge them into one organic surface.
+
+  const sdf = MT.core.sdfUnion(
+    MT.core.sdfSphere(head_center, head_radius),
+    MT.core.sdfCapsule(body_top, body_bottom, body_radius),
+  );
+  // ... add arms, legs, etc.
+  const bodyGeo = MT.core.sdfMarch(sdf, { resolution: 64, size: 2 });
+
+This is THE canonical fix for Pitfall 1 (visible intersections
+between adjacent parts that read as "two stacked boxes").
+
+================================================================================
+PART 160 — CSG RECIPES FOR COMMON PATTERNS (NEW IN v1.31 / v8.22)
+================================================================================
+
+TRIGGER RECIPES:
+
+Mouth grille / speaker pattern:
+  const slotPattern = buildSlotPattern(n=4, slotW=0.18, slotH=0.02);
+  const headWithSlots = MT.core.csgSubtract(headGeo, slotPattern);
+
+Eye patch socket:
+  const patchSocket = new THREE.CylinderGeometry(0.06, 0.06, 0.04);
+  const headWithSocket = MT.core.csgSubtract(headGeo, patchSocket);
+
+Belt buckle slot:
+  const buckleSlot = new THREE.BoxGeometry(0.12, 0.12, 0.04);
+  const torsoWithSlot = MT.core.csgSubtract(torsoGeo, buckleSlot);
+
+All three produce VISIBLE DEPTH, not just dark surfaces.
+
+================================================================================
+PART 161 — USE MT.core.loft (NOT hand-written profileLoft) (NEW IN v1.31 / v8.22)
+================================================================================
+
+Use `MT.core.loft(sections, opts)` from PART 74.5. The helper
+defaults are: {radial: 8, length: 4, caps: 'flat'}.
+
+For organic curves (tails, tentacles, hair): {radial: 8, length: 16}.
+For highly curved tubes (hook, antenna): {radial: 12, length: 24}.
+
+Do NOT hand-write a profileLoft function — the renderer's MT.core
+helper handles caps, normals, UVs, and tangent computation
+correctly. Hand-written profileLoft functions tend to produce
+faceted shading artifacts.
+
+================================================================================
+PART 162 — INSTANCED RIVETS / REPEATED DETAILS (NEW IN v1.31 / v8.22)
+================================================================================
+
+TRIGGER: if you have >3 identical small meshes (rivets, screws,
+bolt heads, eye bumps, scales), use MT.advanced.makeInstanced:
+
+  const rivetGeo = new THREE.SphereGeometry(0.013, 6, 4);
+  const transforms = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    transforms.push({
+      position: [Math.cos(a) * 0.40, 0.04, Math.sin(a) * 0.40],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    });
+  }
+  const rivets = MT.advanced.makeInstanced(rivetGeo, 8,
+                                           { transforms });
+
+Result: 1 draw call instead of 8.
+
+================================================================================
+PART 163 — AUTO-ENABLE PMREM/HDRI FOR METALLIC MATERIALS (NEW IN v1.31 / v8.22)
+================================================================================
+
+If the model contains ANY material with metalness >= 0.5, the
+test viewer / factory's lookDevLights() MUST enable HDRI:
+
+  function lookDevLights(mode) {
+    // ... existing lights ...
+    if (hasMetallicMaterial(root)) {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(
+        new RoomEnvironment(), 0.04
+      ).texture;
+    }
+  }
+
+Without IBL, metallic materials look like flat plastic.
+
+================================================================================
+PART 164 — DETAIL INVENTORY BEFORE BUILDING (NEW IN v1.31 / v8.22)
+================================================================================
+
+Before building any geometry, list the detail inventory as a
+JSDoc comment on the factory:
+
+  /**
+   * DETAIL INVENTORY:
+   *   IDENTITY (60% tris, 1800): head, hat, hook, belt, eye glow
+   *   SECONDARY (25%, 750):    torso, arms, legs, boots, eye patch,
+   *                            mouth grille
+   *   TERTIARY (15%, 450):     rivets, cheek bolts, antenna,
+   *                            harness strap
+   */
+
+Then allocate triangle budget 60/25/15 per PART 42.5.
+
+================================================================================
+PART 165 — 11-STEP CANONICAL RECIPE (UPDATED FROM PART 152)
+================================================================================
+
+PART 152's 10-step recipe becomes 11 steps. The new step 11 is:
+
+  11. RUN ACES + IoU. After construction, call
+      `window.ACES.run({scene: root})` if available. ACES catches
+      25+ mechanical issues automatically (faceted body, soft mass,
+      missing touch connections, value order, contrast adjacent,
+      etc.). For image-driven factories, ALSO call
+      `lblSpec.helpers.compareToReference(root, refImg)` and log
+      the IoU. Fix any BLOCK warnings + iterate until IoU >= 0.85.
+
+================================================================================
+PART 166 — GENERATE 3 VARIANTS, PICK BEST (NEW IN v1.31 / v8.22)
+================================================================================
+
+For image-driven factories, ALWAYS generate 3 variants (seeds 1,
+2, 3) from the same detail inventory. Run ACES + silhouette IoU
+on each. Pick the variant with the highest IoU + fewest warnings.
+Ship that one.
+
+================================================================================
+PART 153-166 SUMMARY (THE ONE-PARAGRAPH VERSION)
+================================================================================
+
+PART 153-166 is the image-driven factory defaults layer added on
+top of PART 145-152 (perfect-shape pipeline). PART 153 mandates
+MT.* helpers over hand-authored BufferGeometry. PART 154 wires
+ACES to run automatically after construction. PART 155 ties
+materials to MAT_DB semantic lookup. PART 156 enforces style-
+specific flatShading + outline + toneMapping rules. PART 157
+ships the imageToWorld() helper that converts reference pixel
+coordinates to literal pivot positions — the single highest-
+leverage fix for proportion errors. PART 158 ships an IoU check
+helper. PART 159 defines the trigger rule for SDF + MarchingCubes.
+PART 160 ships CSG recipes for mouth grille, eye patch socket, and
+belt buckle slot. PART 161 standardizes on MT.core.loft. PART 162
+standardizes on InstancedMesh for repeated small details. PART 163
+auto-enables PMREM/HDRI for metallic materials. PART 164 adds the
+detail-inventory / triangle-budget discipline. PART 165 extends
+the canonical recipe to 11 steps (adds ACES + IoU). PART 166 adds
+the 3-variant / best-of-N ranking. PART 153-166 is purely additive
+guidance — PART 1-152 and the 44 PART 100-143 helpers all still
+work exactly as before. See CHANGES_v130.md for the v1.31 release
+notes.
+
+================================================================================
+END OF PART 153-166
+================================================================================

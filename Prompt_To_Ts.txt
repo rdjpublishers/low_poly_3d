@@ -24945,6 +24945,16 @@ For any chunky low-poly character, this is the canonical recipe:
       - Style decisions documented (chunky, mascot, single
         exaggerated axis).
 
+  11. RUN ACES + IoU (v1.31 / v8.22 ADDITION)
+      - After construction, call `window.ACES.run({scene: root})` if
+        available. ACES catches 25+ mechanical issues automatically
+        (faceted body, soft mass, missing touch connections, value
+        order, contrast adjacent, etc.).
+      - For image-driven factories ONLY, ALSO call
+        `lblSpec.helpers.compareToReference(root, refImg)` and log
+        the IoU. Fix any BLOCK warnings + iterate until IoU >= 0.85.
+      - ACES surfaces warnings as console messages, never throws.
+
 ================================================================================
 PART 145-152 SUMMARY (THE ONE-PARAGRAPH VERSION)
 ================================================================================
@@ -24966,10 +24976,15 @@ names, frame 0 == frame N, headless playback test, secondary motion).
 PART 150 catalogues 6 validation techniques (silhouette test from 4
 angles, multi-view IoU, triangle budget, bbox overlap, height match,
 cheat-sheet check). PART 151 documents 10 named pitfalls with concrete
-fixes. PART 152 ships the canonical recipe as a 10-step checklist.
+fixes. PART 152 ships the canonical recipe as an 11-step checklist
+(in v1.31 / v8.22, step 11 — RUN ACES + IoU — was added).
 The renderer keeps every existing capability (PARTs 1-144 + PART 90
 ACES + PART 45 CS2 + PART 67 + PART 74); PART 145-152 is purely
 additive guidance for the AI factory.
+
+In v1.31 / v8.22, PART 153-166 is appended to Image_To_Ts.txt (the
+image-driven factory defaults layer) and referenced by all 6 spec
+docs. See CHANGES_v130.md for the full v1.31 release notes.
 
 ================================================================================
 END OF PART 145-152

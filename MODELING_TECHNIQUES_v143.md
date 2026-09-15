@@ -258,5 +258,98 @@ for the complete picture.
 
 ---
 
+## Example 11 (v1.31 / v8.22) — Image-driven chunky low-poly mascot (pirate robot)
+
+The most worked-through example in this annex is the **pirate robot
+mascot** — a chunky low-poly chunky-mascot that exercises the full
+PART 153-166 image-driven factory defaults + PART 145-152 perfect-
+shape pipeline + the 44 PART 100-143 techniques. This example is
+referenced from `Image_To_Ts.txt` and shipped as
+`public/models/Model_PirateRobot.ts` (C.1 in SYSTEM_UPDATE_REQUESTS).
+
+The pirate robot demonstrates:
+
+  - **PART 153** — MT helper defaults (every primitive built via
+    `MT.core.makePrimitive`, `MT.core.loft`, `MT.core.makeLathe`,
+    `MT.core.makeExtrude`, `MT.core.makeNurbsCurve`, etc.).
+  - **PART 154** — ACES auto-trigger (`window.ACES.run({scene: root})`
+    is called immediately after `root` is built; warnings go to
+    console; BLOCK warnings are addressed before ship).
+  - **PART 155** — MAT_DB semantic lookup (every material is looked
+    up by name first: `MAT_DB.fabric_red` for the hat,
+    `MAT_DB.gold` for trim, `MAT_DB.gunmetal` for the dark armor,
+    `MAT_DB.leather` for the belt, `MAT_DB.brushed_steel` for the
+    hook, emissive override on `MAT_DB.glass` for the glowing eye).
+  - **PART 156** — Style lock: every material sets `flatShading: true`;
+    the test viewer enables `outlineMode = 'screenspace'` and
+    `THREE.NoToneMapping`.
+  - **PART 157** — `imageToWorld()` mapping (every pivot — head crown,
+    head chin, shoulder, hip, foot bottom, hook tip — is sampled at
+    pixel coordinates from the reference image and converted via
+    `imageToWorld()`).
+  - **PART 159** — SDF + MarchingCubes for the body (head + torso +
+    arm stubs merged into one organic blob via
+    `MT.core.sdfUnion` + `MT.core.sdfMarch`).
+  - **PART 160** — CSG for the eye patch socket (cylinder subtracted
+    from head), mouth grille (4-slot pattern subtracted from head),
+    belt buckle slot (rectangle subtracted from torso).
+  - **PART 161** — `MT.core.loft` for arms and legs
+    (sections array of {t, radius} with `radial: 8, length: 4`,
+    caps: 'flat'; hook uses `radial: 12, length: 24`).
+  - **PART 162** — Instanced rivets (8 hat rivets and 10 torso rivets
+    each use 1 `MT.advanced.makeInstanced` call instead of N
+    individual `Mesh` instances).
+  - **PART 163** — PMREM/HDRI auto-enable for metallic materials
+    (`scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04)
+    .texture` is set in the `lookDevLights()` export because the hat
+    trim and the hook have `metalness >= 0.5`).
+  - **PART 164** — Detail inventory as a JSDoc comment at the top of
+    the file:
+    ```
+    IDENTITY (60% tris, ~1800): head, hat, hook, belt, eye glow
+    SECONDARY (25%, ~750):    torso, arms, legs, boots, eye patch,
+                              mouth grille
+    TERTIARY (15%, ~450):     rivets, cheek bolts, antenna,
+                              harness strap
+    ```
+  - **PART 165** — 11-step canonical recipe (the factory builds the
+    model, calls ACES, calls IoU, logs results).
+  - **PART 166** — 3-variant ranking (the factory builds with seeds
+    1, 2, 3; runs ACES + IoU on each; ships the best).
+
+### Why this example matters
+
+Without the PART 153-166 defaults, an AI authoring the pirate robot
+hits every pitfall in PART 151: visible intersections between head
+and body (Pitfall 1), wrong pivot offsets (Pitfall 2),
+`getObjectByName` collisions (Pitfall 3), track-name bugs (Pitfall
+4), mixed tick + mixer (Pitfall 5), single big mesh (Pitfall 6),
+smooth-shaded low-poly (Pitfall 7), hand-placed seam boxes (Pitfall
+8), glossy plastic look (Pitfall 9), and over-amplified animations
+(Pitfall 10). With the PART 153-166 defaults, the AI factory:
+
+  - silhouette IoU target: 0.92+ (vs ~0.65 without defaults),
+  - ACES warnings target: 0-1 (vs ~8 without defaults),
+  - manual iteration count target: 1-2 (vs 8+ without defaults),
+  - spec size for the AI: ~2 MB (de-duplicated) vs ~6.6 MB.
+
+### Source file location
+
+`public/models/Model_PirateRobot.ts` — see the worked example in
+that file. The example follows PART 152 + PART 153-166 in order
+and is heavily commented with `// PART XXX` markers so a reader can
+trace each line back to the corresponding spec PART.
+
+### Cross-references
+
+  - PART 145-152 in `CHANGES_v130.md` (the methodology layer).
+  - PART 153-166 in `Image_To_Ts.txt` (the image-driven factory
+    defaults).
+  - PART 151 pitfalls (the pre-emission checklist).
+  - `MODELING_TECHNIQUES_v143.md` (this file) — the renderer-side
+    spec annex for PART 100-143.
+
+---
+
 **License:** Same as the parent project. Author: Mavis / RDJ Publishers
 low_poly_3d renderer surface. See LICENSE-3RD-PARTY.md.
