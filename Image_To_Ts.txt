@@ -91,7 +91,7 @@ generate output from this spec; please read them before producing code.
     valid historical context but are NOT re-fixed in v1.30.
   - CHANGES_SUMMARY.md has fresh v1.30 / v8.22 + v1.29 / v8.21 entries
     at the top (see CHANGES_v130.md for the standalone v1.30 changelog
-    and CHANGES_v129.md for the v1.29 changelog). PART 145-152
+   ). PART 145-152
     PERFECT-SHAPE MODELING PIPELINE is the new additive guidance
     layered on top of PART 100-143 in v1.30 / v8.22.
 ================================================================================

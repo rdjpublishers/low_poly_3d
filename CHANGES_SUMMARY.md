@@ -1255,8 +1255,6 @@ new helpers, no new fields, no removed / weakened rule.
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 45 covers (12 sub-sections)
 
@@ -1591,8 +1589,6 @@ magic; the existing 4 families stay exactly as they were).
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 44 covers (11 sub-sections)
 
@@ -1902,8 +1898,6 @@ declarations, not pipeline steps).
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 43 covers (7 sub-sections)
 
@@ -2098,8 +2092,6 @@ SPECIFIC superset; non-character subjects still use PART 41's
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 42 covers (11 sub-sections)
 
@@ -2348,8 +2340,6 @@ production-grade pipeline framing.
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 41 covers (11 sub-sections)
 
@@ -2591,8 +2581,6 @@ factory + options pattern.
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 40 covers (11 sub-sections)
 
@@ -2812,8 +2800,6 @@ PART 38.22's style agnosticism.
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What PART 39 covers (8 sub-sections + 3 appendices)
 
@@ -2948,8 +2934,6 @@ character poses).
 - `public/models/manifest.json` (still works as-is)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
-- `public/rig/build.sh`
 
 ## What the new PART 38 covers (21 sub-sections)
 
@@ -3182,7 +3166,6 @@ v1.13 / v8.5 (PART 36 multi-file drop + model + rig pairing).
   automatically when the manifest isn't using them)
 - `.github/workflows/manifest.yml`
 - `public/rig/three-rig-helpers.js`
-- `public/rig/src/*.ts`
 
 ## What the new PART 37 covers (6 subsections)
 
