@@ -8,7 +8,7 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 ================================================================================
 >>> v1.32 / v8.23 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
 >>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
->>> documented in MODELING_TECHNIQUES_v143.md and CHANGES_v130.md.
+>>> documented in public/modeling/MODELING_TECHNIQUES_v143.md and CHANGES_v130.md.
 >>> PART 153-166 (image-driven factory defaults) is canonically
 >>> documented in Image_To_Ts.txt. PART 167-178 (hard-surface /
 >>> vehicle modeling pipeline) is canonically documented in
