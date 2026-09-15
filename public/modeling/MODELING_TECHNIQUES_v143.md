@@ -258,5 +258,77 @@ for the complete picture.
 
 ---
 
+## PART 167-178 — HARD-SURFACE / VEHICLE MODELING PIPELINE (v1.32 / v8.23)
+
+PART 167-178 is the **hard-surface / vehicle / prop methodology
+layer** added on top of PART 145-152 (perfect-shape pipeline,
+character-focused) + PART 153-166 (image-driven factory defaults,
+character-focused). PART 167-178 is the missing methodology layer
+for motorcycles / cars / planes / props with wheels + suspension +
+fairings + articulated mechanical sub-systems.
+
+The renderer ships 9 concrete helpers exposed on `window.MT_hardsurface`
+(see `public/modeling/mt-hardsurface.js`):
+
+  - **PART 169** — 4 procedural primitive helpers
+    - `MT_hardsurface.createFilletedBoxGeometry(w, h, d, r, smooth)`
+      → chassis blocks, fuel tanks, side panels, cube-on-wheels.
+    - `MT_hardsurface.createTaperedTube(points, startR, endR, seg)`
+      → forks, exhaust pipes, shock absorbers, swingarms.
+    - `MT_hardsurface.createRimStarPattern(numSpokes, innerR, outerR, t)`
+      → motorcycle wheels, car wheels, gear patterns, fan blades.
+    - `MT_hardsurface.createBeveledWasher(innerR, outerR, t, bevel)`
+      → brake discs, gaskets, ring spacers, mounting flanges.
+  - **PART 171** — seeded micro-roughness procedural texture
+    - `MT_hardsurface.mulberry32(seed)` — deterministic PRNG.
+    - `MT_hardsurface.createMicroRoughnessMap(size, seed, base, jitter)`
+      → CanvasTexture of value-noise sampled as roughness modulation.
+  - **PART 173** — 3-point studio lighting rig
+    - `MT_hardsurface.createHardSurfaceLookDevLights(mode)` —
+      mode = `'studio'` (3-point key+fill+rim + hemisphere ambient +
+      contact shadow plane) or `'outdoor'` (sun + sky).
+  - **PART 174** — 4 self-verification runtime hooks
+    - `MT_hardsurface.validateTriangleBudget(root, { budget })`
+    - `MT_hardsurface.validateDrawCallCount(root, { budget })`
+    - `MT_hardsurface.validateBoundingBox(root, { minY, maxAbsCoord })`
+    - `MT_hardsurface.validateGroundClearance(root)`
+  - **PART 175** — 8-section code architecture helper
+    - `MT_hardsurface.createHardSurfaceFactoryShell(spec)` — wraps
+      the canonical 8-section factory architecture so a TS / JS
+      model file becomes a consistent, auditable, deterministic
+      module.
+
+The highest-leverage technique picks per vehicle part:
+
+  - **Chassis blocks / panels / tanks** → PART 169.1
+    (createFilletedBoxGeometry)
+  - **Forks / shock absorbers / drive shafts** → PART 169.2
+    (createTaperedTube)
+  - **Wheels (rim + spokes + hub)** → PART 169.3
+    (createRimStarPattern)
+  - **Brake discs / gaskets** → PART 169.4
+    (createBeveledWasher)
+  - **Fairings / cowls / nose / tail** → PART 170.2 (bezier
+    profile) + PART 170.3 (lathe) + PART 170.4 (swept extrusion)
+  - **Every material** → PART 171 (microRoughnessMap)
+  - **Pivot tree** → PART 172.1 (motorcycle) / 172.5 (car) /
+    172.6 (plane)
+  - **Lighting** → PART 173 (3-point rig + contact shadow)
+  - **Every model before shipping** → PART 174 (triangle / draw
+    call / bbox / ground-clearance audits)
+  - **Pre-emission checklist** → PART 176 (10 hard-surface
+    pitfalls; verify fixes for #1, 2, 3, 4, 5, 7, 8, 9, 10 before
+    shipping any vehicle)
+  - **Ship list** → PART 178 (12-step canonical recipe)
+
+PART 167-178 is canonically documented in **Prompt_To_Ts.txt** (the
+master TS spec). The 5 sibling spec files (Prompt_To_Js.txt /
+Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt /
+Image_To_Json.txt) reference PART 167-178 from Prompt_To_Ts.txt
+rather than duplicating it. See `CHANGES_v132.md` for the full
+v1.32 / v8.23 release notes.
+
+---
+
 **License:** Same as the parent project. Author: Mavis / RDJ Publishers
 low_poly_3d renderer surface. See LICENSE-3RD-PARTY.md.

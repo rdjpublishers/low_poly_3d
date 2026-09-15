@@ -1,8 +1,10 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.30 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.32 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
+  PART 153-166 (v1.31 / v8.22) -- IMAGE-DRIVEN FACTORY DEFAULTS added canonically to Image_To_Ts.txt (this file references them); de-dup note in the header below. See CHANGES_v130.md.
+  PART 167-178 (v1.32 / v8.23) -- HARD-SURFACE / VEHICLE MODELING PIPELINE added canonically to this file (the missing methodology layer for motorcycles / cars / planes / props with wheels / suspension / fairings); 8-step vehicle pipeline + dimension & clearance contract + 4 new procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques (quadratic / bezier / lathe / swept extrusion / parametric) + seeded mulberry32 micro-roughness texture + hierarchical articulation tree (steering / swingarm / wheel pivots) + 3-point studio lighting rig + self-verification runtime hooks (triangle / drawcall / bbox / ground-clearance audits) + 8-section code architecture + 10 hard-surface pitfalls with fixes + canonical worked example + 12-step ship checklist. The 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt) REFERENCE PART 167-178 from this file rather than duplicating it.
 ================================================================================
 
 ================================================================================
@@ -24986,8 +24988,1008 @@ In v1.31 / v8.22, PART 153-166 is appended to Image_To_Ts.txt (the
 image-driven factory defaults layer) and referenced by all 6 spec
 docs. See CHANGES_v130.md for the full v1.31 release notes.
 
+In v1.32 / v8.23, PART 167-178 (HARD-SURFACE / VEHICLE MODELING
+PIPELINE) is appended to THIS file (Prompt_To_Ts.txt) as the missing
+methodology layer for motorcycles / cars / planes / props with wheels
++ suspension + fairings + articulated mechanical sub-systems. PART
+167-178 complements PART 145-152 (perfect-shape pipeline, character-
+focused) and PART 153-166 (image-driven factory defaults, character-
+focused). PART 167-178 is purely additive — PART 1-166 and the 44
+PART 100-143 helpers all still work exactly as before. See
+CHANGES_v132.md for the full v1.32 release notes.
+
+>>> v1.31 / v8.22 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
+>>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
+>>> documented in MODELING_TECHNIQUES_v143.md and CHANGES_v130.md.
+>>> PART 153-166 (image-driven factory defaults) is canonically
+>>> documented in Image_To_Ts.txt. PART 167-178 (hard-surface /
+>>> vehicle modeling pipeline) is canonically documented in THIS file
+>>> (Prompt_To_Ts.txt). The 5 sibling spec files reference these
+>>> documents; see them for the full technique vocabulary and
+>>> pipeline steps.
+>>>
+
 ================================================================================
 END OF PART 145-152
 ================================================================================
 END OF PART 75-89
+================================================================================
+
+================================================================================
+================================================================================
+PART 167 — v1.32 / v8.23 ADDITIONS: HARD-SURFACE / VEHICLE MODELING
+PIPELINE
+================================================================================
+
+PART 167-178 is the missing VEHICLE / PROP / HARD-SURFACE methodology layer
+that the LBL v1.30 / v8.22 perfect-shape pipeline (PART 145-152) does not
+cover. PART 145-152 is character-focused (creatures, robots, mascots with
+limbs); PART 167-178 is vehicle-focused (motorcycles, cars, planes, props
+with wheels, suspension, fairings, and articulated mechanical sub-systems).
+
+The pipeline generalizes the chunky-low-poly aesthetic to mechanical
+hard-surface forms: motorcycle fairings, car body panels, plane fuselages,
+prop surfaces. It is the direct response to the procedural-3D-modeling
+problems documented in MODELING_SYSTEM_IMPROVEMENT_REPORT.txt
+(2026-09-15) for the Chunky Sport Motorcycle build.
+
+PART 167 catalogues the 8-step vehicle pipeline (skeleton → axles →
+fairings → wheels → lighting → validate → ship). PART 168 specifies
+the dimension & clearance contract that every model MUST declare upfront
+(bounding box, tire-mudguard gap, rotor-caliper clearance). PART 169
+ships 4 new procedural primitive helpers (FilletedBox, TaperedTube,
+RimStarPattern, BeveledWasher) that eliminate ~40% of vertex math for
+hard-surface work. PART 170 catalogues 5 fairing construction techniques
+(quadratic curve, bezier, lathe, swept extrusion, parametric modifier
+stack). PART 171 ships the canonical seeded micro-roughness procedural
+texture (mulberry32 PRNG, CanvasTexture, deterministic, 5-10%
+micro-roughness break-up). PART 172 documents the hierarchical
+articulation tree every vehicle MUST use (steering pivot at the rake
+angle, swingarm pivot at the rear suspension, wheel spin axes, brake
+disc spin axes). PART 173 ships the 3-point studio lighting rig (key
+/ fill / rim) plus the dedicated contact-shadow ground plane. PART 174
+ships the self-verification runtime hooks (triangle count, draw call,
+bounding-box overlap, ground clearance). PART 175 lays out the
+canonical 8-section code architecture for any hard-surface model
+(header / types / palette / helpers / materials / builders / factory /
+look-dev lights). PART 176 documents 10 hard-surface pitfalls with
+concrete fixes. PART 177 ships a worked example (the Chunky Sport
+Motorcycle). PART 178 ships a 12-step ship checklist.
+
+PART 167-178 is STYLE-AGNOSTIC and applies to every image-to-code or
+prompt-to-code path the AI factory supports. The AI factory does NOT
+need to call any new helper to satisfy PART 167-178. PART 167-178 is
+PURELY ADDITIVE GUIDANCE for the authoring process.
+
+The COMPLETE 12-step pipeline the AI follows for any hard-surface model:
+  STEP 1 (Analyze)          ← PART 167.1 (no helper)
+  STEP 2 (Dimension+Clear.) ← PART 168 (bounding box + clearance gaps)
+  STEP 3 (Skeleton-Pivot)   ← PART 172 (steering / swingarm / wheel pivots)
+  STEP 4 (Helpers+Materials) ← PART 169 (primitives) + PART 171 (micro-roughness)
+  STEP 5 (Fairings)         ← PART 170 (profile lofting / lathe / extrude)
+  STEP 6 (Accessories)      ← parent.position + offset_in_parent_frame
+  STEP 7 (Uniform Bevel)    ← PART 169 FilletedBoxGeometry
+  STEP 8 (Lighting)         ← PART 173 (3-point rig + contact shadow)
+  STEP 9 (Rig+Validate)     ← PART 174 (triangle/drawcall/bbox audits)
+  STEP 10 (Animate)         ← AnimationClip + mixer (PART 149.1-149.6)
+  STEP 11 (Code Structure)  ← PART 175 (8-section file architecture)
+  STEP 12 (Ship Check)      ← PART 178 (12-step ship list + PART 176 pitfalls)
+
+The AI does NOT have to USE every technique. It picks from PART 169-175
+catalogs per part. A simple cube-on-wheels toy might use only PART 169.1
+(FilletedBox) + PART 172 (basic pivot tree) + PART 173 (lighting); a
+full sport motorcycle uses PART 170 (fairings) + PART 169.2 (TaperedTube
+for forks) + PART 169.3 (RimStar for wheels) + PART 172 (full pivot
+tree) + PART 173 (3-point rig) + PART 174 (full validation).
+
+The PITFALLS list (PART 176) is the canonical pre-emission checklist for
+hard-surface models. Each pitfall has a concrete fix — the AI factory
+SHOULD verify Pitfalls 1, 2, 3, 4, 5, 7, 8, 9, 10 before shipping any
+hard-surface model.
+
+The renderer keeps every existing capability (PARTs 1-166 + PART 90
+ACES + PART 45 CS2 + PART 67 + PART 74 + PART 100-143 + PART 145-152);
+PART 167-178 is purely additive guidance for the AI factory.
+
+================================================================================
+PART 167 — THE 8-STEP VEHICLE PIPELINE (the orchestration)
+================================================================================
+
+Apply this pipeline IN ORDER to every hard-surface / vehicle model. The
+8 steps come from the maintainer's reference build of the Chunky Sport
+Motorcycle and generalize to any mechanical hard-surface form (cars,
+planes, robots with wheels, props with hinges, articulated vehicles).
+
+  STEP 1. ANALYZE the reference.
+    - Sample proportions: total Length × Height × Width bounding box
+      (e.g., compact motorcycle: 1.2 m × 0.9 m × 0.5 m).
+    - Sample palette: extract 5-7 dominant colors (body / trim / tire /
+      chrome / dark).
+    - Identify parts: every distinct silhouette element — chassis,
+      fairings, fuel tank, seat cowl, tail cowl, headlight bezel,
+      fork stanchions, swingarm, exhaust, wheels, brake discs.
+    - Identify style: chunky / sleek / sport / off-road / vintage.
+    Output: a one-page "anatomy card" before any geometry work.
+
+  STEP 2. SKELETON-FIRST.
+    - Place the 6 PIVOT GROUPS FIRST, as named Object3Ds in the right
+      hierarchy (PART 172).
+    - The pivot positions DEFINE the geometry to come; geometry follows.
+    - Naming convention: use clear, single-purpose names. Suffixes
+      `_pivot` for invisible pivot nodes and `_mesh` or `_visual` for
+      visible meshes to avoid getObjectByName collisions (PART 148.3).
+      Examples: chassis_pivot, steering_pivot, swingarm_pivot,
+      wheel_front_pivot, wheel_rear_pivot, suspension_front_pivot.
+    - Document offsets in a pivot-table comment at the top of the .ts
+      file. Every pivot offset = mesh length below it.
+    - The AI factory MUST produce exactly ONE root pivot. Sub-roots
+      (steering / swingarm) attach as children of the chassis pivot.
+    Verify: walk the rig top-down, every pivot sits at the END of the
+            mesh above it.
+
+  STEP 3. FAIRINGS & COWLS.
+    - Build aerodynamic surfaces by sweeping custom CatmullRom splines
+      or extruding closed 2D bezier paths (PART 170).
+    - Apply the same uniform bevel pass to every fairing mesh
+      (bevelSegments: 4, bevelSize: 0.025 m for the chunky cast-resin
+      look).
+    - Replace naive spherical visors with anisotropic half-cylinders
+      swept back at the rake angle (Pitfall 2 fix, PART 176.2).
+    - Use PART 169.2 (TaperedTube) for fork stanchions and exhaust
+      pipes — different radii at each end eliminate the visible
+      "stick" silhouette of uniform cylinders.
+
+  STEP 4. WHEELS & ROTATING ASSEMBLIES.
+    - Each wheel is a sub-tree rooted at a wheel_N_pivot (PART 172).
+    - Build tire + rim + spokes + brake disc + brake caliper as
+      children of the wheel pivot, so spinning the pivot rotates
+      everything correctly.
+    - Use PART 169.3 (RimStarPattern) for spoked rims — 1 mesh, N
+      spokes, parameterized.
+    - Use PART 169.4 (BeveledWasher) for brake discs — gives the
+      chamfered edge for free.
+    - The wheel pivot's Z-axis = spin axis; align the rim + tire + brake
+      geometry around Z.
+
+  STEP 5. SUSPENSION & ARTICULATED LINKS.
+    - Swingarm: a child of swingarm_pivot; rotates around the rear
+      suspension pivot axis (Z by convention for a motorcycle).
+    - Fork stanchions: telescoping inner + outer cylinders, parented
+      under the steering_pivot so they yaw with the handlebars
+      (Pitfall 3 fix, PART 176.3).
+    - Brake calipers: static on the fork lower (for a motorcycle) or
+      on the swingarm (for the rear); NOT on the wheel so they don't
+      spin with the wheel.
+
+  STEP 6. POSITION ACCESSORIES procedurally.
+    - Each accessory (headlight bezel, mirror, license plate, fairing
+      bolt) is placed RELATIVE to a named pivot Group, NOT in world
+      coordinates.
+    - position = parent.position + offset_in_parent_frame.
+    - This makes accessories follow the rig automatically.
+
+  STEP 7. UNIFORM BEVEL pass.
+    - Apply the SAME chamfer / soft-edge pass to every solid mesh
+      (PART 169.1 FilletedBoxGeometry for box-like chassis parts,
+      beveled extrude for fairings, beveled lathe for wheels).
+    - Standard chunky bevel size: 0.015-0.025 m.
+
+  STEP 8. LIGHTING + VALIDATE.
+    - Apply the 3-point studio rig (PART 173) for look-dev.
+    - Run the validation hooks (PART 174): triangle count < 45k,
+      draw calls < 30, ground clearance Y >= 0.0.
+    - Render from 4 angles (front, side, back, 3/4) and verify the
+      silhouette is correct.
+
+================================================================================
+PART 168 — DIMENSION & CLEARANCE SPECIFICATION
+================================================================================
+
+For hard-surface models, dimensions and clearances are not optional. Every
+model MUST declare:
+
+  168.1  STRICT BOUNDING BOX SCALE
+    - Declare Length × Height × Width in meters at the top of the .ts
+      file, in a PIVOT TABLE comment block.
+    - Standard sizes (compact examples, scale up/down as needed):
+        Compact motorcycle: 1.20 × 0.90 × 0.50
+        Sport motorcycle:   2.10 × 1.15 × 0.75
+        City car:           4.20 × 1.50 × 1.80
+        Pickup truck:       5.50 × 1.85 × 2.00
+        Propeller plane:    8.00 × 2.40 × 10.00 (wingspan)
+        Forklift:          2.50 × 2.00 × 1.00
+        Toy cube-on-wheels: 0.40 × 0.30 × 0.30
+    - Renderer helper: window.lblSpec.dimensionContract = {
+        length: number, height: number, width: number,
+        unit: 'm' | 'cm', category: 'motorcycle'|'car'|'plane'|... }
+
+  168.2  MANDATORY CLEARANCE GAPS
+    - The AI MUST compute and document every clearance gap in the
+      module header. Standard minimum gaps:
+        Tire tread ↔ Mudguard:    0.015 m
+        Brake rotor ↔ Caliper:    0.010 m
+        Fork stanchion ↔ Triple clamp: 0.008 m
+        Exhaust pipe ↔ Swingarm:  0.020 m
+        Fairing ↔ Frame:          0.012 m
+        Wheel ↔ Fender:           0.018 m
+        Chain ↔ Sprocket center:  0.005 m (chain wrap tolerance)
+    - When 2 solids touch at their boundary, declare a 0.005-0.010 m
+      shrink at the contact point (PART 176.1 fix).
+
+  168.3  GROUND CLEARANCE CONTRACT
+    - The lowest point of the model (tire bottom, kickstand, fairing
+      edge) MUST have Y >= 0.0 m after assembly.
+    - Renderer audit: window.lblSpec.validateGroundClearance(root)
+      returns { minY: number, ok: boolean, offendingMesh: string }.
+
+  168.4  WHEELBASE & TRACK
+    - For any vehicle with multiple wheels, declare:
+        wheelbase = distance between front and rear axle centers
+        track     = distance between left and right wheel centers
+      in the PIVOT TABLE comment.
+
+================================================================================
+PART 169 — PROCEDURAL PRIMITIVE LIBRARY EXPANSION (4 new helpers)
+================================================================================
+
+Four ready-to-use procedural geometry factory helpers that eliminate ~40%
+of boilerplate vertex math for hard-surface work. The renderer exposes
+them on window.MT.advanced (next to PART 67 / PART 100-143 helpers).
+
+  169.1  createFilletedBoxGeometry(width, height, depth, radius, smoothness)
+    - A box with rounded edges (fillet) on every corner.
+    - Replaces hand-built RoundedBoxGeometry + manual scale.
+    - Signature: (w, h, d, r=0.02, smoothness=4) → BufferGeometry.
+    - Use for: chassis blocks, fuel tanks, side panels, electronics
+      housings, cube-on-wheels toy bodies.
+    - Chunk-low-poly default: smoothness = 4 (segments per corner);
+      the silhouette stays angular enough for a toy look but the
+      bevel catches highlights.
+    - Standard fillet radius: 0.015-0.025 m. Larger = softer toy look;
+      smaller = sharper industrial look.
+
+  169.2  createTaperedTube(points, startRadius, endRadius, segments)
+    - A tube along a 3D path (array of THREE.Vector3) with linearly
+      interpolated radius from startRadius to endRadius.
+    - Replaces uniform CylinderGeometry for forks, exhaust pipes,
+      shock absorbers, swingarms, drive shafts.
+    - Signature: (points: Vector3[], startR: number, endR: number,
+      segments=8) → BufferGeometry.
+    - Canonical use: telescoping fork = TaperedTube from upper triple
+      clamp (radius 0.022 m) down to axle (radius 0.028 m), giving a
+      subtle bulge at the axle.
+
+  169.3  createRimStarPattern(numSpokes, innerRadius, outerRadius, thickness)
+    - A spoked wheel rim (ring + N spokes + central hub).
+    - Replaces N hand-built spoke BoxGeometries.
+    - Signature: (numSpokes=5, innerR=0.12, outerR=0.20, thickness=0.04)
+      → BufferGeometry (a single merged geometry with hub + ring + spokes).
+    - Use for: motorcycle wheels, car wheels, gear patterns, fan blades.
+    - Returns a single merged BufferGeometry — 1 draw call.
+
+  169.4  createBeveledWasher(innerRadius, outerRadius, thickness, bevel)
+    - A flat washer (annulus) with beveled inner + outer edges.
+    - Replaces hand-built TorusGeometry segments for brake discs,
+      gaskets, ring spacers, mounting flanges.
+    - Signature: (innerR=0.06, outerR=0.12, thickness=0.008, bevel=0.002)
+      → BufferGeometry.
+    - The bevel = 0.002 m gives the chamfered ring edge that catches
+      the rim light on a real brake disc.
+
+  169.5  PART 169 USAGE PATTERN
+    - For a motorcycle wheel assembly:
+        const tireGeom = createTireGeometry(outerRadius=0.22, width=0.12);
+        const rimGeom  = createRimStarPattern(5, 0.10, 0.18, 0.04);
+        const discGeom = createBeveledWasher(0.05, 0.10, 0.008, 0.002);
+      → 3 BufferGeometries, 3 child meshes, all spinning around the
+        wheel_pivot's Z-axis.
+    - The renderer auto-merges these into 1 InstancedMesh if all 3 are
+      the same material; otherwise 3 draw calls (within PART 174
+      budget).
+
+  169.6  WHY THIS BEATS HAND-WRITTEN GEOMETRY
+    - The 4 helpers above ship as Three.js JS code, MIT-licensed, and
+      can be inlined directly into any .ts factory (no extra
+      dependency).
+    - Each helper produces a deterministic, vertex-normal-correct
+      BufferGeometry that calls computeVertexNormals() internally.
+    - Saves ~250 lines of repetitive spoke / fork / brake math per
+      vehicle model.
+
+================================================================================
+PART 170 — LATHE & PROFILE EXTRUSION FOR FAIRINGS
+================================================================================
+
+Five techniques for building aerodynamic / curved fairings without
+relying on naive spheres or boxes. Each technique targets a different
+silhouette type.
+
+  170.1  QUADRATIC CURVE PROFILE (best for: simple convex cowls)
+    - THREE.Shape.moveTo() + THREE.Shape.quadraticCurveTo() with a
+      single control point.
+    - Sweep with ExtrudeGeometry to get a half-cylinder-ish cowl.
+    - Canonical use: fuel tank profile (when the tank is short and
+      slightly bulged).
+
+  170.2  BEZIER CURVE PROFILE (best for: complex aerodynamic shapes)
+    - THREE.Shape.bezierCurveTo() with 2 control points for an
+      S-curve or a swept-back silhouette.
+    - Canonical use: nose fairing of a sport motorcycle, swept-back
+      side cowl, jet fighter canopy.
+    - Recipe:
+        const fairingShape = new THREE.Shape();
+        fairingShape.moveTo(x0, y0);
+        fairingShape.quadraticCurveTo(cx1, cy1, x1, y1);
+        fairingShape.bezierCurveTo(cx2, cy2, cx3, cy3, x2, y2);
+        fairingShape.closePath();
+        const fairingGeom = new THREE.ExtrudeGeometry(fairingShape, {
+          depth: 0.25, bevelEnabled: true, bevelSegments: 4,
+          bevelSize: 0.025, bevelThickness: 0.025, steps: 1
+        });
+
+  170.3  LATHE GEOMETRY (best for: rotationally symmetric parts)
+    - THREE.LatheGeometry(points, segments) for wheel hubs, headlight
+      bezels, conical exhaust tips, vase-shaped fuel tanks.
+    - Profile = 2D array of (x, y) points along the rotation axis.
+    - Canonical use: headlight bezel (round front face + bevel back).
+
+  170.4  SWEPT EXTRUSION ALONG A CURVE (best for: swept horns / tails)
+    - THREE.ExtrudeGeometry with extrudePath = CatmullRomCurve3 for
+      a swept profile along a 3D path.
+    - Canonical use: exhaust header pipes that curve from the engine
+      to the muffler, swept-back antenna, curved motorcycle fender.
+
+  170.5  PARAMETRIC MODIFIER STACK (best for: tweaking existing shapes)
+    - Apply taper / twist / bend / spherize / inflate / applyNoise
+      (PART 67 / PART 100-109 deformers) to any of the above.
+    - Canonical use: take a circular fuel tank profile, apply taper
+      (top wider than bottom) + slight bend (forward rake) for a
+      teardrop tank silhouette.
+
+  170.6  THE "EGG VISOR" PITFALL (fixed here)
+    - A naive SphereGeometry partial produces a tall, bulbous, egg-
+      like dome — not a swept-back racing visor (PART 176.2).
+    - Fix: combine PART 170.2 (bezier profile) with anisotropic scaling
+      (0.95, 0.65, 0.88) + rotation along the rake axis (~37 deg) +
+      a thin dark rubber perimeter gasket (separate small TorusGeometry
+      scaled non-uniformly).
+
+================================================================================
+PART 171 — SEEDED MICRO-ROUGHNESS PROCEDURAL TEXTURE
+================================================================================
+
+The single biggest visual upgrade for hard-surface models. A flat
+MeshStandardMaterial looks like painted plastic; the seeded micro-
+roughness texture breaks up the uniform specular into a real painted
+metal feel.
+
+  171.1  THE mulberry32 PRNG
+    - A tiny seeded pseudo-random number generator (~6 lines of code).
+    - Seed-driven determinism: every model with seed = N renders the
+      SAME micro-roughness pattern across runs.
+    - Recipe:
+        function mulberry32(a: number) {
+          return function () {
+            let t = (a += 0x6D2B79F5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+  171.2  THE createRoughnessMap(size, seed) HELPER
+    - Generates a CanvasTexture of value-noise sampled as roughness
+      modulation.
+    - Signature: (size=256, seed=1, baseRoughness=0.85, jitter=0.15)
+      → THREE.CanvasTexture.
+    - Recipe:
+        function createRoughnessMap(size=256, seed=1) {
+          const rand = mulberry32(seed);
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext('2d')!;
+          const img = ctx.createImageData(size, size);
+          for (let i = 0; i < size * size * 4; i += 4) {
+            const val = Math.floor((0.85 + rand() * 0.15) * 255);
+            img.data[i] = img.data[i+1] = img.data[i+2] = val;
+            img.data[i+3] = 255;
+          }
+          ctx.putImageData(img, 0, 0);
+          const tex = new THREE.CanvasTexture(canvas);
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.repeat.set(4, 4);
+          return tex;
+        }
+
+  171.3  APPLICATION PATTERN
+    - Build the texture ONCE at module init (not per-mesh).
+    - Apply to EVERY material as `material.roughnessMap = sharedRoughMap`.
+    - The base roughness stays in `material.roughness` (e.g., 0.45 for
+      painted body, 0.25 for chrome, 0.85 for raw tire rubber).
+    - The roughnessMap MODULATES the base via the standard PBR
+      roughness = baseRoughness * textureValue equation.
+    - Result: each material gets a deterministic, repeatable
+      micro-roughness break-up without any external image assets.
+
+  171.4  WHY DETERMINISTIC PRNG (NOT Math.random())
+    - Math.random() produces a different pattern every load → the
+      model "shimmers" between page reloads (looks buggy).
+    - mulberry32(seed) is reproducible → same pattern every time.
+    - Renderer convention: every procedural texture that affects
+      material appearance MUST be seeded. The factory's
+      `meta.proceduralSeed` field is the canonical seed source.
+
+  171.5  VARIANTS
+    - For different surface types, change the jitter and repeat:
+        Painted body panel:  baseRoughness=0.45, jitter=0.12, repeat=(4,4)
+        Chrome / polished:    baseRoughness=0.15, jitter=0.08, repeat=(8,8)
+        Brushed alloy:        baseRoughness=0.40, jitter=0.18, repeat=(6,6)
+        Raw tire rubber:      baseRoughness=0.85, jitter=0.10, repeat=(3,3)
+        Cast iron engine:     baseRoughness=0.65, jitter=0.20, repeat=(5,5)
+
+================================================================================
+PART 172 — HIERARCHICAL ARTICULATION TREE
+================================================================================
+
+Every vehicle MUST use the canonical hierarchical articulation tree.
+The tree separates static chassis space from articulated pivot space,
+so that wheels don't wobble out of the axle plane when rotated
+(Pitfall 3 fix, PART 176.3).
+
+  172.1  CANONICAL MOTORCYCLE TREE
+    Root Group (chassis_pivot, position at ground level, suspension roll)
+      ├── Static Body (no rotation, parented at chassis_pivot)
+      │     ├── Frame
+      │     ├── Engine block
+      │     ├── Fuel tank
+      │     ├── Tail cowl
+      │     ├── Headlight bezel
+      │     ├── License plate
+      │     └── Side fairings
+      ├── Rear Suspension (swingarm_pivot at rear axle height)
+      │     ├── Swingarm geometry (rotates around X for suspension
+      │     │   travel, optional)
+      │     ├── Rear wheel (wheel_rear_pivot, spins around Z)
+      │     │     ├── Tire
+      │     │     ├── Rim + spokes
+      │     │     ├── Brake disc (spins with wheel)
+      │     │     └── Sprocket + chain (spins with wheel)
+      │     └── Rear brake caliper (STATIC, NOT a child of wheel_pivot)
+      └── Steering System (steering_pivot at steering stem center)
+            ├── Triple clamps & handlebars
+            ├── Fork stanchions (telescopic, inner + outer cylinder)
+            ├── Front mudguard
+            └── Front wheel (wheel_front_pivot, spins around Z)
+                  ├── Tire
+                  ├── Rim + spokes
+                  ├── Brake disc (spins with wheel)
+                  └── Brake caliper (STATIC, child of fork lower)
+
+  172.2  PIVOT OFFSETS = MESH LENGTHS (PART 148.1 APPLIED TO VEHICLES)
+    - steering_pivot.position = (headstockTopX, headstockTopY, headstockTopZ).
+      The whole fork+wheel subtree rotates around this point on yaw.
+    - wheel_front_pivot.position = (axleX, axleY, axleZ) relative to
+      fork_lower. The wheel subtree spins around this point.
+    - swingarm_pivot.position = (rearAxleX, rearAxleY, rearAxleZ). The
+      swingarm+wheel_rear subtree pivots around this point on suspension
+      travel.
+    - Every offset = mesh length above it (the visual mesh ends at the
+      pivot). Walk the tree top-down to verify.
+
+  172.3  RAKE ANGLE
+    - The steering pivot's local rotation Z = -rakeAngleDeg (radians)
+      so the entire steering subtree is tilted back at the headstock
+      angle (typical sport motorcycle: 22-25 deg).
+    - Apply the rake ONCE on the steering_pivot, not on every child.
+      All subsequent yaw turns preserve the mechanical steering
+      geometry.
+
+  172.4  WHY "WORLD ATTACHMENT" IS WRONG
+    - A common bug: parent a wheel directly to scene (or to root
+      group) and rotate it → the wheel wobbles out of the axle plane
+      because there's no pivot at the axle center.
+    - Fix: ALWAYS parent wheels to a wheel_N_pivot whose origin IS the
+      axle center. Rotate the pivot, the wheel rotates around its own
+      center.
+
+  172.5  CAR / 4-WHEEL TREE (variant)
+    Root Group (chassis_pivot)
+      ├── Static Body (frame + body panels + glass)
+      ├── Front Axle (front_axle_pivot)
+      │     ├── Wheel_LF_pivot, Wheel_RF_pivot (spin around X for car)
+      │     └── Steering rack (rotates left/right for steering)
+      └── Rear Axle (rear_axle_pivot)
+            ├── Wheel_LR_pivot, Wheel_RR_pivot
+
+  172.6  PLANE / 3D TREE (variant)
+    Root Group (fuselage_pivot)
+      ├── Static Body (fuselage, wings, tail, cockpit canopy)
+      ├── Propeller (propeller_pivot, spins around Z at the nose)
+      ├── Landing gear
+      │     ├── Gear_front_pivot (extends/retracts)
+      │     ├── Gear_left_pivot
+      │     └── Gear_right_pivot
+      └── Control surfaces
+            ├── Aileron_left, Aileron_right (rotate around X)
+            ├── Elevator (rotates around X)
+            └── Rudder (rotates around Y)
+
+================================================================================
+PART 173 — 3-POINT STUDIO LIGHTING RIG
+================================================================================
+
+The lighting rig is just as important as the geometry. A default model
+looks flat if lit with only ambient and a single directional light. The
+canonical 3-point studio rig catches highlights on every curved surface
+and carves the silhouette.
+
+  173.1  CANONICAL 3-POINT RIG (Hard-Surface)
+    - KEY LIGHT (DirectionalLight)
+        position: (5, 6, 4) (front-right-above)
+        color: 0xfff3e0 (warm white, ~3500 K)
+        intensity: 1.4
+        castShadow: true
+        shadow.mapSize: (2048, 2048)
+        shadow.camera: tight orthographic frustum around the model
+    - FILL LIGHT (DirectionalLight)
+        position: (-4, 3, 2) (back-left-above)
+        color: 0xc7d8ff (cool, ~7000 K)
+        intensity: 0.45 (35% of key)
+        castShadow: false
+    - RIM / KICK LIGHT (DirectionalLight or SpotLight)
+        position: (-3, 4, -6) (back-behind-above)
+        color: 0xffffff (neutral)
+        intensity: 1.8 (stronger than key to carve the silhouette)
+        castShadow: false
+    - HEMISPHERE AMBIENT (HemisphereLight)
+        skyColor: 0xb1c5ff (cool sky)
+        groundColor: 0x4a3a2a (warm ground)
+        intensity: 0.35
+    - CONTACT SHADOW (PlaneGeometry + MeshBasicMaterial alphaMap)
+        A 1.5×1.5 m plane at Y = 0.0, directly under the tires.
+        Texture: radial gradient dark-to-transparent (mulberry32 +
+          domainWarpFBM for organic edges).
+        Helps anchor the asset to the ground.
+
+  173.2  WHY 3-POINT (NOT 1 OR 2)
+    - 1-light = flat, no shape definition. Highlights all on one side,
+      nothing else.
+    - 2-light (key + fill) = OK but silhouette is mushy. The back of
+      the model merges with the background.
+    - 3-point (key + fill + rim) = the rim carves the back edge so
+      the silhouette pops. Industry standard for product photography.
+
+  173.3  LIGHTING RIG AS A SECOND EXPORT
+    - Convention: ship a separate lookDevLights() factory next to the
+      model factory:
+        export function createMotorcycleModelLookDevLights()
+          : THREE.Group
+    - The renderer auto-discovers the lookDevLights export and wires it
+      to the model's userData.lookDevLights (PART 44 + PART 173).
+
+  173.4  SHADOW CAMERA TUNING
+    - The orthographic shadow camera frustum MUST be tight around the
+      model. A loose frustum produces low-resolution shadows ("shadow
+      acne" or "peter-panning").
+    - Recipe: shadow.camera.left = -1.5, right = 1.5, top = 1.5,
+      bottom = -1.5, near = 0.5, far = 12.
+    - For a vehicle longer than it is tall, bias the frustum:
+      shadow.camera.left = -2.5, right = 2.5 (wider on X), top = 1.5,
+      bottom = -1.5 (narrower on Y).
+
+  173.5  HDRI / PMREM AUTO-ENABLE FOR METALLIC MATERIALS (PART 163)
+    - If any material has metalness >= 0.5, the test viewer /
+      factory's lookDevLights() MUST enable HDRI:
+        import { RoomEnvironment } from 'three/examples/jsm/environments/
+          RoomEnvironment.js';
+        scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04)
+          .texture;
+    - Without HDRI, polished metal looks like flat gray. With HDRI,
+      the chrome catches the environment reflection and reads as
+      "actually metal".
+
+================================================================================
+PART 174 — AUTOMATED SELF-VERIFICATION RUNTIME HOOKS
+================================================================================
+
+Three runtime validators the AI factory MUST call before shipping any
+hard-surface model. They are surfaced as warnings on console; they
+NEVER throw.
+
+  174.1  TRIANGLE COUNT AUDIT
+    - validateTriangleBudget(root, { budget: 45000 })
+    - Walks the entire tree, sums indexed triangles.
+    - Logs WARNING if total > budget, INFO with exact count.
+    - Standard budgets by category:
+        Compact motorcycle:    < 18 000 tris
+        Sport motorcycle:      < 30 000 tris
+        Car (mid-poly):        < 35 000 tris
+        Plane (mid-poly):      < 45 000 tris
+        Cube-on-wheels toy:    <  4 000 tris
+    - If over budget, apply MT.mesh.qemDecimate (PART 116) to the
+      largest meshes first.
+
+  174.2  DRAW CALL AUDIT
+    - validateDrawCallCount(root, { budget: 30 })
+    - Counts every Mesh descendant.
+    - Logs WARNING if mesh count > budget.
+    - For static parts (chassis, fairings, exhaust), call
+      BufferGeometryUtils.mergeGeometries to merge N meshes into 1.
+      N draw calls → 1 draw call.
+
+  174.3  BOUNDING BOX AUDIT
+    - validateBoundingBox(root, { minY: 0.0, maxAbsCoord: 10.0 })
+    - Walks the tree, computes every Mesh's boundingBox.
+    - Logs WARNING if any mesh has minY < 0.0 (tire clipping ground).
+    - Logs WARNING if any mesh's bbox extends beyond maxAbsCoord (a
+      wheel flying off into space, a misplaced fork, etc.).
+    - Logs WARNING if 2 solid parts have overlapping bounding boxes
+      unless one is a child of the other (PART 150.4 cross-check).
+
+  174.4  GROUND CLEARANCE AUDIT
+    - validateGroundClearance(root)
+    - Returns { minY: number, ok: boolean, offendingMesh: string }.
+    - The factory's ship() step should refuse to export if ok = false.
+
+  174.5  STANDARD SHIPPING WRAPPER
+    - Wire all 4 audits into the factory's tail:
+        export function createMotorcycleModel(opts): THREE.Group {
+          const root = buildMotorcycle(opts);
+          // ... wire userData.tick, userData.sculptRuntime, sockets
+          // RUN AUDITS
+          validateTriangleBudget(root, { budget: 30000 });
+          validateDrawCallCount(root, { budget: 30 });
+          validateBoundingBox(root, { minY: 0.0, maxAbsCoord: 10.0 });
+          validateGroundClearance(root);
+          // RETURN
+          return root;
+        }
+    - Audits log to console, never throw — the model still ships
+      even if a warning fires.
+
+================================================================================
+PART 175 — OPTIMAL CODE STRUCTURE & ARCHITECTURAL BLUEPRINT
+================================================================================
+
+A production-ready procedural hard-surface model module MUST adhere to
+the 8-section file architecture below to guarantee reliability,
+modularity, and zero runtime crashes. The architecture mirrors PART 30 +
+PART 67 + PART 145-152 but is specialized for vehicles/props.
+
+  175.1  SECTION 1 — MODULE HEADER & COORDINATE CONTRACT
+    - ASCII diagram or docstring at the top of the file:
+        // CHUNKY SPORT MOTORCYCLE — TS Factory
+        // Coordinate frame: +x = front, +y = up, +z = right
+        // Units: 1 unit = 1 meter
+        // Bounding box: 2.10 (L) × 1.15 (H) × 0.75 (W)
+        // Wheelbase: 1.42 m, Track: 0.50 m
+        // Style: chunky-low-poly, sport, fairing-cowl
+    - Declares units, axes, dimensions, wheelbase, track, style.
+
+  175.2  SECTION 2 — TYPE DEFINITIONS & CONFIG OPTIONS
+    - Customizable scale, color overrides, wireframe toggles, and
+      runtime flags.
+    - Interface for runtime contract:
+        interface MotorcycleRuntime {
+          nodes:   Record<string, THREE.Object3D>;
+          meshes:  Record<string, THREE.Mesh>;
+          sockets: Record<string, THREE.Object3D>;
+          actions: Record<string, (...args: any[]) => void>;
+          tick:    (delta: number, elapsed: number) => void;
+          sculptRuntime: any;
+        }
+
+  175.3  SECTION 3 — PALETTE & PHYSICAL CONSTANTS
+    - Centralized hex color dictionary with semantic names:
+        const PALETTE = {
+          fairingOrange:  0xff6a1f,
+          chassisBlack:   0x111114,
+          rimSilver:      0xc7ccd1,
+          tireCharcoal:   0x1a1a1c,
+          brakeRed:       0xc0271d,
+          mufflerSilver:  0x9ba0a6,
+          headlightLens:  0xf5f7ff,
+        };
+    - Physical constants (mass_kg, wheelbase_m, max_steer_deg, etc.)
+      as named numbers.
+
+  175.4  SECTION 4 — REUSABLE GEOMETRY HELPERS
+    - Math routines, mulberry32 PRNG, curve definitions, the 4 PART
+      169 primitive helpers inlined (or imported from MT.advanced).
+    - Per-model sub-helpers (e.g., createFairingShape, createRim)
+
+  175.5  SECTION 5 — CENTRALIZED MATERIAL REGISTRY
+    - One MATERIALS object instantiated once per model:
+        const MATERIALS = {
+          fairing: new THREE.MeshStandardMaterial({
+            color: PALETTE.fairingOrange,
+            roughness: 0.45, metalness: 0.15,
+            roughnessMap: sharedRoughMap,  // PART 171
+          }),
+          chassis: new THREE.MeshStandardMaterial({
+            color: PALETTE.chassisBlack,
+            roughness: 0.55, metalness: 0.35,
+            roughnessMap: sharedRoughMap,
+          }),
+          // ...
+        };
+    - Maximizes GPU batching (every mesh of the same material shares
+      the shader program) and prevents redundant shader compilation.
+
+  175.6  SECTION 6 — ISOLATED SUBASSEMBLY BUILDERS
+    - Each subassembly is its own function:
+        function buildChassisAndEngine(mat, meshMap) { ... }
+        function buildFrontForkAssembly(mat, meshMap) { ... }
+        function buildFairingAndCockpit(mat, meshMap) { ... }
+        function buildFuelTank(mat, meshMap) { ... }
+        function buildSeatAndTailSection(mat, meshMap) { ... }
+        function buildExhaustSystem(mat, meshMap) { ... }
+        function buildRearSwingarm(mat, meshMap) { ... }
+        function buildWheelsAndBrakes(mat, meshMap) { ... }
+    - Each builder takes (MATERIALS, meshMap) and mutates meshMap
+      with the meshes it created.
+
+  175.7  SECTION 7 — PRIMARY FACTORY FUNCTION
+    - createMotorcycleModel(options): THREE.Group
+    - Calls each builder in order, attaches them to the pivot tree
+      (PART 172), wires userData.tick + userData.sculptRuntime,
+      attaches named socket nodes (headlight, exhaustTip, riderSeat,
+      etc.), runs the validation audits (PART 174).
+    - Bound actions: revEngine, steer, setDriveSpeed,
+      toggleHeadlight, leanBody (for a motorcycle).
+
+  175.8  SECTION 8 — DEDICATED LOOK-DEV LIGHTS FACTORY
+    - createMotorcycleModelLookDevLights(mode): THREE.Group
+    - The canonical 3-point studio rig (PART 173) returned as a Group
+      the renderer adds to the scene next to the model.
+
+  175.9  WHY THIS STRUCTURE WINS
+    - Each section is independently testable.
+    - The 8 builders are pure functions — no globals, no hidden state.
+    - Re-running the factory with different options produces different
+      variants (PART 166 multi-variant ranking).
+    - The lookDevLights factory is the renderer's "stage" — the
+      vehicle "drives onto the set" the same way a real product does.
+
+================================================================================
+PART 176 — HARD-SURFACE PITFALLS & HOW TO AVOID THEM
+================================================================================
+
+Ten named pitfalls for hard-surface / vehicle models. Each has a
+concrete fix. The AI factory SHOULD verify fixes for 1, 2, 3, 4, 5, 7,
+8, 9, 10 before shipping.
+
+  176.1  PRIMITIVE INTERPENETRATION & INTERNAL FACES (CLIPPING)
+    - Symptom: overlapping separate geometries create internal
+      z-fighting, self-shadowing dark artifacts, and visible clipping
+      when materials are semi-transparent.
+    - Cause: Three.js standard primitives render closed volumes. Two
+      volumes intersecting without boolean subtraction or union
+      produce rendering anomalies under contact shadows.
+    - Fix: use PART 169.1 FilletedBoxGeometry (or shrink each
+      primitive 0.01-0.03 m at every contact point). For deeper
+      recesses, use CSG (PART 146.4) or SDF union (PART 146.5) so the
+      intersection becomes a single solid.
+
+  176.2  THE "EGG VISOR" PHENOMENON
+    - Symptom: a partial SphereGeometry for an aerodynamic sportbike
+      windscreen produces a tall, bulbous, egg-like dome rather than
+      an aggressive, swept-back racing visor.
+    - Cause: spheres expand radially equally along all dimensions. An
+      aerodynamic visor has distinct curvature radii along pitch,
+      camber, and perimeter.
+    - Fix: use PART 170.2 (bezier profile) + anisotropic scaling
+      (0.95, 0.65, 0.88) + rotation along the rake axis (~37 deg) +
+      a dedicated thin dark rubber perimeter gasket.
+
+  176.3  PARENTING & TRANSFORMATION HIERARCHY MISALIGNMENT
+    - Symptom: the front wheel, fork assembly, handlebars, and
+      mudguard must turn as a single coherent unit around an inclined
+      steering head angle. Attaching parts directly to world
+      coordinates or root groups causes wheels to wobble out of the
+      axle plane when rotated.
+    - Cause: incomplete separation of static chassis space versus
+      articulated steering pivot space.
+    - Fix: establish a dedicated `steering_pivot` node located exactly
+      at the steering stem center (PART 172.1), apply the rake angle
+      ONCE on the pivot, all subsequent yaw turns preserve mechanical
+      steering geometry.
+
+  176.4  UNIFORM PBR "PLASTIC" SHINE WITHOUT TEXTURES
+    - Symptom: raw MeshStandardMaterial with static roughness values
+      looks like generic, smooth extruded plastic rather than molded
+      painted vinyl or powder-coated alloy.
+    - Cause: uniform specular reflection without micro-facet
+      distribution variation.
+    - Fix: apply PART 171 (seeded micro-roughness procedural
+      texture) to every material. Apply PART 147.2 (striate maps) to
+      cylinder limbs + body panels. Apply PART 147.5 (cavity-dirt AO)
+      to every material for in-crevice darkening.
+
+  176.5  CODE TOKEN LIMITS & LARGE-FILE SYNTAX HAZARDS
+    - Symptom: generating comprehensive 1,500+ line procedural files
+      in a single pass risks syntax cutoffs, nested loop bracket
+      mismatch, or duplicate variable declarations.
+    - Cause: high density of repetitive geometric coordinate points
+      in Shape/Path arrays.
+    - Fix: split into the 8-section architecture (PART 175). Each
+      builder is < 200 lines, isolated scope, no cross-builder
+      variable collisions.
+
+  176.6  LACK OF NATIVE REAL-TIME BEVEL & FILLET ENGINE
+    - Symptom: standard Three.js geometries (Box, Cylinder) have
+      razor-sharp geometric edges that break the chunky toy aesthetic
+      unless custom rounded primitives are constructed.
+    - Cause: ExtrudeGeometry supports bevelSize + bevelSegments, but
+      Box / Cylinder primitives do not.
+    - Fix: use PART 169.1 FilletedBoxGeometry for box-like parts,
+      PART 170.3 LatheGeometry for rotationally symmetric parts
+      (with bevel), and MT.mesh.subdivideCatmullClark (PART 113) for
+      organic curvature.
+
+  176.7  CSG BROWSER OVERHEAD
+    - Symptom: libraries like three-bvh-csg add significant CPU
+      spikes, memory allocations, and dependency overhead to
+      lightweight client-side applications.
+    - Cause: boolean union/subtraction is O(N*M) on triangle counts.
+    - Fix: simulate recessed cuts using optical tricks when possible:
+      negative-offset dark cavities (a smaller dark mesh INSIDE a
+      larger mesh), bevel frames (a thin extruded ring at the
+      perimeter of the cut), extruded insets (an inset Shape
+      extruded slightly behind the surface). Use CSG only when the
+      cut MUST be visible depth (e.g., a real hole through a panel).
+
+  176.8  NORMAL ARTIFACTS ON SCALED NON-UNIFORM GEOMETRIES
+    - Symptom: calling .scale(x, y, z) on a BufferGeometry with
+      non-uniform factors distorts vertex normals, resulting in
+      pinched specular highlights.
+    - Cause: the normal matrix is the inverse-transpose of the
+      scale matrix; uniform .scale() doesn't recompute it.
+    - Fix: call geometry.computeVertexNormals() AFTER every
+      non-uniform .scale() call. Better: avoid .scale() entirely for
+      hard-surface parts — bake the radius directly into the
+      primitive construction.
+
+  176.9  DRAW CALL CONSTRAINTS
+    - Symptom: a model composed of 50-80 individual sub-meshes
+      creates 50-80 draw calls per frame. Mobile devices and embedded
+      WebViews stutter.
+    - Cause: each Mesh is a separate draw call.
+    - Fix: for static parts, call BufferGeometryUtils.mergeGeometries
+      to merge N meshes → 1. For repeated small details (rivets,
+      bolts), use InstancedMesh — 1 draw call for N instances. PART
+      162 trigger rule: >3 identical small meshes → makeInstanced.
+
+  176.10  LIGHTING RIG OMITTED
+    - Symptom: the model looks flat / dead / uninteresting even
+      though the geometry is correct.
+    - Cause: only ambient + a single directional light = no shape
+      definition, no silhouette carve.
+    - Fix: ship the 3-point studio rig (PART 173) as a second
+      factory export (createModelLookDevLights). The renderer
+      auto-discovers it and wires it next to the model.
+
+================================================================================
+PART 177 — CANONICAL WORKED EXAMPLE (Chunky Sport Motorcycle)
+================================================================================
+
+A worked example is shipped in the spec annex (see MODELING_TECHNIQUES
+v143+ Example 12). The example demonstrates the 8-section architecture
+(PART 175) with:
+
+  - Bounding box: 2.10 × 1.15 × 0.75 m
+  - Style: chunky-low-poly sport motorcycle, orange fairings
+  - Pivot tree (PART 172.1):
+      chassis_pivot
+      ├── static body (frame, engine, tank, tail, headlight)
+      ├── swingarm_pivot (rotates for suspension travel)
+      │     ├── swingarm mesh
+      │     ├── wheel_rear_pivot (spins around Z)
+      │     │     ├── tire, rim (PART 169.3 5-spoke), brake disc
+      │     │     │   (PART 169.4), sprocket
+      │     │     └── chain (decorative)
+      │     └── rear brake caliper (STATIC)
+      └── steering_pivot (rotated -23 deg on Z = rake angle)
+            ├── triple clamps + handlebars
+            ├── fork stanchions (PART 169.2 tapered tube)
+            ├── front mudguard
+            └── wheel_front_pivot (spins around Z)
+                  ├── tire, rim, brake disc
+                  └── front brake caliper (STATIC, child of fork)
+  - Materials: 8 distinct PBR materials (PART 175.5), each with
+    PART 171 micro-roughness map.
+  - Lighting: 3-point studio rig (PART 173) as second export.
+  - Validation: triangle budget 30 000, draw calls 22 (after merges),
+    bbox audit clean.
+
+The example file is intended as the canonical copy-paste starting
+point for any new vehicle model.
+
+================================================================================
+PART 178 — 12-STEP SHIP CHECKLIST FOR HARD-SURFACE MODELS
+================================================================================
+
+A 12-step ship list for hard-surface / vehicle models. Steps 1-12
+replace PART 152's 10-step recipe when the model has wheels,
+suspension, fairings, or any articulated mechanical sub-system.
+
+  1.  ANATOMY CARD (in code, as comment at top of .ts file).
+      Bounding box, wheelbase, track, style, palette.
+
+  2.  DIMENSION & CLEARANCE CONTRACT (PART 168).
+      All clearance gaps declared in the pivot-table comment.
+
+  3.  PIVOT TREE (PART 172).
+      chassis_pivot + steering_pivot + swingarm_pivot +
+      wheel_front_pivot + wheel_rear_pivot in the right hierarchy.
+
+  4.  RAKE ANGLE applied ONCE on steering_pivot (PART 172.3).
+
+  5.  PRIMITIVE HELPERS (PART 169).
+      FilletedBox for chassis, TaperedTube for forks + exhaust,
+      RimStar for wheels, BeveledWasher for brake discs.
+
+  6.  FAIRINGS via PART 170.
+      Profile lofting (PART 170.2 bezier) for nose + tail cowls;
+      lathe (PART 170.3) for headlight bezels; swept extrusion
+      (PART 170.4) for exhaust headers.
+
+  7.  MATERIALS with PART 171 micro-roughness map.
+      One MATERIALS object, instantiated once; 5-8 distinct PBR
+      materials with seeded roughness map.
+
+  8.  UNIFORM BEVEL pass.
+      Every solid mesh has 0.015-0.025 m fillet (PART 169.1 or
+      beveled extrude).
+
+  9.  LOOK-DEV LIGHTS as second export (PART 173).
+      3-point studio rig + contact shadow plane.
+
+  10. RUNTIME CONTRACTS wired.
+      userData.tick + userData.sculptRuntime + named sockets
+      (headlight, exhaustTip, riderSeat) + bound actions
+      (revEngine, steer, setDriveSpeed).
+
+  11. SELF-VERIFICATION AUDITS (PART 174).
+      Triangle count + draw call + bounding box + ground clearance,
+      all logging to console.
+
+  12. SHIP.
+      Single .ts file, single export function (factory) + optional
+      second export (lookDevLights), no relative imports,
+      deterministic (mulberry32 seeded), 8-section architecture
+      (PART 175).
+
+================================================================================
+PART 167-178 SUMMARY (THE ONE-PARAGRAPH VERSION)
+================================================================================
+
+PART 167-178 is the hard-surface / vehicle / prop methodology layer
+added on top of PART 145-152 (perfect-shape pipeline, character-
+focused) + PART 153-166 (image-driven factory defaults). PART 167
+documents the 8-step vehicle pipeline. PART 168 specifies the
+dimension & clearance contract every hard-surface model MUST declare.
+PART 169 ships 4 procedural primitive helpers (FilletedBox,
+TaperedTube, RimStarPattern, BeveledWasher) that eliminate ~40% of
+vertex math for hard-surface work. PART 170 catalogues 5 fairing
+construction techniques (quadratic curve / bezier / lathe / swept
+extrusion / parametric modifier stack). PART 171 ships the seeded
+mulberry32-based micro-roughness procedural texture — the single
+biggest visual upgrade for painted surfaces. PART 172 documents the
+canonical hierarchical articulation tree every vehicle MUST use
+(steering pivot at rake angle, swingarm pivot at rear axle, wheel
+spin axes, brake disc spin axes). PART 173 ships the 3-point studio
+lighting rig (key / fill / rim + contact shadow plane). PART 174 ships
+the self-verification runtime hooks (triangle / drawcall / bbox /
+ground clearance audits). PART 175 lays out the 8-section code
+architecture (header / types / palette / helpers / materials /
+builders / factory / lookDevLights). PART 176 documents 10
+hard-surface pitfalls with concrete fixes. PART 177 ships a canonical
+worked example (Chunky Sport Motorcycle). PART 178 ships a 12-step
+ship checklist. PART 167-178 is purely additive — PART 1-166 and the
+44 PART 100-143 helpers all still work exactly as before. See
+CHANGES_v132.md for the full v1.32 release notes.
+
+================================================================================
+END OF PART 167-178
 ================================================================================

@@ -1,3 +1,104 @@
+# v1.32 / v8.23 — Hard-Surface / Vehicle Modeling Pipeline (2026-09-15)
+
+This release layers the **HARD-SURFACE / VEHICLE MODELING PIPELINE**
+(PART 167-178) on top of the v1.31 / v8.22 spec. PART 145-152
+(perfect-shape pipeline) and PART 153-166 (image-driven factory
+defaults) are character-focused; PART 167-178 is the missing
+methodology layer for motorcycles / cars / planes / props with
+wheels + suspension + fairings + articulated mechanical sub-systems.
+Unlike v1.30 / v1.31 (methodology-only), v1.32 ships both the
+methodology AND 9 concrete renderer-side helpers exposed on
+`window.MT_hardsurface`. See `CHANGES_v132.md` for the full release
+notes.
+
+What ships in this release:
+  - 12 new spec PARTs (PART 167 → PART 178) added canonically to
+    Prompt_To_Ts.txt (the 5 sibling spec files reference them).
+  - PART 167 — THE 8-STEP VEHICLE PIPELINE (analyze /
+    skeleton-first / fairings / wheels / suspension /
+    accessories / bevel / lighting+validate).
+  - PART 168 — DIMENSION & CLEARANCE SPECIFICATION (bounding
+    box + tire↔mudguard + rotor↔caliper + fork↔triple clamp +
+    exhaust↔swingarm + fairing↔frame + wheel↔fender + chain↔
+    sprocket + ground-clearance Y >= 0).
+  - PART 169 — PROCEDURAL PRIMITIVE LIBRARY EXPANSION (4 new
+    helpers: FilletedBox / TaperedTube / RimStarPattern /
+    BeveledWasher).
+  - PART 170 — LATHE & PROFILE EXTRUSION FOR FAIRINGS (5
+    techniques: quadratic / bezier / lathe / swept extrusion /
+    parametric modifier stack).
+  - PART 171 — SEEDED MICRO-ROUGHNESS PROCEDURAL TEXTURE
+    (mulberry32 PRNG + CanvasTexture, deterministic, 5-10%
+    micro-roughness break-up).
+  - PART 172 — HIERARCHICAL ARTICULATION TREE (chassis_pivot +
+    steering_pivot at rake angle + swingarm_pivot + wheel_N_pivot
+    trees; car + plane variants).
+  - PART 173 — 3-POINT STUDIO LIGHTING RIG (key + fill + rim +
+    hemisphere ambient + contact shadow plane; second factory
+    export).
+  - PART 174 — AUTOMATED SELF-VERIFICATION RUNTIME HOOKS (4
+    audits: validateTriangleBudget / validateDrawCallCount /
+    validateBoundingBox / validateGroundClearance).
+  - PART 175 — 8-SECTION CODE ARCHITECTURE (header / types /
+    palette / helpers / materials / builders / factory /
+    lookDevLights).
+  - PART 176 — HARD-SURFACE PITFALLS (10 named pitfalls with
+    concrete fixes, e.g., the "egg visor" phenomenon).
+  - PART 177 — CANONICAL WORKED EXAMPLE (Chunky Sport
+    Motorcycle with full pivot tree + 8 materials + 3-point
+    rig).
+  - PART 178 — 12-STEP SHIP CHECKLIST.
+  - New renderer-side sub-module: public/modeling/
+    mt-hardsurface.js (9 helpers on `window.MT_hardsurface`).
+  - Renderer's <meta description> + <meta keywords> + spec
+    chip title + window.lblSpec.VERSION constants bumped from
+    v1.30/v8.22 → v1.32/v8.23.
+  - Backward-compatible: PART 1-166 + the 44 PART 100-143
+    helpers all still work exactly as before.
+
+---
+
+# v1.31 / v8.22 — IMAGE-DRIVEN FACTORY DEFAULTS (2026-09-15)
+
+This release layers the **IMAGE-DRIVEN FACTORY DEFAULTS** layer
+(PART 153-166) on top of the v1.30 / v8.22 perfect-shape modeling
+pipeline. It is the direct response to the gaps surfaced by the
+pirate-robot build documented in `SYSTEM_UPDATE_REQUESTS.txt`
+(2026-09-15). No new runtime helpers — PART 153-166 is the missing
+**factory-defaults layer** that tells the AI *when* to use each
+PART 100-143 technique and *how* to wire ACES + IBL + IoU
+automatically so future image-driven models hit the reference on
+the first attempt.
+
+What ships in this release:
+  - 14 new spec PARTs (PART 153 → PART 166) added canonically to
+    Image_To_Ts.txt.
+  - PART 153 — IMAGE-DRIVEN FACTORY TECHNIQUE DEFAULTS (MT.*
+    helpers over hand-authored BufferGeometry).
+  - PART 154 — AUTO-TRIGGER ACES after construction.
+  - PART 155 — PBR PRESET TABLE FOR IMAGE-DRIVEN FACTORIES
+    (MAT_DB semantic lookup).
+  - PART 156 — STYLE LOCK → FLAT-SHADING / OUTLINE TRIGGERS.
+  - PART 157 — IMAGE-TO-WORLD MAPPING HELPER (imageToWorld).
+  - PART 158 — SILHOUETTE IoU CHECK.
+  - PART 159 — SDF + MARCHING CUBES TRIGGER.
+  - PART 160 — CSG RECIPES FOR COMMON PATTERNS (mouth grille /
+    eye patch socket / belt buckle slot).
+  - PART 161 — USE MT.core.loft (NOT hand-written profileLoft).
+  - PART 162 — INSTANCED RIVETS / REPEATED DETAILS.
+  - PART 163 — AUTO-ENABLE PMREM/HDRI FOR METALLIC MATERIALS.
+  - PART 164 — DETAIL INVENTORY BEFORE BUILDING.
+  - PART 165 — 11-STEP CANONICAL RECIPE (UPDATED FROM PART 152).
+  - PART 166 — GENERATE 3 VARIANTS, PICK BEST.
+  - 4 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt
+    / Image_To_Js.txt / Image_To_Json.txt) updated with v1.31 /
+    v8.22 de-dup notes; canonical PART 153-166 content stays in
+    Image_To_Ts.txt.
+  - The 4 sibling spec files plus Prompt_To_Ts.txt (v1.32) also
+    got v1.32 / v8.23 de-dup notes referencing PART 167-178.
+
+---
+
 # v1.30 / v8.22 — Perfect-Shape Modeling Pipeline (2026-09-15)
 
 This release layers the **PERFECT-SHAPE MODELING PIPELINE** (PART
