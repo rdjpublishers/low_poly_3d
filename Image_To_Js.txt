@@ -10,6 +10,84 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 >>> The image-to-JS path inherits the same v8.17
 >>> opt-in capability bundle.
 ================================================================================
+
+================================================================================
+STATUS — KNOWN ISSUES (from ANALYSIS_REPORT.txt, 2026-09-14)
+================================================================================
+This spec file is the canonical LBL spec source for its input format. The
+following items from the repo-wide audit affect how an AI author should
+generate output from this spec; please read them before producing code.
+
+  #1  public/rig/skeletons/object.json has 4 root joints (Bone_Top /
+      Bottom / Left / Right) and violates the 1-root rule. If the AI
+      author is generating a TS/JS factory for an "object" class that
+      opts into the auto-template loader, the template will throw on
+      buildSkeleton. Workaround: ship a rigGraph with an explicit
+      single root instead of relying on the object.json template.
+
+  #2  public/rig/specs/quadruped_light.json declares height 1.45 m but
+      the resolved Y range is 0.035 to 1.150 m (1.115 m, 23% short).
+      This file is shipped as the worked example for anyCreature 1.3.1;
+      it loads, renders, but a 0.335 m mismatch is baked into the data.
+      Authoring tip: do NOT copy the joint offsets verbatim from this
+      file — re-measure the resolved Y range and align joints so the
+      declared `height` field matches the geometry.
+
+  #3  quadruped_light.json anchor numbers (W_over_H, fill, leg_fraction,
+      mass_thirds, head_share_of_length, belly_y_over_H) don't match the
+      actual joint layout. They are explicitly labelled "ANCHORS, not
+      targets" — but no measurement recipe is documented. Authoring tip:
+      if you cite these anchors, document the measurement formula
+      inline; otherwise readers have no way to verify the values.
+
+  #7  aces-engine.js extractSkeleton() previously used `root.THREE` for
+      Vector3, which threw on SkinnedMesh. Fixed in index.html by
+      `window.THREE = THREE;` at module top level. No spec author
+      action needed — but if you reference ACES, note that the renderer
+      is now correctly wired.
+
+  #15 quadruped_light.json has `animations.move.mirror_phase: 0.5` that
+      is parsed but never read by the anycreature compiler. The mirror
+      phase shift is the recommended technique for natural quadruped
+      walks (right-side cycle offset by half the duration) — the field
+      is reserved for the v2 compiler and currently has no effect.
+
+  #16 parts[].anchor and parts[].conform are parsed but ignored in v1
+      of the anycreature compiler. buildPart / buildFin / buildEye
+      orient by udir/vdir only. v2 will implement surface projection.
+      For now: ignore these fields when authoring parts.
+
+  #19 buildFin() / buildEye() / buildHand() / buildMembrane() are
+      v1 placeholders. The compiler will warn at load time. Authoring
+      tip: keep your part definitions simple (spike, fin, eye, paw,
+      curve, hand, membrane) and don't rely on host-bone orientation
+      being honoured for fin/eye.
+
+  #23 Model_2 publishes runtime.animations as both a real AnimationClip
+      array AND a legacy hint array. Both code paths run; the legacy
+      path silently loses track type (see #18). For NEW TS factories:
+      publish only the modern shape (rt.animations.clips + .mixer), not
+      the legacy hint array.
+
+  #26 Model_6 has 21 AnimationClips but no `userData.tick` (it relies
+      on the renderer-level lblAnim.mixer.update). Best practice for
+      NEW TS factories: set `root.userData.tick = (dt) =>
+      mixer.update(dt);` even if you also rely on the renderer's
+      per-frame mixer — that way other code paths that read
+      userData.tick (e.g. addTsModelToScene diagnostics) still find it.
+
+  CROSS-REFS
+  - The full audit is in /ANALYSIS_REPORT.txt (1 145 lines, 30
+    problems ranked BLOCKING / HIGH / MEDIUM / LOW).
+  - The canonical LBL version pair is v1.29 (TS) / v8.21 (JSON-JS).
+    The renderer's #lbl-spec-chip and meta description are now aligned
+    with this pair (previously they said v1.27/v8.19 — fixed in the
+    same commit that addressed #7 and #5).
+  - CHANGES_SUMMARY.md has a fresh v1.29 entry at the top (see
+    CHANGES_v129.md for the standalone changelog).
+================================================================================
+
+
 NOTE — three other input formats exist alongside this image-to-JS
 blueprint DSL. (1) JSON blueprint — the same shape, declarative
 (Prompt_To_Json.txt / Image_To_Json.txt). (2) TS factory — a
