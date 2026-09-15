@@ -1387,3 +1387,10 @@ export function exportRiggedModelToGlb(
     );
   });
 }
+
+
+// ANALYSIS-REPORT #5 — add default export so `import robotModel from
+// "./Model_7"` resolves. The named `createRobotCharacterModel` export
+// works for the renderer loader (pickTsFactory prefers create*Model),
+// but the spec PART 1 worked example uses the default-import form.
+export default createRobotCharacterModel;

@@ -935,3 +935,7 @@ export function createRabbitWarriorModelLookDevLights(
 
   return lightsGroup;
 }
+
+
+// ANALYSIS-REPORT #5 — default export for spec PART 1 worked-example form.
+export default createRabbitWarriorModel;

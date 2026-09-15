@@ -1,14 +1,15 @@
 {
   "class": "object",
   "_meta": {
-    "source": "Mesh2Motion distilled, see PART 76.2 of LBL v1.25 / v8.17",
-    "restPose": "1.0 m cube, joints at bounding-box extremes",
-    "jointCount": 4
+    "source": "Mesh2Motion distilled, see PART 76.2 of LBL v1.29 / v8.21",
+    "restPose": "1.0 m cube, joints at bounding-box extremes (Bone_Center is the implicit root; the 4 cardinal joints are its children)",
+    "jointCount": 5
   },
   "joints": [
-    { "id": "Bone_Top",    "restPosition": [ 0,  0.5,  0], "restRotation": [0, 0, 0, 1] },
-    { "id": "Bone_Bottom", "restPosition": [ 0, -0.5,  0], "restRotation": [0, 0, 0, 1] },
-    { "id": "Bone_Left",   "restPosition": [-0.5, 0,    0], "restRotation": [0, 0, 0, 1] },
-    { "id": "Bone_Right",  "restPosition": [ 0.5, 0,    0], "restRotation": [0, 0, 0, 1] }
+    { "id": "Bone_Center", "restPosition": [0, 0, 0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Top",    "parentId": "Bone_Center", "restPosition": [ 0,  0.5,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Bottom", "parentId": "Bone_Center", "restPosition": [ 0, -0.5,  0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Left",   "parentId": "Bone_Center", "restPosition": [-0.5, 0,    0], "restRotation": [0, 0, 0, 1] },
+    { "id": "Bone_Right",  "parentId": "Bone_Center", "restPosition": [ 0.5, 0,    0], "restRotation": [0, 0, 0, 1] }
   ]
 }

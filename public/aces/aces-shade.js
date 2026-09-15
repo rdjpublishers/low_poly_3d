@@ -38,6 +38,13 @@ const oklab = (typeof require !== 'undefined' && typeof module !== 'undefined')
   ? require('./aces-oklab.js')
   : (typeof window !== 'undefined' ? window.ACES_oklab : null);
 
+// ANALYSIS-REPORT #6 — guard with a clear error message so an import-order
+// bug in index.html surfaces immediately instead of as a generic destructure
+// exception deep in the L1-L8 stack.
+if (!oklab) {
+  throw new Error('[ACES] aces-shade.js requires aces-oklab.js to load first. Check the import order in index.html — aces-oklab must precede aces-shade.');
+}
+
 const { lin2oklab, oklab2lin, inGamut, hex2lab, ss, mixOK, vnoise3, walkChromaToEdge } = oklab;
 
 // ── settled values ─────────────────────────────────────────────────────────

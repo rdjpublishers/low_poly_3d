@@ -21,6 +21,17 @@ const { hex2lin } = (typeof require !== 'undefined' && typeof module !== 'undefi
   ? require('./aces-oklab.js')
   : (typeof window !== 'undefined' ? window.ACES_oklab : null);
 
+// ANALYSIS-REPORT #6 — surface a clear error if a dependency is missing.
+// The default destructure would throw "Cannot destructure property 'X'
+// of 'null'" with no breadcrumb; the explicit guard names the missing
+// module and tells the user to fix the import order in index.html.
+if (!vertexNormals) {
+  throw new Error('[ACES] aces-ao.js requires aces-normals.js to load first. Check the import order in index.html — aces-normals must precede aces-ao.');
+}
+if (!hex2lin) {
+  throw new Error('[ACES] aces-ao.js requires aces-oklab.js to load first. Check the import order in index.html — aces-oklab must precede aces-ao.');
+}
+
 function triangulate(F) {
   const out = [];
   for (const f of F) {

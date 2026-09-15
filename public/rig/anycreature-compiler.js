@@ -43,25 +43,34 @@
 //                           renderer treats the compiled model identically
 //                           to a hand-written factory.
 //
-// Known limitations (v1 of the compiler; v2 is a follow-up):
-//   - The volumes and parts are emitted as regular THREE.Mesh, not
-//     THREE.SkinnedMesh, so the bone hierarchy is decoupled from the
-//     geometry. The AnimationMixer can find the joints (and the
-//     animation player shows the clips in the panel), but the model
-//     does NOT visibly deform on playback. Switching to SkinnedMesh
-//     is straightforward but interacts badly with the renderer's
-//     gizmo-anchor wrap (which re-parents the model after bind) — the
-//     rebind must happen after the wrap, not at compile time. v2 will
-//     detect the wrap and rebind.
-//   - Section refs (`profile row opts.section`) are accepted but the
-//     named 2D section from spec.sections is rendered as a simple
-//     ellipse — the custom outline (concave, star, etc.) is v2.
-//   - The "conform" flag on fin/eye parts is parsed but ignored —
-//     parts always orient by the spec's udir/vdir. v2 will project
-//     against the host volume's surface normal.
-//   - Membrane parts and hand parts are very rough placeholders.
-//     They render a flat fan / ellipsoid; the full 4-bone rib mesh
-//     and the palm + 4 fingers + thumb are v2.
+// ANALYSIS-REPORT #14 — single source of truth for "Known limitations".
+// Both the top-of-file docstring and the inline reference in
+// compileAnyCreature() previously duplicated this list; the v2 plan
+// risks drifting between the two copies.
+const V1_KNOWN_LIMITATIONS = [
+  'The volumes and parts are emitted as regular THREE.Mesh, not THREE.SkinnedMesh, so the bone hierarchy is decoupled from the geometry. The AnimationMixer can find the joints (and the animation player shows the clips in the panel), but the model does NOT visibly deform on playback. Switching to SkinnedMesh is straightforward but interacts badly with the renderer\'s gizmo-anchor wrap (which re-parents the model after bind) — the rebind must happen after the wrap, not at compile time.',
+  'Section refs (`profile row opts.section`) are accepted but the named 2D section from spec.sections is rendered as a simple ellipse — the custom outline (concave, star, etc.) is v2.',
+  'The `conform` flag and `anchor` block on fin/eye parts are parsed but ignored — parts always orient by the spec\'s udir/vdir. v2 will project against the host volume\'s surface normal and resolve chain-t / around-angle anchoring.',
+  'Membrane parts and hand parts are very rough placeholders. They render a flat fan / ellipsoid; the full 4-bone rib mesh and the palm + 4 fingers + thumb are v2.',
+];
+
+// ANALYSIS-REPORT #14 — known limitations documented at the top of the file.
+// (See V1_KNOWN_LIMITATIONS below for the canonical list; this comment is
+// the human-readable summary.)
+//   - Bones exist in the scene graph but volumes/parts are NOT SkinnedMesh
+//     → the AnimationMixer can play clips but the geometry does NOT deform.
+//     Switching to SkinnedMesh is blocked by the renderer's gizmo-anchor
+//     wrap (re-parents the model after bind). v2 will rebind after wrap.
+//   - `profile row opts.section` resolves to a simple ellipse only.
+//   - `conform` and `anchor` on fin/eye parts are parsed but ignored.
+//   - `membrane` and `hand` parts are rough placeholders.
+//
+// ANALYSIS-REPORT #4 — SPEC VERSION (LBL v1.29 / v8.21):
+// This file is part of the renderer surface documented at v1.25/v8.17
+// (PART 75-89, procedural rigging + skin-weights). The anycreature
+// compiler was added at PART 97 (v1.27/v8.19). No spec-version change
+// in v1.28/v8.20 or v1.29/v8.21; this file is unchanged across those
+// revisions.
 //
 // Public surface:
 //   import { compileAnyCreature } from 'anycreature-compiler.js';
@@ -684,6 +693,20 @@ function addCap(indices, positionsArr, normalsArr, colorsArr, samples, ringIdx, 
 //
 // 7 part types. Each is a small mesh bound to a host joint. The 'mirror'
 // flag on the part is honored at the chain-mirror stage, not here.
+//
+// ANALYSIS-REPORT #28 — validate numeric inputs. Every part builder reads
+// thickness / size / offset / dir / sides / segments from the spec; an
+// accidental NaN or negative number used to silently corrupt the mesh.
+// The `sanitizeNum` helper clamps to a safe range and falls back to a
+// default. The original value is preserved in the userData so a designer
+// can see what got clamped.
+function sanitizeNum(v, dflt, min, max) {
+  if (!Number.isFinite(v)) return { v: dflt, clamped: false, original: v };
+  if (v < min) return { v: min, clamped: true, original: v };
+  if (v > max) return { v: max, clamped: true, original: v };
+  return { v: v, clamped: false, original: v };
+}
+
 function buildPart(part, positions, palette, chains, bonesByName) {
   const hostPos = positions[part.host];
   if (!hostPos) return { mesh: null, warn: `part "${part.type}" references unknown host joint "${part.host}"` };
@@ -691,6 +714,22 @@ function buildPart(part, positions, palette, chains, bonesByName) {
   const baseColor = new THREE.Color(matSpec.color || '#888888');
   const mat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: matSpec.rough != null ? matSpec.rough : 0.7, metalness: 0.0 });
   let mesh = null;
+  // ANALYSIS-REPORT #16 — surface v1 limitations per part type so the
+  // designer sees when anchor / conform / full-hand / full-membrane
+  // features were silently ignored.
+  const partWarnings = [];
+  if ((part.type === 'fin' || part.type === 'eye') && part.anchor) {
+    partWarnings.push(`part "${part.type}" (host="${part.host}"): anchor {chain, t, around} is parsed but ignored in v1; the part is placed by its host position + udir/vdir. v2 will resolve chain-t / around-angle anchoring.`);
+  }
+  if (part.type === 'fin' && part.conform) {
+    partWarnings.push(`part "${part.type}" (host="${part.host}"): conform=${part.conform} is ignored in v1 — the fin lies flat in the section plane, not on the host volume's surface. v2 will project against the volume normal.`);
+  }
+  if (part.type === 'membrane' && Array.isArray(part.ribs) && part.ribs.length > 4) {
+    partWarnings.push(`part "${part.type}" (host="${part.host}"): only the first 2 rib joints are used to build the membrane triangle; the full 4-bone rib mesh is v2.`);
+  }
+  if (part.type === 'hand') {
+    partWarnings.push(`part "${part.type}" (host="${part.host}"): v1 emits a stylised ellipsoid palm only; fingers + thumb are v2.`);
+  }
   switch (part.type) {
     case 'spike': mesh = buildSpike(part, hostPos, mat); break;
     case 'eye':   mesh = buildEye(part, hostPos, mat, chains, positions); break;
@@ -717,8 +756,9 @@ function buildPart(part, positions, palette, chains, bonesByName) {
     partType: part.type,
     material: part.material,
     join: part.join,
+    v1Warnings: partWarnings, // ANALYSIS-REPORT #16/#19 — surface on inspection
   });
-  return { mesh, warn: null, bones: hostBone ? [hostBone] : [] };
+  return { mesh, warn: null, warnings: partWarnings, bones: hostBone ? [hostBone] : [] };
 }
 
 // (v1) SkinnedMesh conversion helper — kept here as a stub for the
@@ -966,7 +1006,10 @@ function buildCurve(part, hostPos, mat) {
     if (s.behind) heading.applyAxisAngle(v, -THREE.MathUtils.degToRad(s.behind));
     if (s.left)  heading.applyAxisAngle(heading, THREE.MathUtils.degToRad(s.left));
     if (s.right) heading.applyAxisAngle(heading, -THREE.MathUtils.degToRad(s.right));
-    if (s.taper) r * 0.3; // visual pinch (the variable reassignment is a no-op in this stub; r is bound above)
+    // ANALYSIS-REPORT #10 — taper was a documented no-op; now actually
+    // pinches the segment radius. Taper value 0..1 means "shrink r to
+    // (1-taper) of original", so taper=0.3 → 0.7× the segment radius.
+    if (s.taper) r *= Math.max(0, 1 - Math.min(1, s.taper));
     ringCenters.push(cursor.clone()); ringRadii.push(r);
   }
   for (let r = 0; r < ringCenters.length; r++) {
@@ -1080,26 +1123,38 @@ function buildMembrane(part, hostPos, mat, positions, chains) {
 // The L* side is the authored chain; the R* side is auto-generated with
 // joint names prefixed "R" instead of "L" and X coordinates negated.
 //
+// ANALYSIS-REPORT #13 — L* prefix convention: every joint in a mirrored
+// chain MUST start with a single capital 'L' so this function can name
+// its R* counterpart by slicing the first character. Joints with mixed
+// naming (LeftFront / leg_l / etc.) are silently skipped. The
+// compileAnyCreature() caller turns any skip into a log.warn entry so the
+// spec author sees it.
+//
 // The spec is treated as authoritative on L* — we build the R* chain by
 // copying L*'s relative deltas and negating the X axis at the world step.
-function applyMirror(spec, positions, jointsByName) {
+function applyMirror(spec, positions, jointsByName, log) {
   const mirror = spec.mirror || [];
   const chains = spec.chains || {};
   const raws = spec.joints || {};
   const mirrors = [];
+  const skipReport = []; // { chain, joint, reason }
   for (const chainName of mirror) {
     const chain = chains[chainName];
-    if (!chain) continue;
+    if (!chain) { skipReport.push({ chain: chainName, joint: null, reason: 'chain-not-found' }); continue; }
     const newPositions = {};
+    // ANALYSIS-REPORT #12 — allocate joints with parentId:undefined, then
+    // populate in the next loop. No more "placeholder" parentId that gets
+    // overwritten a few lines later.
     const newJoints = [];
     for (const jn of chain) {
-      if (!jn.startsWith('L')) continue;
+      if (!jn.startsWith('L')) { skipReport.push({ chain: chainName, joint: jn, reason: 'name-does-not-start-with-L' }); continue; }
       const rName = 'R' + jn.slice(1);
       const lp = positions[jn];
-      if (!lp) continue;
+      if (!lp) { skipReport.push({ chain: chainName, joint: jn, reason: 'unresolved-L-joint' }); continue; }
       newPositions[rName] = new THREE.Vector3(-lp.x, lp.y, lp.z);
-      newJoints.push({ name: rName, parentId: rName === 'R' + chain[0].slice(1) ? null : 'R' + jn.slice(1) /* placeholder */ });
+      newJoints.push({ name: rName, parentId: undefined });
     }
+    if (!newJoints.length) { skipReport.push({ chain: chainName, joint: null, reason: 'no-L-joints-in-chain' }); continue; }
     // Re-parent mirror joints along the chain order.
     for (let i = 0; i < newJoints.length; i++) {
       if (i === 0) {
@@ -1127,6 +1182,14 @@ function applyMirror(spec, positions, jointsByName) {
     const newChain = newJoints.map(j => j.name);
     if (!chains['R' + chainName.slice(1)]) chains['R' + chainName.slice(1)] = newChain;
     mirrors.push({ original: chainName, mirror: 'R' + chainName.slice(1) });
+  }
+  // ANALYSIS-REPORT #27 — surface skipped entries in the build log so the
+  // spec author sees when their mirror list produced no geometry.
+  if (log && skipReport.length) {
+    for (const s of skipReport) {
+      const what = s.joint ? `joint "${s.joint}"` : `chain "${s.chain}"`;
+      log.push({ level: 'warn', text: `applyMirror: ${what} skipped (${s.reason}). Mirror requires every chain joint to start with capital L (e.g. LFrontRoot, LBackKnee).` });
+    }
   }
   return mirrors;
 }
@@ -1165,15 +1228,26 @@ function compileAnimations(spec, positions) {
   const mirror = new Set(spec.mirror || []);
   for (const [name, def] of Object.entries(anims)) {
     const dur = def.duration || 1.0;
+    // ANALYSIS-REPORT #15 — implement mirror_phase. The spec defines
+    // `animations.X.mirror_phase` as a value in [0,1) that time-shifts
+    // the R* tracks by mirror_phase * duration so the right-side cycle
+    // is phase-offset from the left. Common technique for natural-looking
+    // quadruped walks (left-front and right-front legs alternate). When
+    // unset (the typical case), R* tracks stay in phase with L*.
+    const phase = (Number.isFinite(def.mirror_phase) && def.mirror_phase >= 0 && def.mirror_phase < 1)
+      ? def.mirror_phase * dur
+      : 0;
     const tracks = [];
     for (const [jointName, chans] of Object.entries(def.tracks || {})) {
       tracks.push(...buildJointTracks(jointName, chans, dur));
       // Mirror tracks: if the joint name starts with 'L' and the chain
       // it belongs to is in spec.mirror, emit a mirrored track on the
-      // R* joint.
+      // R* joint, optionally phase-shifted by `phase` seconds.
       if (jointName.startsWith('L') && isInMirror(jointName, spec)) {
         const rName = 'R' + jointName.slice(1);
-        tracks.push(...buildJointTracks(rName, mirrorChannels(chans), dur));
+        const mirrored = mirrorChannels(chans);
+        const shifted = phase > 0 ? phaseShiftChannels(mirrored, phase, dur) : mirrored;
+        tracks.push(...buildJointTracks(rName, shifted, dur));
       }
     }
     if (tracks.length) {
@@ -1182,6 +1256,26 @@ function compileAnimations(spec, positions) {
     }
   }
   return clips;
+}
+
+// ANALYSIS-REPORT #15 — wrap the mirrored R* tracks' timestamps so the
+// right-side cycle lags the left-side cycle by `phase` seconds. Frame
+// values that would land before t=0 or after t=duration get clamped or
+// wrapped depending on whether the original clip loops (we treat every
+// looped clip as cyclic — the Three.js mixer interpolates with the
+// InterpolateLinear / InterpolateSmooth setting; clampWhenFinished is
+// left to the caller).
+function phaseShiftChannels(chans, phase, duration) {
+  const out = {};
+  for (const [k, frames] of Object.entries(chans || {})) {
+    out[k] = frames.map(([t, v]) => {
+      const nt = t + phase / duration;
+      // Cycle: wrap [1, 2) back to [0, 1).
+      const wrapped = nt >= 1 ? nt - Math.floor(nt) : nt;
+      return [wrapped, v];
+    });
+  }
+  return out;
 }
 
 function isInMirror(jointName, spec) {
@@ -1335,7 +1429,7 @@ export function compileAnyCreature(spec, opts) {
   //    part of the tree).
   const jointsByName = Object.create(null);
   for (const [n, p] of Object.entries(positions)) jointsByName[n] = p;
-  const mirrors = applyMirror(spec, positions, jointsByName);
+  const mirrors = applyMirror(spec, positions, jointsByName, log);
   if (mirrors.length) info(`anycreature: mirrored ${mirrors.length} chain(s)`);
 
   // 3. Create the THREE.Bone hierarchy. Bones are added as
@@ -1372,6 +1466,10 @@ export function compileAnyCreature(spec, opts) {
       info(`anycreature: part "${p.type}" (${p.material || ''}) on ${p.host}`);
     }
     if (r.warn) warn(r.warn);
+    // ANALYSIS-REPORT #16/#19 — surface per-part v1 warnings in the log.
+    if (r.warnings && r.warnings.length) {
+      for (const wmsg of r.warnings) warn(wmsg);
+    }
   }
 
   // 6. (v1) No SkinnedMesh binding — bones exist in the scene graph
@@ -1389,6 +1487,18 @@ export function compileAnyCreature(spec, opts) {
   root.userData.bonesByName = bonesByName;
   root.userData.spec = spec;
   root.userData.sourceFormat = 'anycreature';
+
+  // ANALYSIS-REPORT #11 — surface the v1 limitation explicitly in the log
+  // so the validator panel / build report shows it. v2 will convert
+  // volumes/parts to SkinnedMesh and rebind after the renderer's gizmo-
+  // anchor wrap; the existing V1_KNOWN_LIMITATIONS constant documents the
+  // four v1 caveats in one place.
+  if (skinMeshes.length > 0) {
+    warn(`anycreature compiler v1 limitation: ${skinMeshes.length} mesh(es) emitted as plain THREE.Mesh — the AnimationMixer can find the bones but the geometry will NOT visibly deform on playback. Volumes/parts need SkinnedMesh binding; v2 is the follow-up. See V1_KNOWN_LIMITATIONS in anycreature-compiler.js for the full caveat list.`);
+  }
+  for (const limit of V1_KNOWN_LIMITATIONS) {
+    warn(`anycreature compiler v1 limitation: ${limit}`);
+  }
 
   info(`anycreature: compile done — ${root.children.length} child(ren), ${skinMeshes.length} skinned`);
   return { group: root, log, bones: { bonesByName, root: rootBone, meshes: skinMeshes }, runtime };

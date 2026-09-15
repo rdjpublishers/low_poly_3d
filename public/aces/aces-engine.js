@@ -39,6 +39,47 @@
     return;
   }
 
+  // ANALYSIS-REPORT #20 — Skin-influence extraction. The default
+  // THREE.SkinnedMesh DOES expose skinIndex / skinWeight attributes when
+  // the geometry was built by buildSemanticWeights / buildGeodesicWeights /
+  // etc.; read those, fall back to nearest-bone for the L8 softener only
+  // when they're missing. The earlier "placeholder" code returned
+  // [Bone_Root, 1.0] for every vertex and that comment was misleading.
+  function extractSkinInfluence(geom, skeleton) {
+    const pos = geom.getAttribute('position');
+    if (!pos || !skeleton || !skeleton.skeleton) return null;
+    const si = geom.getAttribute('skinIndex');
+    const sw = geom.getAttribute('skinWeight');
+    if (!si || !sw) return null;
+    const out = new Array(pos.count);
+    const itemSize = Math.min(si.itemSize, sw.itemSize, 4);
+    for (let v = 0; v < pos.count; v += 1) {
+      const entries = [];
+      for (let s = 0; s < itemSize; s += 1) {
+        const boneIdx = si.getComponent ? si.getComponent(v, s) : (si.array[v * si.itemSize + s]);
+        const w = sw.getComponent ? sw.getComponent(v, s) : (sw.array[v * sw.itemSize + s]);
+        if (w > 0 && boneIdx >= 0 && boneIdx < skeleton.skeleton.bones.length) {
+          entries.push([skeleton.skeleton.bones[boneIdx].name, w]);
+        }
+      }
+      if (!entries.length) entries.push([mirrorName('Bone_Root'), 1.0]);
+      out[v] = entries;
+    }
+    return out;
+  }
+
+  // ANALYSIS-REPORT #7 — read a translation vector from an Object3D's
+  // worldMatrix directly, without depending on Vector3 / setFromMatrixPosition.
+  // Used as a fallback when window.THREE is not exposed (e.g. in a Node
+  // test harness). The matrix's translation is elements[12..14].
+  function getWorldTranslation(obj, out) {
+    out = out || [0, 0, 0];
+    obj.updateWorldMatrix(true, false);
+    const e = obj.matrixWorld.elements;
+    out[0] = e[12]; out[1] = e[13]; out[2] = e[14];
+    return out;
+  }
+
   // ── Three.js scene → plain mesh records ────────────────────────────────
   //
   // For each Mesh / SkinnedMesh, produce a record:
@@ -115,18 +156,19 @@
         _geom: geom,
         _vertexCount: pos.count,
       };
-      // SkinnedMesh → inflate per-vertex skin influences
+      // SkinnedMesh → inflate per-vertex skin influences from skinIndex/skinWeight
+      // attributes when present. Falls back to a single Bone_Root influence
+      // for the L8 bone-field softener if the attributes are missing
+      // (older .glb exports without skin data, for example).
       if (obj.isSkinnedMesh && obj.skeleton) {
-        const sk = obj.skeleton;
-        const skin = new Array(pos.count);
-        for (let i = 0; i < pos.count; i++) {
-          // The default Three.js SkinnedMesh doesn't expose per-vertex
-          // influences in a public form, so we approximate by nearest bone
-          // for the L8 bone-field softener. A full extraction would need the
-          // SkinIndex/SkinWeight attributes which aren't always present.
-          skin[i] = [[bones.mirrorName('Bone_Root'), 1.0]]; // placeholder, replaced if real data
+        const skin = extractSkinInfluence(geom, obj.skeleton);
+        if (skin) {
+          record.skin = skin;
+        } else {
+          const placeholder = new Array(pos.count);
+          for (let i = 0; i < pos.count; i++) placeholder[i] = [[bones.mirrorName('Bone_Root'), 1.0]];
+          record.skin = placeholder;
         }
-        record.skin = skin;
       }
       out.push(record);
     });
@@ -144,9 +186,12 @@
         for (let i = 0; i < obj.skeleton.bones.length; i++) {
           const b = obj.skeleton.bones[i];
           const parent = obj.skeleton.bones.indexOf(b.parent);
-          const pos = b.getWorldPosition(new (root.THREE || { Vector3: function () { return { x: 0, y: 0, z: 0 }; } }).Vector3());
-          // Fall back to bind pose if world position isn't available
-          const worldPos = (pos && Number.isFinite(pos.x)) ? [pos.x, pos.y, pos.z] : (b.userData && b.userData.bindPos) || [0, 0, 0];
+          // ANALYSIS-REPORT #7 — use the matrix-element fallback if THREE
+          // isn't exposed on window (Node test harness). Real browsers do
+          // expose window.THREE via index.html.
+          const worldPos = root.THREE
+            ? (() => { const v = new root.THREE.Vector3(); b.getWorldPosition(v); return [v.x, v.y, v.z]; })()
+            : getWorldTranslation(b, null);
           joints.push({ name: b.name, pos: worldPos, parent: parent === i ? -1 : parent });
           index[b.name] = i;
         }
@@ -157,6 +202,14 @@
   }
 
   // ── write back ──────────────────────────────────────────────────────────
+  //
+  // ANALYSIS-REPORT #17 — write-back contract:
+  //   • m.C → COLOR_0 (linear-light vertex colours, only when m.C is present)
+  //   • m.N → NORMAL (angle-weighted vertex normals, only when m.N is present)
+  //   • POSITION is NEVER touched (the engine never moves geometry)
+  //   • UV / UV1 / UV2 / skinIndex / skinWeight are read-only
+  //   • The vertex COUNT may grow (crease split duplicates vertices along
+  //     dihedral > smooth_angle). The original index buffer is replaced.
   function applyToGeometry(meshes, reports) {
     const THREE = root.THREE;
     for (const m of meshes) {

@@ -85,6 +85,16 @@ const oklab = (typeof require !== 'undefined' && typeof module !== 'undefined')
 
 const { lin2oklab, oklab2lin, hex2lab, hex2lin } = oklab;
 
+// ANALYSIS-REPORT #6 — clear error if a dependency failed to load. The
+// default destructure would otherwise throw an opaque "Cannot destructure"
+// deep in a check function.
+if (!normals) {
+  throw new Error('[ACES] aces-checks.js requires aces-normals.js to load first. Check the import order in index.html — aces-normals must precede aces-checks.');
+}
+if (!oklab) {
+  throw new Error('[ACES] aces-checks.js requires aces-oklab.js to load first. Check the import order in index.html — aces-oklab must precede aces-checks.');
+}
+
 const V3 = {
   sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
   add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
@@ -878,17 +888,23 @@ function srgbSaturation(lin) {
   return mx > 0 ? (mx - mn) / mx : 0;
 }
 
-// thinnest_px48 — width of the thinnest feature on the 48px thumbnail the
+// thinnest_px48 — width of the thinnest feature on the thumbnail the
 // reader sees. Under 3 px = invisible. Computed on the silhouette mask
-// (top-down projection of the Y axis). 48 px = the reader's thumbnail.
+// (top-down projection of the Y axis). 48 px = the reader's default
+// thumbnail (this matches the PART 96.3 scale rule "48 px reads
+// IDENTITY"). ANALYSIS-REPORT #29 — callers can override PX via
+// ctx.checksOpts.thumbnailPx to scale the threshold to the actual
+// viewport dimensions.
 function chk_thinnest_px48(ctx) {
   const out = { blocks: [], warns: [], info: [] };
   if (!ctx.meshes.length) { out.info.push('thinnest_px48: no meshes, skipped'); return out; }
-  // Project to XZ (top-down view), build a 48x48 mask, find protrusions.
+  // Project to XZ (top-down view), build a thumbnailPx × thumbnailPx mask,
+  // find protrusions. Honour checksOpts.thumbnailPx; default 48.
+  const opts = (ctx && ctx.checksOpts) || {};
+  const PX = (Number.isFinite(opts.thumbnailPx) && opts.thumbnailPx >= 16 && opts.thumbnailPx <= 1024) ? Math.round(opts.thumbnailPx) : 48;
   const { lo, hi } = bbox(ctx.meshes);
   const sx = (hi[0] - lo[0]) || 1;
   const sz = (hi[2] - lo[2]) || 1;
-  const PX = 48;
   const mask = new Uint8Array(PX * PX);
   for (const m of ctx.meshes) {
     for (const f of m.F || []) {
@@ -958,12 +974,16 @@ function chk_thinnest_px48(ctx) {
   // minimum non-zero
   let thinnest = Infinity;
   for (let i = 0; i < dt.length; i++) if (dt[i] > 0 && dt[i] < thinnest) thinnest = dt[i];
-  // px48 is the actual width in pixels
-  const px48 = thinnest === Infinity ? 0 : Math.round(thinnest * 2);
-  if (px48 < 3) {
-    out.warns.push(`thinnest_px48: thinnest feature measures ${px48}px on the 48px thumbnail (< 3px = invisible to the blind reader). Thicken it or drop it.`);
+  // px is the actual width in pixels. Threshold scales with PX: at the
+  // default 48 px thumbnail, <3 px is invisible; at 96 px the same
+  // proportion is 6 px, etc. Floor at 2 px to avoid false positives on
+  // very small thumbnails.
+  const px = thinnest === Infinity ? 0 : Math.round(thinnest * 2);
+  const minPx = Math.max(2, Math.round(PX * 3 / 48));
+  if (px < minPx) {
+    out.warns.push(`thinnest_px48: thinnest feature measures ${px}px on the ${PX}px thumbnail (< ${minPx}px = invisible to the reader). Thicken it or drop it.`);
   } else {
-    out.info.push(`thinnest_px48: thinnest feature is ${px48}px on the 48px thumbnail (≥ 3px = visible)`);
+    out.info.push(`thinnest_px48: thinnest feature is ${px}px on the ${PX}px thumbnail (≥ ${minPx}px = visible)`);
   }
   return out;
 }

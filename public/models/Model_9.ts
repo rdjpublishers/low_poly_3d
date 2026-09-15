@@ -1252,3 +1252,7 @@ export function createChibiTankModelLookDevLights(
 
   return lights;
 }
+
+
+// ANALYSIS-REPORT #5 — default export for spec PART 1 worked-example form.
+export default createChibiTankModel;

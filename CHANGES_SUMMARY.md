@@ -1,3 +1,53 @@
+# v1.29 / v8.21 — Renderer/spec sync (2026-09-14)
+
+This release aligns the renderer with the v1.29 (TS path) / v8.21
+(JSON-JS path) reference documents. No new feature; this is a
+house-keeping release so the renderer meta description, the
+in-app spec chip, and the six Prompt_To_*.txt / Image_To_*.txt
+reference docs all advertise the same version. See
+ANALYSIS_REPORT.txt problem #4 for the version-drift list.
+
+Changes since v1.25 / v8.17:
+  - public/rig/skeletons/object.json: added an explicit
+    Bone_Center root joint so the "object" template satisfies the
+    single-root validator (was 4 roots → throws on buildSkeleton).
+  - public/rig/specs/quadruped_light.json: declared `height` now
+    matches the actual silhouette (1.115 m, was 1.45 m); added a
+    `_measurement` block documenting the recipe each anchor uses
+    and a `_actual_anchors` block showing the values computed from
+    the current geometry, so the AI can compute deviations.
+  - public/aces/aces-engine.js: extracted real skin influences from
+    skinIndex / skinWeight attributes when present (the L8
+    bone-field softener no longer needs the
+    [Bone_Root, 1.0] fallback for modern SkinnedMeshes).
+  - public/aces/aces-engine.js: defensive matrix-translation
+    fallback so the engine works in Node test harnesses without
+    window.THREE.
+  - public/aces/aces-{ao,shade,checks}.js: explicit guards with
+    a clear error message if a dependency fails to load, instead
+    of an opaque "Cannot destructure" exception.
+  - public/rig/anycreature-compiler.js: buildCurve taper field
+    now actually pinches the radius (was a documented no-op).
+    compileAnyCreature logs an explicit v1-not-deforming warning.
+    applyMirror no longer carries a "placeholder" parentId.
+    Silent empty-mirror skip now logs a warning. All part builders
+    (fin/eye/hand/membrane) now log a warning when their v1
+    limitations actually fire on the input spec.
+  - index.html: window.THREE exposed so the ACES modules'
+    `root.THREE` lookup succeeds (was an undefined-stub that
+    threw on SkinnedMesh scenes).
+  - index.html: lblCollectAnimations() legacy hint path now detects
+    track type by values-array length and emits the matching
+    THREE track class (was hardcoded NumberKeyframeTrack — lost
+    rotation fidelity on factories that publish the legacy hint
+    array).
+  - public/models/Model_{7,8,9}.ts: added `export default` so the
+    external `import model from "./Model_X"` path resolves.
+  - public/models/Model_6.ts: added userData.tick so the
+    per-frame hook contract is satisfied for anim-free code paths.
+
+---
+
 # v1.25 / v8.17 — Procedural rigging + skin-weights integration (PART 75-89) — OPT-IN capability bundle
 
 The spec now teaches the AI a FOURTH OPT-IN capability

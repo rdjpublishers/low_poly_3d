@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.24 (TS path) and v8.16 (JSON/JS path) with 10 opt-in architectural features, 36 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30, 6 PART 67 opt-in validators E31 modifier stack order / E32 UV projection sanity / E33 modifier stack safety / E34 converge direction / E35 recolor roles / E36 preflight check), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider), PART 67 OPT-IN CAPABILITY BUNDLE (7 new cross-primitive shape generators makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix + 6 deform modifiers taper / twist / bend / spherize / inflate / applyNoise dispatched by applyModifierStack + 3 UV projections via projectUV + 1 vertex-channel helper fillVertexChannel + 1 convergeFaces helper + 1 recolorByPalette runtime swap + 1 placeChain chain placement + 1 applyMaterialAnimation time-driven material keyframes + 1 preflightCheck safety budget — especially useful for weapons, blades, and metal-finish subjects), and PART 74 OPT-IN CAPABILITY BUNDLE (procedural texturing & shading techniques: 6 noise helpers mulberry32 / fnv1a / valueNoise2D / fbm2D / voronoi2D / domainWarpFBM + 3 procedural micro-texture generators microRoughnessMap / punctateMaps / striateMaps with Sobel-with-wrap-around tile-safety + 5 height-to-X conversions heightToNormal / heightToRoughness / heightToAO / heightToCurvature / cavityDirt + 4 PBR creature recipes chitin / elytra / membrane / velvet with clearcoat-capped-at-0.55 + 4 loft-based organic geometry helpers loft / spindle / segmentedAbdomen / surfaceDecorationAlongCurvedBody + 1 hex-facet helper facetHeightField via triangular-lattice Voronoi + 3 cross-cutting tricks domainWarpFBM / slopeBlur / makeTileableSquare / makeTileablePeriodic + 4 procedural pattern helpers makeBricksPattern / makeTruchetPattern / makeCairoPattern / makeSplatterPattern + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane, and any model whose reference surface has identifiable material micro-structure). PART 45, PART 67, and PART 74 are EXTRA CAPABILITIES — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
+<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser — low-poly is the project name and the default, but the system supports ANY 3D model style: low-poly, mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX, or any combination. Renderer targets LBL spec v1.29 (TS path) and v8.21 (JSON/JS path) with 10 opt-in architectural features, 36 hard anti-pattern guards (incl. 4 character-pipeline validators E13-E16, 2 modeling-technique validators E17-E18, 3 production-grade validators E19-E21, 2 high-detail validators E22-E23, 2 character-production validators E24-E25, 2 refinement/style-locking/variant-ranking validators E26-E27, 2 professional-pipeline validators E28-E29, 1 CS2-profile validator E30, 6 PART 67 opt-in validators E31 modifier stack order / E32 UV projection sanity / E33 modifier stack safety / E34 converge direction / E35 recolor roles / E36 preflight check), a triangle-first geometry inspector, PART 39 3D modeling techniques, PART 40 better models through better generation, PART 41 high-detail generation, PART 42 character production discipline, PART 43 refinement + style locking + variant ranking, PART 44 professional pipeline (ship the GLB + .ts is the viewer adapter + BVH-accelerated raycasting via three-mesh-bvh + per-model look-dev lights + 6-family material hierarchy with bone + magic + fitted clothing/armor layers + 4 canonical animation clips + 18-render multi-view validation grid + 6 practical coding rules), PART 45 CS2 PBR material profile (9 finish styles: Anodized, Anodized Multicolored, Custom Paint Job, Gunsmith, Hydrographic, Patina, Solid Color, Sprayed, Damascus Steel + 5-tier wear system FN/MW/FT/WW/BS + 4 new MeshPhysicalMaterial properties iridescence / iridescenceIOR / iridescenceThicknessRange / specularIntensity / specularColor / attenuationColor / attenuationDistance + 8 new MAT_DB presets brushedsteel / gunmetal / damascussteel / anodizedblue / anodizedred / anodizedgold / casehardened / polishedmetal + 5 new canonical helpers cs2PbrProfile / applyWear / cs2-finish materialVariants family / cs2WearMaskTexture / wearSlider), PART 67 OPT-IN CAPABILITY BUNDLE (7 new cross-primitive shape generators makeDisc / makeRing / makeArc / makeHemisphere / makeRibbon / makeCrossPlanes / makeHelix + 6 deform modifiers taper / twist / bend / spherize / inflate / applyNoise dispatched by applyModifierStack + 3 UV projections via projectUV + 1 vertex-channel helper fillVertexChannel + 1 convergeFaces helper + 1 recolorByPalette runtime swap + 1 placeChain chain placement + 1 applyMaterialAnimation time-driven material keyframes + 1 preflightCheck safety budget — especially useful for weapons, blades, and metal-finish subjects), and PART 74 OPT-IN CAPABILITY BUNDLE (procedural texturing & shading techniques: 6 noise helpers mulberry32 / fnv1a / valueNoise2D / fbm2D / voronoi2D / domainWarpFBM + 3 procedural micro-texture generators microRoughnessMap / punctateMaps / striateMaps with Sobel-with-wrap-around tile-safety + 5 height-to-X conversions heightToNormal / heightToRoughness / heightToAO / heightToCurvature / cavityDirt + 4 PBR creature recipes chitin / elytra / membrane / velvet with clearcoat-capped-at-0.55 + 4 loft-based organic geometry helpers loft / spindle / segmentedAbdomen / surfaceDecorationAlongCurvedBody + 1 hex-facet helper facetHeightField via triangular-lattice Voronoi + 3 cross-cutting tricks domainWarpFBM / slopeBlur / makeTileableSquare / makeTileablePeriodic + 4 procedural pattern helpers makeBricksPattern / makeTruchetPattern / makeCairoPattern / makeSplatterPattern + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane, and any model whose reference surface has identifiable material micro-structure). PART 45, PART 67, and PART 74 are EXTRA CAPABILITIES — not a rule every model must follow. Drop a .zip bundle to ship model + rig + assets in one go. Export GLB, OBJ, STL, or .ts."/>
 <meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.24, LBL v8.16, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.24 v8.16, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments, PART 100-143 44-Technique Modeling Bundle Primitive BMesh Procedural Parametric Generative SDF Voxel CSG Boolean L-System Fractal NURBS Non-Manifold Subdivision Remeshing Retopology Decimation Triangulation Quad Smoothing Sculpting Displace SMPL Blendshapes ShapeKeys MorphTargets LBS DQS ImplicitSkinning DeltaMush CageDeformation MuscleSim SoftBody Hair AutoRig PBRNodes ProceduralTex UVUnwrap Baking TexturePainting AtlasPacking LOD Instancing GeometryNodes PhysicsSim, MakePrimitive BmeshFromGeometry ProceduralGenerate MakeParametric GenerativeGrow SdfEvaluate VoxelCarve CsgUnion LSystem FractalMandelbulb MakeNurbsCurve DetectNonManifold SubdivideCatmullClark IsotropicRemesh AutoRetopologize QemDecimate Triangulate Quadify LaplacianSmooth SculptBrush DisplaceSurface SmplSkeleton MakeBlendshape ShapeKeyStore ComputeLBS ComputeDQS ImplicitSkin DeltaMush CageDeform MuscleSim SoftBodySim HairStrands AutoRig PbrMaterialGraph ProceduralTextureCanvas UvUnwrap BakeMap PaintTexture PackAtlases GenerateLOD MakeInstanced GeoNodesEvaluate PhysicsStep"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
@@ -1527,7 +1527,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <!-- RJS UPDATE 14 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
        TS factories target v1.24 (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects + PART 74 procedural texturing & shading techniques OPT-IN capability bundle: 6 noise helpers + 3 procedural micro-texture generators + 5 height-to-X conversions + 4 PBR creature recipes (chitin / elytra / membrane / velvet) + 4 loft-based organic geometry helpers + 1 hex-facet helper + 3 cross-cutting tricks + 4 procedural pattern helpers + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane), PART 100-143 44-Technique Modeling Bundle (12 core modeling techniques Primitive / BMesh / Procedural / Parametric / Generative / SDF / Voxel / CSG / L-System / Fractal / NURBS / Non-Manifold + 9 mesh quality techniques Subdivision / Remeshing / Retopology / Decimation / Triangulation / Quad Conversion / Smoothing / Sculpting API / Displace+Noise + 13 human/organic techniques SMPL-X / Blendshapes / Shape Keys / Morph Targets / LBS / DQS / Implicit Skinning / Delta Mush / Cage Deformation / Muscle Sim / Soft Body / Hair / Auto-Rigging + 6 materials & UV techniques PBR Material Nodes / Procedural Texturing / UV Unwrapping / Baking / Texture Painting / Atlas Packing + 4 optimization & advanced techniques LOD / Instancing / Geometry Nodes / Physics Sim, all deterministic per PART 74 contract, zero external assets, opt-in via window.MT catalog, fully integrated with the ACES PART 90 quality pass), JSON/JS blueprints target v8.16 (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67 + PART 74).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 36 anti-patterns from PART 32/65/38/39/40/41/42/43/44/45/67. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.27 TS / v8.19 JSON-JS, with PART 100-143 44-Technique Modeling Bundle). Models generated against older specs (≤v1.7 / ≤v8.0) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), PART 74 OPT-IN validators (covered by E19/E20/E22 + extended PART 21 checklist — see PART 74.10.4) as non-blocking warnings, and PART 100-143 OPT-IN 44-Technique Modeling Bundle helpers exposed on window.MT (12 CORE + 9 MESH + 13 ORGANIC + 6 MATERIALS + 4 ADVANCED) for catalog-driven scene authoring. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), PART 74 (procedural texturing & shading techniques), and PART 100-143 (44-Technique Modeling Bundle) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.27 / v8.19</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.29 TS / v8.21 JSON-JS, with PART 100-143 44-Technique Modeling Bundle). Models generated against older specs (≤v1.28 / ≤v8.20) still load — the validator surfaces any PART 32/65 anti-patterns, PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), PART 74 OPT-IN validators (covered by E19/E20/E22 + extended PART 21 checklist — see PART 74.10.4) as non-blocking warnings, and PART 100-143 OPT-IN 44-Technique Modeling Bundle helpers exposed on window.MT (12 CORE + 9 MESH + 13 ORGANIC + 6 MATERIALS + 4 ADVANCED) for catalog-driven scene authoring. The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), PART 74 (procedural texturing & shading techniques), and PART 100-143 (44-Technique Modeling Bundle) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.29 / v8.21</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -2109,6 +2109,16 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// LBL FIX — expose THREE on window so the ACES (anyCreature Engine Surface)
+// sub-modules (classic scripts attached to window.ACES_*) can read
+// `root.THREE` for Vector3 / BufferAttribute construction. Without this,
+// aces-engine.js's extractSkeleton() falls back to a plain object stub
+// whose `getWorldPosition` target is missing `setFromMatrixPosition`,
+// throwing "setFromMatrixPosition is not a function" on the first
+// SkinnedMesh encountered. See ANALYSIS_REPORT problem #7.
+window.THREE = THREE;
+window.__rendererThreeVersion = THREE.REVISION;
+
 // LBL UPDATE — eagerly import the ACES (anyCreature Engine Surface)
 // sub-modules so window.ACES is available for the auto-ACES trigger
 // the anyCreature compiler uses. These are modules (not classic
@@ -2156,7 +2166,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       console.warn('[LBL] MT modules failed to load:', e && e.message);
     }
   })();
-})();
 
 // LBL update H2 — transform gizmo (drag objects in viewport)
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -17101,20 +17110,73 @@ function normalizeClipForGlb(origClip, opts){
     // out correctly.
     const easyPass = [];
     const eulerTracks = [];
+    const directRotationTracks = [];
     for(const t of tracks){
       const m = /\.rotation\[([xyz])\]$/.exec(t.name);
       if(m){
         eulerTracks.push({ track: t, axis: m[1] });
       } else if(/\.rotation$/.test(t.name)){
-        // Raw "*.rotation" tracks are unusual but Three.js's mixer
-        // resolves them; let the GLTFExporter's normal validation
-        // path take a shot.
-        easyPass.push(t);
+        // ANALYSIS-REPORT #22 — raw "*.rotation" tracks come in two shapes:
+        //   1. Euler angles (3 values per frame, in radians) — convert to
+        //      a quaternion track so glTF consumers see proper rotation.
+        //   2. Quaternions (4 values per frame) — already a quaternion
+        //      track; convert via QuaternionKeyframeTrack for cleanliness.
+        // We detect by the values-array length on the first frame. If
+        // neither 3 nor 4 (degenerate, NaN, or 16-component matrix), pass
+        // through and let the GLTFExporter's normal validation handle it.
+        const firstV = t.values ? t.values[0] : null;
+        const size = Array.isArray(firstV) ? firstV.length : (typeof firstV === 'number' ? 1 : 0);
+        if(size === 4) directRotationTracks.push({ track: t, kind: 'quaternion' });
+        else if(size === 3) directRotationTracks.push({ track: t, kind: 'euler' });
+        else easyPass.push(t); // unknown size — let exporter validate
       } else {
         easyPass.push(t);
       }
     }
     newTracks.push(...easyPass);
+    // Convert direct *.rotation tracks (quaternion or Euler) into the
+    // matching QuaternionKeyframeTrack. This replaces the older behaviour
+    // that passed them through unchanged and let GLTFExporter silently
+    // fail.
+    for(const { track: t, kind } of directRotationTracks){
+      const cleanTimes = (t.times || []).slice();
+      const cleanVals = [];
+      if(kind === 'quaternion'){
+        for(const v of t.values) {
+          if(Array.isArray(v) && v.length === 4) cleanVals.push(v[0], v[1], v[2], v[3]);
+          else if(typeof v === 'number') cleanVals.push(v); // already flat
+        }
+        if(cleanTimes.length && cleanVals.length === cleanTimes.length * 4){
+          _normNormalizeRotations(cleanTimes, cleanVals);
+          newTracks.push(new THREE.QuaternionKeyframeTrack(node + '.quaternion', cleanTimes, cleanVals, THREE.InterpolateLinear));
+        } else {
+          // Could not parse — pass through; exporter will complain.
+          newTracks.push(t);
+        }
+      } else if(kind === 'euler'){
+        const eulSamples = [];
+        for(const v of t.values){
+          if(Array.isArray(v) && v.length === 3) eulSamples.push(v);
+        }
+        if(eulSamples.length){
+          const qv = new Array(eulSamples.length * 4);
+          for(let i = 0; i < eulSamples.length; i++){
+            _normEuler.set(eulSamples[i][0] || 0, eulSamples[i][1] || 0, eulSamples[i][2] || 0, 'XYZ');
+            _normQuat.setFromEuler(_normEuler);
+            qv[i*4    ] = _normQuat.x;
+            qv[i*4 + 1] = _normQuat.y;
+            qv[i*4 + 2] = _normQuat.z;
+            qv[i*4 + 3] = _normQuat.w;
+          }
+          // Map original times to the eulSamples count if necessary
+          const times = cleanTimes.length === eulSamples.length ? cleanTimes : cleanTimes.slice(0, eulSamples.length);
+          _normNormalizeRotations(times, qv);
+          newTracks.push(new THREE.QuaternionKeyframeTrack(node + '.quaternion', times, qv, THREE.InterpolateLinear));
+        } else {
+          newTracks.push(t);
+        }
+      }
+    }
     if(!eulerTracks.length) continue;
     // Build the master keyframe-time grid.  Start with every keyframe
     // any euler track already contains, then add resampled points
@@ -22625,24 +22687,45 @@ function lblCollectAnimations(root, gltf){
     // Legacy hint array path: older factories publish a plain array of
     // {name, duration, tracks:[{name, times, values}]} objects. Build
     // real AnimationClips from them so the mixer can play them.
+    //
+    // ANALYSIS-REPORT #18 — pick the right Three.js track class by the
+    // values-array length (1 → NumberKeyframeTrack, 3 → VectorKeyframeTrack,
+    // 4 with name ending ".quaternion" → QuaternionKeyframeTrack, else
+    // NumberKeyframeTrack). The previous code hardcoded NumberKeyframeTrack
+    // which silently broke rotation interpolation (quaternions stored as 4
+    // scalars were treated as 4 separate properties).
     if(Array.isArray(rt.animations)){
-      rt.animations.forEach((a, i)=>{
-        if(!a || !Array.isArray(a.tracks)) return;
-        try{
-          const tracks = a.tracks.map(t=>{
-            // tracks can be {name, times, values} or THREE.KeyframeTrack
-            if(t && t.isKeyframeTrack) return t;
-            if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
-              return new THREE.NumberKeyframeTrack(t.name, t.times, t.values);
+      // Skip the legacy path entirely if the modern clips path already
+      // produced results — saves redundant NumberKeyframeTrack construction.
+      if(lblAnim.clips.length === 0){
+        rt.animations.forEach((a, i)=>{
+          if(!a || !Array.isArray(a.tracks)) return;
+          try{
+            const tracks = a.tracks.map(t=>{
+              // tracks can be {name, times, values} or THREE.KeyframeTrack
+              if(t && t.isKeyframeTrack) return t;
+              if(t && t.name && Array.isArray(t.times) && Array.isArray(t.values)){
+                // Determine per-keyframe value-size from the first frame.
+                const firstV = t.values[0];
+                const valueSize = Array.isArray(firstV) ? firstV.length : (typeof firstV === 'number' ? 1 : 0);
+                if(valueSize === 3) return new THREE.VectorKeyframeTrack(t.name, t.times, t.values, THREE.InterpolateLinear);
+                if(valueSize === 4 && /\.quaternion$/i.test(t.name)) return new THREE.QuaternionKeyframeTrack(t.name, t.times, t.values, THREE.InterpolateLinear);
+                if(valueSize === 4) {
+                  // 4 scalars with a non-quaternion track name → fall back to
+                  // NumberKeyframeTrack but log so the author can rename.
+                  console.warn('[anim] legacy hint track "' + t.name + '" has 4 values but name does not end with .quaternion — using NumberKeyframeTrack (rotation may interpolate incorrectly).');
+                }
+                return new THREE.NumberKeyframeTrack(t.name, t.times, t.values, THREE.InterpolateLinear);
+              }
+              return null;
+            }).filter(Boolean);
+            if(tracks.length){
+              const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
+              addClip(clip);
             }
-            return null;
-          }).filter(Boolean);
-          if(tracks.length){
-            const clip = new THREE.AnimationClip(a.name || ('anim_'+(i+1)), a.duration || -1, tracks);
-            addClip(clip);
-          }
-        }catch(err){ console.warn('[anim] failed to build clip from TS factory hint:', err); }
-      });
+          }catch(err){ console.warn('[anim] failed to build clip from TS factory hint:', err); }
+        });
+      }
     }
   }
   lblAnim.clips = clips;

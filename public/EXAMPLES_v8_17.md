@@ -1,5 +1,13 @@
 # EXAMPLES_v8_17 — Worked Examples for PART 75-89
 
+**Stability note (2026-09-14):** These examples were authored
+against the v1.25 / v8.17 spec and remain valid for the current
+v1.29 / v8.21 spec. The PART 75-89 bundle (multi-mode skin weights,
+skeleton class + 6 templates, Mixamo bone remap, voxel/BodyPix
+auto-riggers, chain-curvature animation, 12-constraint catalog) is
+unchanged. Filename keeps the v8_17 suffix to avoid breaking the
+cross-references in the four Prompt_To_*.txt / Image_To_*.txt docs.
+
 This file is the **worked-example annex** to the v8.17 spec (PART 75-89
 in `Prompt_To_*.txt`). It's intentionally a separate, smaller file so
 the AI can read it without scanning the full 24,000+ line spec.

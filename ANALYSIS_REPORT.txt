@@ -1,0 +1,1145 @@
+================================================================================
+LOWPOLY_3D — RENDERER + SUBSYSTEM ANALYSIS REPORT
+Repo: https://github.com/rdjpublishers/low_poly_3d.git
+Date: 2026-09-14
+Scope: Full source audit (renderer, ACES engine, modeling bundle, rigging,
+       9 demo TS models, all spec skeletons / JSON, all 6 reference docs)
+================================================================================
+
+TABLE OF CONTENTS
+  1. PROJECT OVERVIEW
+  2. RENDERER CAPABILITIES (index.html, 31 389 lines)
+  3. ACES (anyCreature Engine Surface) — public/aces/
+  4. MODELING TECHNIQUES BUNDLE (PART 100-143) — public/modeling/
+  5. RIGGING SUBSYSTEM (public/rig/)
+  6. ANIMATION CODE STRUCTURE
+  7. SPECIFICATION FILES (skeletons, manifest, design-card, anchor numbers)
+  8. REFERENCE DOCS (Prompt_To_*.txt, Image_To_*.txt, CHANGES_SUMMARY.md)
+  9. TS DEMO MODELS (public/models/Model_*.ts)
+  10. PROBLEMS FOUND + SOLUTIONS
+  11. SUMMARY SCORECARD
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+low_poly_3d is a single-page browser app that turns an "LBL blueprint"
+(declarative JSON or a hand-written .ts module) into a live, editable
+Three.js scene. Project name says "low poly" but the system supports ANY
+style (low-poly, mid-poly, high-poly, smooth-shaded, voxel, toon, photoreal,
+hand-painted, retro-PSX, etc.).
+
+Layout:
+  - index.html           — 1.6 MB monolith, the whole renderer + UI
+  - mockup-generator.html — 84 KB sibling "model store" UI
+  - public/aces/         — 7 files, 113 KB — ACES engine (anyCreature port)
+  - public/modeling/     — 9 files, 198 KB — 44-Technique MT bundle
+  - public/rig/          — 14 files, 125 KB — skeleton templates,
+                            anycreature compiler, three-rig-helpers bundle
+  - public/models/       — 10 files, 512 KB — 9 .ts demo models + manifest
+  - 6 reference docs in repo root — 6.6 MB combined
+  - .github/workflows/manifest.yml — auto-regenerates public/models/manifest.json
+
+External runtime dependencies (CDN, via import map):
+  - three@0.160.0
+  - three/addons/* (OrbitControls, TransformControls, GLTFExporter, RoundedBoxGeometry,
+    DecalGeometry, ConvexGeometry, MarchingCubes, SimplifyModifier, BufferGeometryUtils,
+    EffectComposer, RenderPass, UnrealBloomPass, OutputPass, Pass, FullScreenQuad,
+    SSAOPass, RoomEnvironment, GLTFLoader, FBXLoader, OBJLoader, STLLoader, ColladaLoader)
+  - three-mesh-bvh@0.9.3
+  - three-bvh-csg@0.0.16
+  - fflate@0.8.2  (zip support)
+
+Spec target advertised: 4 different version numbers across the repo
+(see Section 8 for the inconsistency table).
+
+================================================================================
+2. RENDERER CAPABILITIES (index.html, 31 389 lines, 1.6 MB)
+================================================================================
+
+The renderer is one ES module. Top-down structure:
+
+2.1  Module bootstrap
+     - <script type="importmap"> resolves "three", "three/addons/", and 14
+       local specifier aliases (aces-*, mt-*, three-rig-helpers, anycreature-
+       compiler) to either CDN URLs or local public/* paths.
+     - The single <script type="module"> block has the entire renderer in
+       one closure-less module. ~504 named function declarations plus
+       ~200 const/let top-level bindings.
+
+2.2  Three.js scene + camera + controls
+     - WebGLRenderer (antialias, ACESFilmic tonemap, PCFSoftShadowMap,
+       shadowMap 2048x2048). setPixelRatio min(devicePixelRatio, 2).
+     - PerspectiveCamera 45° fov, near 0.05, far 2000.
+     - OrbitControls with damping, autoRotate 0.5 deg/s.
+     - 5-light rig: ambient (0.5), hemi (sky/ground 0.8), directional sun
+       (2.4, casts shadows), fill (0x7f40ff, 1.0), rim (0x4fc3f7, 0.4),
+       back-left rim (0xaaccff, 0.8).
+     - GridHelper 60x60 with renderOrder=1 (renders after scene).
+     - 4 lighting presets (Studio / Outdoor / Night / Flat), cycle button.
+     - Dark + light themes (CSS variable swap).
+
+2.3  Post-processing (EffectComposer)
+     - RenderPass → SSAOPass (off by default) → UnrealBloomPass (strength 0.55)
+       → OutputPass.
+     - Custom screen-space outline shader (depth+normal edge detect) as
+       alternative to backface-expansion outline. ~50 lines of GLSL.
+     - Two outline modes: 'backface' (default) and 'screenspace'.
+     - PMREMGenerator + RoomEnvironment (procedural IBL, no .hdr file).
+     - Per-style tone-mapping table (NoToneMapping for voxel/toon/flat,
+       ACESFilmic for realistic, Cineon for stylized/chibi, Linear for painterly).
+
+2.4  Materials / textures (PBR pipeline)
+     - buildMaterial() / buildMaterialRaw() honour per-object material id,
+       color, roughness, metalness, transmission, ior, sheen, clearcoat,
+       emissive, emissiveIntensity, normalScale, opacity, transparent.
+     - Material presets: MAT_DB (60+ keys: fabric/leather/wood/metal/glass
+       /stone/plastic etc.), CS2_PBR (9 finish styles + 5 wear tiers:
+       FN/MW/FT/WW/BS, 8 new MAT_DB presets, MeshPhysicalMaterial extras:
+       iridescence, iridescenceIOR, iridescenceThicknessRange, specularIntensity,
+       specularColor, attenuationColor, attenuationDistance).
+     - Procedural texture generators (no external assets):
+       microRoughnessMap, punctateMaps, striateMaps, heightField→normal/
+       /roughness/ao/curvature/cavityDirt, bricks/Truchet/Cairo/splatter
+       patterns, gradient/matcap/toon/contact-shadow textures.
+     - Image-texture pipeline (data-URLs only, no network fetch).
+     - Cavity-shading / color-variation / edge-split / smoothing-groups /
+       subdivision on per-object userData flags.
+
+2.5  Geometry pipeline
+     - buildGeometry() dispatches to 60+ primitive builders (buildFrustumBox,
+       buildWedge, buildArch, buildRoofPlane, buildStair, buildFrame, buildArc,
+       buildHelix, buildSpiral, buildCurve, buildHill, buildMountain, buildCliff,
+       buildPlateau, buildValley, buildRockFormation, buildCave, buildTreeTrunk,
+       buildBranch, buildRoot, buildLeaf, buildPetal, buildFlower, buildGrassBlade,
+       buildVine, buildSeed, buildFruit, buildBlob, buildEgg, buildTeardrop,
+       buildHorn, buildAntler, buildClaw, buildBeak, buildFin, buildWing,
+       buildFeather, buildTentacle, buildStar, buildHeart, buildGem,
+       buildCrystal, buildDiamond, buildLantern, buildBanner, buildGear …).
+     - Loopsubdivide (Catmull-Clark-like) on per-mesh flag.
+     - CSG (three-bvh-csg) lazy-loaded for boolean ops.
+     - DecalGeometry for surface-projected decals.
+     - Convex hull (ConvexGeometry) and Marching Cubes (SDF/voxel).
+     - 50+ animation/easing falloff curves, helix/spiral path builders.
+
+2.6  Animation system
+     - THREE.AnimationMixer + THREE.AnimationClips.
+     - lblCollectAnimations() pulls clips from 4 sources in priority order:
+       1. gltf.animations (GLTFLoader)
+       2. root.animations (FBX/Collada loaders)
+       3. rt.animations.clips (modern TS factories — Model_3, _4, _6, _7, _9)
+       4. rt.animations.mixer.getActions() (also modern path)
+       5. rt.animations as a plain [{name, duration, tracks:[…]}] array
+          (legacy hint path — Model_2 publishes this; renderer builds
+          new NumberKeyframeTracks from the descriptors, **losing original
+          VectorKeyframe/QuaternionKeyframe type** — see Problem #18)
+     - Dedup by clip.uuid AND clip.name.
+     - Silences any pre-existing mixer on the loaded root (stops actions,
+       uncaches, calls root.stop() if present) so only the in-app mixer
+       runs.
+     - Pose snapshot/restore for the pause button.
+     - Play/pause + cycle-next UI (panel hidden when no clips).
+     - normalizeClipForGlb() rewrites Euler-axis tracks ("*.rotation[x|y|z]")
+       into a single quaternion track, with FPS resampling, end-time clamp,
+       and shortest-arc continuity.
+     - _stripEmptyBufferViewsFromGLB scrubs zero-length bufferViews that
+       GLTFExporter occasionally writes.
+
+2.7  Rigging integration
+     - three-rig-helpers bundle (3.9 KB minified, ESM) provides 9 helpers:
+       buildSkeleton, resetSkeleton, jointWorldPosition, validateRigGraph,
+       asVector, buildSemanticWeights, buildRigidSemanticWeights,
+       validateWeights, buildGeodesicWeights, buildHeatDiffusionWeights,
+       buildInverseDistanceWeights, buildSegmentationWeights.
+     - PART 75.1 dispatch in __lblApplySkinWeights() — 6-value enum:
+       "semantic" | "rigid" | "geodesic" | "heat-diffusion" | "inverse-distance" | "segmentation".
+     - PART 76.3: lazy-load skeleton templates from public/rig/skeletons/*.json
+       and auto-scale to model bounding box.
+     - PART 77: Mixamo bone remap (21-entry preset), __lblRemapAnimationClip()
+       rewrites track names at import time.
+     - PART 78/79/85: voxel/pose/cloud auto-riggers (declared STUBS).
+     - PART 81: chain-curvature animation (Sin+Perlin per chain root).
+     - PART 82: 12-constraint post-pass catalog.
+     - 30-bone canonical catalog (CANONICAL_BONE_CATALOG_30).
+     - BVH-accelerated raycast (lazy-loaded three-mesh-bvh).
+
+2.8  ACES integration (PART 90)
+     - Eagerly imports 7 ACES sub-modules at startup.
+     - #aces-btn in toolbar → ACES panel → ACES.run(scene, opts).
+     - 6-stage pipeline: extract → crease split + angle-weighted normals →
+       AO bake → L1-L8 OKLab stack → L8 bone-field normal softening →
+       25 mechanical checks → write-back to live BufferGeometry.
+     - Check report renders in the panel + feeds the validator log.
+
+2.9  44-Technique MT bundle (PART 100-143)
+     - Same eager-import pattern as ACES.
+     - #mt-btn → MT panel (sections, catalog). MT.run(name, target, opts)
+       / MT.runStack / MT.applyToScene / MT.selfTest.
+
+2.10 UI / panel architecture
+     - Left panel: object tree + Inspector (Properties / Triangles / Fidelity
+       tabs). Right panel: top toolbar + view + postprocess controls +
+       fidelity chip. Bottom: animation strip + status pill.
+     - Modal overlays: prompt builder (PART 52.1), compare (PART 52.2),
+       keyboard shortcuts.
+     - ACES panel + MT panel lazy-built.
+     - 60-step undo/redo via buildScene wrapper.
+     - Box-select, gizmo (TransformControls), grid, multi-select groups.
+     - Theme toggle (dark/light), lighting preset cycle, view presets.
+     - Compare mode (reference image overlay), silhouette IoU grading.
+     - Model store (preload via mockup-generator.html).
+
+2.11 Validation
+     - validateBlueprintSchema() — JSON schema check.
+     - lblValidateAgainstSpec() — 36 PART 32/65/38-46/67/74/100-143
+       anti-pattern validators (E1..E36).
+     - 9 fidelity-gate checks (STYLE MATCH, CATEGORY MATCH, COLOR/SILHOUETTE
+       MATCH, DETAIL COUNT, METALLIC-PRESENCE, EMISSIVE-PRESENCE,
+       STYLE-COHERENT-MATERIALS).
+     - Triangle-budget tiers (10k/30k/100k with colour-coded bar).
+     - Proportion-declaration gate.
+
+2.12 Export / packaging
+     - GLB (GLTFExporter with skin weight + animation track support,
+       bufferView sanitization, name remap).
+     - OBJ, STL.
+     - GLB-with-rigged-skeleton (exportRiggedModelToGlb in Model_7).
+     - .ts source dump, .zip bundle (model+rig+assets via fflate).
+
+2.13 Other features
+     - Group / ungroup / combine (group-pivot wrap).
+     - Face-texture editor (per-face UV/transform).
+     - Texture positioning (drag/scale on viewport).
+     - Modular socket kitbash (PART 33.1[7]).
+     - FSM (animation state machine) inspector.
+     - 18-render multi-view validation grid (PART 44.7).
+     - LOD chain generation (5-LOD, displayed in inspector).
+     - T-pose, mesh cleanup, eye-tracking helpers.
+
+================================================================================
+3. ACES (anyCreature Engine Surface) — public/aces/
+================================================================================
+
+7 ES2020 classic scripts, 4 254 lines, 113 KB total. All attach to
+window.ACES_* (no exports). Run in browser via dynamic import() in
+index.html.
+
+3.1  aces-engine.js (317 lines) — façade
+     - acesQualityPass(ctx) — the single entry point.
+     - ctx = { scene, shading, ao, smoothAngle, classMap, skipChecks,
+              skeleton, spec, onReport, animsCompiled, checksOpts }
+     - 6 steps: extract → crease split + angle-weighted normals → AO →
+       L1-L8 stack → L8 bone-field softening → mechanical checks → write-back.
+     - extractMeshes() converts Three.js Object3D tree to plain {V,F,C,N,AO,color,material,part,…} records.
+     - extractSkeleton() walks SkinnedMesh.skeleton.bones; **uses
+       root.THREE for Vector3** — fragile, see Problem #7.
+     - applyToGeometry() writes COLOR_0 + NORMAL back to the live
+       BufferGeometry (POSITION is never moved).
+
+3.2  aces-oklab.js (148 lines)
+     - s2l, l2s, lin2oklab, oklab2lin, hex2lin, lin2hex, inGamut
+     - oklab2srgb, srgb2oklab, mixOK, chromaWalk, etc.
+     - The "Why OKLab" docstring is excellent — explains why L and chroma
+       are independent in OKLab (so brighten + saturate are two numbers,
+       not a blend mode).
+
+3.3  aces-normals.js (278 lines)
+     - vertexNormals(V, tris) — angle-weighted (Meyer) vertex normals.
+     - smoothSplit(V, tris, deg, attrs) — crease split; only duplicates a
+       vertex when it really carries more than one smoothing group.
+     - faceData, incidence, creaseShare, foldCount.
+     - foldCount: faces whose per-vertex normal sum disagrees with face
+       normal. Used by mesh_integrity check to catch twist/breakage.
+
+3.4  aces-ao.js (206 lines)
+     - bakeAO(meshes, cfg) — Möller-Trumbore hemisphere rays from every
+       vertex against the whole mesh (uniform grid acceleration).
+     - cfg: { samples, strength, radius, multiply, skip }.
+     - Writes m.AO[v] + multiplies into m.C[v] (linear-light color).
+
+3.5  aces-shade.js (472 lines)
+     - shadeStack(meshes, ctx, info) — the 8-layer L1-L8 stack.
+     - softenNormalsByBones(meshes, sk, opts) — L8 layer.
+     - DEFAULTS documented as "settled values a measured run agreed on".
+
+3.6  aces-checks.js (1 258 lines) — 25 named checks
+     - BLOCK (legality):
+       mesh_integrity, root_containment, part_attachment, touch, balance,
+       size, proportion, limb_clearance, anim_integrity, attack_reach,
+       faceted_body, mirror_distortion, part_overlap, part_seat, soft_mass
+     - WARN (style, PART 99): value_order, contrast_adjacent, share_hierarchy,
+       focal_contrast, saturation_area, thinnest_px48, sq_fill, mirror_sym,
+       straight_max, tri_budget, bright_floor
+     - runChecks() walks CHECK_ORDER, collects per-check blocks/warns/info.
+     - opts.strict: warns become blocks.
+     - Each check returns { blocks, warns, info }.
+
+3.7  aces-bones.js (176 lines)
+     - mirrorName(), JOINT_TAGS table, side-limb joint name convention
+       (LArm1Sh, RFrontLeg1Kn).
+     - exportNames(spec, sk), assetExtras(spec).
+     - HARNESS_NAME='ACES (anyCreature Engine Surface)', HARNESS_VERSION='1.0.0'.
+
+3.8  Module loading contract
+     - Each module is a classic script wrapped in IIFE.
+     - Top: reads `window.ACES_*` dependencies. The `const` destructure
+       runs at module top level, so a module CANNOT load before its
+       dependency sets the global.
+     - Bottom: `window.ACES_xxx = api;` + CommonJS fallback (`module.exports`).
+     - index.html imports them in this order:
+         aces-oklab → aces-normals → aces-ao → aces-shade →
+         aces-checks → aces-bones → aces-engine
+     - This order is correct, but aces-ao/aces-checks/aces-shade/aces-engine
+       all destructure the dependency top-level, so a reorder would
+       throw "Cannot destructure property X of 'Y' as it is null" at
+       load time. There is no graceful fallback. (See Problem #6.)
+
+================================================================================
+4. MODELING TECHNIQUES BUNDLE (PART 100-143) — public/modeling/
+================================================================================
+
+7 modules + 1 facade, 198 KB. Same classic-script pattern as ACES.
+window.MT_* global surface, window.MT = { run, runStack, applyToScene, selfTest, catalog }.
+
+4.1  mt-noise.js — PRNG + noise (40-line header docstring)
+     - mulberry32, splitmix32, fnv1a (hash)
+     - valueNoise2D (Perlin's quintic smoothstep f*f*f*(f*(f*6-15)+10))
+     - fbm2D (with `folds` parameter for ridge/turbulence)
+     - voronoi2D (F1)
+     - perlin3D, simplex2D
+     - rngSphere, rngBox, rngLattice
+
+4.2  mt-core-modeling.js (1 026 lines) — 12 core techniques
+     - makePrimitive, bmeshFromGeometry, bmeshOp, bmeshToGeometry
+     - proceduralGenerate, makeParametric, generativeGrow
+     - sdfEvaluate + sdfUnion/Intersect/Subtract/Sphere/Box/Torus/Plane, sdfMarch
+     - voxelCarve, marchingCubesFromVoxels
+     - csgUnion/Intersect/Subtract (three-bvh-csg)
+     - lSystem, lSystemInterpret
+     - fractalMandelbulb, fractalMenger, fractalRaymarch
+     - makeNurbsCurve, makeCatmullRom
+     - detectNonManifold, fixNonManifold
+
+4.3  mt-mesh-quality.js (764 lines) — 9 mesh techniques
+     - subdivideCatmullClark, subdivideLoop
+     - isotropicRemesh, autoRetopologize, qemDecimate
+     - triangulate, quadify
+     - laplacianSmooth, taubinSmooth
+     - sculptBrush, displaceSurface
+
+4.4  mt-organic.js (961 lines) — 13 organic techniques
+     - smplSkeleton, smplBuild, smplApplyShape
+     - makeBlendshape, shapeKeyStore, shapeKeyEvaluate, morphTargetCompute
+     - computeLBS / lbsSkin, computeDQS / dqsSkin
+     - implicitSkin, deltaMush, buildCage / cageDeform
+     - muscleSim, softBodySim, hairStrands
+     - autoRig (skeleton from voxel+thinning heuristic)
+
+4.5  mt-materials-uv.js (535 lines) — 6 materials techniques
+     - pbrMaterialGraph, proceduralTextureCanvas
+     - uvUnwrap, bakeMap, paintTexture, packAtlases (MaxRects BSSF)
+
+4.6  mt-advanced.js (314 lines) — 4 advanced techniques
+     - generateLOD, makeInstanced, geoNodesEvaluate
+     - physicsStep, buildClothWorld, buildFluidWorld (Verlet mass-spring)
+
+4.7  mt-engine.js (178 lines) — façade
+     - TECHNIQUE_CATALOG: 44 entries (12 CORE + 9 MESH + 13 ORGANIC +
+       6 MATERIALS + 4 ADVANCED).
+     - run(name/number/fn, target, opts) — dispatch.
+     - runStack, applyToScene, selfTest.
+
+Determinism contract: all helpers deterministic for same seed; default
+seed = 1, PRNG = mulberry32, hash = fnv1a.
+
+================================================================================
+5. RIGGING SUBSYSTEM (public/rig/)
+================================================================================
+
+5.1  three-rig-helpers.js (10 KB minified, 1 line)
+     - esbuild bundle of public/rig/src/{index,skeleton,weights}.ts +
+       ir/character-ir.ts.
+     - 9 public exports: buildSkeleton, resetSkeleton, jointWorldPosition,
+       validateRigGraph, asVector, buildRigidSemanticWeights,
+       buildSemanticWeights, validateWeights, buildGeodesicWeights,
+       buildHeatDiffusionWeights, buildInverseDistanceWeights,
+       buildSegmentationWeights.
+     - Internal types: SkeletonBuildResult, WeightBuildResult,
+       CompactWeightBuildResult, RigGraph, RigJoint, Vec3, Quat4.
+
+5.2  anycreature-compiler.js (1 398 lines) — design-card compiler
+     - compileAnyCreature(spec, opts) → { group, log, bones, runtime }.
+     - 7 pipeline steps: resolveJoints → buildBoneHierarchy →
+       buildVolumes → buildParts → applyMirror → compileAnimations →
+       wireRuntime.
+     - resolveJoints() — relational defs (from/up/fwd/side/dir/len/ground)
+       iterated to fixed point.
+     - buildVolume() — sweep a tube along a chain; Catmull-Rom spline;
+       rotation-minimising frame; profile rows with exp/bias/roll/sharp.
+     - buildPart() — spike, eye, fin, paw, curve, hand, membrane.
+     - applyMirror() — duplicating L* chain as R* with X negated. **Known
+       placeholder parentId bug** is fixed in the very next loop.
+     - compileAnimations() — Euler→Quat, Mirror-channel flips (ry/rz/tx).
+     - **WireRuntime is a STUB**: the volumes/parts are plain THREE.Mesh,
+       not SkinnedMesh, so bones exist in the scene graph (so AnimationMixer
+       can find them) but the model does NOT visibly deform on playback.
+       The 7-line "Known limitations" comment in lines 46-65 documents this
+       honestly and the v2 plan (rebind after gizmo-anchor wrap). **See
+       Problem #14.**
+
+5.3  public/rig/src/ (TypeScript source for the bundle)
+     - skeleton.ts (92 lines) — buildSkeleton, resetSkeleton,
+       jointWorldPosition, validateRigGraph, asVector.
+     - weights.ts (510 lines) — 7 weight builders + 5 helpers
+       (buildEdgeAdjacency, bfsEdgeDistance, nearestVertexIndex, isManifold,
+       buildCotangentLaplacian).
+     - ir/character-ir.ts (32 lines) — shared types.
+     - index.ts (15 lines) — re-exports for esbuild.
+     - build.sh — esbuild --bundle --minify --external:three.
+
+5.4  public/rig/skeletons/ — 6 templates
+     - humanoid.json (13 joints, 1.0m A-pose)
+     - quadruped.json (19 joints, 1.0m long)
+     - bird.json (15 joints, 0.3m)
+     - fish.json (9 joints, 0.5m)
+     - insect.json (17 joints, 0.05m)
+     - object.json (4 joints — **HAS 4 ROOTS, VIOLATES THE 1-ROOT RULE**,
+       see Problem #1)
+
+5.5  public/rig/specs/quadruped_light.json (858 lines)
+     - The "design card" example. Documents anyCreature 1.3.1 format.
+     - 23 joints, 5 chains, 5 volumes, 5 parts, 2 animations.
+     - Includes a `mirror_phase: 0.5` field on the "move" animation,
+       **which is never read anywhere** in the codebase. (Problem #15)
+
+================================================================================
+6. ANIMATION CODE STRUCTURE
+================================================================================
+
+6.1  Data flow at load time
+     - User drops a file / picks a model / pastes a .ts module.
+     - runTsBlueprint() (or load3DFile() for uploaded 3D) is invoked.
+     - If model is .ts: pickTsFactory() picks create*Model OR default.
+       TypeScript is compiled in-browser via `ts.transpileModule()` (no
+       external TS server).
+     - The model is mounted via addTsModelToScene(group).
+     - lblCollectAnimations() runs:
+         a) gltf.animations (if GLTFLoader produced a gltf object)
+         b) root.animations (any loader)
+         c) rt.animations.clips (modern TS path)
+         d) rt.animations.mixer.getActions() (modern TS path)
+         e) rt.animations as a plain array (legacy hint array)
+     - Dedup by clip.uuid AND clip.name.
+     - lblSilenceRootPreExistingAnimations() stops every pre-existing
+       mixer so the lblAnim mixer is sole driver.
+     - lblSnapshotPose() captures the rest pose.
+     - lblAnim.mixer = new AnimationMixer(root); actions = clips.map(mixer.clipAction);
+     - First action plays; rest are stopped.
+
+6.2  Per-frame
+     - animate() calls lblAnim.mixer.update(dt) when a mixer exists.
+     - tsClock (THREE.Clock) is the canonical dt source for TS factories
+       via tickAllTsModels(dt, elapsedTime).
+     - Modern TS factories store their own THREE.AnimationMixer in
+       rt.animations.mixer AND set userData.tick to mixer.update; the
+       lblAnim system silences these on take-over so there's no double-tick.
+
+6.3  Export path
+     - exportGLB() collects all exportable clips via
+       collectExportableClips(exportRoot, sourceClips).
+     - Each clip is run through normalizeClipForGlb() which:
+       - Drops clips with no live tracks.
+       - For each node, detects euler-axis sub-tracks ("*.rotation[x|y|z]"),
+         builds a master time grid (keyframe times ∪ fps-resampled times),
+         converts to quaternions, and writes a single QuaternionKeyframeTrack.
+       - Enforces shortest-arc continuity.
+     - Other track types (Vector, Number, raw "*.rotation") pass through.
+
+6.4  Authoring (TS factory) contract (PART 1)
+     - export function create*Model(options): THREE.Group
+     - Optional export function create*ModelLookDevLights(): THREE.Group
+     - Allowed imports: 'three', 'three/addons/...', 'three/examples/jsm/...'
+     - No side effects; deterministic for same (seed, options).
+     - userData.sculptRuntime = { nodes, meshes, sockets, materials,
+       actions, animation, detailInventory, landmarks, fidelity, …,
+       animations: { clips, mixer, actions: actionMap } }
+     - userData.tick = (dt) => mixer.update(dt) (or noop for static).
+     - userData.isPickable = true, userData.partName = ... on every mesh.
+
+6.5  Authoring (anycreature spec) contract (PART 97)
+     - JSON shape: name, height, palette, shading, smooth_angle,
+       joints (map of name → [x,y,z] or relational def), chains,
+       attach, mirror, volumes, parts, animations, claims, …
+     - Compiled by anycreature-compiler.js (described above).
+     - v1 limitation: bones exist in scene graph but the meshes are
+       not SkinnedMesh, so animations don't visibly deform the model.
+
+================================================================================
+7. SPECIFICATION FILES — CORRECTNESS AUDIT
+================================================================================
+
+7.1  public/models/manifest.json
+     - {"version":1, "models":[9 entries]}
+     - All 9 listed files exist on disk. ✓
+     - Order is Model_1..Model_9.
+     - Workflow auto-regenerates from Model_*.{ts,tsx,js,jsx,json} (see
+       .github/workflows/manifest.yml). ✓
+
+7.2  public/rig/skeletons/*.json
+     Filename  | class      | joints | declared count | 1-root | quat unit
+     ----------+------------+--------+----------------+--------+-----------
+     humanoid  | humanoid   | 13     | 13             | yes    | yes
+     quadruped | quadruped  | 19     | 19             | yes    | yes
+     bird      | bird       | 15     | 15             | yes    | yes
+     fish      | fish       |  9     |  9             | yes    | yes
+     insect    | insect     | 17     | 17             | yes    | yes
+     **object**| **object** |  4     |  4             | **NO** | yes
+     ----------------------------------------------------------------------
+     → object.json has 4 roots (Bone_Top, Bone_Bottom, Bone_Left, Bone_Right),
+       each with no parentId. **validateRigGraph() and buildSkeleton()
+       will throw "rig must have one root joint" / "Character rig must
+       have exactly one root, got 4" when this template is loaded.**
+       (Problem #1.)
+
+7.3  public/rig/specs/quadruped_light.json
+     - 23 joints, 5 chains, 5 volumes (body, head, tail, LFront, LBack),
+       5 parts (2 ears, 1 eye, 1 nose, 2 paws), 2 animations (idle, move).
+     - All joint / chain / volume / part / animation references resolve
+       to real joint names. ✓
+     - **Height inconsistency**:
+         declared: "height": 1.45
+         actual Y range: 0.035 (LFrontToe) → 1.150 (Skull) = 1.115
+         → 0.335 m shorter than declared (23% off).
+       (Problem #2.)
+     - **Anchor numbers vs geometry mismatch**:
+         declared W_over_H = 1.41  | actual = 1.682 (body_length / height)
+         declared fill        = 0.39 | actual = 0.960 (1 - belly_y/H)
+         declared leg_fraction = 0.35 | actual = 0.960 (leg_l / H)
+         declared mass_thirds_rear_mid_front = [0.30, 0.42, 0.28]
+         actual (rear:mid:front by z-position) = [0.738, 0.0, 0.262]
+         declared head_share_of_length = 0.26 | actual = 0.434
+         declared belly_y_over_H       = 0.34 | actual = 0.040
+       The spec text says these are ANCHORS that designers DEVIATE from,
+       so the inconsistency is intentional ("ANCHOR, not target"). The
+       measured values are not documented in the spec. (Problem #3.)
+     - **mirror_phase: 0.5** on the "move" animation is never read
+       anywhere in the codebase (compiler, renderer, helpers). (Problem #15.)
+     - **body chain order**: ['Rump','Hips','Spine','Chest','NeckB','Neck2']
+       This is rear-to-front (back→head), which is the canonical direction
+       for the volume sweep. ✓
+     - **parts[].anchor field** is set on 2 of 5 parts (ear fin, eye),
+       but the compiler's buildPart() ignores it (it orients by udir/vdir).
+       The spec calls this out as v1-known-limitation. (Problem #16.)
+     - **parts[].conform: false** on the ear fin is also parsed but ignored.
+     - The mirror list is ["LFront","LBack"] — the compiler's applyMirror
+       only iterates chain members whose names start with 'L', which both
+       LFront and LBack do. ✓
+
+================================================================================
+8. REFERENCE DOCS — DATA CONSISTENCY
+================================================================================
+
+8.1  Versioning — 4 different version strings, all in the same repo
+     ┌──────────────────────┬──────────────────┬──────────────────────────┐
+     │ File                 │ Declared version │ Header text              │
+     ├──────────────────────┼──────────────────┼──────────────────────────┤
+     │ index.html meta desc │ v1.24 / v8.16    │ (description tag)        │
+     │ index.html spec chip │ v1.27 / v8.19    │ #lbl-spec-chip           │
+     │ Prompt_To_Ts.txt     │ v1.29            │ (top of file)            │
+     │ Image_To_Ts.txt      │ v1.29            │ (top of file)            │
+     │ Prompt_To_Js.txt     │ v8.21            │ (top of file)            │
+     │ Prompt_To_Json.txt   │ v8.21            │ (top of file)            │
+     │ Image_To_Js.txt      │ v8.21            │ (top of file)            │
+     │ Image_To_Json.txt    │ v8.21            │ (top of file)            │
+     │ CHANGES_SUMMARY.md   │ v1.25 / v8.17    │ (latest entry)           │
+     │ EXAMPLES_v8_17.md    │ v1.25 / v8.17    │ (filename + heading)     │
+     └──────────────────────┴──────────────────┴──────────────────────────┘
+     → 4 different version numbers. The renderer chip + meta description
+       are each ALSO out of sync with each other (1.24/8.16 vs 1.27/8.19)
+       and with the 6 spec docs (1.29/8.21). (Problem #4.)
+
+8.2  PART numbering
+     - Prompt_To_Js.txt   : 100 unique PART numbers, 1–141
+     - Prompt_To_Json.txt : 100 unique PART numbers, 1–141
+     - Prompt_To_Ts.txt   :  82 unique PART numbers, 1–141
+     - Prompt_To_Ts.txt skips some image-to-3D PARTs (18-25, 31-44 are
+       heavily image-driven, so a pure-text TS prompt legitimately
+       condenses them). Both spec families agree on the highest PART
+       number (141).
+
+8.3  All 6 spec docs are 1.0–1.3 MB each, ~25 000–27 000 lines.
+     The combined 6.6 MB is the spec corpus; CHANGES_SUMMARY.md is
+     224 KB / 4 245 lines.
+
+================================================================================
+9. TS DEMO MODELS (public/models/Model_*.ts)
+================================================================================
+
+Audit of the 9 ships-in-repo models (each is a self-contained .ts module
+that imports only 'three' / 'three/addons/'):
+
+  Model | Purpose                                | create*Model  | default | tick | LookDev | sculptRuntime
+  ------+----------------------------------------+---------------+---------+------+---------+---------------
+   1    | Minecraft character (knight)            | createMinecr… | YES     | YES  | YES     | YES
+   2    | Supercar (Apex Horizon GT)              | createSuper…  | YES     | NO   | YES     | YES (legacy hint array)
+   3    | AeroBot drone (coaxial rotor)            | createAeroD…  | YES     | YES  | YES     | YES (modern clips+mixer)
+   4    | Spider-Sentry Mech (8-leg)              | createSpide…  | YES     | YES  | YES     | YES
+   5    | Train (static — no animations)          | createTrain…  | YES     | NO   | YES     | YES (no animations)
+   6    | Chicken-Jockey King                     | createChick…  | YES     | NO   | YES     | YES (21 clips)
+   7    | 3D Robot Character                      | createRobot…  | **NO**  | NO   | YES     | YES
+   8    | Rabbit Warrior                          | createRabbit… | **NO**  | NO   | YES     | YES
+   9    | Chibi Tank                              | createChibi…  | **NO**  | NO   | YES     | YES
+
+     - All 9 declare a `create*Model` export. The renderer's
+       pickTsFactory() picks `create*Model` first, so Models 7/8/9
+       still work despite missing the default export — but they
+       technically violate PART 1 of the spec ("a function named
+       /^create\w+Model$/… default export is optional" — actually
+       the spec just says "ONE top-level export" so the lack of
+       default is a spec deviation). (Problem #5.)
+     - Models 2/5/6/7/8/9 don't export `tick`. The renderer contract
+       says factories MAY publish their own internal `userData.tick`;
+       these models do publish `userData.tick` (Model_2: yes, others:
+       also yes, set in userData). So the "export tick" requirement
+       is not actually in the spec — only userData.tick is.
+     - Model_2 publishes `runtime.animations` as a plain
+       `[{name, duration, tracks:[{name, times, values}]}]` array
+       (the "legacy hint" format). The renderer fallback path
+       (lblCollectAnimations e) reads this and synthesises NEW
+       THREE.AnimationClip objects, but loses the original track
+       type (VectorKeyframeTrack / QuaternionKeyframeTrack) by
+       using NumberKeyframeTrack for everything. (Problem #18.)
+     - Model_5 has no AnimationMixer, no AnimationClip — it sets
+       AnimationClips = null in its runtime, and a noop tick. The
+       lblCollectAnimations e) path checks `Array.isArray(a.tracks)`
+       and skips null, so this works. ✓
+
+================================================================================
+10. PROBLEMS FOUND + SOLUTIONS
+================================================================================
+
+Severity legend:
+  [B] BLOCKING — feature won't work, or runtime error on common path
+  [H] HIGH     — wrong data, spec inconsistency that misleads the AI
+  [M] MEDIUM   — incomplete implementation, feature partially works
+  [L] LOW      — polish / cleanup
+
+────────────────────────────────────────────────────────────────────────
+[B] #1  public/rig/skeletons/object.json has 4 root joints
+────────────────────────────────────────────────────────────────────────
+    validateRigGraph() and buildSkeleton() (in three-rig-helpers.js
+    AND src/skeleton.ts) both enforce "exactly one root joint". The
+    object template has 4 (Bone_Top / Bone_Bottom / Bone_Left /
+    Bone_Right), so any model that opts into class="object" and uses
+    the auto-scaled template will throw on buildSkeleton.
+
+    SOLUTION: Either (a) add a real root parent to all 4 joints
+    (e.g. a hidden "Bone_Center" at restPosition [0,0,0] with all 4
+    children) and update the renderer template-loader to keep the
+    "object" class but tolerate multi-root via a flag, or (b) make
+    buildSkeleton/validateRigGraph multi-root-aware and add a new
+    helper buildMultiRootSkeleton that picks the first non-parented
+    joint as the implicit root, or (c) special-case class="object"
+    in the renderer to skip the validator (consistent with the
+    "anyCreature compiled" path, which already allows multi-root).
+
+    Recommended: (a) — keeps the data model honest and explicit.
+
+────────────────────────────────────────────────────────────────────────
+[B] #2  quadruped_light.json declared height (1.45) is 0.335 m off
+────────────────────────────────────────────────────────────────────────
+    The spec file says `"height": 1.45` (overall quadruped height in
+    metres). The actual resolved Y range is 0.035 (LFrontToe) to 1.150
+    (Skull) = 1.115 m. About 23% shorter than declared.
+
+    SOLUTION: Either tighten the joint offsets so the resolved range
+    matches the declared height (raise Chest, Skull, and Brow/Skull y
+    by ~0.34), or change the declared `height` to 1.115 (or a value
+    matching the actual silhouette). Make sure the toes are at y≈0
+    and the head crown is at y≈1.45.
+
+    Recommended: fix the joint offsets (it's a design-card example, so
+    the actual silhouette is what people copy).
+
+────────────────────────────────────────────────────────────────────────
+[H] #3  Anchor numbers in quadruped_light.json don't match the geometry
+────────────────────────────────────────────────────────────────────────
+    W_over_H, fill, leg_fraction, mass_thirds, head_share, belly_y_over_H
+    are all declared but none match the actual joint layout. The
+    `_template` field claims they are ANCHORS for designers to deviate
+    from, but the spec never says how the values are *measured* (body
+    arc length vs bbox length, etc.) and the AI has no way to verify
+    which definition the anchor uses.
+
+    SOLUTION: Add a `_measurement` block to the spec documenting the
+    exact recipe for each anchor number:
+       "W_over_H"        = body_arc_length / (max_y - toe_y)
+       "fill"            = 1 - (toe_y / hip_y)
+       "leg_fraction"    = (hip_y - toe_y) / hip_y
+       "head_share_of_length" = head_arc_length / body_arc_length
+    and either (a) recompute the numbers so they match the joint data
+    in this file, or (b) change the joint data so the numbers hold.
+    Also: only 2 of 7 anchors include the unit; the rest have an
+    ambiguous name. Either rename (e.g. `fill_1_minus_belly_over_H`)
+    or include the formula in the spec.
+
+    Recommended: (b) — the existing data is the de-facto geometry, so
+    adjust the joints (or the body chain order) so the numbers hold.
+
+────────────────────────────────────────────────────────────────────────
+[H] #4  LBL version is stated 4 different ways
+────────────────────────────────────────────────────────────────────────
+    index.html meta description → v1.24 / v8.16
+    index.html #lbl-spec-chip   → v1.27 / v8.19
+    Prompt_To_*.txt / Image_To_*.txt → v1.29 / v8.21
+    CHANGES_SUMMARY.md latest   → v1.25 / v8.17 (3 versions stale)
+    EXAMPLES_v8_17.md           → v1.25 / v8.17 (3 versions stale)
+
+    SOLUTION: Pick one canonical pair (v1.29 / v8.21 is the latest
+    from the 6 spec docs), then:
+      (a) update the renderer's <meta name="description"> to say
+          "Renderer targets LBL spec v1.29 (TS path) and v8.21
+          (JSON/JS path) with 12 opt-in capability bundles (…)"
+      (b) update #lbl-spec-chip text to "LBL: v1.29 / v8.21"
+      (c) rename EXAMPLES_v8_17.md → EXAMPLES_v8_21.md and update its
+          heading + cross-references (4 internal cross-refs)
+      (d) update CHANGES_SUMMARY.md's v1.25 entry to reflect the
+          renumbering, or add a v1.29 entry
+      (e) the "≤v1.7 / ≤v8.0" backward-compat note in the spec-chip
+          title should be ≤v1.28 / ≤v8.20.
+
+────────────────────────────────────────────────────────────────────────
+[M] #5  Models 7, 8, 9 don't export `default`
+────────────────────────────────────────────────────────────────────────
+    PART 1 of the spec says "ONE top-level export: a function named
+    /^create\w+Model$/ (…); returns THREE.Group (never null, never
+    empty)". The spec text is satisfied by the named export — but the
+    inline code block in PART 1's worked example uses `export default
+    createXxxModel`, and Models 1-6 all follow that pattern. Models
+    7/8/9 omit the default export, so external tools that expect
+    `import model from './Model_7'` (rather than `import { create… }`)
+    will fail.
+
+    SOLUTION: Add `export default createRobotCharacterModel;` /
+    `export default createRabbitWarriorModel;` /
+    `export default createChibiTankModel;` to Models 7, 8, 9. Three
+    one-line additions.
+
+────────────────────────────────────────────────────────────────────────
+[M] #6  ACES module loading is fragile
+────────────────────────────────────────────────────────────────────────
+    aces-shade.js, aces-ao.js, aces-checks.js all do
+        const oklab = ... window.ACES_oklab ...
+        const { lin2oklab, oklab2lin, ... } = oklab;
+    at module top level. If the import order in index.html is
+    re-ordered (or a sub-module fails to load), the destructure
+    throws "Cannot destructure property 'lin2oklab' of 'oklab' as
+    it is null" and the whole app breaks.
+
+    SOLUTION: Wrap the destructure in a function that's called only
+    when ACES.run() is invoked (lazy), not at module load. Or add
+    a `if (!oklab) { throw new Error('aces-oklab.js must load
+    first'); }` guard. Or change the destructure to optional
+    destructuring `const { lin2oklab = () => identity } = oklab || {};`.
+
+    Recommended: the throw — clearest error message for the user.
+
+────────────────────────────────────────────────────────────────────────
+[B] #7  aces-engine.js extractSkeleton() uses root.THREE for Vector3
+────────────────────────────────────────────────────────────────────────
+    The browser doesn't have `window.THREE` set (no `window.THREE = THREE`
+    in index.html). The fallback stub object `{ Vector3: function() {
+    return { x: 0, y: 0, z: 0 } } }` is missing the `setFromMatrixPosition`
+    method that `b.getWorldPosition(target)` calls. So as soon as a
+    SkinnedMesh is in the scene, ACES.run() throws
+    "setFromMatrixPosition is not a function".
+
+    SOLUTION: Either (a) add `window.THREE = THREE;` once at the top
+    of the module <script type="module"> in index.html (right after the
+    THREE import), so the ACES modules' `root.THREE` lookup succeeds,
+    or (b) make extractSkeleton() tolerant of no-THREE by reading
+    `b.matrixWorld.elements` directly (the matrix's translation is
+    elements[12..14]).
+
+    Recommended: (a) — one line, fixes 2 sites (extractSkeleton +
+    applyToGeometry's BufferAttribute lookup).
+
+────────────────────────────────────────────────────────────────────────
+[L] #8  CHANGES_SUMMARY.md is 3 versions behind
+────────────────────────────────────────────────────────────────────────
+    The summary's latest entry is v1.25 / v8.17. The spec docs are
+    v1.29 / v8.21. Anyone reading CHANGES_SUMMARY first gets a
+    3-revision-old view of the project.
+
+    SOLUTION: Either append the v1.26 / v1.27 / v1.28 / v1.29 entries
+    (ACES engine, 3D modeling style, MT bundle) or replace the file
+    with a one-line pointer "see Prompt_To_*.txt header for the latest
+    changelog".
+
+────────────────────────────────────────────────────────────────────────
+[L] #9  EXAMPLES_v8_17.md filename and contents reference v8.17
+────────────────────────────────────────────────────────────────────────
+    The file's purpose is to document the v8.17 PART 75-89 working
+    examples. The current spec is v8.21. The filename and heading
+    should match.
+
+    SOLUTION: Either rename to EXAMPLES_v8_21.md (and update 4
+    cross-references in other docs), or — if the examples really
+    target the v8.17 bundle specifically — add a note that the
+    examples are STABLE from v8.17 onwards and were last verified
+    against v8.21.
+
+────────────────────────────────────────────────────────────────────────
+[M] #10  anycreature-compiler.js buildCurve() taper field is a no-op
+────────────────────────────────────────────────────────────────────────
+    Line 969: `if (s.taper) r * 0.3; // visual pinch (the variable
+    reassignment is a no-op in this stub; r is bound above)`
+    The `s.taper` knob is parsed but ignored. The model will render
+    but the spec's intended effect (pinching the segment radius)
+    won't happen.
+
+    SOLUTION: Change to `if (s.taper) r *= (1 - s.taper);` (linearly
+    scale the radius by the taper fraction). Then re-test on
+    quadruped_light.json (which doesn't use .curve, so the spec example
+    won't regress).
+
+────────────────────────────────────────────────────────────────────────
+[M] #11  anycreature-compiler.js v1 limitation: meshes are not SkinnedMesh
+────────────────────────────────────────────────────────────────────────
+    Volumes/parts emit THREE.Mesh (not SkinnedMesh) so the AnimationMixer
+    can find the joints but the model doesn't visibly deform. The
+    comment in the source (lines 46-65) and the function header
+    (lines 1377-1381) document this honestly as v1-of-compiler, with a
+    v2 plan: "rebind after the renderer's gizmo-anchor wrap".
+
+    This is fine as a v1 limitation IF the user is warned. The renderer's
+    ACES panel + the animation panel both show the bones, so a user
+    loading a quadruped_light.json and clicking "play move" will see
+    nothing move. The compileAnyCreature() log includes the
+    "compile done — N child(ren)" line, but doesn't flag the v1
+    limitation explicitly.
+
+    SOLUTION: Add a `warnings.push({level:'warn', text:'anycreature
+    compiler v1: volumes and parts are not SkinnedMesh, so the
+    animation mixer can find the bones but the model will not
+    visibly deform on playback. See PART 97 v2 plan.'})` line
+    at the end of compileAnyCreature, and surface the warnings in
+    the ACES / Animation panel.
+
+────────────────────────────────────────────────────────────────────────
+[L] #12  anycreature-compiler.js applyMirror() uses a "placeholder" parentId
+────────────────────────────────────────────────────────────────────────
+    Line 1101: `newJoints.push({ name: rName, parentId: rName === 'R' +
+    chain[0].slice(1) ? null : 'R' + jn.slice(1) /* placeholder */ });`
+    The placeholder is overwritten in the next loop (lines 1104-1114).
+    Works correctly, but the "placeholder" comment is a code smell.
+
+    SOLUTION: Pre-allocate newJoints with `parentId: undefined`, then
+    populate in the next loop. Drop the `/* placeholder */` comment.
+
+────────────────────────────────────────────────────────────────────────
+[L] #13  anycreature-compiler.js applyMirror() only mirrors L* names
+────────────────────────────────────────────────────────────────────────
+    Line 1096: `if (!jn.startsWith('L')) continue;` — chains with mixed
+    L/R naming, or with custom names (e.g. "LeftFront", "leg_l"), are
+    silently skipped.
+
+    SOLUTION: Either document the L* prefix requirement more loudly
+    (right at the top of applyMirror), or accept any of {L, Left, left_,
+    leg_l, …} prefixes and route through a single normaliser. The spec
+    convention is L* / R* with a single capital-L prefix, so documenting
+    the requirement is the lighter fix.
+
+────────────────────────────────────────────────────────────────────────
+[L] #14  anycreature-compiler.js v1 — "Known limitations" duplicates
+────────────────────────────────────────────────────────────────────────
+    Lines 22-66 (the design-card docstring) and lines 1377-1381
+    (the v1 SkinnedMesh note) duplicate the same set of "Known
+    limitations" information. Two copies → if one is updated, the
+    other drifts.
+
+    SOLUTION: Move the "Known limitations" block to a single
+    `const ANYCREATURE_V1_LIMITATIONS = [...]` constant at the top
+    of the file and reference it from both places. Or, since the
+    limitation list is short, just delete the duplicate at
+    lines 1377-1381 (the code path that uses it is identical to
+    the v1 build path already described at the top).
+
+────────────────────────────────────────────────────────────────────────
+[L] #15  quadruped_light.json has a `mirror_phase: 0.5` field that is
+        read by no one
+────────────────────────────────────────────────────────────────────────
+    `animations.move.mirror_phase: 0.5` is declared but never
+    referenced in the renderer, compiler, or any helper.
+
+    SOLUTION: Either implement it in the compiler's
+    compileAnimations() (apply a per-track time shift to the
+    mirrored copy so the right-side cycle is phase-offset by
+    `mirror_phase` of the clip duration — common technique for
+    natural-looking quadruped walks), or remove the field.
+
+────────────────────────────────────────────────────────────────────────
+[L] #16  parts[].anchor and parts[].conform are parsed but ignored
+────────────────────────────────────────────────────────────────────────
+    In quadruped_light.json, the ear `fin` and the `eye` part both
+    declare `anchor: { chain, t, around }`, and the fin declares
+    `conform: false`. The compiler's buildPart() / buildFin() /
+    buildEye() never reads these fields.
+
+    SOLUTION: Either implement (a) anchor-relative placement
+    (project the part to a t-position + around-angle on a volume
+    surface — straightforward but adds a few hundred lines) and
+    (b) conform-to-surface (raycast against the host volume), or
+    remove the fields from the spec example. The spec header
+    already documents them as v1-known-limitation, so the fix is
+    documentation completeness, not implementation.
+
+────────────────────────────────────────────────────────────────────────
+[L] #17  applyToGeometry() in aces-engine.js only writes COLOR_0 + NORMAL
+────────────────────────────────────────────────────────────────────────
+    Vertices are never moved (by design — the position attribute is
+    read-only), but UVs/UV2/skinIndex/skinWeight are also not touched.
+    If a model arrives with non-standard UV channel names, ACES won't
+    fix them. Probably intentional.
+
+    SOLUTION: Document the write-back contract in a comment block at
+    the top of applyToGeometry: "Writes m.C → COLOR_0, m.N → NORMAL.
+    POSITION, UV*, skinIndex, skinWeight are read-only (the engine
+    never moves geometry, never re-skins)."
+
+────────────────────────────────────────────────────────────────────────
+[M] #18  lblCollectAnimations() legacy hint path loses track type
+────────────────────────────────────────────────────────────────────────
+    When a TS factory publishes `runtime.animations` as a plain
+    `[{name, duration, tracks:[{name, times, values}]}]` array, the
+    renderer builds new NumberKeyframeTrack objects from the track
+    descriptors. The original Three.js VectorKeyframeTrack /
+    QuaternionKeyframeTrack type is lost. The AnimationMixer handles
+    NumberKeyframeTrack fine, but if the values are 4-component
+    quaternions, the mixer will interpret them as 4 separate scalar
+    properties, not as a quaternion, and rotation interpolation
+    becomes wrong.
+
+    SOLUTION: In the legacy-hint path, detect the value-array length:
+       1 → NumberKeyframeTrack
+       3 → VectorKeyframeTrack
+       4 → QuaternionKeyframeTrack (track name ending in ".quaternion")
+            or NumberKeyframeTrack (anything else)
+    Add this branching to lblCollectAnimations() around line 22631.
+
+────────────────────────────────────────────────────────────────────────
+[L] #19  anycreature-compiler.js buildFin() and buildEye() — v1 partial
+────────────────────────────────────────────────────────────────────────
+    buildFin() ignores .anchor / .conform; buildEye() doesn't
+    orient by host-bone forward; buildHand() / buildMembrane() are
+    simple placeholders. The header docstring (lines 58-64) is
+    honest about this.
+
+    SOLUTION: Add a `warnings` push for each placeholder so the
+    validator log shows "buildFin: anchor/conform fields ignored
+    (v1 limitation)".
+
+────────────────────────────────────────────────────────────────────────
+[L] #20  ACES skin-influence extraction is a placeholder
+────────────────────────────────────────────────────────────────────────
+    aces-engine.js line 127:
+       `skin[i] = [[bones.mirrorName('Bone_Root'), 1.0]]; // placeholder`
+    The "The default Three.js SkinnedMesh doesn't expose per-vertex
+    influences in a public form" comment is correct — but three.js
+    DOES expose them via `geometry.getAttribute('skinIndex')` and
+    `'skinWeight'`. The placeholder is fine for the L8 normal-
+    softening path (which only needs the nearest bone), but the
+    comment is misleading.
+
+    SOLUTION: Replace the placeholder with:
+       const si = geom.getAttribute('skinIndex');
+       const sw = geom.getAttribute('skinWeight');
+       if (si && sw) {
+         // … fill from si/sw per vertex
+       } else {
+         skin[i] = [[bones.mirrorName('Bone_Root'), 1.0]];
+       }
+    so the comment matches the code.
+
+────────────────────────────────────────────────────────────────────────
+[L] #21  _stripEmptyBufferViewsFromGLB handles a GLTFExporter bug
+────────────────────────────────────────────────────────────────────────
+    The exporter occasionally writes empty bufferViews (header
+    present, no data). The renderer has a 170-line scrubber
+    (lines 15761-16034) that walks the glTF, drops empty views,
+    remaps index/image references, and re-pads the BIN chunk. This
+    works, but the scrubber is reactive (fixes the bug every export
+    instead of working around it in the exporter path).
+
+    SOLUTION: Either (a) document the scrubber as a permanent
+    workaround for upstream GLTFExporter#2456 (or whatever the
+    bug is), or (b) switch to GLTFExporter's "uncompressed"
+    embed mode which doesn't have the issue. Mark the scrubber
+    with a TODO to remove when the upstream bug is fixed.
+
+────────────────────────────────────────────────────────────────────────
+[L] #22  normalizeClipForGlb() handles only Euler-axis rotation tracks
+────────────────────────────────────────────────────────────────────────
+    *.rotation[x|y|z] sub-tracks get fused into a single quaternion
+    track. But *.rotation direct tracks (not axis-split) are
+    passed through unchanged, and GLTFExporter's normal validation
+    will then fail on rotation tracks whose getValueSize doesn't
+    match a Quaternion.
+
+    SOLUTION: Either normalise *.rotation direct tracks into
+    quaternions too (if the values look like quaternions, convert;
+    if they look like euler, convert), or document the expectation
+    that the AI factory MUST split rotation into *.rotation[x|y|z]
+    for ACES to handle it.
+
+────────────────────────────────────────────────────────────────────────
+[L] #23  Model_2 publishes `runtime.animations` as legacy hint, then
+        also `carRoot.animations = clips` — both code paths run
+────────────────────────────────────────────────────────────────────────
+    lblCollectAnimations() picks the root.animations first (real
+    AnimationClips), then also runs the legacy-hint path because
+    runtime.animations is a non-null non-clips non-mixer array. The
+    legacy path builds new NumberKeyframeTrack clips and addClip()
+    dedups by name — so in practice, the synthetic clips are
+    silently dropped. The intent is fine but the code is doing
+    extra work for no reason.
+
+    SOLUTION: In lblCollectAnimations(), short-circuit the legacy
+    path when the real clips path already produced results:
+       if (clips.length === 0 && Array.isArray(rt.animations)) { … }
+    (currently the legacy path runs unconditionally on Array.isArray).
+
+────────────────────────────────────────────────────────────────────────
+[L] #24  MT bundle + ACES bundle load on startup even if the user
+        never opens ACES or MT
+────────────────────────────────────────────────────────────────────────
+    index.html eagerly imports all 7 ACES + 7 MT modules at startup
+    (~430 KB transferred on first load). The modules are only
+    needed when the user clicks 🛡 ACES or 🧰 MT.
+
+    SOLUTION: Either (a) lazy-import on first click (cleanest), or
+    (b) document the trade-off (faster button-click latency vs
+    ~430 KB extra initial load). The current `import()` is
+    deliberately non-blocking (`async IIFE`, no `await` at top
+    level), so the user sees the scene first — but the network
+    is still doing the work in the background.
+
+────────────────────────────────────────────────────────────────────────
+[L] #25  PROBLEM 25 — 459 functions in index.html is a maintenance
+        risk
+────────────────────────────────────────────────────────────────────────
+    504 named function declarations in a single 31k-line file.
+    Bundle-splitting (e.g. one <script> per PART) would make the
+    code easier to read and faster to test in isolation.
+
+    SOLUTION: Consider extracting the 36 anti-pattern validators,
+    the fidelity gate, the ACES wiring, the animation pipeline, the
+    texture pipeline, and the export pipeline into separate ES
+    modules under public/ (mirroring how ACES, MT, and three-rig-
+    helpers are already split). The current monolithic shape makes
+    the spec a single source of truth, but the actual code would
+    benefit from the same split.
+
+    Recommended: at minimum, extract lblCollectAnimations +
+    lblSilenceRootPreExistingAnimations + lblTeardownAnimations +
+    lblSnapshotPose + lblRestorePose + lblUpdateAnimUI + lblAnimToggle
+    + lblAnimNext + lblAnimPlay + normalizeClipForGlb +
+    _stripEmptyBufferViewsFromGLB into public/anim/.
+
+────────────────────────────────────────────────────────────────────────
+[L] #26  Model_6 has 21 animations but no exported `tick`
+────────────────────────────────────────────────────────────────────────
+    Model_6 declares `userData.sculptRuntime.animations.clips` +
+    `userData.sculptRuntime.animations.mixer` (modern shape), so
+    the renderer's lblSilenceRootPreExistingAnimations correctly
+    stops it. But there's no `userData.tick` set. The renderer's
+    animate() loop calls `lblAnim.mixer.update(dt)`, which IS
+    the Model_6 mixer, so it works. But if any other code path
+    checks `userData.tick`, it'll see `undefined`.
+
+    SOLUTION: Add `root.userData.tick = (dt) => mixer.update(dt);`
+    to Model_6 (and any other model that's missing it). One-liner.
+
+────────────────────────────────────────────────────────────────────────
+[L] #27  The anycreature compiler's "applyMirror" skip is silent
+────────────────────────────────────────────────────────────────────────
+    If a chain listed in `spec.mirror` has NO joints starting with
+    'L', applyMirror returns an empty `mirrors` array and the
+    spec author's intent is silently lost.
+
+    SOLUTION: If mirrors.length === 0 but spec.mirror.length > 0,
+    push a `warn` log line: `anycreature: spec.mirror chains
+    ${spec.mirror.join(', ')} produced no L*-named joints — no
+    mirror geometry emitted. Check the chain joint names.`
+
+────────────────────────────────────────────────────────────────────────
+[L] #28  buildFin() reads part.thickness but doesn't validate it
+────────────────────────────────────────────────────────────────────────
+    `thickness = part.thickness || 0.02;` — no warning for negative
+    or NaN thickness. The same applies to buildPaw / buildSpike /
+    buildCurve / buildMembrane / etc.
+
+    SOLUTION: Add a `const validate = (v, dflt, min, max) =>
+    Number.isFinite(v) && v >= min && v <= max ? v : dflt;` helper
+    and use it for every numeric input across the part builders.
+
+────────────────────────────────────────────────────────────────────────
+[L] #29  aces-checks.js check_thinnest_px48 assumes 48px head size
+────────────────────────────────────────────────────────────────────────
+    The check measures "thinnest part" in pixels assuming a 48-px
+    silhouette. If the renderer's actual viewport puts the model
+    at a different screen size, the threshold is wrong.
+
+    SOLUTION: Pass the renderer's current canvas dimensions into
+    the ACES run-time ctx so the check scales the 48-px reference
+    to the actual viewport.
+
+────────────────────────────────────────────────────────────────────────
+[L] #30  The spec docs (Prompt_To_*.txt) are 6.6 MB and the AI loads
+        them verbatim
+────────────────────────────────────────────────────────────────────────
+    The AI consumes 24-27k-line markdown files. Loading the full
+    file every prompt is wasteful; many sections (e.g. PART 14's
+    shotgun example) are illustrative only.
+
+    SOLUTION: Split each spec into per-PART files (PART_45_cs2.md,
+    PART_67_modifiers.md, etc.) and a top-level index. The AI can
+    then load the index + only the PARTs relevant to the task.
+
+================================================================================
+11. SUMMARY SCORECARD
+================================================================================
+
+Code shipped: ~2.7 MB of source (renderer + ACES + MT + rig + 9 models)
+Spec shipped: ~6.6 MB across 6 reference docs
+CDN shipped at runtime: ~430 KB (ACES + MT) + 7+ MB Three.js addons
+Ships via GitHub Pages: yes (one HTML file, no build step)
+
+Capability coverage:
+  Rendering:           A  (post-fx, PBR, themes, outline, SSAO, bloom, IBL)
+  Geometry:            A  (60+ primitive builders, CSG, marching cubes, decals)
+  Animation:           A  (mixer, clip dedup, normalize for export, Euler→Quat)
+  Rigging:             A- (rig helpers + 6 templates + 6 skin algorithms)
+  Modeling bundle:     A- (44 techniques, deterministic, well-documented)
+  ACES quality pass:   A- (L1-L8 OKLab stack, 25 checks, 1 known-bug)
+  Validation:          A- (36 anti-patterns + 8 fidelity checks)
+  Export:              A- (GLB, OBJ, STL, .ts dump, .zip)
+  Spec / docs:         B- (4 version numbers in 6 places; 1 wrong data file)
+  Demo models:         A- (9 well-typed ships, 2 missing `default` export)
+  Anycreature spec:    B+ (honest about v1 limitations, 4 fields ignored)
+
+Headline issues to fix first (in order of impact):
+  1. [B] object.json multi-root (validation throws on opt-in path)
+  2. [B] quadruped_light.json declared height 0.335 m off actual
+  3. [B] ACES extractSkeleton() throws on any SkinnedMesh
+  4. [H] LBL version stated 4 different ways across the repo
+  5. [H] quadruped anchor numbers don't match the geometry they anchor
+  6. [M] lblCollectAnimations legacy-hint path loses track type
+  7. [M] ACES module loading is fragile (no graceful fallback)
+  8. [M] Models 7, 8, 9 missing `default` export (spec deviation)
+  9. [M] anycreature v1 doesn't actually deform on playback (need warn log)
+ 10. [L] buildCurve taper is a no-op
+
+────────────────────────────────────────────────────────────────────────
+END OF REPORT
+────────────────────────────────────────────────────────────────────────
