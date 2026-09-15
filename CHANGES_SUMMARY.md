@@ -1,3 +1,46 @@
+# v1.30 / v8.22 — Perfect-Shape Modeling Pipeline (2026-09-15)
+
+This release layers the **PERFECT-SHAPE MODELING PIPELINE** (PART
+145-152) on top of the v1.29 / v8.21 renderer + spec target. PART
+145-152 is the missing **methodology layer** that orchestrates the
+44 PART 100-143 helpers (plus PART 74 procedural texturing) into
+the 8-step "build a real shape" pipeline that the maintainer's
+reference build of the pirate robot demonstrated works but never
+documented. No new runtime helpers — PART 145-152 is purely
+additive AI-factory guidance. See `CHANGES_v130.md` for the full
+release notes.
+
+What ships in this release:
+  - 8 new spec PARTs (PART 145 → PART 152) added to all 6
+    Prompt_To_*.txt / Image_To_*.txt spec docs.
+  - PART 145 — THE 8-STEP PIPELINE (analyze / skeleton-first /
+    cross-section profiles / loft / position accessories /
+    uniform bevel / rig+validate / animate).
+  - PART 146 — SHAPE-CREATION TECHNIQUES (8 named methods:
+    profile lofting / lathe / extrude / CSG / SDF+MarchingCubes /
+    subdivision / NURBS / procedural deformers).
+  - PART 147 — MATERIAL & SURFACE TECHNIQUES (5 named methods:
+    microRoughnessMap / striate / punctate / curvature /
+    cavity-dirt AO).
+  - PART 148 — RIGGING TECHNIQUES (6 named methods: pivot offsets
+    = mesh lengths / hierarchy = anatomy / naming convention /
+    rigid binding / smooth binding / auto-rig validation).
+  - PART 149 — ANIMATION TECHNIQUES (6 named methods: rest pose
+    first / phase-offset / NodeName.property track names / loop
+    frame equality / headless playback test / secondary motion).
+  - PART 150 — VALIDATION & QA TECHNIQUES (6 named methods:
+    silhouette from 4 angles / multi-view IoU / triangle budget
+    / bbox overlap / height match / cheat-sheet check).
+  - PART 151 — PITFALLS (10 named pitfalls with concrete fixes).
+  - PART 152 — REFERENCE CHEAT-SHEET (10-step canonical recipe
+    for any chunky low-poly character).
+  - Renderer's <meta description> + <meta keywords> + spec chip
+    title + window.lblSpec.VERSION constants all bumped from
+    v1.24/v8.16 → v1.30/v8.22.
+  - Backward-compatible: v1.29 / v8.21 spec examples still load.
+
+---
+
 # v1.29 / v8.21 — Renderer/spec sync (2026-09-14)
 
 This release aligns the renderer with the v1.29 (TS path) / v8.21

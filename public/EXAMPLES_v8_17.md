@@ -8,6 +8,14 @@ auto-riggers, chain-curvature animation, 12-constraint catalog) is
 unchanged. Filename keeps the v8_17 suffix to avoid breaking the
 cross-references in the four Prompt_To_*.txt / Image_To_*.txt docs.
 
+**v1.30 / v8.22 addendum (2026-09-15):** PART 145-152 PERFECT-SHAPE
+MODELING PIPELINE is now layered additively on top of PART 100-143
+in the six spec files. The PART 75-89 worked examples in this annex
+remain valid; the new pipeline is the methodology that orchestrates
+the 44 PART 100-143 helpers. See `CHANGES_v130.md` and the PART
+145-152 sections at the end of each Prompt_To_*.txt / Image_To_*.txt
+spec doc for the full pipeline.
+
 This file is the **worked-example annex** to the v8.17 spec (PART 75-89
 in `Prompt_To_*.txt`). It's intentionally a separate, smaller file so
 the AI can read it without scanning the full 24,000+ line spec.

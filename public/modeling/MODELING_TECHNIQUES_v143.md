@@ -182,5 +182,81 @@ console summary with `passed`/`failed` counts.
 
 ---
 
+## Companion methodology: PART 145-152 Perfect-Shape Modeling Pipeline
+
+The 44 techniques above are the **vocabulary**. PART 145-152 is the
+**methodology** that orchestrates them into the 8-step "build a real
+shape" pipeline. See `CHANGES_v130.md` for the full release notes.
+
+The pipeline generalizes beyond the pirate robot — it applies to any
+chunky low-poly character (creature, mascot, prop, vehicle), and to
+most other 3D styles (chunkier the model, smaller the rotations).
+
+  - **PART 145** — THE 8-STEP PIPELINE (analyze / skeleton-first /
+    cross-section profiles / loft / position accessories / uniform
+    bevel / rig+validate / animate).
+  - **PART 146** — SHAPE-CREATION TECHNIQUES (8 named methods: profile
+    lofting / lathe / extrude / CSG / SDF+MarchingCubes / subdivision
+    / NURBS / procedural deformers).
+  - **PART 147** — MATERIAL & SURFACE TECHNIQUES (5 named methods:
+    microRoughnessMap / striate / punctate / curvature / cavity-dirt
+    AO).
+  - **PART 148** — RIGGING TECHNIQUES (6 named methods: pivot offsets
+    = mesh lengths / hierarchy = anatomy / naming convention / rigid
+    binding / smooth binding / auto-rig validation).
+  - **PART 149** — ANIMATION TECHNIQUES (6 named methods: rest pose
+    first / phase-offset / NodeName.property track names / loop
+    frame equality / headless playback test / secondary motion).
+  - **PART 150** — VALIDATION & QA TECHNIQUES (6 named methods:
+    silhouette from 4 angles / multi-view IoU / triangle budget /
+    bbox overlap / height match / cheat-sheet check).
+  - **PART 151** — PITFALLS (10 named pitfalls with concrete fixes).
+  - **PART 152** — REFERENCE CHEAT-SHEET (10-step canonical recipe
+    for any chunky low-poly character).
+
+The 44 PART 100-143 helpers above are the LOW-LEVEL primitives. PART
+145-152 tells the AI factory **when** to use each one. The highest-
+leverage technique picks per use case are:
+
+  - **Limbs** → PART 146.1 (profile loft) + PART 146.6 (subdivision)
+  - **Hats / bowls / hook curves** → PART 146.2 (lathe)
+  - **Belts / harnesses / panels / capes** → PART 146.3 (extrude) +
+    PART 146.4 (CSG for buckle slot)
+  - **Hard-surface recesses (panels, screws, eye patch socket)** →
+    PART 146.4 (CSG subtract)
+  - **Organic blob creatures** → PART 146.5 (SDF + Marching Cubes)
+    [THE canonical fix for visible intersections, Pitfall 1]
+  - **Curved paths (cables, hat brim, swept horns / tails /
+    tentacles)** → PART 146.7 (NURBS / splines)
+  - **Tweaking existing primitives into the right shape** →
+    PART 146.8 (procedural deformers / PART 67 modifier stack)
+  - **Every material** → PART 147.1 (microRoughnessMap) +
+    PART 147.5 (cavity-dirt AO)
+  - **Body panels + cylinder limbs** → PART 147.2 (striate maps)
+  - **Rivets / screws / bolt holes** → PART 147.3 (punctate maps)
+  - **Polished rim, dull field** → PART 147.4 (curvature-driven
+    material variation)
+  - **Every joint** → PART 148.1 (pivot offsets = mesh lengths)
+  - **Chunky mesh binding** → PART 148.4 (rigid binding via PART 30.7
+    auto-promotion)
+  - **Organic surface binding** → PART 148.5 (smooth binding via
+    PART 34 buildSemanticWeights or PART 75.2 geodesic weights)
+  - **Every animation** → PART 149.1-149.6 (rest pose first,
+    phase-offset, NodeName.property tracks, loop frame equality,
+    headless playback test, secondary motion)
+  - **Every model before shipping** → PART 150.1-150.6 (silhouette
+    from 4 angles, multi-view IoU, triangle budget, bbox overlap,
+    height match, cheat-sheet check)
+  - **Pre-emission checklist** → PART 151 (10 named pitfalls; verify
+    fixes for #1, 2, 3, 4, 5, 6, 8, 9, 10 before shipping any chunky
+    character)
+  - **Ship list** → PART 152 (10-step canonical recipe)
+
+PART 145-152 is STYLE-AGNOSTIC and is published as the meta-layer
+above the 44 techniques in this annex. Read both documents together
+for the complete picture.
+
+---
+
 **License:** Same as the parent project. Author: Mavis / RDJ Publishers
 low_poly_3d renderer surface. See LICENSE-3RD-PARTY.md.

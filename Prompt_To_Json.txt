@@ -1,7 +1,8 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.21 — MASTER AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v8.22 — MASTER AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v8.21) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v8.21 pass (2026-09-14).
+  PART 145-152 (v8.22) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
 ================================================================================
 
 ================================================================================
@@ -72,12 +73,15 @@ generate output from this spec; please read them before producing code.
   CROSS-REFS
   - The full audit is in /ANALYSIS_REPORT.txt (1 145 lines, 30
     problems ranked BLOCKING / HIGH / MEDIUM / LOW).
-  - The canonical LBL version pair is v1.29 (TS) / v8.21 (JSON-JS).
-    The renderer's #lbl-spec-chip and meta description are now aligned
-    with this pair (previously they said v1.27/v8.19 — fixed in the
-    same commit that addressed #7 and #5).
-  - CHANGES_SUMMARY.md has a fresh v1.29 entry at the top (see
-    CHANGES_v129.md for the standalone changelog).
+  - The canonical LBL version pair is now v1.30 (TS) / v8.22 (JSON-JS).
+    The renderer's #lbl-spec-chip and meta description are aligned with
+    this pair; the v1.29/v8.21 known issues from the audit remain
+    valid historical context but are NOT re-fixed in v1.30.
+  - CHANGES_SUMMARY.md has fresh v1.30 / v8.22 + v1.29 / v8.21 entries
+    at the top (see CHANGES_v130.md for the standalone v1.30 changelog
+    and CHANGES_v129.md for the v1.29 changelog). PART 145-152
+    PERFECT-SHAPE MODELING PIPELINE is the new additive guidance
+    layered on top of PART 100-143 in v1.30 / v8.22.
 ================================================================================
 
 
@@ -27146,6 +27150,607 @@ PART 45 CS2 + PART 67 + PART 74); MT is purely additive.
 END OF PART 100-143
 ================================================================================
 
+================================================================================
+
+================================================================================
+PART 145-152 — v1.30 / v8.22 ADDITIONS: PERFECT-SHAPE MODELING PIPELINE
+================================================================================
+
+Source: the maintainer's "PERFECT-SHAPE MODELING GUIDE — A generalized
+reference for building low-poly chunky characters (pirate robot + future
+models)" (2026-09-15). The guide is the meta-orchestration layer that
+turns the 44 PART 100-143 helpers into a coherent "build a real shape"
+pipeline. PART 145-152 layers on top of — never replaces — PARTs 1-144
+(including PART 100-143 / MT bundle, PART 74 micro-roughness/striate/
+puncture + heightToX + creature PBR recipes, PART 67 modifier stack,
+PART 45 CS2 PBR, PART 39 3D modeling techniques, PART 34 pre-bundled
+rig helpers, PART 30 + PART 30.7 auto-promotion).
+
+Why this PART exists: naive primitive-placing (BoxGeometry for chest +
+CylinderGeometry for arms + SphereGeometry for eye) produces four
+classes of structural bugs:
+  (a) VISIBLE INTERSECTIONS — chest cuts through arm at shoulder;
+      belt ring crosses body surface; eye patch hovers in front of eye.
+  (b) INCONSISTENT BEVEL — chamfered chest next to perfect cylinder
+      arms means mixed "soft chunky" / "hard industrial" silhouette.
+  (c) HAND-TUNED POSITIONS — every primitive position is a magic
+      number tuned by eye; tweak one and you break five others.
+  (d) NO SKELETON-DRIVEN GEOMETRY — limbs are independent meshes
+      floating at fixed offsets; the rig rotates the parent Group but
+      the mesh origin isn't at the joint center, so limbs orbit
+      instead of bend.
+
+PART 145-152 replaces "place a bunch of primitives" with "build a real
+shape". The shape comes from rules, not coordinates. Once the shape is
+derived from a parameter set, changes propagate consistently and the
+silhouette is automatically correct.
+
+PART 145 — THE 8-STEP PIPELINE (the orchestration)
+PART 146 — SHAPE-CREATION TECHNIQUES (8 named methods)
+PART 147 — MATERIAL & SURFACE TECHNIQUES (5 named methods)
+PART 148 — RIGGING TECHNIQUES (6 named methods)
+PART 149 — ANIMATION TECHNIQUES (6 named methods)
+PART 150 — VALIDATION & QA TECHNIQUES (6 named methods)
+PART 151 — PITFALLS & HOW TO AVOID THEM (10 named pitfalls)
+PART 152 — REFERENCE CHEAT-SHEET (canonical recipe + 10-step ship list)
+
+PART 145-152 is STYLE-AGNOSTIC and applies to every image-to-code path
+the AI factory supports: low-poly, mid-poly, high-poly, smooth-shaded,
+voxel, toon, photoreal, hand-painted, retro-PSX. Chunkier the model,
+smaller the rotations (Pitfall 10's rule).
+
+================================================================================
+PART 145 — THE 8-STEP PIPELINE
+================================================================================
+
+Apply this pipeline IN ORDER to every model. The 8 steps come from the
+maintainer's reference build of the pirate robot and generalize to any
+chunky low-poly character (robot, creature, prop, vehicle, mascot).
+
+  STEP 1. ANALYZE the reference.
+    - Sample proportions: total height, head ratio (head / total),
+      leg-to-body ratio, arm-to-body ratio, depth vs height.
+    - Sample palette: extract 5-7 dominant colors (palette w/ rough).
+    - Identify parts: list every distinct silhouette element.
+    - Identify style: chunky / sleek / stylized / realistic.
+    Output: a single-page "anatomy card" before any geometry work.
+
+  STEP 2. SKELETON-FIRST.
+    - Place joints FIRST, as named pivot Groups in the right hierarchy.
+    - Joint positions DEFINE the geometry to come; geometry follows.
+    - Naming convention (matches LBL PART 33.1[10] STANDARD_BONES
+      catalog, extended to 21 bones per PART 77):
+        hipRoot / Bone_Pelvis / Bone_Spine / Bone_Chest / Bone_Neck /
+        Bone_Head / Bone_Shoulder_L / Bone_Arm_L / Bone_Elbow_L /
+        Bone_Forearm_L / Bone_Hand_L (mirror to _R for the right side).
+    - Document offsets in a pivot-table comment at the top of the .ts
+      file. Every offset = mesh length below it (Pitfall 2).
+    - The AI factory MUST produce exactly ONE root pivot. Sub-roots
+      (e.g. shoulder.L vs shoulder.R) attach as children of the spine.
+    Verify: walk the rig top-down, every pivot sits at the END of the
+            mesh above it. If it doesn't, the rig will visually "pop"
+            on the first rotation.
+
+  STEP 3. CROSS-SECTION PROFILES at each joint.
+    - At each bone, define a 2D shape representing the cross-section
+      perpendicular to the bone direction.
+    - Walk up the limb: for an arm —
+        shoulder:  round(0.07)
+        mid-upper: oval(0.075, 0.075)
+        elbow:     round(0.07)
+        mid-forearm: oval(0.07, 0.07)
+        wrist:     taper(0.06, 0.04)
+    - The variation along the bone is what gives limbs character; a
+      uniform-radius cylinder reads as "stick", not "arm".
+    - Encode as MT.core.makeParametric input or as section arrays for
+      PART 74.5 loft() (PART 146.1).
+
+  STEP 4. LOFT between profiles.
+    - For each limb: build a tube by interpolating the cross-sections
+      along the bone from one joint to the next.
+    - 8 radial segments + 4 length segments is enough for chunky.
+    - 16 + 8 for organic creatures.
+    - This gives ONE mesh per limb instead of 5 primitives.
+    - Use MT.core.loft (PART 74.5) or build manually with BufferGeometry
+      via MT.core.bmeshFromGeometry + MT.core.bmeshOp('subdivide').
+    - Variations: tapered (different radii at each end), bulged
+      (sinusoidal radius variation), segmented (cylinder + membrane
+      rings between).
+
+  STEP 5. POSITION ACCESSORIES procedurally.
+    - Each accessory (hat, belt, hook, buckle, scarf) is placed
+      RELATIVE to a named pivot Group, NOT in world coordinates.
+    - position = parent.position + offset_in_parent_frame.
+    - This makes accessories follow the rig automatically; rotating
+      the chest pivot moves the buckle along with the chest.
+    - For accessories that should drape / swing on their own
+      (hat brim, scarf tail, belt buckle), attach them to the
+      nearest pivot but animate with secondary motion (PART 149.6).
+
+  STEP 6. UNIFORM BEVEL pass.
+    - Apply the SAME chamfer / soft-edge pass to every solid mesh.
+    - In Three.js: RoundedBoxGeometry for box-like parts OR
+      MT.mesh.subdivideCatmullClark (PART 113) for organic curvature
+      OR post-pass shrink-on-corner-vertices for legacy Box.
+    - Picks a single "soft chunky" style across all primitives so the
+      silhouette is uniform (Pitfall 1's fix).
+    - Standard chunky bevel size: 0.015-0.025 m. Larger than 0.04 and
+      the silhouette goes "rubber toy"; smaller and the bevel is
+      invisible at viewport scale.
+
+  STEP 7. RIG + VALIDATE.
+    - Add the bone hierarchy (already done in STEP 2).
+    - Each bone should have its visual mesh as a descendant.
+    - Set userData.partName + userData.isPickable on every mesh so
+      the inspector + ACES panel can target individual parts
+      (PART 30.7 contract).
+    - Render from 4 angles (front, side, back, 3/4) and verify the
+      silhouette is correct in every pose. If any angle breaks, fix
+      the JOINT OFFSET, not the mesh position (Pitfall 2).
+    - Run validateModel(root, {maxGap: 0.02}) to catch floating parts.
+
+  STEP 8. ANIMATE.
+    - 4 named clips minimum: idle (loop), walk (loop), attack (once),
+      express (once).
+    - All rotation tracks use QuaternionKeyframeTrack (3.6(a)) or
+      the legacy NumberKeyframeTrack fallback (PART 39.6 + PART 75
+      v8.17 fallback path).
+    - Use phase-offset for symmetric limbs: left at t, right at
+      t + 0.5 * duration. Author ONE clip, mirror the playback
+      (PART 149.2).
+    - Test playback HEADLESS: compile the file, import it, drive the
+      mixer for 30-90 frames, check that target object positions
+      actually CHANGED. A clip that "constructs without error" but
+      doesn't move anything is a silent failure (PART 149.5 +
+      PART 5.6(b)).
+
+================================================================================
+PART 146 — SHAPE-CREATION TECHNIQUES (8 named methods)
+================================================================================
+
+Each method has a sweet spot. Picking the wrong one for a given part
+is the #1 source of "looks hand-tuned" in the silhouette.
+
+  146.1  PROFILE LOFTING  (best for: limbs, body segments, organic tubes)
+    - Define N cross-sections along an axis; interpolate to build a tube.
+    - Three.js: build manually with BufferGeometry, OR use the
+      MT.core.loft (PART 74.5 / PART 121.5 alias) helper.
+    - API: loft(sections, opts) — sections is an array of {t, radius}
+      where t in [0,1] is the position along the bone and radius is the
+      cross-section radius at that t.
+    - opts: {radialSegments (default 8), lengthSegments (default 4),
+      caps: 'dome'|'flat'|'none', twist (default 0)}.
+    - Variations:
+        Tapered    — different radii at each end (segment.r differs)
+        Bulged     — sinusoidal radius variation around the mean
+        Segmented  — cylinder + membrane rings between segments
+    - For chunky characters: 8 radial + 4 length is the sweet spot.
+
+  146.2  LATHE GEOMETRY  (best for: hats, bowls, vases, limbs with
+         circular cross-section, screw threads, hook curves)
+    - Define a 2D profile (X-Y half-cross-section); revolve around Y.
+    - Three.js: `new THREE.LatheGeometry(points, segments)`.
+    - Pick this for: hat domes, belt buckles, boot soles, hook curves.
+    - Single geometry + correct UVs = automatic (no manual unwrap).
+    - Tip: cap the bottom with a flat disc if you need a closed bottom.
+
+  146.3  EXTRUDE GEOMETRY  (best for: 2D shapes that need depth —
+         belts, harnesses, panels, capes, name plates, straps)
+    - Define a 2D shape (THREE.Shape with lineTo / bezierCurveTo).
+    - Extrude along the Z axis with optional bevel.
+    - Three.js: `new THREE.ExtrudeGeometry(shape, {depth,
+      bevelEnabled, bevelThickness, bevelSize, bevelSegments})`.
+    - Bevel is FREE here — much better than hand-coded chamfer.
+
+  146.4  CSG (Constructive Solid Geometry)  (best for: hard-surface
+         mechanical things — recessed panels, holes, slots, cutouts)
+    - Start with a base shape, subtract / intersect / union others.
+    - Three.js: three-bvh-csg package, or
+      MT.core.csgUnion / csgSubtract / csgIntersect (PART 108).
+    - Use cases: panel lines, screw holes, eye patch socket, mouth
+      grille, belt buckle slot.
+    - Get this right and you stop manually placing dark boxes on top of
+      light boxes to fake detail.
+
+  146.5  SDF + MARCHING CUBES  (best for: organic blob characters,
+         smoothly merged volumes, creature bodies)
+    - Define each limb as a signed-distance field:
+        sdSphere(c, r)        for joint volumes
+        sdCapsule(a, b, r)    for bone shafts
+    - Combine with sdfUnion (smooth-min) for organic merging — this
+      is the canonical fix for Pitfall 1 (visible intersections).
+    - Extract the isosurface with marching cubes:
+      MT.core.sdfMarch(field, {resolution, size}).
+    - Gives a perfectly merged, smooth organic body without any
+      visible intersections between parts.
+
+  146.6  SUBDIVISION SURFACES  (best for: smoothing a coarse control
+         mesh without re-authoring at high resolution)
+    - Start with a low-poly mesh (10-50 verts).
+    - Apply Catmull-Clark subdivision to get 4x-16x the verts.
+    - Three.js: MT.mesh.subdivideCatmullClark(geom, levels).
+    - Use when: the silhouette needs to be smoother than the control
+      mesh can express, but you want to author at low resolution.
+
+  146.7  NURBS / SPLINES  (best for: curved paths — cables, hat brim
+         trim, swept horns, swept tails, tentacles, whips)
+    - Define control points for a smooth curve.
+    - Sample N points along the curve.
+    - Sweep a cross-section along the curve.
+    - Three.js: new THREE.CatmullRomCurve3(points).getPoints(divisions)
+      + manual sweep, OR MT.core.makeNurbsCurve(controlPoints, degree,
+      knots) (PART 111).
+    - For low-poly: 4-8 control points → 12-20 sampled positions.
+    - For high-poly: 16 control points → 80+ sampled positions.
+    - For chains (tails, tentacles, hair): pair with PART 81 chain-
+      curvature animation (the .ts path / PART 75-89).
+
+  146.8  PROCEDURAL DEFORMERS  (best for: tweaking existing primitives
+         into the right shape without re-authoring)
+    - The PART 67 modifier stack:
+        taper / twist / bend / spherize / inflate / applyNoise
+    - Dispatched by applyModifierStack(stack, geom).
+    - Take a BoxGeometry, apply taper → wedge.
+    - Apply bend → arc.
+    - Apply spherize → rounded blob.
+    - Apply noise → organic surface.
+    - Each modifier is a few lines of math; composes cleanly.
+
+================================================================================
+PART 147 — MATERIAL & SURFACE TECHNIQUES (5 named methods)
+================================================================================
+
+A flat MeshStandardMaterial looks like painted plastic. The way to
+make it look real is micro-surface variation. Five techniques that
+always pay off — apply to EVERY material (including the gold and red
+trim, not just the body).
+
+  147.1  microRoughnessMap (PART 74.2)
+    - Universal "kill plastic feel" overlay.
+    - A CanvasTexture of value-noise, sampled as roughness modulation.
+    - Formula: roughness = baseRoughness * (1 - 0.12 * noise).
+    - Apply to EVERY material; one texture, used everywhere.
+    - Renderer helper: lblHelpers.microRoughnessMap({size:256, scale:8,
+      amplitude:0.12, seed:1}).
+    - Single biggest bang-for-buck material technique.
+
+  147.2  Striate Maps (PART 74.2)
+    - Longitudinal grooves with micro-bulge between.
+    - Use for: body panels, cylinder limbs, belt straps, helmet seams.
+    - Generates normal + roughness + height in one bundle.
+    - Replaces hand-placed dark "seam" boxes (Pitfall 8).
+    - Renderer helper: lblHelpers.striateMaps({size:256, count:14,
+      depth:0.4, width:0.3, wobble:0.08, seed:7}).
+
+  147.3  Punctate Maps (PART 74.2)
+    - Beetle-elytra style puncture dots.
+    - Use for: rivets, screw heads, bolt holes, scale patterns.
+    - The texture includes the highlight rim automatically.
+    - Renderer helper: lblHelpers.punctateMaps({size:256, density:0.05,
+      pitRadius:0.04, pitDepth:0.5, normalStrength:1.2, seed:11}).
+
+  147.4  Curvature-Driven Material Variation
+    - Per-vertex curvature (Laplacian) → "polished rim, dull field".
+    - This is what real painted metal looks like — bright edges where
+      the surface curves away, dull where it faces you.
+    - Three.js: compute per-vertex Laplacian, modulate roughness.
+    - PART 74.3 heightToCurvature helper:
+      curvature = heightToCurvature(height, size, kernel).
+    - Apply via aoMap modulation or roughness channel multiply.
+
+  147.5  Cavity-Dirt AO
+    - AO (ambient occlusion) baked per-vertex via raycast hemisphere.
+    - Dirt naturally collects in crevices — under the belt, under the
+      brim, in the gap between chest and arms.
+    - One MT.materials.bakeMap(geom, 'ao', {size:256}) pass, applied as
+      aoMap on every material.
+    - Without this, the model looks "floating"; with it, parts feel
+      physically attached.
+
+================================================================================
+PART 148 — RIGGING TECHNIQUES (6 named methods)
+================================================================================
+
+For chunky low-poly characters, perfect rigging means:
+
+  148.1  PIVOT OFFSETS = MESH LENGTHS
+    - If the upper-arm mesh is 0.22 m long, the elbow pivot must be
+      at (0, -0.22, 0) from the shoulder, NOT (0, -0.20, 0).
+    - Same for every joint — derive the offset from the mesh length,
+      never eyeball it.
+    - Cheat sheet: walk through the skeleton, mark every pivot as
+      "the END of the mesh above me". Fixes Pitfall 2.
+
+  148.2  HIERARCHY = ANATOMY
+    - The parent-child chain in the rig matches the joint articulation.
+    - rotate hipRoot → whole body rotates.
+    - rotate spine → upper body relative to pelvis.
+    - rotate chest → shoulders relative to spine.
+    - Never skip levels: chest should NOT be a child of hipRoot (use
+      spine as the intermediate).
+    - The 21-bone PART 77 Mixamo catalog provides the canonical names
+      (Bone_Pelvis / Bone_Spine / Bone_Chest / Bone_Neck / Bone_Head /
+      Bone_Shoulder_L / Bone_Arm_L / Bone_Elbow_L / Bone_Forearm_L /
+      Bone_Hand_L / mirrored _R variants).
+
+  148.3  NAMING CONVENTION
+    - Every pivot Group gets a unique non-empty `.name`.
+    - Pick a single suffix for visual meshes (`_mesh` or `_visual`)
+      to avoid getObjectByName collisions with the pivot.
+    - Convention names: Bone_Pelvis, Bone_Spine, Bone_Chest, Bone_Neck,
+      Bone_Head, Bone_Shoulder_L, etc.
+      (matches the LBL PART 33.1[10] STANDARD_BONES catalog).
+
+  148.4  RIGID BINDING FOR CHUNKY MESHES
+    - For low-poly chunky characters: don't use SkinnedMesh with
+      vertex weights — just parent the mesh under the pivot Group.
+    - The renderer's PART 30.7 auto-promotion pass wraps each named
+      pivot in a real THREE.Bone and binds every mesh beneath it
+      with weight = 1.0.
+    - Result: a real `skins` section in the exported GLB, perfect
+      per-part rigid binding.
+
+  148.5  SMOOTH BINDING FOR ORGANIC SURFACES
+    - Use SkinnedMesh + buildSemanticWeights (PART 34) when a single
+      mesh needs to deform across multiple bones.
+    - Example: a tube torso that bends at the spine AND twists at
+      the chest simultaneously.
+    - Compact 4-influence per vertex, distance falloff (PART 75.1).
+    - Alternative skin-weight modes: geodesic (PART 75.2), heat-
+      diffusion (PART 75.3), inverse-distance (PART 75.4), segmentation
+      (PART 75.5). Use geodesic for humanoid-style skin; use inverse-
+      distance for mechanical hard-surface parts.
+
+  148.6  AUTO-RIGGING VALIDATION
+    - Run MT.organic.autoRig(geom, {resolution:64}) (PART 134) on the
+      assembled model to verify the skeleton topology is correct.
+    - Voxelizes the geometry, 3D-thins it to a medial line, then
+      matches the joint chain.
+    - Catches missing joints and parented-wrong children.
+    - Alternative: PART 78 voxel-fallback auto-rigger (1s latency on
+      1000-vertex meshes, ~10s on 10k-vertex).
+
+================================================================================
+PART 149 — ANIMATION TECHNIQUES (6 named methods)
+================================================================================
+
+  149.1  REST POSE FIRST
+    - Get the silhouette right in rest pose BEFORE authoring any clip.
+    - Every clip is a set of offsets from this rest pose.
+    - A wrong rest pose = wrong every clip.
+
+  149.2  PHASE-OFFSET FOR SYMMETRY
+    - Don't author two near-duplicate keyframe sets for left and right.
+    - Author one set, then play the same clip on the right side with
+      a phase offset of `duration * 0.5`.
+    - For 4-legged models use PART 75.15's chain-curvature animation
+      or the anycreature compiler's mirror_phase (v1.29 PART 15 fix).
+    - Makes the clip shorter, easier to tweak, mathematically
+      guaranteed to stay symmetric.
+
+  149.3  Track names MUST be `<NodeName>.<property>`
+    - Rotation → `head.quaternion` (QuaternionKeyframeTrack)
+    - Translation → `hipRoot.position` (VectorKeyframeTrack)
+    - Scale → `body.scale` (VectorKeyframeTrack)
+    - NEVER use the glTF `rotation` / `translation` / `scale` form —
+      that's a runtime binding failure (silent — won't throw).
+    - The legacy hint array path uses NumberKeyframeTrack — PART 18
+      v1.29 fix detects track class by values-array length on first
+      frame: 1→Number, 3→Vector, 4 (suffix .quaternion)→Quaternion.
+
+  149.4  Loop clips need frame 0 === frame N
+    - Last keyframe values must equal first keyframe values.
+    - Otherwise the loop has a visible "jump" at the seam.
+
+  149.5  Test playback HEADLESS
+    - Compile the file, import it, call the factory.
+    - Drive the mixer for 30-90 frames.
+    - Check that target object positions/quaternions actually CHANGED.
+    - A clip that "constructs without error" but doesn't move anything
+      is a silent failure (track name wrong, etc.).
+    - PART 5.6(b) — MANDATORY headless playback verification.
+
+  149.6  Use secondary motion for life
+    - After the primary clip, add a tiny procedural wobble on loose
+      parts: hat brim, eye patch strap, belt buckle, scarf, cape tip.
+    - Driven by Math.sin(elapsed * 4 + parentAngularVel).
+    - 5 lines of math, sells the character as "alive".
+
+================================================================================
+PART 150 — VALIDATION & QA TECHNIQUES (6 named methods)
+================================================================================
+
+  150.1  SILHOUETTE TEST FROM 4 ANGLES
+    - Render the model from front, side, back, 3/4.
+    - The silhouette should read as the character at every angle.
+    - A silhouette that works only from the front = a sticker, not a
+      model.
+    - PART 39.4 E17 bbox-overlap validator runs at boot.
+
+  150.2  MULTI-VIEW IoU
+    - PART 39.4 — render the reference and your model at the same
+      camera angle, compute silhouette IoU.
+    - Target: 0.85+ IoU for chunky characters.
+    - Use the 18-render multi-view grid (PART 44) for batch validation.
+
+  150.3  TRIANGLE BUDGET
+    - Target: < 5,000 triangles for chunky character.
+    - The reference pirate robot was 4,700 — within budget.
+    - PART 35 — triangle-first geometry discipline.
+    - lion-cost optimization: use MT.mesh.qemDecimate (PART 116) to
+      hit the budget without hand-trimming.
+
+  150.4  BBOX OVERLAP CHECK
+    - PART 11 — no two solid parts should have overlapping bounding
+      boxes unless they're meant to be in contact.
+    - Catches: belt hovering in front of body, eye patch not recessed,
+      arm intersecting chest.
+
+  150.5  HEIGHT MATCH
+    - Resolved Y range should match declared `height` field.
+    - PART 72.13 #2 — re-measure after building, fix if off.
+    - Declaration says 1.45 m → silhouette must reach y=1.45. If not,
+      the joints are lying.
+
+  150.6  CHECK AGAINST CHEAT-SHEET (PART 152 below)
+    - Run the 10-step ship-list before declaring done.
+    - All 10 items passing → model is shippable.
+
+================================================================================
+PART 151 — PITFALLS & HOW TO AVOID THEM (10 named pitfalls)
+================================================================================
+
+The maintainer's reference build hit each of these at least once.
+Documenting them so the AI factory doesn't repeat the cycle.
+
+  PITFALL 1: Visible intersections between parts.
+    Symptom: chest box cuts through arm cylinder at shoulder.
+    Fix: use SDF union (PART 146.5) for organic merging, OR shrink
+         each primitive by 0.01 m at every contact point.
+
+  PITFALL 2: Pivot offset doesn't match mesh length.
+    Symptom: visible gap when joint bends.
+    Fix: walk through the skeleton, every pivot = bottom of mesh
+         above. SEE PART 148.1.
+
+  PITFALL 3: getObjectByName returns wrong object.
+    Symptom: animation targets the wrong Group.
+    Fix: never let a mesh and a pivot share a name. Use _mesh suffix
+         on the visual, or _pivot on the Group. SEE PART 148.3.
+
+  PITFALL 4: Track name uses glTF form.
+    Symptom: clip "plays" but model doesn't move.
+    Fix: ALWAYS pass through the lookup table:
+         {translation: 'position', rotation: 'quaternion', scale: 'scale'}
+         SEE PART 149.3.
+
+  PITFALL 5: Mix `tick` and `mixer.update` without coordinating.
+    Symptom: animations stutter or get double-driven.
+    Fix: either let the factory's tick own the mixer, OR let the
+         renderer own it. Never both. Pick one.
+
+  PITFALL 6: Single BIG mesh instead of multiple small ones.
+    Symptom: external GLB viewer says "1 mesh/group part(s)".
+    Fix: PART 30.7 — every body part must be its own Mesh with
+         userData.isPickable + userData.partName set.
+
+  PITFALL 7: Smooth-shaded normals on a low-poly mesh.
+    Symptom: edges look smeared, mesh looks higher-poly than it is.
+    Fix: `flatShading: true` on every material, OR recompute
+         vertex normals after a low-poly mesh edit.
+
+  PITFALL 8: Hand-placed dark boxes for seams.
+    Symptom: body has visible "panel lines" but they're flat geometry.
+    Fix: replace with a striateMap (PART 74.2 / PART 147.2) for proper
+         surface micro-grooves with consistent normals.
+
+  PITFALL 9: Glossy plastic look from default MeshStandardMaterial.
+    Symptom: model looks like a child's toy, not a real character.
+    Fix: add microRoughnessMap (PART 74.2 / PART 147.1) to every
+         material, vary roughness ±0.05 across the surface.
+
+  PITFALL 10: Animation amplitudes tuned for human scale.
+    Symptom: chunky mascot's walk looks like a near-cartwheel.
+    Fix: scale rotations DOWN for chunky characters:
+            human walk hip swing    = ±25°
+            chunky mascot walk      = ±10°
+            chunky mascot arm sway  = ±8°
+         Default rule: chunkier the model, smaller the rotations.
+
+================================================================================
+PART 152 — REFERENCE CHEAT-SHEET
+================================================================================
+
+For any chunky low-poly character, this is the canonical recipe:
+
+  1. ANATOMY TABLE (in code, as a comment at top of .ts file)
+     - List every joint: id, parent, local offset, DOF (degrees of
+       freedom).
+     - Verify offsets = mesh lengths BEFORE placing anything
+       (PART 148.1).
+
+  2. SKELETON FIRST
+     - 26 named pivot Groups in the right hierarchy (PART 33.1[10] +
+       PART 77 extension to 21 bones + hands).
+     - One root group, depth ≤ 6.
+
+  3. ONE MESH PER LIMB
+     - Profile loft along the bone (PART 146.1).
+     - For body: beveled box with chamfered corners (STEP 6).
+     - For accessories: lathe (PART 146.2) or extrude (PART 146.3).
+
+  4. CSG FOR RECESSES
+     - Mouth grille, eye patch socket, belt buckle slot, rivet holes.
+     - All via csgSubtract (PART 146.4).
+
+  5. UNIFORM BEVEL
+     - 0.02 m chamfer on every solid mesh, applied via RoundedBoxGeometry
+       or MT.mesh.subdivideCatmullClark (STEP 6).
+     - This single pass unifies the style across all primitives.
+
+  6. MATERIALS
+     - microRoughnessMap overlay on every material (PART 147.1).
+     - striateMaps for body seams and limb cylinders (PART 147.2).
+     - aoMap baked per-vertex from hemisphere raycast (PART 147.5).
+     - PBR: roughness 0.55, metalness 0.35 for dark body
+            roughness 0.25, metalness 0.85 for gold trim
+
+  7. RIG
+     - PART 30 pivot hierarchy with named Groups.
+     - PART 30.7 auto-promotion → real bones + skin at GLB export.
+     - userData.partName + userData.isPickable on every mesh.
+
+  8. ANIMATIONS (4 named clips minimum)
+     - idle (1.6 s loop): breath + look + sway.
+     - walk (1.0 s loop): full gait with phase-offset.
+     - attack (0.9 s once): wind-up + strike + recovery.
+     - express (1.2 s once): bow + gesture.
+
+  9. VALIDATE
+     - Render from 4 angles, verify silhouette at every pose
+       (PART 150.1).
+     - Check triangle budget (< 5,000 for chunky character)
+       (PART 150.3).
+     - Test playback headlessly (30+ frames, verify positions change)
+       (PART 149.5).
+     - Confirm no duplicate getObjectByName collisions (PART 148.3).
+
+  10. SHIP
+      - Single .ts file, single export function, no relative imports.
+      - LOOK-DEV LIGHTS as second optional export.
+      - PIVOT TABLE in module header comment.
+      - 6:3:1 value hierarchy.
+      - Style decisions documented (chunky, mascot, single
+        exaggerated axis).
+
+================================================================================
+PART 145-152 SUMMARY (THE ONE-PARAGRAPH VERSION)
+================================================================================
+
+The renderer now ships the perfect-shape modeling pipeline as an
+additive meta-orchestration layer over PART 100-143 (44 helpers on
+window.MT) and PART 30/34/74 (rig + procedural texturing). PART 145
+documents the 8-step pipeline (analyze / skeleton-first / cross-section
+profiles / loft / position accessories / uniform bevel / rig+validate /
+animate). PART 146 catalogues 8 shape-creation techniques (profile
+lofting, lathe, extrude, CSG, SDF+MarchingCubes, subdivision surfaces,
+NURBS/splines, procedural deformers). PART 147 catalogues 5 material
+techniques (microRoughnessMap, striate, punctate, curvature, cavity-
+dirt AO). PART 148 catalogues 6 rigging techniques (pivot offsets =
+mesh lengths, hierarchy = anatomy, naming convention, rigid vs smooth
+binding, auto-rigging validation). PART 149 catalogues 6 animation
+techniques (rest pose first, phase-offset, NodeName.property track
+names, frame 0 == frame N, headless playback test, secondary motion).
+PART 150 catalogues 6 validation techniques (silhouette test from 4
+angles, multi-view IoU, triangle budget, bbox overlap, height match,
+cheat-sheet check). PART 151 documents 10 named pitfalls with concrete
+fixes. PART 152 ships the canonical recipe as a 10-step checklist.
+The renderer keeps every existing capability (PARTs 1-144 + PART 90
+ACES + PART 45 CS2 + PART 67 + PART 74); PART 145-152 is purely
+additive guidance for the AI factory.
+
+================================================================================
+END OF PART 145-152
 ================================================================================
 END OF PART 75-89
 ================================================================================
