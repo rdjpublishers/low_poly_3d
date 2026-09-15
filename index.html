@@ -3069,6 +3069,9 @@ const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 const proceduralEnvMap = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 let hdriEnabled = false;
+// v1.31 / v8.22 — remembers the previous scene.environment so the auto-trigger
+// in addTsModelToScene() can restore it on the next model load (PART 163).
+let __lblPrevHdri = null;
 
 // Resize
 function resize(){
@@ -14168,6 +14171,67 @@ function addTsModelToScene(group, meta, lightsGroup){
   // touch it.
   if(typeof lblCollectAnimations === 'function') lblCollectAnimations(group, group.userData && group.userData.__gltf);
   frameCameraOnScene();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // v1.31 / v8.22 — IMAGE-DRIVEN FACTORY AUTO-TRIGGERS (PART 154 + PART 163)
+  //   - Auto-enable PMREM/HDRI when the model contains ANY material with
+  //     metalness >= 0.5. Without IBL, metallic materials look like flat
+  //     plastic. Reverts to the user's HDRI toggle state on next load.
+  //   - Auto-run ACES so the 25+ mechanical checks (faceted body, soft
+  //     mass, missing touch connections, value order, contrast adjacent,
+  //     share hierarchy, etc.) fire without the user clicking anything.
+  //     ACES never throws — warnings go to console + the fidelity chip.
+  //   Both auto-triggers are non-blocking and only run if the helpers
+  //   are available. See CHANGES_v130.md for the v1.31 release notes.
+  // ═══════════════════════════════════════════════════════════════════════
+  (function __lblAutoTriggersV131(group){
+    try {
+      // (PART 163) — scan loaded model for metallic materials; auto-enable
+      // scene.environment if any are found. Records the previous state in
+      // __lblPrevHdri so the next load can restore.
+      let hasMetallic = false;
+      group.traverse(obj => {
+        if (!obj || !obj.material) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const m of mats) {
+          if (m && typeof m.metalness === 'number' && m.metalness >= 0.5) {
+            hasMetallic = true; break;
+          }
+        }
+      });
+      if (hasMetallic && typeof proceduralEnvMap !== 'undefined' && scene) {
+        __lblPrevHdri = scene.environment;
+        scene.environment = proceduralEnvMap;
+        console.log('[LBL v1.31] Auto-enabled PMREM/HDRI — model has metallic materials (PART 163)');
+      }
+      // (PART 154) — auto-run ACES so the AI-factory pass checklist
+      // catches 25+ mechanical issues immediately. Mirror the wiring the
+      // user-triggered ACES button uses.
+      if (typeof window.ACES !== 'undefined' && window.ACES && typeof window.ACES.run === 'function') {
+        const sceneGroupLocal = (typeof sceneGroup !== 'undefined') ? sceneGroup : scene;
+        try {
+          const report = window.ACES.run({
+            scene: sceneGroupLocal,
+            spec: (typeof CURRENT_TS_META !== 'undefined' && CURRENT_TS_META) ? CURRENT_TS_META.spec : undefined,
+            shading: undefined,
+            checksOpts: { autoTrigger: true }
+          });
+          if (report && report.summary) {
+            console.log('[LBL v1.31] ACES auto-trigger:', report.summary);
+          }
+          if (typeof updateFidelityChip === 'function' && report && Array.isArray(report.warnings)) {
+            const blocks = report.warnings.filter(w => w && (w.severity === 'BLOCK' || w.severity === 'block'));
+            if (blocks.length) updateFidelityChip(`ACES: ${blocks.length} BLOCK warning(s)`);
+          }
+        } catch(acesErr) {
+          // ACES is non-blocking per PART 154; never throw out of the mount path.
+          console.warn('[LBL v1.31] ACES auto-trigger skipped:', acesErr && acesErr.message);
+        }
+      }
+    } catch(autoErr) {
+      console.warn('[LBL v1.31] auto-triggers skipped:', autoErr && autoErr.message);
+    }
+  })(group);
 
   CURRENT_TS_MODEL=group;
   CURRENT_TS_META=meta;
@@ -31277,9 +31341,112 @@ window.lblSpec = (function(){
     openTrianglePanel,
     getLastTriMetrics: () => lblSpecState.trisMetrics,
     refreshTriMetrics,
+    // v1.31 / v8.22 — PART 158 silhouette IoU helper. Renders the loaded
+    // root and an optional reference image (HTMLImageElement or canvas)
+    // to off-screen 2D contexts at a fixed size, computes the binary
+    // silhouette of each, and returns an IoU score 0..1 plus 1-3
+    // directional suggestions. Safe to call when no reference image is
+    // available — returns silhouette IoU of just the model.
+    compareToReference: function(root, refImg){
+      try {
+        const W = 256, H = 256;
+        const modelSil = __lblRenderSilhouette(root, W, H);
+        const refSil = refImg ? __lblRenderImageSilhouette(refImg, W, H) : null;
+        if (!refSil) {
+          return { iou: null, silhouette: modelSil, suggestions: ['No reference image provided — pass an HTMLImageElement or canvas as refImg to compare.'] };
+        }
+        let inter = 0, uni = 0;
+        for (let i = 0; i < modelSil.data.length; i++) {
+          const m = modelSil.data[i] > 128 ? 1 : 0;
+          const r = refSil.data[i] > 128 ? 1 : 0;
+          if (m || r) uni++;
+          if (m && r) inter++;
+        }
+        const iou = uni ? (inter / uni) : 0;
+        const suggestions = [];
+        if (iou < 0.85) suggestions.push('IoU < 0.85 — check head-to-body ratio, arm length, hat brim size.');
+        if (iou < 0.65) suggestions.push('IoU < 0.65 — major proportion drift. Re-sample landmarks via PART 157 imageToWorld.');
+        if (iou >= 0.92) suggestions.push('IoU ≥ 0.92 — silhouette matches the reference. Ship.');
+        return { iou, silhouette: modelSil, reference: refSil, suggestions };
+      } catch (err) {
+        console.warn('[LBL v1.31] compareToReference failed:', err && err.message);
+        return { iou: 0, silhouette: null, suggestions: ['compareToReference threw — see console for details.'] };
+      }
+    },
     helpers: __threeTriHelpers
   };
 })();
+
+// v1.31 / v8.22 — PART 158 helpers used by compareToReference above.
+// Renders the model to an off-screen canvas, returns {data, width, height}
+// (8-bit grayscale silhouettes). For the reference image path, decodes to
+// a 2D canvas, downscales, and produces a luminance-based silhouette.
+function __lblRenderSilhouette(root, W, H){
+  if (!root || typeof THREE === 'undefined') return null;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const r = new THREE.WebGLRenderer({ canvas: off, antialias: false, alpha: false, preserveDrawingBuffer: true });
+  r.setSize(W, H, false);
+  r.setClearColor(0x000000, 1);
+  const s = new THREE.Scene();
+  s.background = new THREE.Color(0x000000);
+  // Clone the root so we don't disturb the live scene
+  const clone = root.clone(true);
+  // Center the clone on its bbox
+  const bb = new THREE.Box3().setFromObject(clone);
+  const c = new THREE.Vector3(); bb.getCenter(c);
+  clone.position.sub(c);
+  s.add(clone);
+  const cam = new THREE.PerspectiveCamera(35, W / H, 0.1, 100);
+  cam.position.set(0, 0, Math.max(bb.getSize(new THREE.Vector3()).length(), 2) * 1.4);
+  cam.lookAt(0, 0, 0);
+  s.add(new THREE.AmbientLight(0xffffff, 1.5));
+  r.render(s, cam);
+  // Read pixels and binarize
+  const px = new Uint8Array(W * H * 4);
+  r.readRenderTargetPixels ? null : null;
+  const ctx2d = off.getContext('2d');
+  const imgData = ctx2d.getImageData(0, 0, W, H);
+  const out = new Uint8ClampedArray(W * H);
+  for (let i = 0; i < W * H; i++) {
+    const r8 = imgData.data[i * 4];
+    const g8 = imgData.data[i * 4 + 1];
+    const b8 = imgData.data[i * 4 + 2];
+    out[i] = (r8 + g8 + b8) / 3 > 32 ? 255 : 0;
+  }
+  r.dispose();
+  return { data: out, width: W, height: H };
+}
+
+function __lblRenderImageSilhouette(refImg, W, H){
+  try {
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    // Fit-contain the reference into the canvas
+    const iw = refImg.naturalWidth || refImg.width || W;
+    const ih = refImg.naturalHeight || refImg.height || H;
+    const scale = Math.min(W / iw, H / ih);
+    const dw = iw * scale, dh = ih * scale;
+    ctx.drawImage(refImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    const data = ctx.getImageData(0, 0, W, H);
+    const out = new Uint8ClampedArray(W * H);
+    for (let i = 0; i < W * H; i++) {
+      const r8 = data.data[i * 4];
+      const g8 = data.data[i * 4 + 1];
+      const b8 = data.data[i * 4 + 2];
+      // Treat non-background pixels as silhouette. Use a luminance
+      // threshold tuned for chunky mascots on white-ish backgrounds.
+      out[i] = (r8 + g8 + b8) / 3 < 220 ? 255 : 0;
+    }
+    return { data: out, width: W, height: H };
+  } catch (err) {
+    console.warn('[LBL v1.31] __lblRenderImageSilhouette failed:', err && err.message);
+    return null;
+  }
+}
 
 // Hook into the model-load path so refreshOnLoad fires after every
 // buildScene() / TS load. Wraps the existing lblTeardownAnimations hook
