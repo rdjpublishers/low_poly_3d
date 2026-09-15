@@ -9416,7 +9416,7 @@ opens; do not silently skip):
                      have different roughness + color behavior
   Rig gate         — deforming vertices have valid normalized weights;
                      skeleton has a predictable hierarchy (PART 38.12)
-  Animation gate   — idle / walk / attack / hit clips do not collapse
+  Animation gate   — idle / walk / attack / express clips do not collapse
                      shoulders, elbows, hips, or knees (PART 38.13)
   Runtime gate     — asset loads, exposes named runtime nodes and
                      sockets, animates inside the viewer (PART 38.14)
@@ -9473,7 +9473,7 @@ it writes geometry.
   }
 
   animation: {
-    idle, walk, attack, hit, death, expression, interaction
+    idle, walk, attack, express, death, expression, interaction
   }
 
   budget: {
@@ -14980,8 +14980,9 @@ PART 42, PART 43, PART 64, PART 65, and PART 66.
   ---------------------------------------------
 
     PART 38.13 enumerated 8 animation quality
-    checks (idle / walk / attack / hit minimum
-    set + extras). PART 42.4.2 listed 30+ blend
+    checks (idle / walk / attack / express minimum
+    set + extras; EXPRESS was renamed from HIT in
+    v1.32 / v8.23 to match PART 145 STEP 8 / PART 152). PART 42.4.2 listed 30+ blend
     shapes for facial expression. PART 44
     EXTENDS the animation set with the
     IMPLEMENTATION PATTERN for baking the 4
@@ -15000,9 +15001,14 @@ PART 42, PART 43, PART 64, PART 65, and PART 66.
       - ATTACK: a 20-40 frame one-shot where the
         character swings a weapon. Plays once,
         returns to idle.
-      - HIT: a 10-20 frame one-shot where the
-        character reacts to damage. Plays once,
-        returns to idle.
+      - EXPRESS: a 10-20 frame one-shot where the
+        character emotes / bows / gestures / reacts
+        (a damage flinch, a bow, a wave, a victory
+        pose — any one-shot expressive beat). Plays
+        once, returns to idle. (Renamed from HIT in
+        v1.32 / v8.23 to match PART 145 STEP 8 and
+        PART 152 ship-checklist; functionally identical
+        for anyCreature v1.3.1 and earlier models.)
 
     The factory publishes the clip set on
     `userData.sculptRuntime.animations`:
