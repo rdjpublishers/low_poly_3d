@@ -1,0 +1,222 @@
+================================================================================
+CHUNKY 3D SPORT MOTORCYCLE (SUPERBIKE)
+TECHNIQUES & TECHNOLOGIES SPECIFICATION
+Low Poly Blueprint Language (LBL) v1.30 / v8.22
+================================================================================
+Source File: createSportMotorcycleModel.ts
+Style: Chunky Mascot / Smooth 3D Vinyl Clay Collectible
+Reference Grounding: bd5da92411032501f007edb073f06372.jpg
+Fully standalone ES module – imports ONLY 'three'. Zero external asset dependencies.
+
+================================================================================
+1. CORE TECHNOLOGIES
+================================================================================
+
+- Three.js (WebGL-based 3D library)
+- TypeScript
+- ES Modules (native)
+- WebGL (via Three.js)
+- Canvas 2D API (procedural texture generation)
+- Deterministic Seeded PRNG (Mulberry32)
+
+================================================================================
+2. 3D MODELING TECHNIQUES
+================================================================================
+
+2.1 Primary Modeling Approaches
+- Procedural Modeling (pure code-driven geometry)
+- Constructive Geometry / Primitive Composition
+- Hierarchical Scene Graph Construction
+- Modular Component Assembly (factory pattern)
+- Low-Poly / Chunky Stylized Modeling
+- Hard-Surface Modeling (mechanical components)
+- Organic Panel Sculpting via 2D profile extrusion
+
+2.2 Geometry Generation Techniques
+- Shape Extrusion (THREE.Shape + THREE.ExtrudeGeometry)
+- Bevel Extrusion (rounded edges via bevelEnabled, bevelSize, bevelThickness)
+- Curve-based Modeling (CatmullRomCurve3 + TubeGeometry)
+- Parametric Spoke Pattern Generation (5-spoke alloy rims)
+- Hole / Cutout Creation (Shape.holes with Path)
+- Non-uniform Scaling (e.g. oval exhaust canister)
+- Geometry Rotation & Transformation (common on cylinders)
+- Deep-dish Rim Construction (stepped cylinders + torus lips)
+- Ventilated Brake Disc (extruded shape with central hole + mounting bolts)
+
+2.3 Specific Geometry Types Used
+- THREE.CylinderGeometry          (forks, rims, hubs, handlebars, exhaust, etc.)
+- THREE.BoxGeometry               (frame spars, engine, calipers, levers, etc.)
+- THREE.ExtrudeGeometry           (fairings, tank, seat, tail, fender, vents)
+- THREE.TorusGeometry             (tires, rim lips, springs, gaskets, clamps)
+- THREE.CapsuleGeometry           (headlight, mirrors, knee recesses)
+- THREE.SphereGeometry            (bar-end weights)
+- THREE.ConeGeometry              (exhaust intake transition)
+- THREE.CircleGeometry            (mirror glass faces)
+- THREE.PlaneGeometry             (radiator grille)
+- THREE.TubeGeometry              (exhaust header pipe)
+- THREE.Shape + THREE.Path        (complex 2D profiles + holes)
+
+================================================================================
+3. MATERIALS & SHADING TECHNIQUES
+================================================================================
+
+3.1 Material System
+- Physically Based Rendering (PBR)
+- MeshStandardMaterial (majority of surfaces)
+- MeshPhysicalMaterial (windscreen – clearcoat + transparency)
+- MeshBasicMaterial (exhaust nozzle interior)
+- Emissive Materials (headlight + taillight)
+
+3.2 Material Properties Used
+- Roughness / Metalness Workflow
+- Clearcoat + ClearcoatRoughness
+- Transparency + Opacity + depthWrite
+- Emissive Color + Emissive Intensity
+- Roughness Map (procedural micro-detail)
+
+3.3 Procedural Texturing
+- Procedural Micro-Roughness Texture (256×256 CanvasTexture)
+- Seeded Noise Generation (Mulberry32 PRNG)
+- Texture Tiling (RepeatWrapping, repeat.set(4, 4))
+- NoColorSpace handling for roughness maps
+- Purpose: Break up artificial plastic highlights (LBL PART 74.2 / 147.1)
+
+3.4 Color Palette (Reference-Sampled)
+- Fairing Orange:        0xf5821b / 0xdc6b0a / 0xff9429
+- Charcoal (Tire/Frame): 0x222428 / 0x2a2c32 / 0x32353c / 0x1e2024 / 0x363940 / 0x151619
+- Accent Silver/Grey:    0xb4bcc8 / 0xd0d5dc / 0x2e3036 / 0xd8dde5 / 0x8e95a0
+- Headlight:             0xf2f6fb / 0xfffaec
+- Taillight:             0xee2525
+- Shock Spring:          0xf5b51b
+
+================================================================================
+4. COMPONENT ARCHITECTURE (MODULAR BUILDERS)
+================================================================================
+
+- createChunkySportWheel()
+  → Torus tire, deep-dish rim, 5-spoke star, hub, optional brake disc + caliper
+
+- buildFrontForkAssembly()
+  → USD inverted forks, triple clamps, aerodynamic fender, clip-on bars, levers
+
+- buildFairingAndCockpit()
+  → Nose cowl, solid headlight + bezel, low swept windscreen, side flanks + vents, belly pan, mirrors
+
+- buildFuelTank()
+  → Muscular sculpted tank, knee recesses, racing filler cap
+
+- buildSeatAndTailSection()
+  → Contoured saddle, upswept ducktail cowl, LED taillight, tail tidy
+
+- buildChassisAndEngine()
+  → Twin-spar frame, engine block + ribs, clutch/stator covers, radiator, mono-shock, footpegs
+
+- buildExhaustSystem()
+  → Curved header (tube), upswept oval muffler, beveled tip, nozzle, hangers
+
+- buildRearSwingarm()
+  → Twin arms, dropouts, cross-brace, sprocket, chain
+
+================================================================================
+5. COORDINATE SYSTEM & PROPORTIONS
+================================================================================
+
+- Coordinate Frame:
+  +X = Front (headlight, nose, front wheel)
+  -X = Rear  (tail, rear wheel, exhaust tip)
+  +Y = Up    (ground plane at Y = 0)
+  +Z = Right (exhaust, clutch cover, brake disc)
+  -Z = Left
+
+- Origin (0,0,0) = Ground plane midpoint between front and rear axles
+- Wheel design: Axles at Y ≈ 0.30 so tires touch ground at Y = 0
+- Explicit rake angle on steering pivot (~22°)
+- Lean-into-turn dynamics based on steering angle + speed
+
+================================================================================
+6. RUNTIME / ANIMATION SYSTEM
+================================================================================
+
+6.1 sculptRuntime Contract (published on root.userData)
+- nodes          : Named Object3D hierarchy
+- meshes         : Named Mesh registry
+- sockets        : Attachment points (headlight, exhaustTip, riderSeat)
+- colliders      : Box3 bounding volumes
+- destructionGroups : Fairings / Wheels / Exhaust groupings
+- materials      : Material map
+- actions        : Public API methods
+- animation      : Animation state
+- vfx            : VFX sockets
+
+6.2 Public Actions API
+- revEngine()
+- steer(angle: number)
+- setDriveSpeed(speed: number)
+- toggleHeadlight(force?: boolean)
+- resetPose()
+
+6.3 Per-Frame Tick System (root.userData.tick)
+- Smooth steering interpolation
+- Body lean / roll based on steering + drive speed
+- Wheel rotation (front + rear)
+- Engine idle vibration + rev decay
+- Headlight emissive breathing pulsation
+
+6.4 Configurable Options
+- scale
+- shadows (cast & receive)
+- wireframe
+- fairingColor / frameColor / accentColor
+- driveSpeed
+- steeringAngle
+- idleVibration
+
+================================================================================
+7. LIGHTING SYSTEM
+================================================================================
+
+- createSportMotorcycleModelLookDevLights(mode)
+  Modes: 'reference' | 'grazing' | 'neutral'
+
+- Techniques:
+  - DirectionalLight (key, fill, rim)
+  - HemisphereLight
+  - AmbientLight
+  - Shadow Mapping (2048 map size, tuned bias & camera frustum)
+  - Warm key + cool fill + rim lighting for orange vinyl/clay look
+
+================================================================================
+8. ARCHITECTURAL & DESIGN PATTERNS
+================================================================================
+
+- Factory Pattern (main model + component builders)
+- Options Object Pattern
+- Runtime Contract / UserData Extension
+- Modular Builder Functions
+- Named Registry Pattern (nodes, meshes, sockets)
+- Action / Command Pattern
+- Deterministic Procedural Generation
+- Zero-Dependency Standalone Module
+
+================================================================================
+9. PERFORMANCE & TARGET METRICS
+================================================================================
+
+- Target Triangle Count: ~8500 tris
+- Shadow casting/receiving on all major meshes
+- Wireframe diagnostic mode available
+- Fully real-time ready (tick-driven animation)
+
+================================================================================
+10. STYLE & SPECIFICATION METADATA
+================================================================================
+
+- Style Label: chunky-mascot
+- Subject: sport-motorcycle
+- Source Reference: bd5da92411032501f007edb073f06372.jpg
+- Reference Views: isometric-front-right
+- LBL Version: v1.30 / v8.22 Factory Module
+
+================================================================================
+END OF SPECIFICATION
+================================================================================

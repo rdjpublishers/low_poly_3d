@@ -1,11 +1,12 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.33 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.34 / v8.25 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
   PART 153-166 (v1.31 / v8.22) -- IMAGE-DRIVEN FACTORY DEFAULTS added canonically to Image_To_Ts.txt (this file references them); de-dup note in the header below. See CHANGES_v130.md.
   PART 167-178 (v1.32 / v8.23) -- HARD-SURFACE / VEHICLE MODELING PIPELINE added canonically to this file (the missing methodology layer for motorcycles / cars / planes / props with wheels / suspension / fairings); 8-step vehicle pipeline + dimension & clearance contract + 4 new procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques (quadratic / bezier / lathe / swept extrusion / parametric) + seeded mulberry32 micro-roughness texture + hierarchical articulation tree (steering / swingarm / wheel pivots) + 3-point studio lighting rig + self-verification runtime hooks (triangle / drawcall / bbox / ground-clearance audits) + 8-section code architecture + 10 hard-surface pitfalls with fixes + canonical worked example + 12-step ship checklist. The 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt) REFERENCE PART 167-178 from this file rather than duplicating it.
   PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 to fix the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. Ships the "Hierarchy of Fidelity" rule (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) at the top of PART 167, RULE 167.1.1 (Form Preservation Mandate) in PART 167 STEP 1, RULE 169.1.2 (Filleted Box Usage Constraint) in PART 169.1, RULE 169.3.2 (Mandatory Wheel Profile Revolution) in PART 169.3, a restated PART 172.1 around the `Body_Fairings & FuelTank` continuous envelope group, and 10 new technical PARTs covering the lathed-tire + Catmull-Rom swept-tube + bezier-extrude fairing + shape-hole duct + TS1117 fix + socket attachment hierarchy techniques (PART 179.1-179.10). 3 new helpers (`createLathedTireGeometry` / `createSweptTube` / `createExhaustCanister`) added to `public/modeling/mt-hardsurface.js`. PART 179 is purely additive — PART 1-178 still works exactly as before. See CHANGES_v133.md.
+  PART 180-189 (v1.34 / v8.25) -- CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION added canonically to this file (the missing reference-specification layer for the PART 177 worked example). Codifies the user-supplied `SportMotorcycle_3D_Techniques_Specification.txt` (10-section authoritative spec at repo root) as 10 numbered PARTs (PART 180 spec layout / PART 181 core technologies stack / PART 182 authoritative geometry catalog + BoxGeometry + CylinderGeometry constraints / PART 183 reference materials + 6-band palette + procedural micro-roughness / PART 184 the 8 builder functions (createChunkySportWheel + 7 build* builders) / PART 185 bike-forward coordinate system + deterministic posture contract / PART 186 the 9-key sculptRuntime contract + 5 Actions API + per-frame tick + 9 SportMotorcycleOpts / PART 187 look-dev lighting factory `createSportMotorcycleModelLookDevLights(mode)` with 'reference' / 'grazing' / 'neutral' modes + 2048 shadow map contract / PART 188 ~8 500 triangle target + 8 architectural patterns (factory + options object + runtime contract + modular builder + named registry + action/command + deterministic procedural + zero-dependency standalone) / PART 189 the 5-field style + LBL version stamp pair). PART 180-189 is purely additive — PART 1-179 still works exactly as before. See CHANGES_v134.md.
 ================================================================================
 
 ================================================================================
@@ -25033,6 +25034,17 @@ CHANGES_v133.md for the full v1.33 / v8.24 release notes.
 >>> documents; see them for the full technique vocabulary and
 >>> pipeline steps.
 >>>
+>>> v1.34 / v8.25 DE-DUP NOTE — PART 180-189 (Chunky 3D Sport
+>>> Motorcycle Reference Specification) is canonically documented
+>>> in THIS file (Prompt_To_Ts.txt) AND mirrored byte-identical in
+>>> SportMotorcycle_3D_Techniques_Specification.txt at repo root
+>>> (the user-supplied authoritative 10-section source of truth).
+>>> The 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt
+>>> / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt)
+>>> reference this file for PART 180-189. If the .txt and the PART
+>>> 180-189 sections ever diverge, the .txt wins (and a CHANGES
+>>> entry is opened) — see RULE 180.0.1.
+>>>
 
 ================================================================================
 END OF PART 145-152
@@ -26369,4 +26381,812 @@ release notes.
 
 ================================================================================
 END OF PART 167-179
+================================================================================
+
+================================================================================
+PART 180-189 — v1.34 / v8.25 ADDITIONS: CHUNKY 3D SPORT MOTORCYCLE
+(SUPERBIKE) TECHNIQUES & TECHNOLOGIES SPECIFICATION
+================================================================================
+
+PART 180-189 is the missing **reference specification layer** that turns
+the Chunky 3D Sport Motorcycle from a summary-level worked example
+(PART 177) into a fully-authoritative 10-section specification that
+the AI factory + every future chunky-mascot / smooth-3D-vinyl-clay
+vehicle can be authored against. PART 177 named the bike as a worked
+example at the pivot-tree + material + lighting + validation summary
+level; PART 180-189 is the **deep-dive specification** for the same
+canonical reference (`source: createSportMotorcycleModel.ts`, reference
+image `bd5da92411032501f007edb073f06372.jpg`, style `chunky-mascot`).
+
+The authoritative source-of-truth document is
+`SportMotorcycle_3D_Techniques_Specification.txt` at repo root — it is
+the user-supplied 10-section spec that PART 180-189 codifies inside
+the LBL spec system. PART 180-189 is purely additive — PART 1-179
++ the 9 PART 167-178 helpers + the 3 PART 179.2-179.4 helpers all
+still work exactly as before. See CHANGES_v134.md for the full v1.34
+/ v8.25 release notes.
+
+PART 180 — 10-SECTION SPEC LAYOUT
+  PART 180-189 mirrors the 10 numbered sections in
+  SportMotorcycle_3D_Techniques_Specification.txt:
+
+    SECTION  SUBJECT                                LBL COVERAGE
+    -------  --------------------------------------  --------------
+    1        CORE TECHNOLOGIES                       PART 181
+    2        3D MODELING TECHNIQUES                  PART 182
+    3        MATERIALS & SHADING                     PART 183
+    4        COMPONENT ARCHITECTURE                  PART 184
+    5        COORDINATE SYSTEM & PROPORTIONS         PART 185
+    6        RUNTIME / ANIMATION                     PART 186
+    7        LIGHTING                                PART 187
+    8        ARCHITECTURAL & DESIGN PATTERNS         PART 188
+    9        PERFORMANCE & TARGET METRICS           PART 188
+    10       STYLE & SPECIFICATION METADATA          PART 189
+
+  PART 180 is the LBL-version contract that declares the reference
+  belongs to v1.34 / v8.25, paired with the
+  `SportMotorcycle_3D_Techniques_Specification.txt` source-of-truth
+  at repo root.
+
+  RULE 180.0.1 — Reference Authority. The
+  `SportMotorcycle_3D_Techniques_Specification.txt` document at repo
+  root is the AUTHORITATIVE source of truth for PART 180-189. The
+  PART 180-189 sections in this file are codifications, not
+  deviations. If they ever diverge, the .txt wins (and a CHANGES
+  entry is opened). Every PART 181-189 section in this file
+  cross-references the matching .txt section number.
+
+  RULE 180.0.2 — Generalisation Beyond the Sport Motorcycle.
+  PART 180-189 is named for the Sport Motorcycle because that is the
+  source reference, but its rules generalise to ANY chunky-mascot /
+  smooth-3D-vinyl-clay vehicle model whose source reference is a
+  single reference image. PART 180-189 does NOT cover low-poly
+  faithful-canon / photoreal / voxel styles (those stay under the
+  PART 167-178 + PART 145-152 generic pipelines).
+
+PART 181 — CORE TECHNOLOGIES STACK
+  Every chunky 3D sport-motorcycle reference model declared under
+  PART 180-189 MUST declare + use exactly the following 6 core
+  technologies:
+
+    1.  Three.js — the only WebGL-3D library allowed.
+    2.  TypeScript — for the image-to-TS factory file
+        (`createSportMotorcycleModel.ts`).
+    3.  ES Modules — native browser ES modules (no bundler).
+    4.  WebGL — the underlying renderer, exposed via Three.js.
+    5.  Canvas 2D API — for the procedural texture generation
+        (`document.createElement('canvas')` + 2D context).
+    6.  Deterministic Seeded PRNG (Mulberry32) — for every random
+        choice (texture noise, micro-jitter, etc.).
+
+  RULE 181.0.1 — Zero External Asset Dependency.
+        The model file imports ONLY `'three'` (and any addon listed
+        by the active LBL roadmap via the import map). No
+        `THREE.SVGLoader`, no `.glb`, no `.fbx`, no `.obj`, no image
+        files. The bike is 100% procedural.
+
+  RULE 181.0.2 — Standalone ES Module.
+        The factory file is a single ES module that exports one or
+        both of:
+          - `createSportMotorcycleModel(options?: SportMotorcycleOpts)`
+            (the model factory, returning `THREE.Group`).
+          - `createSportMotorcycleModelLookDevLights(mode)`
+            (the second export, returning `{ lights: Light[],
+              shadowCatcher: Mesh }`).
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 1
+  for the authoritative technology list.
+
+PART 182 — AUTHORITATIVE GEOMETRY CATALOG
+  PART 182 codifies the mapping between every chunky-mascot part
+  category and its canonical Three.js primitive + PART 145-179
+  helper. This is the part-to-geometry lookup table that PART 177
+  had summarised but never specified piece-by-piece.
+
+  182.1  PRIMARY MODELING APPROACHES
+        - Procedural Modeling (pure code-driven geometry)
+        - Constructive Geometry / Primitive Composition
+        - Hierarchical Scene Graph Construction
+        - Modular Component Assembly (factory pattern)
+        - Low-Poly / Chunky Stylized Modeling
+        - Hard-Surface Modeling (mechanical components)
+        - Organic Panel Sculpting via 2D profile extrusion
+
+  182.2  GEOMETRY GENERATION TECHNIQUES
+        - Shape Extrusion            (THREE.Shape + ExtrudeGeometry)
+        - Bevel Extrusion            (bevelEnabled / bevelSize /
+                                      bevelThickness)
+        - Curve-based Modeling       (CatmullRomCurve3 + TubeGeometry)
+        - Parametric Spoke Pattern   (5-spoke alloy rims, PART 169.3)
+        - Hole / Cutout Creation     (Shape.holes + Path)
+        - Non-uniform Scaling        (e.g. oval exhaust canister)
+        - Geometry Rotation & Transform (common on CylinderGeometry)
+        - Deep-dish Rim Construction (stepped cylinders + torus lips)
+        - Ventilated Brake Disc      (ExtrudeGeometry with central
+                                      hole + mounting bolts)
+
+  182.3  PART-TO-PRIMITIVE LOOKUP TABLE
+        (canonical mapping — the AI factory picks from this table
+        before adding any custom geometry)
+
+        PART CATEGORY              THREE PRIMITIVE          NOTES
+        -----------------          ---------------           -----
+        Body panels / fairings     ExtrudeGeometry           bevelEnabled,
+        / tank / seat / tail /                             depth per part
+        fender / vents
+        Forks / rims / hubs /      CylinderGeometry          rotated per part
+        handlebars / exhaust
+        Tires / rim lips /         TorusGeometry             radial + tubular
+        springs / gaskets /                                segments tuned
+        clamps
+        Headlight / mirrors /      CapsuleGeometry           cap segments
+        knee recesses                                        per part
+        Bar-end weights            SphereGeometry            radius +
+                                                                  widthSegments
+        Exhaust intake transition  ConeGeometry              openEnded for
+                                                                  transition
+        Mirror glass faces         CircleGeometry            2 sides
+        Radiator grille            PlaneGeometry             1 side + texture
+        Exhaust header pipe        TubeGeometry              along
+                                                                  CatmullRomCurve3
+        Frame spars / engine /     BoxGeometry               ONLY for straight-
+        calipers / levers                                    edge structural
+                                                                  members
+        5-spoke alloy rim         Parametric spokes (PART   numSpokes=5,
+                                   169.3 RimStarPattern)    1 draw call
+        Deep-dish rim              Stepped cylinders +       2+ cylinder
+                                   torus lips                stack + 2 torus
+        Brake disc                 ExtrudeGeometry + Shape   central hole
+                                   holes                     + bolt circle
+        Complex 2D profiles /      THREE.Shape + Path.holes  outline +
+        cutouts                                                cutouts
+        Oval exhaust canister      CylinderGeometry          non-uniform
+                                   with non-uniform scale   xyz scale
+
+  RULE 182.0.1 — BoxGeometry Constraint.
+        BoxGeometry is **ONLY** allowed for straight-edge structural
+        members (frame spars / engine blocks / calipers / levers).
+        Every curved or organic body surface MUST use ExtrudeGeometry,
+        TorusGeometry, CapsuleGeometry, TubeGeometry, or LatheGeometry.
+        This rule supplements PART 167.0.2 / 169.1.2 (the v1.33
+        FORBIDDEN FAIRING GEOMETRY list) — extending the prohibition
+        to BoxGeometry so the form-preservation mandate cannot be
+        circumvented by switching back from FilletedBoxGeometry to
+        raw BoxGeometry.
+
+  RULE 182.0.2 — CylinderGeometry Constraint.
+        CylinderGeometry is allowed ONLY for rotated / non-uniformly
+        scaled structural members (forks / rims / hubs / handlebars
+        / exhaust). CylinderGeometry is PROHIBITED for primary
+        aerodynamic cowls, fuel tanks, fairings, visors, tires,
+        side panels (the v1.33 PART 167.0.2 list, plus a clause for
+        tires specifically — see PART 169.3.2 Mandatory Wheel
+        Profile Revolution).
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 2 for
+  the authoritative geometry / modeling list.
+
+PART 183 — REFERENCE MATERIALS & COLOR PALETTE
+  PART 183 codifies the 3-tier PBR material system + the 6-band
+  reference-sampled color palette + the procedural micro-roughness
+  texture rules used by every chunky 3D sport-motorcycle reference
+  model.
+
+  183.1  MATERIAL SYSTEM (3 tiers)
+
+        Tier 1 — MeshStandardMaterial
+                Used for the majority of surfaces (frame, engine,
+                tank, fairings, rims, spokes, swingarm, levers,
+                calipers, fenders). Attach PART 171 micro-roughness
+                map to .roughnessMap. .metalness + .roughness + .color
+                are the canonical PBR knobs.
+
+        Tier 2 — MeshPhysicalMaterial (Tier 1 + extras)
+                Used for the windscreen (clearcoat + transparency),
+                and any other clear-coated surface. Set .clearcoat,
+                .clearcoatRoughness, .transparent, .opacity, .depthWrite
+                together to get the see-through-but-reflective glass
+                behaviour. Mirrors use this tier too (per-instance
+                .clearcoat = 0.8).
+
+        Tier 3 — MeshBasicMaterial (no lighting)
+                Used for the exhaust nozzle interior (no shading is
+                wanted — light bounces are filtered by soot inside
+                the canister).
+
+        Emissive Materials (separate from the 3 tiers)
+                Used for the headlight (cool white 0xf2f6fb emissive
+                + warm 0xfffaec core) and the taillight (red 0xee2525
+                emissive). Set both .color and .emissive + .emissiveIntensity.
+
+  183.2  MATERIAL PROPERTIES USED
+        - Roughness + Metalness workflow (PBR standard knobs).
+        - Clearcoat + ClearcoatRoughness (Tier 2 surfaces).
+        - Transparency + Opacity + .depthWrite (windscreen + mirror
+          glass).
+        - Emissive color + Emissive intensity (headlight + taillight).
+        - Roughness Map (procedural micro-detail, see 183.3).
+
+  183.3  PROCEDURAL MICRO-ROUGHNESS TEXTURE (mulberry32, deterministic)
+        Every chunky 3D sport-motorcycle model MUST attach a procedural
+        micro-roughness map to break up artificial plastic highlights.
+        The recipe (mirrors PART 171.2):
+
+          size      = 256                       (256×256 canvas)
+          seed      = options.seed ?? 1         (Mulberry32 PRNG seed)
+          base      = 192,128,64,32             (4 base roughness values)
+          jitter    = ±32 grey-noise deltas     (seeded noise on top)
+          wrap      = THREE.RepeatWrapping
+          repeat    = texture.repeat.set(4, 4)
+          colorSpace = THREE.NoColorSpace       (roughness map is data,
+                                                  not color)
+
+        The Mulberry32 PRNG is the canonical seeded PRNG (matches
+        the LBL PART 171.1 contract). Never call `Math.random()`
+        directly — that breaks the deterministic posture contract
+        (PART 185).
+
+  183.4  REFERENCE-SAMPLED COLOR PALETTE (6 bands, locked hex values)
+        (Every value below is locked; chunky-mascot reference models
+        may extend with a 7th accent band but MUST keep these 6
+        bands untouched.)
+
+          Band                       Hex shades
+          -------                    ----------
+          Fairing Orange             0xf5821b, 0xdc6b0a, 0xff9429
+                                     (highlight / mid / shadow)
+          Charcoal (tire / frame)    0x222428, 0x2a2c32, 0x32353c,
+                                     0x1e2024, 0x363940, 0x151619
+                                     (6 shades for rim / tire / frame)
+          Accent Silver / Grey       0xb4bcc8, 0xd0d5dc, 0x2e3036,
+                                     0xd8dde5, 0x8e95a0
+                                     (5 shades for calipers /
+                                     levers / accents)
+          Headlight                  0xf2f6fb (cool white) +
+                                     0xfffaec (warm core)
+          Taillight                  0xee2525 (red emissive)
+          Shock Spring               0xf5b51b (yellow coil)
+
+        The fairing orange + the headlight warm-core is the
+        signature chunky-mascot look-and-feel; PART 187's
+        'reference' lighting mode is calibrated against this palette.
+
+  RULE 183.0.1 — Palette Authenticity.
+        The 6 bands + their hex codes are reference-sampled, not
+        invented. If the reference image is re-shot or relit, the
+        author should re-sample and open a CHANGES entry to update
+        the palette; in-flight references use the values listed
+        here.
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 3 for
+  the authoritative material + palette list.
+
+PART 184 — MODULAR COMPONENT ARCHITECTURE
+  PART 184 codifies the **8 builder functions** every chunky 3D
+  sport-motorcycle reference model declares. They are split out of
+  the main factory so each component group is independently editable,
+  replaced, or skipped. Each function takes its inputs in local-frame
+  coordinates (relative to the calling pivot), returns a THREE.Group
+  + a sub-registry of named child meshes.
+
+    Builder                          Builds
+    ------------------------------   --------------------------------
+    createChunkySportWheel(opts)     Torus tire + deep-dish rim +
+                                     5-spoke star + hub + optional
+                                     brake disc + caliper.
+                                     Calls: 182.3 (RimStar),
+                                     169.4 (BeveledWasher for disc),
+                                     179.2 (LathedTire).
+    buildFrontForkAssembly(mats)     USD inverted forks + triple
+                                     clamps + aerodynamic fender +
+                                     clip-on bars + levers.
+                                     Calls: 169.2 (TaperedTube for
+                                     fork stanchions).
+    buildFairingAndCockpit(mats)     Nose cowl + solid headlight +
+                                     bezel + low swept windscreen +
+                                     side flanks + vents + belly pan
+                                     + mirrors.
+                                     Calls: 170.2 (bezier), 183.1
+                                     (Tier 2 windscreen, Tier 1
+                                     headlight).
+    buildFuelTank(mats)              Muscular sculpted tank + knee
+                                     recesses + racing filler cap.
+                                     Calls: 179.3 (bezier-extrude),
+                                     179.5 (shape holes for the
+                                     recess).
+    buildSeatAndTailSection(mats)    Contoured saddle + upswept
+                                     ducktail cowl + LED taillight
+                                     + tail tidy.
+                                     Calls: 170.2, 170.4, 183.1
+                                     (Emissive taillight).
+    buildChassisAndEngine(mats)      Twin-spar frame + engine block
+                                     + ribs + clutch + stator covers
+                                     + radiator + mono-shock + footpegs.
+                                     Calls: PART 34 rigGraph for
+                                     the chassis_pivot,
+                                     183.1 (Tier 1 frame + Tier 1
+                                     engine).
+    buildExhaustSystem(mats)         Curved header (TubeGeometry
+                                     along CatmullRomCurve3) +
+                                     upswept oval muffler (non-
+                                     uniform-scaled CylinderGeometry)
+                                     + beveled tip (extrude) +
+                                     nozzle (MeshBasicMaterial Tier 3) +
+                                     hangers.
+                                     Calls: 179.4 (SweptTube),
+                                     179.5 (extruded muffler).
+    buildRearSwingarm(mats)          Twin arms + dropouts + cross-
+                                     brace + sprocket + chain
+                                     (decorative).
+                                     Calls: PART 34 rigGraph,
+                                     169.2 (TaperedTube cross-brace).
+
+  Each builder MUST register its named child meshes on its return
+  shape (typically `group.userData.meshes` with shape
+  `{ tire, rim, hub, disc, caliper, ... }` etc.). The main factory
+  collects all builder registries into the top-level `meshes` map
+  (PART 186.1).
+
+  RULE 184.0.1 — Builder Return Shape.
+        Every builder returns `{ group: THREE.Group, meshes: { ... },
+        sockets?: { ... }, colliders?: Box3[] }`. The factory
+        consolidates these into the `sculptRuntime` contract per
+        PART 186.1.
+
+  RULE 184.0.2 — Materials Map Parameter.
+        Every builder takes a `mats: Record<string, THREE.Material>`
+        parameter as its material source; it never instantiates
+        materials locally. This guarantees the palette (PART 183)
+        + the procedural micro-roughness map (PART 183.3) stay
+        consistent across all 8 components.
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 4 for
+  the authoritative builder-function list.
+
+PART 185 — AUTHORITATIVE COORDINATE SYSTEM & PROPORTIONS
+  PART 185 locks the chunky 3D coordinate frame + the deterministic
+  posture contract every chunky-mascot / vehicle reference model
+  uses. The frame is bike-forward: positive X points to the front of
+  the bike (headlight / nose / front wheel).
+
+    +X = Front (headlight / nose / front wheel)
+    -X = Rear  (tail / rear wheel / exhaust tip)
+    +Y = Up    (ground plane at Y = 0)
+    +Z = Right (exhaust / clutch cover / brake disc — the
+               mechanical-side of the bike)
+    -Z = Left
+
+    ORIGIN (0, 0, 0) = Ground plane midpoint BETWEEN the front
+                       and rear axles (so axles sit symmetrically
+                       on either side of the origin, and the bike
+                       spans roughly origin -1.05 m to origin
+                       +1.05 m on X for a 2.10 m wheelbase).
+
+    AXLES AT  Y ≈ 0.30 — every wheel axle is mounted at WORLD Y
+    ≈ 0.30 m so the lathed tires (with the canonical 0.27 m
+    outer radius) touch the ground at Y = 0, satisfying the
+    PART 174.4 / 168.3 ground-clearance contract.
+
+    RAKE ANGLE ON STEERING PIVOT = ~22° (matches real superbike
+    rake angles). The steering pivot Group is rotated by
+    -22° around Z once at construction time (per PART 172.3);
+    it is NOT pre-baked into per-part geometry.
+
+    LEAN-INTO-TURN DYNAMICS are driven every frame from the
+    public API's `steer(angle: number)` + `setDriveSpeed(speed:
+    number)` actions (PART 186.2). The body roll is computed as
+    a function of |steer * speed|, clamped to a maximum lean
+    angle, and applied to the chassis_pivot (per PART 172.4 +
+    PART 186.3).
+
+  RULE 185.0.1 — Deterministic Posture Contract.
+        Every wheel axle Y position is fixed at construction time
+        (Y ≈ 0.30). Every lathed tire's outer radius is fixed at
+        construction time (0.27 m outer crown radius for the
+        canonical 17-inch wheel). No "magic number" posture
+        adjustments per build; the geometry IS the posture. If you
+        need a wheel size variant, declare a new option in
+        `SportMotorcycleOpts` rather than tweaking the axle Y.
+
+  RULE 185.0.2 — Bike-Forward Frame vs Scene-Forward.
+        Bike-Forward (PART 185) is mandatory for the factory
+        output. The renderer (`index.html`) is Scene-Forward
+        (+X = right, -Z = forward) and applies a -90° rotation
+        around Y when consuming a bike; do NOT pre-rotate the
+        factory output to Scene-Forward, the renderer handles it.
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 5 for
+  the authoritative coord-system + proportions list.
+
+PART 186 — sculptRuntime RUNTIME CONTRACT
+  PART 186 codifies the 9-key runtime contract every chunky 3D sport-
+  motorcycle reference model publishes on `root.userData` (= the
+  factory's return value + `group.userData`). The contract makes
+  every bike runtime-controllable, runtime-inspectable, and
+  runtime-attachable.
+
+  186.1  THE 9-KEY CONTRACT (mandatory on root.userData)
+
+          nodes             : { [name: string]: THREE.Object3D }
+                              — the named Object3D hierarchy
+                              (chassis_pivot, steering_pivot,
+                              swingarm_pivot, wheel_front_pivot,
+                              wheel_rear_pivot, ...).
+          meshes            : { [name: string]: THREE.Mesh }
+                              — the named Mesh registry (a flat
+                              collect from every builder's meshes
+                              sub-registry per PART 184.0.1).
+          sockets           : { [name: string]: THREE.Object3D }
+                              — attachment points (headlight,
+                              exhaustTip, riderSeat, mirrorLeft,
+                              mirrorRight, fuelCap — per PART
+                              179.9 socket attachment hierarchy).
+          colliders         : { [name: string]: THREE.Box3 }
+                              — bounding volumes (one per major
+                              subassembly) for raycast + physics.
+          destructionGroups : { fairings: THREE.Object3D[],
+                              wheels:    THREE.Object3D[],
+                              exhaust:   THREE.Object3D[] }
+                              — destruction-friendly grouping so
+                              the bike can be "knocked apart" with
+                              one lookup per group.
+          materials         : { [name: string]: THREE.Material }
+                              — the material map (8 distinct PBR
+                              materials per PART 183.1) collected
+                              once at construction.
+          actions           : { [name: string]: (...args) => void }
+                              — the public API methods (PART
+                              186.2). Bound at construction so
+                              callers can do `bike.userData.
+                              actions.revEngine()`.
+          animation         : { state: { steerAngle,
+                                          driveSpeed,
+                                          leanAngle,
+                                          revs,
+                                          headlightOn },
+                              clock: THREE.Clock }
+                              — the animation state + clock.
+          vfx               : { [name: string]: { from:
+                              THREE.Object3D, particle: () => 
+                              THREE.Object3D, lifetime: number } }
+                              — VFX sockets (typically exhaustTip
+                              puff, headlight flare on toggle,
+                              brake-disc spark on rev).
+
+  186.2  PUBLIC ACTIONS API (the 5 methods of PART 186.1.actions)
+
+          revEngine()
+                Spikes `animation.state.revs` to a peak value,
+                plays the 0.5 s headlight breathing pulsation,
+                optionally emits a vfx at the exhaustTip socket
+                (PART 186.1.vfx.exhaustPuff).
+          steer(angle: number)
+                Sets the target steering angle in radians;
+                per-frame `tick` interpolates the actual
+                steering_pivot rotation towards the target.
+          setDriveSpeed(speed: number)
+                Sets the drive speed (positive = forward, negative
+                = reverse); drives the lean-angle computation in
+                `tick` (per PART 186.3).
+          toggleHeadlight(force?: boolean)
+                If `force` is provided, set the headlight on/off
+                state to that value; otherwise flip it. Updates
+                .emissive + .emissiveIntensity on the headlight
+                mesh.
+          resetPose()
+                Resets steering, drive speed, lean, and revs
+                back to defaults; smoothly interpolates the
+                bike back to its rest pose over 0.3 s.
+
+  186.3  PER-FRAME TICK SYSTEM (root.userData.tick)
+        The factory sets `root.userData.tick = (dt: number) => { ... }`
+        so the renderer's per-frame loop calls it. The tick is
+        responsible for:
+
+          - Smooth steering interpolation
+                (target → actual via lerp(dt * 4))
+          - Body lean / roll based on `steer * driveSpeed`
+                (clamped to a max lean of 30° on chassis_pivot)
+          - Wheel rotation (front + rear)
+                (rotation.z += driveSpeed * dt * wheelRadiusInverse)
+          - Engine idle vibration + rev decay
+                (chassis_pivot.position.y += sin(t * 50) * 0.0015
+                when idle; revs decay linearly toward 0)
+          - Headlight emissive breathing pulsation
+                (when `headlightOn`, .emissiveIntensity oscillates
+                by ±10% at 1 Hz so the bike looks alive)
+
+  186.4  CONFIGURABLE OPTIONS (the 9 keys of SportMotorcycleOpts)
+        The factory takes an options object with these 9 fields,
+        each with a documented default.
+
+          scale          number  = 1.0
+                                (uniform scale factor applied to
+                                the whole group; > 1 makes a big
+                                bike, < 1 a small one)
+          shadows        { cast: boolean = true,
+                          receive: boolean = true }
+                                (per-mesh .castShadow + .receiveShadow)
+          wireframe      boolean = false
+                                (diagnostic mode for inspecting
+                                triangulation)
+          fairingColor   number  = 0xf5821b
+                                (PART 183.4 Fairing Orange highlight)
+          frameColor     number  = 0x222428
+                                (PART 183.4 Charcoal)
+          accentColor    number  = 0xb4bcc8
+                                (PART 183.4 Accent Silver)
+          driveSpeed     number  = 0
+                                (initial drive speed in m/s)
+          steeringAngle  number  = 0
+                                (initial steering angle in radians)
+          idleVibration  boolean = true
+                                (enables the engine idle vibration
+                                in the tick system per PART 186.3)
+
+  RULE 186.0.1 — Runtime Contract First.
+        The `sculptRuntime` contract (PART 186.1) is published at
+        end-of-construction, just before the factory returns. The
+        factory MUST NOT return before nodes / meshes / sockets /
+        colliders / destructionGroups / materials / actions /
+        animation / vfx are all populated. AUDIT #E186 in the
+        ship checklist (PART 186.0.2) verifies this at runtime.
+
+  RULE 186.0.2 — Audit Hook (#E186).
+        At end-of-construction, run:
+          `console.assert(Object.keys(root.userData.nodes).length
+           >= 5, 'sculptRuntime.nodes missing');`
+        for ALL 9 contract keys. If any key is missing or has
+        the wrong shape, log a warning + the key name. This is
+        audit E186 in the PART 178 ship list and the new
+        PART 179.10 ship-list addendum.
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 6 for
+  the authoritative runtime contract + actions API + tick system.
+
+PART 187 — LOOK-DEV LIGHTING SYSTEM (3 MODES)
+  PART 187 codifies the second factory export
+  `createSportMotorcycleModelLookDevLights(mode)` and its 3 named
+  look-dev lighting modes. Every chunky 3D sport-motorcycle reference
+  model ships this as a sibling export so the renderer / ART team /
+  shader-tuning team can re-light the model for look-dev inspection
+  without touching the model.
+
+  187.1  THREE MODES
+
+          'reference' (DEFAULT)
+                Warm key (1.0 intensity, warm 0xffd7a5) +
+                cool fill (0.4 intensity, cool 0xbfd4ff) +
+                rim (0.3 intensity, cool 0xeaf2ff from behind).
+                This is the canonical look-dev lighting for the
+                chunky-mascot / smooth-3D-vinyl-clay aesthetic, and
+                the lighting is calibrated against the 6-band
+                palette per PART 183.4.
+
+          'grazing'
+                Single low-angle directional (0.7 intensity, warm
+                0xfff5d4) at +5° elevation, no fill, no rim. Used
+                to inspect edge contour + fillet quality + micro-
+                roughness behaviour across all surfaces.
+
+          'neutral'
+                Balanced reference illumination: 3.0 intensity
+                AmbientLight + 1.0 intensity HemisphereLight
+                (sky 0xffffff, ground 0x444444) for unbiased
+                material + colour evaluation.
+
+  187.2  SHADOW-MAP CONTRACT
+        Every look-dev mode MUST include a DirectionalLight key that
+        casts shadows with the following contract:
+
+          mapSize.width  = mapSize.height = 2048
+          bias           = -0.0005 (or the active LBL shadow bias)
+          camera.near    = 0.5
+          camera.far     = 50
+          camera.left / right / top / bottom tuned to the bike's
+          +/-1.6 m X half-extent and +/-0.8 m Z half-extent
+
+        Every major mesh (tires, fairings, frame, handlebars, seat,
+        exhaust, calipers, sprocket) MUST set `.castShadow = true`
+        AND `.receiveShadow = true`. The ground plane is a
+        `ShadowMaterial` plane at Y = 0.
+
+  187.3  RETURN SHAPE
+        The factory returns:
+          `{ lights: THREE.Light[], shadowCatcher: THREE.Mesh }`
+        The renderer adds `lights` to the scene + adds
+        `shadowCatcher` to the scene beneath the model.
+
+  RULE 187.0.1 — Mode is the ONLY knob.
+        The 3-mode contract is the only thing the look-dev lighting
+        factory exposes. No intensity sliders, no position knobs,
+        no shadow-bias adjustments in production. Anyone who needs
+        a custom look should fork the factory — not parametrize it
+        (matches the PART 173 / PART 177 philosophy).
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 7 for
+  the authoritative lighting-system spec.
+
+PART 188 — ARCHITECTURAL & PERFORMANCE TARGETS
+  PART 188 codifies (a) the 3-rule performance contract every
+  chunky 3D sport-motorcycle reference model ships + (b) the 8
+  architectural patterns every such model uses.
+
+  188.1  PERFORMANCE TARGETS
+
+          Triangle Count Target       ~8 500 triangles
+                                       (after every merge the bike
+                                       sits in this budget; merge
+                                       static body parts into one
+                                       mesh, merge fairings into
+                                       one mesh per side)
+          Shadow Cast + Receive       All major meshes (frame,
+                                       fairings, tank, seat, tail,
+                                       forks, wheels, exhaust,
+                                       handlebars)
+          Wireframe Diagnostic Mode   Available via the
+                                       `wireframe: boolean` option
+                                       per PART 186.4
+
+        Validation hooks (per PART 174) — every factory should
+        expose `userData.audits = { triangles, drawCalls, bbox,
+        groundClearance }`. The renderer MAY call these via
+        a diagnostics panel.
+
+  188.2  ARCHITECTURAL & DESIGN PATTERNS (8 locked patterns)
+
+          1. Factory Pattern
+                The model + lookDevLights are factories (functions
+                that return a configured THREE.Group / lighting
+                rig).
+          2. Options Object Pattern
+                Every factory takes an `opts` object with the 9
+                PART 186.4 keys.
+          3. Runtime Contract / UserData Extension
+                The 9-key sculptRuntime contract is published on
+                `root.userData` per PART 186.1.
+          4. Modular Builder Functions
+                The 8 PART 184 builders compose the bike.
+          5. Named Registry Pattern
+                `nodes` / `meshes` / `sockets` / `colliders` /
+                `destructionGroups` / `materials` / `vfx` are
+                all named registries keyed by string.
+          6. Action / Command Pattern
+                The 5 PART 186.2 methods (`revEngine` /
+                `steer` / `setDriveSpeed` / `toggleHeadlight` /
+                `resetPose`) are actions callable by external code.
+          7. Deterministic Procedural Generation
+                Mulberry32 PRNG everywhere (PART 183.3 + 181.0.1).
+                `Math.random()` is FORBIDDEN in the factory file.
+          8. Zero-Dependency Standalone Module
+                Only `import { ... } from 'three'` in the factory
+                file (per PART 181.0.1).
+
+  RULE 188.0.1 — Performance Contract Conformance.
+        The triangle budget (~8 500) + shadow map (2048) +
+        wireframe mode (PART 186.4) are the THREE non-negotiable
+        performance contract items. No chrome / no aesthetic
+        upgrade may push the bike over the triangle budget; if
+        you must, declare an LOD tier (PART 41-44) rather than
+        silently growing the budget.
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 8
+  + 9 for the authoritative patterns + performance list.
+
+PART 189 — STYLE METADATA + LBL VERSION STAMP
+  PART 189 codifies the 5-field style / spec metadata pair every
+  chunky 3D sport-motorcycle reference model publishes. This pair
+  is what the renderer reads to populate the `style-chip` UI
+  element, the window.lblSpec.VERSION constants, and the diagnostics
+  panel.
+
+  189.1  THE 5-FIELD PAIR (mandatory)
+
+          style-label        'chunky-mascot'
+                             (the canonical LBL style label for
+                             the smooth-3D-vinyl-clay aesthetic;
+                             matches the SPEC label on the bike in
+                             MODELING_TECHNIQUES v143+)
+          subject            'sport-motorcycle'
+                             (canonical LBL subject taxonomy;
+                             singular kebab-case)
+          source-reference   'bd5da92411032501f007edb073f06372.jpg'
+                             (the reference image filename; you
+                             may swap this for a different hash
+                             when authoring a new bike, but the
+                             field is REQUIRED and must match the
+                             reference image used)
+          reference-views    'isometric-front-right'
+                             (canonical LBL reference-view enum;
+                             the Sport Motorcycle is canonically
+                             authored against an isometric front-
+                             right 3/4 view)
+          lbl-version        'v1.34 / v8.25'
+                             (the canonical LBL version pair this
+                             model was authored against; PART 180-
+                             189 was introduced in this pair)
+
+  189.2  THE DUAL-VERSION STAMP RULE
+        The TS path uses `v1.x`; the JSON-JS path uses `v8.x`. They
+        are always released as a pair. The current canonical pair
+        as of v1.34 is `v1.34 / v8.25`.
+
+        If a future release ships in `v1.35 / v8.26`, both new
+        bike factories + every existing bike factory MUST update
+        their `lbl-version` field. The renderer validates the
+        version stamp on load and surfaces a `console.warn` if
+        the stamp is older than `lblSpec.VERSION`.
+
+  RULE 189.0.1 — Style + Subject Are Canonical Enums.
+        `chunky-mascot` is the canonical style for the Sport
+        Motorcycle. Adding new styles (e.g. `photoreal-bike` or
+        `voxel-bike`) requires a new PART in a future release;
+        PART 189 only recognises canonical enum values.
+
+  RULE 189.0.2 — Source-Reference is Required.
+        Every chunky 3D sport-motorcycle reference MUST declare a
+        `source-reference` field. A bike without a reference
+        image is an "invented" bike, not a reference-grounded one,
+        and is OUT OF SCOPE for PART 180-189 (it falls back to
+        PART 167-178 generic vehicle pipeline).
+
+  See SportMotorcycle_3D_Techniques_Specification.txt SECTION 10
+  for the authoritative style + metadata list.
+
+================================================================================
+PART 180-189 SUMMARY (THE v1.34 / v8.25 ONE-PARAGRAPH VERSION)
+================================================================================
+
+PART 180-189 is the v1.34 / v8.25 reference-specification layer
+that elevates the Chunky 3D Sport Motorcycle from a summary-level
+worked example (PART 177) into a fully authoritative 10-section
+specification. PART 180 lays out the 10-section structure mirroring
+the user-supplied `SportMotorcycle_3D_Techniques_Specification.txt`
+at repo root. PART 181 locks the 6 core technologies (Three.js /
+TypeScript / ES modules / WebGL / Canvas 2D / Mulberry32 PRNG) + the
+zero-external-asset import constraint. PART 182 publishes the
+authoritative part-to-primitive lookup table (CylinderGeometry for
+rotated structural members, ExtrudeGeometry for organic panels,
+TorusGeometry for tires and rims, CapsuleGeometry for mirrors and
+headlights, TubeGeometry for the exhaust header, BoxGeometry only
+for straight structural members) + the BoxGeometry / CylinderGeometry
+constraints that prevent form-regression. PART 183 codifies the
+3-tier material system (MeshStandardMaterial / MeshPhysicalMaterial
+with clearcoat / MeshBasicMaterial for the nozzle interior) + the
+emissive headlight + taillight + the procedural 256×256 micro-
+roughness texture with seeded Mulberry32 noise + the 6-band
+reference-sampled colour palette (fairing orange / charcoal / accent
+silver / headlight white / taillight red / shock spring yellow).
+PART 184 lists the 8 modular builder functions (createChunkySportWheel
+/ buildFrontForkAssembly / buildFairingAndCockpit / buildFuelTank /
+buildSeatAndTailSection / buildChassisAndEngine / buildExhaustSystem
+/ buildRearSwingarm) + the canonical return shape + the materials
+map parameter contract. PART 185 locks the bike-forward coordinate
+frame (+X front / -X rear / +Y up / +Z right; origin between axles;
+axles at Y ≈ 0.30; rake angle ~22°; deterministic posture contract).
+PART 186 codifies the 9-key sculptRuntime contract on `root.userData`
+(nodes / meshes / sockets / colliders / destructionGroups /
+materials / actions / animation / vfx) + the 5 Actions API methods
+(revEngine / steer / setDriveSpeed / toggleHeadlight / resetPose) +
+the per-frame Tick System + the 9 SportMotorcycleOpts fields +
+Audit #E186. PART 187 ships the look-dev lighting factory
+`createSportMotorcycleModelLookDevLights(mode)` with its 3 named
+modes ('reference' / 'grazing' / 'neutral') + the 2048 shadow map
+contract + the { lights, shadowCatcher } return shape. PART 188
+publishes the 3-rule performance contract (~8 500 triangles / shadow
+cast+receive on all major meshes / wireframe diagnostic mode) + the
+8 architectural patterns (factory + options object + runtime
+contract + modular builder + named registry + action/command +
+deterministic procedural + zero-dependency standalone). PART 189
+locks the 5-field style / spec metadata pair (style-label
+'chunky-mascot' / subject 'sport-motorcycle' / source-reference
+'image filename' / reference-views 'isometric-front-right' /
+lbl-version 'v1.34 / v8.25') + the dual-version stamp rule (TS
+v1.x paired with JSON-JS v8.x, always released together). PART
+180-189 is purely additive — PART 1-179 + the 9 PART 167-178
+helpers + the 3 PART 179 helpers all still work exactly as before.
+See CHANGES_v134.md for the full v1.34 / v8.25 release notes.
+
+================================================================================
+END OF PART 180-189
 ================================================================================

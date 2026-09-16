@@ -1,3 +1,73 @@
+# v1.34 / v8.25 — Chunky 3D Sport Motorcycle Reference Specification (2026-09-16)
+
+This release ships the **CHUNKY 3D SPORT MOTORCYCLE (SUPERBIKE)
+TECHNIQUES & TECHNOLOGIES SPECIFICATION** as a canonical top-level
+reference document, layered on top of the v1.33 / v8.24 artist-first
+form-preservation patch (PART 179). PART 180-189 codifies the 10-section
+**authoritative specification** for the Chunky Sport Motorcycle
+(`source: createSportMotorcycleModel.ts`,
+reference image: `bd5da92411032501f007edb073f06372.jpg`); it generalises
+to any vehicle whose source reference is single-image-grounded.
+See `CHANGES_v134.md` for the full release notes.
+
+What ships in this release:
+  - 10 new spec PARTs (PART 180 → PART 189) added canonically to
+    Prompt_To_Ts.txt (the 5 sibling spec files reference them).
+  - PART 180 — 10-SECTION SPEC LAYOUT (table of contents + scope
+    + LBL version contract for the new reference specification).
+  - PART 181 — CORE TECHNOLOGIES STACK (Three.js / TypeScript /
+    ES modules / WebGL / Canvas 2D / Mulberry32 PRNG + the
+    "zero external asset dependency" rule).
+  - PART 182 — AUTHORITATIVE GEOMETRY CATALOG (mapping every
+    chunky-mascot part to its canonical Three.js primitive +
+    PART 145-179 helper).
+  - PART 183 — REFERENCE MATERIALS & COLOR PALETTE (the 3-tier
+    material system + reference-sampled 6-band palette + the
+    procedural micro-roughness texture rules).
+  - PART 184 — MODULAR COMPONENT ARCHITECTURE (the 8 builder
+    functions: createChunkySportWheel / buildFrontForkAssembly /
+    buildFairingAndCockpit / buildFuelTank /
+    buildSeatAndTailSection / buildChassisAndEngine /
+    buildExhaustSystem / buildRearSwingarm).
+  - PART 185 — AUTHORITATIVE COORDINATE SYSTEM & PROPORTIONS
+    (+X front / -X rear / +Y up / +Z right; origin between the
+    axles; axles at Y ≈ 0.30; rake angle ~22°; lean-into-turn).
+  - PART 186 — sculptRuntime RUNTIME CONTRACT (the 9-key
+    contract on root.userData + 5 Actions API methods +
+    per-frame Tick System + 6 configurable options).
+  - PART 187 — LOOK-DEV LIGHTING SYSTEM (3 modes: 'reference' /
+    'grazing' / 'neutral' via
+    createSportMotorcycleModelLookDevLights(mode)).
+  - PART 188 — ARCHITECTURAL & PERFORMANCE TARGETS (~8 500 tris
+    / shadow cast+receive on all major meshes / wireframe
+    diagnostic mode; the 8 architectural patterns: factory +
+    options object + runtime contract + modular builder +
+    named registry + action/command + deterministic procedural
+    + zero-dependency standalone).
+  - PART 189 — STYLE METADATA + LBL VERSION STAMP (5-field
+    pair: style-label / subject / source-reference /
+    reference-views / lbl-version).
+  - The user-supplied authoritative source-of-truth document
+    `SportMotorcycle_3D_Techniques_Specification.txt` is dropped
+    byte-identical at repo root for repo-root discoverability.
+  - 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt /
+    Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt)
+    updated with v1.34 / v8.25 de-dup notes referencing PART
+    180-189 from Prompt_To_Ts.txt (the same relationship PART
+    167-178 has had since v1.32 and that PART 179 has had since
+    v1.33).
+  - No renderer-side changes — PART 180-189 is reference-
+    specification focused, not helper-shipment focused. The 9
+    helpers from v1.32 (PART 169.1-169.4 + PART 173-175 sub-
+    helpers) and the 3 helpers from v1.33 (PART 179.2 / 179.4)
+    are reused as-is.
+  - Renderer's #lbl-spec-chip VERSION pair theoretically could
+    be bumped from v1.33/v8.24 → v1.34/v8.25 (cosmetic).
+    Backward-compatible: every model that worked under v1.33
+    still works.
+
+---
+
 # v1.33 / v8.24 — Artist-First Geometry Flow & Form-Preservation Patch (2026-09-16)
 
 This release layers the **ARTIST-FIRST GEOMETRY FLOW & FORM-
