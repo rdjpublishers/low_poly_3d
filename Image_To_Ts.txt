@@ -1,20 +1,23 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.32 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.33 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
   PART 153-166 (v1.31 / v8.22) -- IMAGE-DRIVEN FACTORY DEFAULTS (canonical in this file): MT helper defaults, ACES auto-trigger, MAT_DB semantic lookup, style-lock flatShading+outline, imageToWorld mapping, IoU check, SDF+MarchingCubes trigger, CSG recipes, MT.core.loft, instanced rivets, PMREM/HDRI auto-enable, detail inventory, 11-step recipe with ACES, 3-variant ranking.
   PART 167-178 (v1.32 / v8.23) -- HARD-SURFACE / VEHICLE MODELING PIPELINE added canonically to Prompt_To_Ts.txt (the missing methodology layer for motorcycles / cars / planes / props with wheels / suspension / fairings); this file REFERENCES PART 167-178 from Prompt_To_Ts.txt rather than duplicating it. See CHANGES_v132.md.
+  PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 in Prompt_To_Ts.txt; fixes the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. The Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) is the OVERRIDING directive of PART 179. Image_To_Ts.txt REFERENCES PART 179 from Prompt_To_Ts.txt the same way it references PART 167-178 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v133.md.
 ================================================================================
->>> v1.32 / v8.23 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
+>>> v1.33 / v8.24 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
 >>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
 >>> documented in public/modeling/MODELING_TECHNIQUES_v143.md and CHANGES_v130.md.
 >>> PART 153-166 (image-driven factory defaults) is canonically
 >>> documented in this file (Image_To_Ts.txt). PART 167-178
 >>> (hard-surface / vehicle modeling pipeline) is canonically
->>> documented in Prompt_To_Ts.txt. The 4 sibling spec files
->>> reference these documents; see them for the full technique
->>> vocabulary and pipeline steps.
+>>> documented in Prompt_To_Ts.txt. PART 179 (artist-first geometry
+>>> flow & form-preservation patch) is canonically documented in
+>>> Prompt_To_Ts.txt. The 4 sibling spec files reference these
+>>> documents; see them for the full technique vocabulary and
+>>> pipeline steps.
 >>>
 
 ================================================================================
@@ -21596,6 +21599,24 @@ and PART 153-166 (image-driven factory defaults). PART 167-178 is
 purely additive — PART 1-166 and the 44 PART 100-143 helpers all
 still work exactly as before. See CHANGES_v132.md for the full v1.32
 release notes.
+
+In v1.33 / v8.24, PART 179 (ARTIST-FIRST GEOMETRY FLOW & FORM-
+PRESERVATION PATCH) was appended to Prompt_To_Ts.txt as a PURELY
+ADDITIVE amendment layer over PART 167-178, addressing the
+"Before vs. After" visual regression documented in
+SYSTEM_UPGRADE_SPECIFICATION.txt (2026-09-16). PART 179 establishes
+the Hierarchy of Fidelity (visual silhouette > compound contour >
+PBR tactile material > mechanical skeleton > code minification),
+injects RULE 167.1.1 / 169.1.2 / 169.3.2 into the relevant PART 167-
+178 sections, restructures PART 172.1 around the continuous
+`Body_Fairings & FuelTank` envelope group, and ships 10 new technical
+PARTs (179.1-179.10) covering procedural helpers (lathed tire /
+Catmull-Rom swept tube / exhaust canister), form-preservation
+recipes (bezier extrude / shape-hole duct / egg-visor fix), and
+generator conflict resolutions (TS1117 duplicate-key fix / single-file
+self-containment / socket attachment hierarchy). PART 179 is purely
+additive — PART 1-178 still works exactly as before. See
+CHANGES_v133.md for the full v1.33 / v8.24 release notes.
 
 ================================================================================
 END OF PART 153-166

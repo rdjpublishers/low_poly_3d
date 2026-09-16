@@ -1,6 +1,6 @@
 // MT_HARDSURFACE — Hard-surface / vehicle modeling techniques.
 //
-// Implements PART 167-178 of the LBL v1.32 / v8.23 spec:
+// Implements PART 167-179 of the LBL v1.33 / v8.24 spec:
 //
 //   PART 169 — 4 procedural primitive helpers
 //     169.1  createFilletedBoxGeometry(w, h, d, r, smooth)
@@ -24,12 +24,22 @@
 //   PART 175 — 8-section code architecture helper
 //     createHardSurfaceFactoryShell({ meta, builders, materials, palette })
 //
+//   PART 179 — v1.33 / v8.24 artist-first geometry flow &
+//   form-preservation patch — 3 new procedural helpers:
+//     179.2  createLathedTireGeometry(outerR, width, crown, taper,
+//                                       bead, segments)
+//     179.4  createSweptTube(waypoints, radius, segments,
+//                              radialSegments, type)
+//     179.4  createExhaustCanister({ inletR, bodyR, bodyLength,
+//                                     nozzleR, tipBevel, segments })
+//
 // All helpers are MIT-licensed and safe to inline into any TS / JS
 // factory without bringing in an extra dependency.
 //
 // Author: Mavis / RDJ Publishers low_poly_3d renderer surface.
-// Part of: PART 167-178 Hard-Surface / Vehicle Modeling Pipeline
-// (LBL v1.32 / v8.23).
+// Part of: PART 167-179 Hard-Surface / Vehicle Modeling Pipeline
+// (LBL v1.33 / v8.24 — v1.32 / v8.23 baseline + PART 179
+// artist-first geometry flow patch).
 
 'use strict';
 
@@ -254,6 +264,212 @@
     const geom = new THREE.LatheGeometry(pts, 24);
     geom.computeVertexNormals();
     geom.userData = { part169: 'createBeveledWasher', innerR: innerRadius, outerR: outerRadius, thickness, bevel };
+    return geom;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PART 179.2 — createLathedTireGeometry(outerR, width, crown,
+  //                                     taper, bead, segments)
+  // ──────────────────────────────────────────────────────────────────────
+  // Implements PART 179.2 — Lathed Tire Profile. A tire is NEVER a plain
+  // CylinderGeometry (RULE 169.3.2). This helper builds the tire around
+  // a Vector2(r, z) HALF-profile rotated around the wheel Z axis with
+  // THREE.LatheGeometry. The profile is constructed with:
+  //   1. Toroidal Crown — a parabolic curve across the tread width.
+  //   2. Inward Tapered Sidewalls — sidewalls pinch inward toward the rim.
+  //   3. Stepped Bead — a defined inner lip where the tire meets the
+  //      wheel rim.
+  //
+  // Signature:
+  //   createLathedTireGeometry(
+  //     outerR=0.22,           // tire outer radius (m)
+  //     width=0.12,            // tire axial width (m)
+  //     crown=0.018,           // tread crown height above the outer
+  //                              equator (m) — parabolic lift
+  //     taper=0.012,           // how much each sidewall pinches inward
+  //                              from outerR toward the rim shoulder (m)
+  //     bead=0.006,            // height of the bead step above the
+  //                              inner rim shoulder (m)
+  //     segments=24,           // LatheGeometry radial segments
+  //     crownSamples=10        // samples across the tread crown curve
+  //   ) → BufferGeometry
+  function createLathedTireGeometry(
+    outerR, width, crown, taper, bead, segments, crownSamples
+  ) {
+    if (!THREE) throw new Error('createLathedTireGeometry requires THREE');
+    outerR       = outerR       == null ? 0.22  : outerR;
+    width        = width        == null ? 0.12  : width;
+    crown        = crown        == null ? 0.018 : crown;
+    taper        = taper        == null ? 0.012 : taper;
+    bead         = bead         == null ? 0.006 : bead;
+    segments     = segments     == null ? 24    : segments;
+    crownSamples = crownSamples == null ? 10    : crownSamples;
+    // Inner shoulder radius (where the bead sits, where the rim
+    // begins). Pulled inward by `taper` from outerR so the sidewalls
+    // are concave (inward-tapered) rather than parallel.
+    const shoulderR = Math.max(0.04, outerR - taper);
+    const beadR     = Math.max(0.03, shoulderR - bead);
+    // The HALF-profile is sampled in (r, z) space where r is the
+    // radial distance from the wheel axis and z is the axial
+    // position across the tire width. We sample one side (z >= 0) and
+    // mirror to z <= 0 to get the full profile.
+    const profile = [];
+    // 1) Inner bead inner corner (the inside edge of the bead where
+    //    it touches the rim).
+    profile.push(new THREE.Vector2(beadR - bead * 0.5, 0));
+    // 2) Up over the bead shoulder to the sidewall start.
+    profile.push(new THREE.Vector2(beadR, 0));
+    profile.push(new THREE.Vector2(shoulderR, 0));
+    // 3) Outward and upward along the sidewall to the tread crown.
+    const sidewallSamples = 6;
+    for (let i = 1; i <= sidewallSamples; i++) {
+      const t = i / sidewallSamples;
+      const r = shoulderR + (outerR - shoulderR) * t;
+      const z = width * 0.5 * t;
+      profile.push(new THREE.Vector2(r, z));
+    }
+    // 4) Across the crown (top of the tire) using a parabolic arch
+    //    so the crown is rounded, not flat.
+    for (let i = 1; i <= crownSamples; i++) {
+      const t = i / crownSamples;          // 0 → 1 across the crown
+      const angle = Math.PI * (0.5 + t);   // π/2 → 3π/2 across the top
+      const r = outerR + crown * Math.sin(angle);
+      // The crown peak is at the axial center (z = width/2).
+      const z = width * 0.5;
+      profile.push(new THREE.Vector2(r, z));
+    }
+    // 5) Mirror back down the other side.
+    for (let i = sidewallSamples; i >= 1; i--) {
+      const t = i / sidewallSamples;
+      const r = shoulderR + (outerR - shoulderR) * t;
+      const z = width * 0.5 * t;
+      profile.push(new THREE.Vector2(r, z));
+    }
+    profile.push(new THREE.Vector2(shoulderR, 0));
+    profile.push(new THREE.Vector2(beadR, 0));
+    profile.push(new THREE.Vector2(beadR - bead * 0.5, 0));
+    const geom = new THREE.LatheGeometry(profile, segments);
+    geom.computeVertexNormals();
+    geom.userData = {
+      part179: 'createLathedTireGeometry',
+      outerR, width, crown, taper, bead, segments, crownSamples,
+    };
+    return geom;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PART 179.4 — createSweptTube(waypoints, radius, segments,
+  //                              radialSegments, type)
+  // ──────────────────────────────────────────────────────────────────────
+  // Implements PART 179.4 — Catmull-Rom Spline Sweeps for exhausts,
+  // tubes, and forks. Sample N 3D waypoints, pass them through a
+  // CatmullRomCurve3, and generate continuous geometry with
+  // TubeGeometry. This replaces disjointed CylinderGeometry
+  // assemblies for any tube that bends through 3+ waypoints.
+  //
+  // Signature:
+  //   createSweptTube(
+  //     waypoints,                  // Array<{x, y, z}> or Vector3[]
+  //     radius=0.025,               // tube radius (m)
+  //     segments=24,                // path subdivisions
+  //     radialSegments=12,          // tube radial subdivisions
+  //     type='centripetal'          // 'centripetal' | 'chordal' |
+  //                                   'catmullrom'
+  //   ) → BufferGeometry
+  function createSweptTube(
+    waypoints, radius, segments, radialSegments, type
+  ) {
+    if (!THREE) throw new Error('createSweptTube requires THREE');
+    if (!waypoints || waypoints.length < 2) {
+      throw new Error('createSweptTube needs at least 2 waypoints');
+    }
+    radius         = radius         == null ? 0.025 : radius;
+    segments       = segments       == null ? 24    : segments;
+    radialSegments = radialSegments == null ? 12    : radialSegments;
+    type           = type           == null ? 'centripetal' : type;
+    const v3 = waypoints.map((w) => (
+      w && w.isVector3
+        ? w
+        : new THREE.Vector3(w.x, w.y, w.z)
+    ));
+    const curve = new THREE.CatmullRomCurve3(v3, false, type);
+    const geom = new THREE.TubeGeometry(
+      curve, segments, radius, radialSegments, false
+    );
+    geom.computeVertexNormals();
+    geom.userData = {
+      part179: 'createSweptTube',
+      radius, segments, radialSegments, type,
+      waypointCount: v3.length,
+    };
+    return geom;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PART 179.4 — createExhaustCanister(opts)
+  // ──────────────────────────────────────────────────────────────────────
+  // Implements PART 179.4 — the muffler canister itself (the swept
+  // CatmullRom tube is for the header). Builds the conical inlet
+  // taper + cylindrical body + beveled twin-nozzle exhaust end-cap
+  // using a LatheGeometry profile.
+  //
+  // Signature:
+  //   createExhaustCanister({
+  //     inletR=0.045,            // inlet radius (m)
+  //     bodyR=0.075,             // body radius (m)
+  //     bodyLength=0.32,         // axial length of the body (m)
+  //     nozzleR=0.038,           // exit nozzle radius (m)
+  //     tipBevel=0.012,          // exit tip bevel size (m)
+  //     segments=32,             // LatheGeometry radial segments
+  //     inletTaperLength=0.06,   // axial length of the inlet cone (m)
+  //     nozzleLength=0.045       // axial length of the exit nozzle (m)
+  //   }) → BufferGeometry
+  function createExhaustCanister(opts) {
+    if (!THREE) throw new Error('createExhaustCanister requires THREE');
+    const o = opts || {};
+    const inletR          = o.inletR          == null ? 0.045 : o.inletR;
+    const bodyR           = o.bodyR           == null ? 0.075 : o.bodyR;
+    const bodyLength      = o.bodyLength      == null ? 0.32  : o.bodyLength;
+    const nozzleR         = o.nozzleR         == null ? 0.038 : o.nozzleR;
+    const tipBevel        = o.tipBevel        == null ? 0.012 : o.tipBevel;
+    const segments        = o.segments        == null ? 32    : o.segments;
+    const inletTaperLen   = o.inletTaperLength == null ? 0.06  : o.inletTaperLength;
+    const nozzleLen       = o.nozzleLength    == null ? 0.045 : o.nozzleLength;
+    // The profile is built left-to-right along the canister axis:
+    //   z=0          → inlet face center
+    //   z=inletTap   → inlet cone meets body
+    //   z=inTap+body → body meets exit cone
+    //   z=...+noz    → exit nozzle start
+    //   z=...+noz+tipBevel → exit tip (outermost point)
+    const profile = [];
+    let z = 0;
+    // Inlet face inner edge (closed end of the canister at the inlet).
+    profile.push(new THREE.Vector2(0.001, z));
+    z += inletTaperLen * 0.15;
+    profile.push(new THREE.Vector2(inletR * 0.5, z));
+    z += inletTaperLen * 0.85;
+    profile.push(new THREE.Vector2(inletR, z));
+    // Inlet → body smooth transition (small fillet).
+    profile.push(new THREE.Vector2(bodyR * 0.95, z + 0.005));
+    z += 0.005;
+    profile.push(new THREE.Vector2(bodyR, z));
+    z += bodyLength;
+    // Body → exit cone transition (small fillet).
+    profile.push(new THREE.Vector2(bodyR, z));
+    profile.push(new THREE.Vector2(nozzleR + tipBevel, z + nozzleLen * 0.5));
+    profile.push(new THREE.Vector2(nozzleR, z + nozzleLen));
+    // Beveled exit tip.
+    z += nozzleLen;
+    profile.push(new THREE.Vector2(nozzleR, z));
+    profile.push(new THREE.Vector2(nozzleR - tipBevel, z + tipBevel));
+    profile.push(new THREE.Vector2(0.001, z + tipBevel));
+    const geom = new THREE.LatheGeometry(profile, segments);
+    geom.computeVertexNormals();
+    geom.userData = {
+      part179: 'createExhaustCanister',
+      inletR, bodyR, bodyLength, nozzleR, tipBevel, segments,
+      inletTaperLength: inletTaperLen, nozzleLength: nozzleLen,
+    };
     return geom;
   }
 
@@ -552,13 +768,17 @@
     validateGroundClearance,
     // PART 175
     createHardSurfaceFactoryShell,
+    // PART 179 (v1.33 / v8.24 artist-first geometry flow patch)
+    createLathedTireGeometry,
+    createSweptTube,
+    createExhaustCanister,
   };
 
   if (typeof window !== 'undefined') window.MT_hardsurface = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 
   console.log(
-    '%c[MT_hardsurface]%c PART 167-178 Hard-Surface / Vehicle Modeling Pipeline loaded — 4 primitive helpers + microRoughness + 3-point rig + 4 audits + factory shell.',
+    '%c[MT_hardsurface]%c PART 167-179 Hard-Surface / Vehicle Modeling Pipeline loaded — 4 primitive helpers (PART 169) + microRoughness (PART 171) + 3-point rig (PART 173) + 4 audits (PART 174) + factory shell (PART 175) + 3 PART 179 helpers (createLathedTireGeometry / createSweptTube / createExhaustCanister — v1.33 / v8.24 artist-first geometry flow patch).',
     'background:#ff9966;color:#000;padding:2px 6px;border-radius:3px;font-weight:bold',
     'color:#ff9966'
   );

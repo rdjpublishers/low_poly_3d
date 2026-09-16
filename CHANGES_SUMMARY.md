@@ -1,3 +1,87 @@
+# v1.33 / v8.24 — Artist-First Geometry Flow & Form-Preservation Patch (2026-09-16)
+
+This release layers the **ARTIST-FIRST GEOMETRY FLOW & FORM-
+PRESERVATION PATCH** (PART 179) on top of the v1.32 / v8.23
+hard-surface pipeline (PART 167-178). PART 179 is the direct
+response to the "Before vs. After" visual regression documented
+in `SYSTEM_UPGRADE_SPECIFICATION.txt` (2026-09-16). It establishes
+the **Hierarchy of Fidelity** (visual silhouette > compound contour
+> PBR tactile material > mechanical skeleton > code minification)
+as the OVERRIDING directive of PART 167-179, and ships the 3 new
+amendment rules (RULE 167.1.1 / 169.1.2 / 169.3.2), the
+Body_Fairings & FuelTank continuous envelope group (PART 172.1.1),
+and 10 new technical PARTs (179.1-179.10) covering the procedural
+primitives (lathed tire / Catmull-Rom swept tube / exhaust
+canister), the form-preservation recipes (bezier extrude / shape-
+hole duct / egg-visor fix), and the generator conflict resolutions
+(TS1117 duplicate-key fix / single-file self-containment / socket
+attachment hierarchy).
+
+What ships in this release:
+  - 1 new spec PART (PART 179) added canonically to
+    Prompt_To_Ts.txt (the 5 sibling spec files reference it).
+  - The Hierarchy of Fidelity (top of PART 167) — 5-tier priority
+    ladder where VISUAL SILHOUETTE & CONTINUOUS SURFACE FLOW is
+    the absolute priority.
+  - RULE 167.0.1 — Structural pivots MUST be invisible structural
+    parents; they MUST NEVER chop up the continuous aesthetic
+    lines of exterior bodywork.
+  - RULE 167.0.2 — FORBIDDEN FAIRING GEOMETRY (BoxGeometry,
+    CylinderGeometry, FilletedBoxGeometry are STRICTLY FORBIDDEN
+    for primary aerodynamic cowls, fuel tanks, fairings, visors,
+    tires).
+  - RULE 167.1.1 — THE FORM PRESERVATION MANDATE (PART 167 STEP 1).
+  - RULE 169.1.2 — FILLETED BOX USAGE CONSTRAINT (PART 169.1) —
+    FilletedBoxGeometry is RE-CLASSIFIED as an internal structural
+    primitive only; PROHIBITED for fairings, cowls, fuel tanks,
+    visors, tires, side panels.
+  - RULE 169.3.2 — MANDATORY WHEEL PROFILE REVOLUTION (PART 169.3)
+    — A tire is NEVER a plain CylinderGeometry; every wheel MUST
+    feature a lathed tire with toroidal crown, inward tapered
+    sidewalls, and stepped bead. Flat cylindrical wheels FAIL
+    audit E41.
+  - PART 172.1.1 — BODY_FAIRINGS & FUELTANK ENVELOPE GROUP — the
+    visible exterior bodywork is gathered in ONE named Group so
+    the tank flows visually into the seat and side panels without
+    seams; body color / material variants apply to one node; LoD
+    swaps hide the whole envelope as one mesh.
+  - PART 179.1 — THE BOUNDARY LINE — canonical USE / DO NOT USE
+    table for createFilletedBoxGeometry.
+  - PART 179.2 — LATHED TIRE PROFILE — canonical helper
+    `MT_hardsurface.createLathedTireGeometry(outerR, width,
+    crown, taper, bead, segments)` based on LatheGeometry.
+  - PART 179.3 — BEZIER-EXTRUDE AERODYNAMIC COWLS — the Perfect
+    Shape Technique for fuel tanks, side cowls, nose cones, tail
+    cowls.
+  - PART 179.4 — CATMULL-ROM SPLINE SWEEPS for exhausts / tubes /
+    forks — canonical helpers
+    `MT_hardsurface.createSweptTube(waypoints, radius, ...)` and
+    `MT_hardsurface.createExhaustCanister({ inletR, bodyR,
+    bodyLength, nozzleR, ... })`.
+  - PART 179.5 — SHAPE HOLES & MULTI-AXIS EXTRUSIONS for ducts /
+    vents (no runtime CSG).
+  - PART 179.6 — FIXING THE "EGG VISOR" (extends PART 170.6 /
+    176.2).
+  - PART 179.7 — SINGLE-FILE SELF-CONTAINMENT VS MT_hardsurface
+    IMPORT MAPPING.
+  - PART 179.8 — TS1117 DUPLICATE-KEY FIX for
+    ExtrudeGeometryOptions.
+  - PART 179.9 — SOCKET ATTACHMENT HIERARCHY (extends PART 172 for
+    runtime sockets).
+  - PART 179.10 — PART 178 SHIP-LIST ADDENDUM (replaces STEP 6 +
+    adds STEP 12.5 Form-Preservation Audit).
+  - 3 new renderer-side helpers added to
+    `public/modeling/mt-hardsurface.js`:
+    `createLathedTireGeometry` / `createSweptTube` /
+    `createExhaustCanister`.
+  - Renderer's <meta description> + <meta keywords> + spec chip
+    title + window.lblSpec.VERSION constants bumped from
+    v1.32/v8.23 → v1.33/v8.24.
+  - Backward-compatible: PART 1-178 + the 44 PART 100-143 helpers
+    all still work exactly as before.
+
+---
+
 # v1.32 / v8.23 — Hard-Surface / Vehicle Modeling Pipeline (2026-09-15)
 
 This release layers the **HARD-SURFACE / VEHICLE MODELING PIPELINE**

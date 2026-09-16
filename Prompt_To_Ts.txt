@@ -1,10 +1,11 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.32 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.33 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
   PART 153-166 (v1.31 / v8.22) -- IMAGE-DRIVEN FACTORY DEFAULTS added canonically to Image_To_Ts.txt (this file references them); de-dup note in the header below. See CHANGES_v130.md.
   PART 167-178 (v1.32 / v8.23) -- HARD-SURFACE / VEHICLE MODELING PIPELINE added canonically to this file (the missing methodology layer for motorcycles / cars / planes / props with wheels / suspension / fairings); 8-step vehicle pipeline + dimension & clearance contract + 4 new procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques (quadratic / bezier / lathe / swept extrusion / parametric) + seeded mulberry32 micro-roughness texture + hierarchical articulation tree (steering / swingarm / wheel pivots) + 3-point studio lighting rig + self-verification runtime hooks (triangle / drawcall / bbox / ground-clearance audits) + 8-section code architecture + 10 hard-surface pitfalls with fixes + canonical worked example + 12-step ship checklist. The 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt) REFERENCE PART 167-178 from this file rather than duplicating it.
+  PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 to fix the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. Ships the "Hierarchy of Fidelity" rule (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) at the top of PART 167, RULE 167.1.1 (Form Preservation Mandate) in PART 167 STEP 1, RULE 169.1.2 (Filleted Box Usage Constraint) in PART 169.1, RULE 169.3.2 (Mandatory Wheel Profile Revolution) in PART 169.3, a restated PART 172.1 around the `Body_Fairings & FuelTank` continuous envelope group, and 10 new technical PARTs covering the lathed-tire + Catmull-Rom swept-tube + bezier-extrude fairing + shape-hole duct + TS1117 fix + socket attachment hierarchy techniques (PART 179.1-179.10). 3 new helpers (`createLathedTireGeometry` / `createSweptTube` / `createExhaustCanister`) added to `public/modeling/mt-hardsurface.js`. PART 179 is purely additive — PART 1-178 still works exactly as before. See CHANGES_v133.md.
 ================================================================================
 
 ================================================================================
@@ -25004,6 +25005,24 @@ focused). PART 167-178 is purely additive — PART 1-166 and the 44
 PART 100-143 helpers all still work exactly as before. See
 CHANGES_v132.md for the full v1.32 release notes.
 
+In v1.33 / v8.24, PART 179 (ARTIST-FIRST GEOMETRY FLOW & FORM-
+PRESERVATION PATCH) is appended to THIS file (Prompt_To_Ts.txt) as a
+PURELY ADDITIVE amendment layer over PART 167-178, addressing the
+"Before vs. After" visual regression documented in
+SYSTEM_UPGRADE_SPECIFICATION.txt (2026-09-16). PART 179 establishes
+the Hierarchy of Fidelity (visual silhouette > compound contour >
+PBR tactile material > mechanical skeleton > code minification),
+injects RULE 167.1.1 / 169.1.2 / 169.3.2 into the relevant PART 167-
+178 sections, restructures PART 172.1 around the continuous
+`Body_Fairings & FuelTank` envelope group, and ships 10 new technical
+PARTs (179.1-179.10) covering procedural helpers (lathed tire /
+Catmull-Rom swept tube / exhaust canister), form-preservation
+recipes (bezier extrude / shape-hole duct / egg-visor fix), and
+generator conflict resolutions (TS1117 duplicate-key fix / single-file
+self-containment / socket attachment hierarchy). PART 179 is purely
+additive — PART 1-178 still works exactly as before. See
+CHANGES_v133.md for the full v1.33 / v8.24 release notes.
+
 >>> v1.31 / v8.22 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
 >>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
 >>> documented in public/modeling/MODELING_TECHNIQUES_v143.md and CHANGES_v130.md.
@@ -25025,6 +25044,9 @@ END OF PART 75-89
 ================================================================================
 PART 167 — v1.32 / v8.23 ADDITIONS: HARD-SURFACE / VEHICLE MODELING
 PIPELINE
+(v1.33 / v8.24 PATCH OVERLAY — see PART 179 below for the
+Artist-First Geometry Flow rule + the Hierarchy of Fidelity that
+governs the entire PART 167-178 section)
 ================================================================================
 
 PART 167-178 is the missing VEHICLE / PROP / HARD-SURFACE methodology layer
@@ -25101,6 +25123,37 @@ PART 167-178 is purely additive guidance for the AI factory.
 PART 167 — THE 8-STEP VEHICLE PIPELINE (the orchestration)
 ================================================================================
 
+┌─────────────────────────────────────────────────────────────────────────┐
+│ HIERARCHY OF FIDELITY (v1.33 / v8.24 — Artist-First Geometry Flow Rule) │
+│ ─────────────────────────────────────────────────────────────────────── │
+│   1. VISUAL SILHOUETTE & CONTINUOUS SURFACE FLOW  (Absolute Priority)   │
+│   2. COMPOUND CONTOUR PROCEDURAL TECHNIQUE        (Lathe / Bezier)     │
+│   3. PBR TACTILE MATERIAL SHADING                 (Micro-roughness)    │
+│   4. MECHANICAL SKELETON & PIVOT HIERARCHY                              │
+│   5. CODE MINIFICATION & PARAMETRIC HELPERS                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+This hierarchy is the OVERRIDING directive of PART 167-179. When two
+rules conflict (e.g. "filleted-box everything" vs. "preserve the
+fuel-tank-to-seat flow line"), the rule higher in the table wins.
+Particularly: a model with every PART 172 pivot correctly named but
+visually broken into boxy disjointed subassemblies is REJECTED. Form
+flow and silhouette fidelity come first.
+
+Rule 167.0.1  Structural pivots MUST be invisible structural parents.
+  They MUST NEVER dictate or chop up the continuous aesthetic lines of
+  exterior bodywork. If a fuel tank visually flows into the rider seat
+  and side panels, the outer contours MUST be authored with continuous
+  matching curvature BEFORE being parented to their respective
+  operational nodes.
+
+Rule 167.0.2  FORBIDDEN FAIRING GEOMETRY.
+  `BoxGeometry`, `CylinderGeometry`, and `FilletedBoxGeometry` are
+  STRICTLY FORBIDDEN for primary aerodynamic cowls, fuel tanks,
+  fairings, visors, and tires. They MAY ONLY be used for internal
+  mechanical machinery, brackets, and structural blocks. See PART 169.1.2
+  for the canonical usage table.
+
 Apply this pipeline IN ORDER to every hard-surface / vehicle model. The
 8 steps come from the maintainer's reference build of the Chunky Sport
 Motorcycle and generalize to any mechanical hard-surface form (cars,
@@ -25115,6 +25168,15 @@ planes, robots with wheels, props with hinges, articulated vehicles).
       fairings, fuel tank, seat cowl, tail cowl, headlight bezel,
       fork stanchions, swingarm, exhaust, wheels, brake discs.
     - Identify style: chunky / sleek / sport / off-road / vintage.
+    - **RULE 167.1.1 — THE FORM PRESERVATION MANDATE (v1.33 / v8.24):**
+      Under no circumstances may the skeletal pivot tree disrupt the
+      continuous, sculpted lines of vehicle bodywork. When modeling
+      vehicles from images, prioritize compound curvature (lathed
+      profiles, bezier-curved extruded shapes, swept tubes) over
+      multi-box approximations. A model that has correct pivot names
+      but looks like assembled boxes is REJECTED. Form flow and
+      silhouette fidelity come first. (See Hierarchy of Fidelity above
+      and PART 179 for the full catalog of non-primitive techniques.)
     Output: a one-page "anatomy card" before any geometry work.
 
   STEP 2. SKELETON-FIRST.
@@ -25246,13 +25308,36 @@ them on window.MT.advanced (next to PART 67 / PART 100-143 helpers).
     - A box with rounded edges (fillet) on every corner.
     - Replaces hand-built RoundedBoxGeometry + manual scale.
     - Signature: (w, h, d, r=0.02, smoothness=4) → BufferGeometry.
-    - Use for: chassis blocks, fuel tanks, side panels, electronics
-      housings, cube-on-wheels toy bodies.
+    - Use for: chassis blocks, electronics housings, internal brackets,
+      engine crankcases, cylinder heads, transmission blocks, brake
+      calipers, triple-clamp brackets, license brackets, battery boxes,
+      radiators, structural frame cross-members, cube-on-wheels toy
+      bodies.
     - Chunk-low-poly default: smoothness = 4 (segments per corner);
       the silhouette stays angular enough for a toy look but the
       bevel catches highlights.
     - Standard fillet radius: 0.015-0.025 m. Larger = softer toy look;
       smaller = sharper industrial look.
+
+    **RULE 169.1.2 — FILLETED BOX USAGE CONSTRAINT (v1.33 / v8.24):**
+    `createFilletedBoxGeometry` is strictly classified as an INTERNAL
+    STRUCTURAL primitive. It is PROHIBITED for fuel tanks, aerodynamic
+    fairings, streamlined cowls, aerodynamic visors, and tires.
+    The "fuel tanks, side panels" listing above from v1.32 has been
+    REMOVED in v1.33 — these surfaces are visible exterior bodywork
+    and MUST use PART 170 profile lofting and extrusions (bezier
+    curves + lathe profiles + swept extrusions).
+    Canonical decision tree:
+      Is the part a visible exterior body panel / cowl / fairing /
+        fuel tank / visor / windshield / tail cowl / nose cone / fender?
+        → YES: use PART 170 (Shape + bezierCurveTo + ExtrudeGeometry,
+              or LatheGeometry, or swept extrusion along a curve).
+        → NO (internal chassis block, engine case, bracket): use
+              createFilletedBoxGeometry.
+    The Hierarchy of Fidelity (PART 167 top) places
+    "COMPOUND CONTOUR PROCEDURAL TECHNIQUE" above
+    "CODE MINIFICATION & PARAMETRIC HELPERS" — silhouette wins over
+    helper convenience.
 
   169.2  createTaperedTube(points, startRadius, endRadius, segments)
     - A tube along a 3D path (array of THREE.Vector3) with linearly
@@ -25272,6 +25357,24 @@ them on window.MT.advanced (next to PART 67 / PART 100-143 helpers).
       → BufferGeometry (a single merged geometry with hub + ring + spokes).
     - Use for: motorcycle wheels, car wheels, gear patterns, fan blades.
     - Returns a single merged BufferGeometry — 1 draw call.
+
+    **RULE 169.3.2 — MANDATORY WHEEL PROFILE REVOLUTION (v1.33 / v8.24):**
+    A tire is NEVER a plain CylinderGeometry. The rim star pattern is
+    only HALF of a wheel. Every wheel MUST feature a LATHED tire with:
+      1. Toroidal Crown: a parabolic or sinusoidal curve across the
+         tread width (`Vector2(r, z)` points revolving around the axle).
+      2. Inward Tapered Sidewalls: sidewalls that pinch inward toward
+         the rim.
+      3. Stepped Bead: a defined inner lip where the tire meets the
+         wheel rim.
+    Use the canonical helper `MT_hardsurface.createLathedTireGeometry(
+    outerR, width, crown, taper, bead)` (PART 179.3) OR build a
+    bespoke LatheGeometry profile (PART 170.3) — both are acceptable.
+    **Flat cylindrical wheels FAIL automated audit E41 (PART 174.3
+    "loft trap-warnings" / "distinct-Z test").** The v1.32 line
+    "Rim Star Pattern (PART 169.3) ... paired with createBeveledWasher
+    for drilled brake rotors" remains correct for the RIM and ROTOR;
+    the TIRE itself MUST be a lathed profile.
 
   169.4  createBeveledWasher(innerRadius, outerRadius, thickness, bevel)
     - A flat washer (annulus) with beveled inner + outer edges.
@@ -25444,32 +25547,47 @@ so that wheels don't wobble out of the axle plane when rotated
 
   172.1  CANONICAL MOTORCYCLE TREE
     Root Group (chassis_pivot, position at ground level, suspension roll)
-      ├── Static Body (no rotation, parented at chassis_pivot)
-      │     ├── Frame
-      │     ├── Engine block
-      │     ├── Fuel tank
-      │     ├── Tail cowl
-      │     ├── Headlight bezel
-      │     ├── License plate
-      │     └── Side fairings
+      ├── Body_Fairings & FuelTank (continuous outer envelope —
+      │   authored as a single continuous-contour group so the tank
+      │   flows into the seat and side panels; v1.33 PART 172.1.1)
+      ├── Engine & Transmission (filleted mechanical blocks only —
+      │   PART 169.1 usage constraint)
+      ├── ExhaustSystem (Catmull-Rom header + Lathed muffler —
+      │   PART 179.4 swept tube + PART 170.3 lathe)
       ├── Rear Suspension (swingarm_pivot at rear axle height)
       │     ├── Swingarm geometry (rotates around X for suspension
       │     │   travel, optional)
       │     ├── Rear wheel (wheel_rear_pivot, spins around Z)
-      │     │     ├── Tire
-      │     │     ├── Rim + spokes
-      │     │     ├── Brake disc (spins with wheel)
-      │     │     └── Sprocket + chain (spins with wheel)
+      │     │     ├── RearTire (LATHED toroidal crown, PART 169.3.2)
+      │     │     ├── RearRim (PART 169.3 RimStarPattern)
+      │     │     └── RearBrakeDisc (PART 169.4 BeveledWasher)
       │     └── Rear brake caliper (STATIC, NOT a child of wheel_pivot)
-      └── Steering System (steering_pivot at steering stem center)
+      └── Steering System (steering_pivot at steering stem center,
+            raked forward at 22° - 25° per PART 172.3)
             ├── Triple clamps & handlebars
-            ├── Fork stanchions (telescopic, inner + outer cylinder)
-            ├── Front mudguard
+            ├── Fork stanchions (telescopic, inner + outer cylinder,
+            │   PART 169.2 TaperedTube)
+            ├── ClipOnHandlebars & AeroMirrors
+            ├── FrontFender / Mudguard
             └── Front wheel (wheel_front_pivot, spins around Z)
-                  ├── Tire
-                  ├── Rim + spokes
-                  ├── Brake disc (spins with wheel)
-                  └── Brake caliper (STATIC, child of fork lower)
+                  ├── FrontTire & Rim (LATHED tire + RimStar)
+                  ├── DualBrakeRotors (BeveledWasher)
+                  └── BrakeCalipers (Rigid to fork, hovering over rotor;
+                                       NOT a child of wheel_pivot)
+
+    172.1.1  BODY_FAIRINGS ENVELOPE GROUP (v1.33 / v8.24):
+      The `Body_Fairings & FuelTank` Group is a NAMED PARENT for
+      every visible exterior body panel: nose cowl, fuel tank, side
+      fairings, tail cowl, front fender, headlight bezel, license
+      bracket. Even though mechanical pivots (steering / swingarm /
+      wheel) live as siblings under `chassis_pivot`, the visible
+      exterior envelope is gathered in ONE Group so that:
+        - The tank flows visually into the seat and side panels
+          without seams (Rule 167.0.1).
+        - Body color and material variants (PART 166) apply to one
+          node, not 6.
+        - LoD swaps (PART 145 STEP 8) hide the whole envelope as one
+          mesh, not 6.
 
   172.2  PIVOT OFFSETS = MESH LENGTHS (PART 148.1 APPLIED TO VEHICLES)
     - steering_pivot.position = (headstockTopX, headstockTopY, headstockTopZ).
@@ -25997,5 +26115,258 @@ ship checklist. PART 167-178 is purely additive — PART 1-166 and the
 CHANGES_v132.md for the full v1.32 release notes.
 
 ================================================================================
-END OF PART 167-178
+PART 179 — v1.33 / v8.24 PATCH: ARTIST-FIRST GEOMETRY FLOW &
+FORM-PRESERVATION TECHNIQUES
+================================================================================
+
+PART 179 is the v1.33 / v8.24 amendment layer over PART 167-178. It
+exists to FIX the "Before vs. After" visual regression documented in
+SYSTEM_UPGRADE_SPECIFICATION.txt (2026-09-16) in which models
+generated under v1.32 lost their flowing organic fairings and
+degraded into flat-plate geometric blocks.
+
+The Hierarchy of Fidelity (top of PART 167) is the OVERRIDING rule of
+PART 179:
+  1. Visual silhouette & continuous surface flow  → absolute priority
+  2. Compound contour procedural technique         → Lathe / Bezier
+  3. PBR tactile material shading                  → micro-roughness
+  4. Mechanical skeleton & pivot hierarchy
+  5. Code minification & parametric helpers
+
+Every PART 179 technique exists to PROTECT rule #1. PART 167-178 ships
+the methodology + helpers; PART 179 ships the FORM-PRESERVATION
+PROCEDURAL TECHNIQUES + the GENERATOR CONFLICT RESOLUTIONS that the
+v1.32 reference build was missing.
+
+  179.1  THE BOUNDARY LINE — WHEN TO USE WHICH PRIMITIVE
+    USE createFilletedBoxGeometry (PART 169.1) ONLY FOR:
+      - Engine crankcases, cylinder heads, transmission blocks.
+      - Brake calipers, triple-clamp brackets, license brackets.
+      - Battery boxes, radiators, structural frame cross-members.
+      - Internal mechanical machinery and brackets.
+    DO NOT USE createFilletedBoxGeometry, BoxGeometry, or
+    CylinderGeometry FOR visible exterior fairings. Exterior fairings
+    MUST use:
+      - THREE.Shape with quadratic / cubic bezier curves +
+        ExtrudeGeometry (PART 170.1 / 170.2).
+      - Multi-axis tapered lofts or revolved profiles (LatheGeometry,
+        PART 170.3).
+      - Swept extrusions along Catmull-Rom curves (PART 179.4).
+    The full v1.32 line "Use for: chassis blocks, fuel tanks, side
+    panels, electronics housings, cube-on-wheels toy bodies" has been
+    AMENDED in v1.33 — fuel tanks and side panels are EXTERIOR and
+    MUST use PART 170 / PART 179 techniques. See PART 169.1.2 above.
+
+  179.2  LATHED TIRE PROFILE (overrides PART 169.3 for the TIRE
+         itself — see PART 169.3.2)
+    A tire is NEVER a cylinder. A high-fidelity sport tire requires:
+      1. Toroidal Crown — a parabolic or sinusoidal curve across the
+         tread width, authored as a `Vector2(r, z)` profile rotating
+         around the axle via `THREE.LatheGeometry`.
+      2. Inward Tapered Sidewalls — the outer profile z-coordinates
+         pinch inward as they approach the bead, so the sidewalls
+         are concave rather than parallel.
+      3. Stepped Bead — a defined inner lip where the tire meets the
+         wheel rim (a small `Vector2(r, z)` notch in the profile).
+    Canonical helper:
+      MT_hardsurface.createLathedTireGeometry(
+        outerR=0.22, width=0.12, crown=0.018, taper=0.012, bead=0.006,
+        segments=24) → BufferGeometry
+    The helper ships as part of the PART 179 surface in
+    `public/modeling/mt-hardsurface.js` and is also inlinable as ~30
+    lines of plain JS in any standalone factory (per PART 179.7 single-
+    file self-containment).
+
+  179.3  BEZIER-EXTRUDE AERODYNAMIC COWLS (extends PART 170.2)
+    The Perfect Shape Technique for fuel tanks, side cowls, nose
+    cones, tail cowls, and aerodynamic fairings:
+      1. Trace the front profile using cubic Bezier curves
+         (`shape.bezierCurveTo(cx2, cy2, cx3, cy3, x2, y2)`) defining
+         a swept parabolic arch that tapers at the crest.
+      2. Extrude with a subtle thickness (0.04 - 0.10 m) and beveled
+         edge (bevelEnabled: true, bevelSegments: 3, bevelSize: 0.02).
+      3. Apply per-axis scale or asymmetric control points so the
+         silhouette is NOT a uniform slab.
+    Canonical recipe:
+      const s = new THREE.Shape();
+      s.moveTo(x0, y0);
+      s.bezierCurveTo(cx1, cy1, cx2, cy2, x1, y1);
+      s.lineTo(x2, y2);
+      s.bezierCurveTo(cx3, cy3, cx4, cy4, x3, y3);
+      s.closePath();
+      const g = new THREE.ExtrudeGeometry(s, {
+        depth: 0.06, bevelEnabled: true, bevelSegments: 3,
+        bevelSize: 0.02, bevelThickness: 0.02, steps: 1,
+      });
+
+  179.4  CATMULL-ROM SPLINE SWEEPS FOR EXHAUSTS, TUBES, FORKS
+         (extends PART 169.2 / PART 170.4)
+    Never assemble an exhaust header or chassis trellis from
+    disjointed CylinderGeometry pieces. Sample 4 to 8 3D waypoints:
+      exhaust port → underbelly collector → mid-chassis sweep →
+      upswept muffler joint.
+    Pass through `new THREE.CatmullRomCurve3(waypoints, false,
+    'centripetal')` then build the geometry with
+    `new THREE.TubeGeometry(curve, 24, radius, 12, false)`.
+    For the muffler canister itself: revolve a bespoke silhouette using
+    `THREE.LatheGeometry` (PART 170.3) — conical inlet taper,
+    cylindrical body, beveled twin-nozzle exhaust end-cap. The
+    `TaperedTube` helper (PART 169.2) suffices for short lengths with
+    ≤ 2 waypoints; Catmull-Rom is REQUIRED for any tube that bends
+    through 3+ waypoints.
+    Canonical helper (added to MT_hardsurface in v1.33):
+      MT_hardsurface.createSweptTube(waypoints, radius, segments=24,
+        radialSegments=12, type='centripetal') → BufferGeometry
+      MT_hardsurface.createExhaustCanister({
+        inletR=0.045, bodyR=0.075, bodyLength=0.32,
+        nozzleR=0.038, tipBevel=0.012, segments=32 }) → BufferGeometry
+
+  179.5  SHAPE HOLES & MULTI-AXIS EXTRUSIONS FOR DUCTS & VENTS
+    Do NOT place separate triangular wedges or use runtime CSG
+    boolean subtraction (which introduces browser hitching and
+    non-manifold edges). Draw the 2D outer fairing polygon using
+    `THREE.Shape()`. Draw the inner intake vents as counter-clockwise
+    `THREE.Path()` loops. Push the vent paths into
+    `shape.holes.push(ventPath)`. Extrude with `bevelEnabled: true,
+    bevelSegments: 3, bevelSize: 0.02` to get a single watertight
+    mesh with built-in beveled duct lips that catch specular
+    highlights cleanly.
+    Canonical recipe:
+      const shape = new THREE.Shape();
+      shape.moveTo(x0, y0);
+      // ... draw outer fairing with bezier / lineTo ...
+      // hole(s):
+      const vent = new THREE.Path();
+      vent.moveTo(vx0, vy0); vent.lineTo(vx1, vy1); vent.lineTo(vx2, vy2);
+      vent.closePath();
+      shape.holes.push(vent);
+      const g = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.04, bevelEnabled: true, bevelSegments: 3,
+        bevelSize: 0.02, bevelThickness: 0.02, steps: 1,
+      });
+
+  179.6  FIXING THE "EGG VISOR" (extends PART 170.6 / PART 176.2)
+    A naive SphereGeometry partial produces a bulbous, inward-curving
+    "egg" that ruins aerodynamic lines. The Perfect Visor Technique:
+      1. Trace the front profile using cubic Bezier curves defining
+         a swept parabolic arch that tapers at the crest.
+      2. Extrude with a subtle thickness (0.03 - 0.05 m) and beveled
+         edge.
+      3. Rake backward between 40° and 55° along the X axis.
+      4. Material: `MeshPhysicalMaterial` with `transmission: 0.45`,
+         `roughness: 0.20`, `thickness: 0.08` to give realistic
+         refractive depth rather than cheap transparent opacity.
+    Notch-list:
+      - Rake angle MUST be set on the visor's local Euler X (around
+        40° - 55°, NOT 37° as in v1.32 PART 170.6 — v1.33 raises the
+        minimum to preserve the racing silhouette).
+      - Add a thin dark rubber perimeter gasket (separate small
+        `TorusGeometry` scaled non-uniformly to (1.0, 0.85, 1.0)).
+
+  179.7  SINGLE-FILE SELF-CONTAINMENT VS MT_hardsurface IMPORT
+         MAPPING
+    LBL v1.32 PART 1.1 demands zero relative imports for ship-able
+    factory files, yet the renderer exposes PART 169 helpers via
+    `window.MT_hardsurface` (or ES import maps). Resolution:
+      - For STANDALONE model files (e.g. `createSportbikeModel.ts`),
+        INLINE the 4 PART 169 helpers + `mulberry32` + the 3 PART 179
+        helpers (createLathedTireGeometry / createSweptTube /
+        createExhaustCanister) directly. Each helper is ≤ 30 lines of
+        plain JS with no external imports — easy to copy-paste into
+        the .ts factory header.
+      - When running INSIDE the full studio viewer environment,
+        BIND to `window.MT_hardsurface` as a performant fallback
+        via `if (typeof window.MT_hardsurface !== 'undefined') {
+        const createFilletedBoxGeometry = window.MT_hardsurface.
+        createFilletedBoxGeometry || inlineCreateFilletedBoxGeometry;
+        }`.
+      - The v1.33 shipped helper bundle
+        (`public/modeling/mt-hardsurface.js`) exposes both the inlined
+        JSDoc copies AND the runtime exports, so authors can copy-
+        paste from one source and ship the other.
+
+  179.8  TS1117 DUPLICATE-KEY FIX FOR ExtrudeGeometryOptions
+    When generators merge bevel options with extrude parameters,
+    accidental duplicate keys (e.g. `steps: 1` appearing twice) cause
+    fatal compiler breaks under TypeScript strict mode (`TS1117`).
+    Standard Fix:
+      - Define an immutable `ExtrudeGeometryOptions` constant via
+        `Object.freeze(...)` so duplicate keys at runtime throw
+        `TypeError: Cannot redefine property: steps`.
+      - OR use a typed helper interface:
+          interface FairingExtrudeOpts extends ExtrudeGeometryOptions {
+            steps: 1; bevelEnabled: true; bevelSegments: 3;
+            bevelSize: number; bevelThickness: number;
+          }
+      - Build every PART 179.3 / PART 179.5 extrusion through ONE
+        factory function `makeFairingGeometry(shape, depth=0.06,
+        bevel=0.02)` that internally owns the single canonical
+        `ExtrudeGeometryOptions` object — no caller can re-introduce
+        a duplicate.
+
+  179.9  SOCKET ATTACHMENT HIERARCHY (extends PART 172 for runtime
+         sockets)
+    Sockets declared in `userData.sculptRuntime.sockets` MUST NOT be
+    loose groups parented to root. They MUST be parented to their
+    operational anchor so they follow the geometry correctly:
+      `Socket_Headlight`        → parented to `NoseCowl` or
+                                   `SteeringHeadPivot`.
+      `Socket_ExhaustTip`       → parented to `ExhaustMufflerCanister`.
+      `Socket_RiderHips`        → parented to `RiderSeatGroup`.
+      `Socket_FuelCap`          → parented to `FuelTank` (which is in
+                                   the `Body_Fairings & FuelTank`
+                                   envelope group per PART 172.1.1).
+      `Socket_MirrorLeft` /
+      `Socket_MirrorRight`      → parented to `ClipOnHandlebars` (which
+                                   is under `SteeringHeadPivot`).
+    This guarantees that when the bike steers, revs, or leans on its
+    kickstand, all mounted accessories and VFX emitters follow their
+    anchors with 100% geometric precision.
+
+  179.10 PART 179 SHIP-LIST ADDENDUM (extends PART 178)
+    Replace PART 178 STEP 6 ("FAIRINGS via PART 170") with:
+      6.  FAIRINGS via PART 170 + PART 179.
+          Profile lofting (PART 170.2 bezier) for nose + tail cowls;
+          lathe (PART 170.3) for headlight bezels; swept extrusion
+          (PART 170.4) for exhaust headers; lathed tire profile
+          (PART 179.2) for wheels; Catmull-Rom swept tubes
+          (PART 179.4) for exhausts / chassis trellis; shape-hole
+          extrusions (PART 179.5) for ducts.
+    Add STEP 12.5 (between PART 178 STEP 12 and the wrap):
+      12.5 FORM-PRESERVATION AUDIT.
+            Walk the .ts factory top-down and verify every visible
+            exterior surface was authored via PART 170 / PART 179
+            (bezier / lathe / swept extrusion), NOT a box or
+            cylinder. The Hierarchy of Fidelity (PART 167 top) is
+            the ruling directive — silhouette wins over helper
+            convenience.
+
+================================================================================
+PART 167-179 SUMMARY (THE v1.33 / v8.24 ONE-PARAGRAPH VERSION)
+================================================================================
+
+PART 179 is the v1.33 / v8.24 amendment layer that prevents the
+"Before vs. After" visual regression documented in
+SYSTEM_UPGRADE_SPECIFICATION.txt. It establishes the "Artist-First
+Geometry Flow" Hierarchy of Fidelity (visual silhouette > compound
+contour > PBR tactile material > mechanical skeleton > code
+minification), injects RULE 167.1.1 (Form Preservation Mandate) into
+PART 167 STEP 1, RULE 169.1.2 (Filleted Box Usage Constraint) into
+PART 169.1, and RULE 169.3.2 (Mandatory Wheel Profile Revolution)
+into PART 169.3, restructures PART 172.1 around the
+`Body_Fairings & FuelTank` continuous envelope group, and ships 10
+new technical PARTs covering the procedural primitives
+(createLathedTireGeometry / createSweptTube / createExhaustCanister),
+the bezier-extrude fairing recipe (PART 179.3), the Catmull-Rom
+swept-tube recipe (PART 179.4), the shape-hole extrusion recipe
+(PART 179.5), the egg-visor fix (PART 179.6), the single-file self-
+containment vs MT_hardsurface import mapping (PART 179.7), the
+TS1117 duplicate-key fix (PART 179.8), the socket attachment
+hierarchy (PART 179.9), and the PART 178 ship-list addendum
+(PART 179.10). PART 179 is purely additive — PART 1-178 still works
+exactly as before. See CHANGES_v133.md for the full v1.33 / v8.24
+release notes.
+
+================================================================================
+END OF PART 167-179
 ================================================================================
