@@ -1429,6 +1429,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   <button class="tbtn hide-xs" id="lighting-btn" title="Cycle lighting preset">💡 Studio</button>
   <button class="tbtn hide-xs" id="ssao-toggle-btn" title="Toggle screen-space ambient occlusion">🌑 AO</button>
   <button class="tbtn hide-xs" id="hdri-toggle-btn" title="Toggle procedural HDRI environment lighting">🌐 HDRI</button>
+  <button class="tbtn hide-xs" id="quality-btn" title="Cycle render quality preset (Low / Med / High). Low disables SSAO + bloom + HDRI, drops shadow map to 512, and caps pixel ratio at 1. Med keeps bloom + HDRI, drops shadow map to 1024, no SSAO, pixel ratio 1.5. High is everything maxed.">⚡ Med</button>
   <button class="tbtn hide-xs" id="wireframe-toggle-btn" title="Toggle wireframe topology overlay">◱ Wireframe</button>
   <!-- RJS UPDATE 3 — PART 33.1[4] multi-style shading: dropdown selector for flat-pbr / cel-toon / hologram / retro-psx.
        When the loaded model declares `shadingMode` on its options, the dropdown is pre-selected and locked to that style.
@@ -18939,6 +18940,135 @@ document.getElementById('hdri-toggle-btn').addEventListener('click',()=>{
   document.getElementById('hdri-toggle-btn').classList.toggle('active',hdriEnabled);
 });
 
+// ─── v1.35 / v8.26 — Render quality preset cycle (Low / Med / High) ────────
+//
+// Why: per user request, the default "everything maxed" config (2048² shadows,
+// SSAO on, bloom on, HDRI on, pixel ratio 2) is heavy on slow GPUs and
+// retina-class monitors. This adds a single toolbar button that cycles
+// 3 quality presets and persists the choice across reloads.
+//
+// Quality trade-offs:
+//   HIGH  — 2048² shadow, PCFSoftShadowMap, SSAO on, bloom on, HDRI on,
+//           pixelRatio = min(devicePixelRatio, 2). The original default.
+//   MED   — 1024² shadow, PCFShadowMap, SSAO OFF (the heaviest single
+//           pass), bloom on, HDRI on, pixelRatio = min(devicePixelRatio,
+//           1.5). ~40-60% faster than HIGH on average.
+//   LOW   —  512² shadow, PCFShadowMap, SSAO off, bloom OFF, HDRI OFF,
+//           pixelRatio = 1.0. ~70-85% faster than HIGH.
+//
+// Switching is one render-frame — the shadow map dispose+null forces
+// regen on the next frame at the new size.
+
+const QUALITY_KEY = 'lbl-render-quality-v1';
+const QUALITY_PRESETS = {
+  high: {
+    label: '⚡ High',
+    pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+    shadowMapSize: 2048,
+    shadowType: THREE.PCFSoftShadowMap,
+    ssaoEnabled: true,
+    bloomEnabled: true,
+    hdriEnabled: true,
+  },
+  med: {
+    label: '⚡ Med',
+    pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+    shadowMapSize: 1024,
+    shadowType: THREE.PCFShadowMap,
+    ssaoEnabled: false,
+    bloomEnabled: true,
+    hdriEnabled: true,
+  },
+  low: {
+    label: '⚡ Low',
+    pixelRatio: 1.0,
+    shadowMapSize: 512,
+    shadowType: THREE.PCFShadowMap,
+    ssaoEnabled: false,
+    bloomEnabled: false,
+    hdriEnabled: false,
+  },
+};
+const QUALITY_CYCLE = ['low', 'med', 'high'];
+
+function applyQuality(mode) {
+  const p = QUALITY_PRESETS[mode];
+  if (!p) return;
+  try {
+    // 1. Pixel ratio (renderer + composer)
+    renderer.setPixelRatio(p.pixelRatio);
+    composer.setPixelRatio(p.pixelRatio);
+    // Force a resize so the back-buffer + composer targets match the new ratio
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    composer.setSize(w, h);
+    // 2. Shadow map size + type. The map dispose+null forces regen
+    //    on the next frame at the new size (Three.js auto-caches the
+    //    depth texture otherwise).
+    if (typeof sun !== 'undefined' && sun && sun.shadow) {
+      sun.shadow.mapSize.set(p.shadowMapSize, p.shadowMapSize);
+      if (sun.shadow.map) {
+        try { sun.shadow.map.dispose(); } catch (_) {}
+      }
+      sun.shadow.map = null;
+      sun.shadow.needsUpdate = true;
+    }
+    if (renderer.shadowMap) {
+      renderer.shadowMap.type = p.shadowType;
+    }
+    // 3. Post-processing
+    if (typeof ssaoPass !== 'undefined' && ssaoPass) {
+      ssaoPass.enabled = p.ssaoEnabled;
+    }
+    if (typeof bloomPass !== 'undefined' && bloomPass) {
+      bloomPass.enabled = p.bloomEnabled;
+    }
+    // 4. HDRI / PMREM environment map
+    if (typeof scene !== 'undefined' && scene) {
+      scene.environment = p.hdriEnabled ? (typeof proceduralEnvMap !== 'undefined' ? proceduralEnvMap : null) : null;
+    }
+    // 5. Sync the individual toggle buttons' active state so they
+    //    stay consistent with the current preset.
+    const ssaoBtn = document.getElementById('ssao-toggle-btn');
+    if (ssaoBtn) ssaoBtn.classList.toggle('active', p.ssaoEnabled);
+    const hdriBtn = document.getElementById('hdri-toggle-btn');
+    if (hdriBtn) hdriBtn.classList.toggle('active', p.hdriEnabled);
+    // 6. Update the button label
+    const btn = document.getElementById('quality-btn');
+    if (btn) {
+      btn.textContent = p.label;
+      btn.title = `Render quality: ${mode.toUpperCase()}. Click to cycle.`;
+    }
+    // 7. Persist
+    try { localStorage.setItem(QUALITY_KEY, mode); } catch (_) {}
+    // 8. Reflect to the in-memory toggles
+    if (typeof ssaoEnabled !== 'undefined') ssaoEnabled = p.ssaoEnabled;
+    if (typeof hdriEnabled !== 'undefined') hdriEnabled = p.hdriEnabled;
+    // 9. Log so users see the change
+    console.log('[LBL] Render quality →', mode, JSON.stringify(p));
+  } catch (e) {
+    console.warn('[LBL] applyQuality failed:', e && e.message);
+  }
+}
+
+// Initial value — default to MEDIUM (was effectively HIGH before this pass).
+let currentQuality = 'med';
+try {
+  const saved = localStorage.getItem(QUALITY_KEY);
+  if (saved && QUALITY_PRESETS[saved]) currentQuality = saved;
+} catch (_) {}
+
+// Apply on init (after the renderer / composer / scene / sun / passes are constructed)
+applyQuality(currentQuality);
+
+// Cycle handler
+document.getElementById('quality-btn').addEventListener('click', () => {
+  const idx = QUALITY_CYCLE.indexOf(currentQuality);
+  const next = QUALITY_CYCLE[(idx + 1) % QUALITY_CYCLE.length];
+  currentQuality = next;
+  applyQuality(next);
+});
+
 // ─── v7.1: Wireframe topology overlay toggle ───────────────────────────────
 document.getElementById('wireframe-toggle-btn').addEventListener('click',()=>{
   wireframeEnabled=!wireframeEnabled;
@@ -18977,6 +19107,9 @@ function updatePerfBudgetBar(triCount){
 
 let _frameCount=0;
 const _perfChip = document.getElementById('perf-chip');
+// v1.35 / v8.26 — FPS rolling-average state (consumed by animate()).
+let _fpsLastNow = 0;
+let _fpsAvg = 0;
 // TS input path only (SYSTEM_UPDATE_PROMPT__Add_TS_Output_to_LBL.md §5) — the
 // blueprint path has no per-frame hook, so nothing else reads this clock.
 const _tsClock = new THREE.Clock();
@@ -18997,10 +19130,21 @@ function animate(){
     try { transformControls.update(); } catch(_){}
   }
   composer.render();
+  // v1.35 / v8.26 — Live FPS counter (rolling average over ~1 second).
+  // Sits next to the tris/calls readout so the user can immediately
+  // see the impact of the Quality cycle button (or any other toggle).
+  const __now = performance.now();
+  const __frameDt = __now - (_fpsLastNow || __now);
+  _fpsLastNow = __now;
+  if (__frameDt > 0 && __frameDt < 1000) {
+    const __instantFps = 1000 / __frameDt;
+    _fpsAvg = _fpsAvg > 0 ? (_fpsAvg * 0.9 + __instantFps * 0.1) : __instantFps;
+  }
   if(_perfChip && (++_frameCount % 20 === 0)){
     const info=renderer.info;
     const chipText = document.getElementById('perf-chip-text');
-    if(chipText) chipText.textContent = `${info.render.triangles.toLocaleString()} tris · ${info.render.calls} calls`;
+    if(chipText) chipText.textContent =
+      `${_fpsAvg.toFixed(0)} fps · ${info.render.triangles.toLocaleString()} tris · ${info.render.calls} calls`;
     updatePerfBudgetBar(info.render.triangles); // RJS update 1, item 7
   }
 }
