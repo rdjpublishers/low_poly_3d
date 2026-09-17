@@ -13671,38 +13671,50 @@ function pickTsLookDevLights(mod, factoryName){
 // deliberate departures explained inline above/below: the import rewrite
 // is narrower (only the examples/jsm alias), and diagnostics are turned ON
 // so syntax errors report a real line number instead of failing silently.
+//
+// v1.35 / v8.26 perf — pre-compiled .js fast-path: when the input
+// filename ends in .js, the source is already a valid ES module
+// (compiled offline via tsc and shipped in public/models/ alongside
+// the .ts sources). We skip ts.transpileModule() entirely and go
+// straight to the blob-import step. This saves ~50-200ms per model
+// load on the common demo path.
 async function runTsBlueprint(text, filename){
-  const ts=await getTsCompiler();
+  const isPreCompiledJs = /\.js$/i.test(filename || '');
 
   // Only .ts/.mts/.cts are accepted now — no JSX.  Single compile
-  // pass with no retry / shim.
-  function tryCompile(){
-    return ts.transpileModule(text,{
-      compilerOptions:{
-        target: ts.ScriptTarget.ES2020,
-        module: ts.ModuleKind.ESNext,
-        esModuleInterop: true,
-        isolatedModules: true,
-      },
-      reportDiagnostics: true,
-    });
-  }
-
+  // pass with no retry / shim. Skipped when the input is already a
+  // pre-compiled .js (see header comment).
   let jsSrc;
-  try{
-    const out=tryCompile();
-    if(out.diagnostics && out.diagnostics.length){
-      const d=out.diagnostics[0];
-      const msg=ts.flattenDiagnosticMessageText(d.messageText, ' ');
-      if(d.file && d.start!=null){
-        const {line}=d.file.getLineAndCharacterOfPosition(d.start);
-        throw new Error(`TypeScript syntax error at line ${line+1}: ${msg}`);
-      }
-      throw new Error(`TypeScript syntax error: ${msg}`);
+  if(isPreCompiledJs){
+    jsSrc = text;
+  } else {
+    const ts=await getTsCompiler();
+    function tryCompile(){
+      return ts.transpileModule(text,{
+        compilerOptions:{
+          target: ts.ScriptTarget.ES2020,
+          module: ts.ModuleKind.ESNext,
+          esModuleInterop: true,
+          isolatedModules: true,
+        },
+        reportDiagnostics: true,
+      });
     }
-    jsSrc=out.outputText;
-  }catch(e){
-    throw /^TypeScript syntax error/.test(e.message) ? e : new Error(`TypeScript syntax error: ${e.message}`);
+    try{
+      const out=tryCompile();
+      if(out.diagnostics && out.diagnostics.length){
+        const d=out.diagnostics[0];
+        const msg=ts.flattenDiagnosticMessageText(d.messageText, ' ');
+        if(d.file && d.start!=null){
+          const {line}=d.file.getLineAndCharacterOfPosition(d.start);
+          throw new Error(`TypeScript syntax error at line ${line+1}: ${msg}`);
+        }
+        throw new Error(`TypeScript syntax error: ${msg}`);
+      }
+      jsSrc=out.outputText;
+    }catch(e){
+      throw /^TypeScript syntax error/.test(e.message) ? e : new Error(`TypeScript syntax error: ${e.message}`);
+    }
   }
 
   const resolvedSrc=rewriteImportsForRuntime(jsSrc);
@@ -15010,7 +15022,7 @@ const LBL_MODEL_STORE_BATCH = 20;
 // repo with a .ts source still loads the source for the inline editor
 // + Download Model Code button), but a zip bundle is the easiest way
 // to ship a model + rig as a single asset.
-const LBL_MODEL_STORE_EXTS  = ['ts','js','json','zip'];
+const LBL_MODEL_STORE_EXTS  = ['js','ts','json','zip'];
 let LBL_MODEL_STORE_BASES_RUNTIME = null;
 function lblModelStoreComputeBases(){
   if(LBL_MODEL_STORE_BASES_RUNTIME) return LBL_MODEL_STORE_BASES_RUNTIME;
@@ -15198,8 +15210,8 @@ async function lblModelStoreLoadByNumber(n){
   // Show the format-detection line BEFORE handing off to the parser, so
   // the user sees "Detected JSON" / "Detected TS" exactly like the
   // file-input / paste path shows.
-  const extLabel = ({js:'JS blueprint script', ts:'TypeScript factory', json:'JSON blueprint'})[found.ext] || found.ext;
-  const phase = (found.ext==='ts') ? 'compiling' : 'validating';
+  const extLabel = ({js:'JS blueprint script (pre-compiled)', ts:'TypeScript factory', json:'JSON blueprint'})[found.ext] || found.ext;
+  const phase = (found.ext==='ts') ? 'compiling' : (found.ext==='js' ? 'building' : 'validating');
   updateAllValLogs(`<span class="ok">✓ Downloaded ${lblModelStoreLoadedFilename} (${text.length.toLocaleString()} bytes)</span><br><span class="info">→ Detected ${extLabel} (${found.url.split('/').pop()})</span><br><span class="info">→ ${phase}…</span>`);
   setStatus(phase + '…', true);
   lblLoadingUpdate({ title: phase.charAt(0).toUpperCase()+phase.slice(1), message: `${extLabel} — ${text.length.toLocaleString()} bytes`, sub: `Building ${lblModelStoreLoadedFilename}…`, progress: 0.7 });
