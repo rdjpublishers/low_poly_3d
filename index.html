@@ -14374,13 +14374,36 @@ async function addTsModelToScene(group, meta, lightsGroup){
   // inverseBindMatrices are out of sync with the bones' current world
   // matrices, so even if the mesh isn't culled the skin math can land
   // every vertex at the origin.
-  group.traverse(n => {
-    if (n.isMesh && n.geometry) {
-      n.geometry.computeBoundingSphere();
-      n.geometry.computeBoundingBox();
-      if (n.skeleton) n.skeleton.update();
-    }
-  });
+  //
+  // LBL FIX (Model_5 freeze) — the bounding-sphere/box loop on a heavy
+  // model like the toy train (45 meshes, 525k verts, RoundedBoxGeometry
+  // segments=16 boxes blowing up to ~30k verts each) blocks the main
+  // thread for ~200ms straight through. Chunk it across N meshes per
+  // requestAnimationFrame tick so the browser can paint the loading
+  // spinner between chunks instead of freezing.
+  await (function __lblChunkedBoundingPass(){
+    const __meshes = [];
+    group.traverse(n => { if (n.isMesh && n.geometry) __meshes.push(n); });
+    const __chunkSize = 12;
+    let __i = 0;
+    return new Promise(resolve => {
+      const __step = () => {
+        const __end = Math.min(__i + __chunkSize, __meshes.length);
+        for (; __i < __end; __i++) {
+          const n = __meshes[__i];
+          n.geometry.computeBoundingSphere();
+          n.geometry.computeBoundingBox();
+          if (n.skeleton) n.skeleton.update();
+        }
+        if (__i < __meshes.length) {
+          requestAnimationFrame(__step);
+        } else {
+          resolve();
+        }
+      };
+      __step();
+    });
+  })();
   // LBL update H2/FIX — register every sub-mesh so the user can click and
   // select individual parts (gizmo, texture, face-texture all re-use the
   // meshMap infrastructure downstream). Skeleton / helper markers are

@@ -64,12 +64,12 @@ export function createTrainModel(options: any = {}): THREE.Group {
     // ==========================================
 
     // Red Platform Base (High segment count for perfectly smooth rounded edges)
-    const platformGeo = new RoundedBoxGeometry(6.8, 0.4, 3.2, 16, 0.15);
+    const platformGeo = new RoundedBoxGeometry(6.8, 0.4, 3.2, 8, 0.15);
     const platform = addMesh(platformGeo, materials.red, train, 'train_platform');
     platform.position.set(0, 1.4, 0);
 
     // Dark Gray Undercarriage
-    const chassisGeo = new RoundedBoxGeometry(6.4, 0.8, 2.6, 16, 0.15);
+    const chassisGeo = new RoundedBoxGeometry(6.4, 0.8, 2.6, 8, 0.15);
     const chassis = addMesh(chassisGeo, materials.darkGray, train, 'train_chassis');
     chassis.position.set(0, 0.8, 0);
 
@@ -77,18 +77,18 @@ export function createTrainModel(options: any = {}): THREE.Group {
     // 2. CABIN & ROOF
     // ==========================================
 
-    const cabinGeo = new RoundedBoxGeometry(2.4, 2.8, 2.9, 16, 0.2);
+    const cabinGeo = new RoundedBoxGeometry(2.4, 2.8, 2.9, 8, 0.2);
     const cabin = addMesh(cabinGeo, materials.red, train, 'train_cabin');
     cabin.position.set(1.8, 3.0, 0);
 
     // The roof has a slight overhang
-    const roofGeo = new RoundedBoxGeometry(2.8, 0.45, 3.3, 16, 0.15);
+    const roofGeo = new RoundedBoxGeometry(2.8, 0.45, 3.3, 8, 0.15);
     const roof = addMesh(roofGeo, materials.darkGray, train, 'train_roof');
     roof.position.set(1.8, 4.6, 0);
 
     // High-fidelity Inset Windows (Frames + Dark Glass)
-    const sideWindowGeo = new RoundedBoxGeometry(1.2, 1.3, 0.3, 16, 0.1);
-    const sideGlassGeo = new RoundedBoxGeometry(0.9, 1.0, 0.35, 16, 0.08);
+    const sideWindowGeo = new RoundedBoxGeometry(1.2, 1.3, 0.3, 8, 0.1);
+    const sideGlassGeo = new RoundedBoxGeometry(0.9, 1.0, 0.35, 8, 0.08);
 
     // Left Window
     const winFrameL = addMesh(sideWindowGeo, materials.darkGray, train, 'train_window_L_frame');
@@ -103,8 +103,8 @@ export function createTrainModel(options: any = {}): THREE.Group {
     winGlassR.position.set(1.8, 3.2, -1.4);
 
     // Back Window
-    const backWindowGeo = new RoundedBoxGeometry(0.3, 1.2, 1.6, 16, 0.1);
-    const backGlassGeo = new RoundedBoxGeometry(0.35, 0.9, 1.2, 16, 0.08);
+    const backWindowGeo = new RoundedBoxGeometry(0.3, 1.2, 1.6, 8, 0.1);
+    const backGlassGeo = new RoundedBoxGeometry(0.35, 0.9, 1.2, 8, 0.08);
     const winFrameB = addMesh(backWindowGeo, materials.darkGray, train, 'train_window_B_frame');
     winFrameB.position.set(2.95, 3.2, 0);
     const winGlassB = addMesh(backGlassGeo, materials.black, train, 'train_window_B_glass');
@@ -115,13 +115,13 @@ export function createTrainModel(options: any = {}): THREE.Group {
     // ==========================================
 
     // Main Boiler Cylinder (High radial segments)
-    const boilerGeo = new THREE.CylinderGeometry(1.15, 1.15, 3.8, 64);
+    const boilerGeo = new THREE.CylinderGeometry(1.15, 1.15, 3.8, 24);
     const boiler = addMesh(boilerGeo, materials.red, train, 'train_boiler');
     boiler.rotation.z = Math.PI / 2;
     boiler.position.set(-1.3, 2.75, 0);
 
     // Boiler Orange Stripes (Slightly larger cylinder to wrap seamlessly)
-    const stripeGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 64);
+    const stripeGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 24);
     const stripe1 = addMesh(stripeGeo, materials.orange, train, 'train_boiler_stripe_1');
     stripe1.rotation.z = Math.PI / 2;
     stripe1.position.set(-0.5, 2.75, 0);
@@ -131,13 +131,13 @@ export function createTrainModel(options: any = {}): THREE.Group {
     stripe2.position.set(-2.1, 2.75, 0);
 
     // Boiler Front Cap (Dark Gray)
-    const capGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.3, 64);
+    const capGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.3, 24);
     const cap = addMesh(capGeo, materials.darkGray, train, 'train_boiler_cap');
     cap.rotation.z = Math.PI / 2;
     cap.position.set(-3.35, 2.75, 0);
 
     // Boiler Front Center Button (Darker)
-    const buttonGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.2, 64);
+    const buttonGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.2, 24);
     const button = addMesh(buttonGeo, materials.black, train, 'train_boiler_button');
     button.rotation.z = Math.PI / 2;
     button.position.set(-3.5, 2.75, 0);
@@ -159,7 +159,7 @@ export function createTrainModel(options: any = {}): THREE.Group {
     const chimneyBase = addMesh(chimneyBaseGeo, materials.darkGray, train, 'train_chimney_base');
     chimneyBase.position.set(-2.8, 4.2, 0);
 
-    const chimneyFlareGeo = new THREE.CylinderGeometry(0.55, 0.35, 0.6, 64);
+    const chimneyFlareGeo = new THREE.CylinderGeometry(0.55, 0.35, 0.6, 24);
     const chimneyFlare = addMesh(chimneyFlareGeo, materials.darkGray, train, 'train_chimney_flare');
     chimneyFlare.position.set(-2.8, 4.9, 0);
 
@@ -172,7 +172,7 @@ export function createTrainModel(options: any = {}): THREE.Group {
     // ==========================================
 
     // We create the wedge by angling a rounded box and intersecting it with the ground/chassis
-    const cowcatcherBaseGeo = new RoundedBoxGeometry(1.2, 1.4, 2.8, 16, 0.1);
+    const cowcatcherBaseGeo = new RoundedBoxGeometry(1.2, 1.4, 2.8, 8, 0.1);
     const cowcatcherBase = addMesh(cowcatcherBaseGeo, materials.darkGray, train, 'train_cowcatcher');
     cowcatcherBase.position.set(-3.5, 0.8, 0);
     cowcatcherBase.rotation.z = -Math.PI / 5.5; // Angled forward
@@ -257,7 +257,7 @@ export function createTrainModel(options: any = {}): THREE.Group {
     // Group of highly segmented spheres merging into a cloud
     const smokeGroup = new THREE.Group();
     smokeGroup.name = 'train_smoke';
-    const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
+    const sphereGeo = new THREE.SphereGeometry(1, 16, 12);
 
     const smokeBlobs = [
         { scale: 0.35, pos: [-2.8, 5.5, 0] },
