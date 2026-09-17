@@ -13666,24 +13666,60 @@ function pickTsLookDevLights(mod, factoryName){
   return alt ? alt[1] : null;
 }
 
+// Heuristic check: does this source actually contain TypeScript-specific
+// syntax (interfaces / type aliases / enums / `as` casts / generic
+// angle-brackets / `: Type` annotations)? If NOT, the input is already
+// valid ES module JS — typically a pre-compiled .ts file (compiled via
+// tsc) — and we can skip the TS compiler entirely.
+//
+// False negatives (we think it's pure JS but it has a hidden TS-only
+// construct) would surface as a parse / import error in the next step,
+// which falls through to the normal error handler. False positives
+// (we skip compile on real TS) are impossible because the regex
+// patterns below only match TS syntax.
+//
+// The check runs BEFORE we await getTsCompiler(), so the most common
+// demo path — fetching a pre-compiled .ts file — doesn't pay the
+// multi-MB typescript@5.5 module fetch on first use either.
+function textLooksLikePureJs(text){
+  // Strip comments + string literals first so patterns inside them
+  // don't trigger false positives.
+  const stripped = text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+    .replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""');
+  // TS-only syntax markers (any one match → real TS, compile needed).
+  if (/\binterface\s+[A-Z]/.test(stripped)) return false;
+  if (/\btype\s+[A-Z]\w*\s*=/.test(stripped)) return false;
+  if (/\benum\s+[A-Z]\w*/.test(stripped)) return false;
+  if (/\bimport\s+type\b/.test(stripped)) return false;
+  if (/\bexport\s+type\b/.test(stripped)) return false;
+  if (/\bdeclare\s/.test(stripped)) return false;
+  // `: Type` annotation immediately after a closing paren or comma
+  // in a function signature. LooksLikeJS would treat these as type
+  // annotations and force a TS compile.
+  if (/\)\s*:\s*[A-Z][\w<>,\[\]\s|&]*\s*[,\){]/.test(stripped)) return false;
+  return true;
+}
+
 // text -> compiled -> imported -> invoked -> live THREE.Group. Mirrors
 // SYSTEM_UPDATE_PROMPT__Add_TS_Output_to_LBL.md §3 (steps 1-5), with two
 // deliberate departures explained inline above/below: the import rewrite
 // is narrower (only the examples/jsm alias), and diagnostics are turned ON
 // so syntax errors report a real line number instead of failing silently.
 //
-// v1.35 / v8.26 perf — pre-compiled .js fast-path: when the input
-// filename ends in .js, the source is already a valid ES module
-// (compiled offline via tsc and shipped in public/models/ alongside
-// the .ts sources). We skip ts.transpileModule() entirely and go
-// straight to the blob-import step. This saves ~50-200ms per model
-// load on the common demo path.
+// v1.35 / v8.26 perf — content-based fast-path: if the input source
+// contains no TypeScript-specific syntax markers, treat it as already-
+// compiled ES module JS and skip ts.transpileModule() entirely. This
+// is invisible to the existing workflow (the .ts source files are
+// untouched, the loader still fetches .ts first, the manifest still
+// points at .ts) but it makes any future "ship pre-compiled .ts"
+// workflow free of the ~50-200ms TS-compile step.
 async function runTsBlueprint(text, filename){
-  const isPreCompiledJs = /\.js$/i.test(filename || '');
+  const isPreCompiledJs = textLooksLikePureJs(text);
 
-  // Only .ts/.mts/.cts are accepted now — no JSX.  Single compile
-  // pass with no retry / shim. Skipped when the input is already a
-  // pre-compiled .js (see header comment).
+  // Compile only when the source actually contains TypeScript syntax.
+  // Pre-compiled .ts files (or any other plain ES module JS) skip this.
   let jsSrc;
   if(isPreCompiledJs){
     jsSrc = text;
@@ -15022,7 +15058,7 @@ const LBL_MODEL_STORE_BATCH = 20;
 // repo with a .ts source still loads the source for the inline editor
 // + Download Model Code button), but a zip bundle is the easiest way
 // to ship a model + rig as a single asset.
-const LBL_MODEL_STORE_EXTS  = ['js','ts','json','zip'];
+const LBL_MODEL_STORE_EXTS  = ['ts','js','json','zip'];
 let LBL_MODEL_STORE_BASES_RUNTIME = null;
 function lblModelStoreComputeBases(){
   if(LBL_MODEL_STORE_BASES_RUNTIME) return LBL_MODEL_STORE_BASES_RUNTIME;
@@ -15210,8 +15246,8 @@ async function lblModelStoreLoadByNumber(n){
   // Show the format-detection line BEFORE handing off to the parser, so
   // the user sees "Detected JSON" / "Detected TS" exactly like the
   // file-input / paste path shows.
-  const extLabel = ({js:'JS blueprint script (pre-compiled)', ts:'TypeScript factory', json:'JSON blueprint'})[found.ext] || found.ext;
-  const phase = (found.ext==='ts') ? 'compiling' : (found.ext==='js' ? 'building' : 'validating');
+  const extLabel = ({js:'JS blueprint script', ts:'TypeScript factory', json:'JSON blueprint'})[found.ext] || found.ext;
+  const phase = (found.ext==='ts') ? 'compiling' : 'validating';
   updateAllValLogs(`<span class="ok">✓ Downloaded ${lblModelStoreLoadedFilename} (${text.length.toLocaleString()} bytes)</span><br><span class="info">→ Detected ${extLabel} (${found.url.split('/').pop()})</span><br><span class="info">→ ${phase}…</span>`);
   setStatus(phase + '…', true);
   lblLoadingUpdate({ title: phase.charAt(0).toUpperCase()+phase.slice(1), message: `${extLabel} — ${text.length.toLocaleString()} bytes`, sub: `Building ${lblModelStoreLoadedFilename}…`, progress: 0.7 });
