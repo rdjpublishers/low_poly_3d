@@ -13606,6 +13606,90 @@ function getTsCompiler(){
   return __tsCompilerPromise;
 }
 
+// v1.35 / v8.26 — Off-main-thread TS compile Worker.
+//
+// The Worker is loaded lazily on the first .ts compile. Subsequent calls
+// reuse it. The Worker loads typescript@5.5 itself (separate from the
+// inline getTsCompiler() cache above) and runs transpileModule() off the
+// UI thread so the loading spinner keeps spinning during the 50-200ms
+// compile. Falls back to inline compile if the Worker can't start
+// (older browsers, strict CSP, file:// loads where module workers are
+// blocked, etc.) — every code path that was there before still works.
+let __tsCompileWorker = null;
+let __tsCompileWorkerPromise = null;
+let __tsCompileNextId = 1;
+const __tsCompilePending = new Map();  // id -> { resolve, reject }
+
+function ensureTsCompileWorker() {
+  if (__tsCompileWorker) return Promise.resolve(__tsCompileWorker);
+  if (__tsCompileWorkerPromise) return __tsCompileWorkerPromise;
+  __tsCompileWorkerPromise = new Promise((resolve, reject) => {
+    let worker;
+    try {
+      worker = new Worker('public/workers/ts-compile-worker.js', { type: 'module' });
+    } catch (err) {
+      // Module workers can fail to construct in environments where the
+      // browser blocks cross-origin worker scripts (some file:// loads,
+      // strict CSP, very old browsers). Mark the failure so the next
+      // call falls back to inline compile without retrying.
+      __tsCompileWorkerPromise = { __failed: true, error: err };
+      reject(err);
+      return;
+    }
+    worker.addEventListener('message', (e) => {
+      const data = e.data || {};
+      const pending = __tsCompilePending.get(data.id);
+      if (!pending) return;
+      __tsCompilePending.delete(data.id);
+      if (data.ok) {
+        pending.resolve({ ok: true, compiledSource: data.compiledSource });
+      } else {
+        pending.reject(new Error(data.error || 'TS compile worker failed'));
+      }
+    });
+    worker.addEventListener('error', (e) => {
+      // Drain all pending with the worker-level error so callers can
+      // cleanly fall back to the inline path on the next compile.
+      const msg = (e && e.message) || 'TS compile worker error';
+      for (const [id, pending] of __tsCompilePending) {
+        pending.reject(new Error(msg));
+        __tsCompilePending.delete(id);
+      }
+      // Tear down so the next call creates a fresh worker.
+      try { worker.terminate(); } catch (_) {}
+      __tsCompileWorker = null;
+      __tsCompileWorkerPromise = null;
+    });
+    __tsCompileWorker = worker;
+    resolve(worker);
+  });
+  return __tsCompileWorkerPromise;
+}
+
+async function compileInWorker(text) {
+  // Returns { ok, compiledSource } on success, throws on failure.
+  // Caller MUST catch and fall back to inline compile on throw.
+  const worker = await ensureTsCompileWorker();
+  const id = __tsCompileNextId++;
+  return new Promise((resolve, reject) => {
+    __tsCompilePending.set(id, { resolve, reject });
+    try {
+      worker.postMessage({ id, source: text });
+    } catch (err) {
+      __tsCompilePending.delete(id);
+      reject(err);
+    }
+  });
+}
+
+// Yields to the browser so the loading overlay / spinner can paint
+// before the next chunk of synchronous work. Used between compile
+// and factory invocation, and between factory invocation and scene
+// mount, so the UI never freezes for more than ~50-100ms at a stretch.
+function yieldToUi() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // Bare "three" and "three/addons/..." specifiers already resolve through
 // this page's own <script type="importmap"> (see <head>), which pins
 // Three.js r0.160.0 — the SAME module instance the rest of the renderer
@@ -13724,33 +13808,61 @@ async function runTsBlueprint(text, filename){
   if(isPreCompiledJs){
     jsSrc = text;
   } else {
-    const ts=await getTsCompiler();
-    function tryCompile(){
-      return ts.transpileModule(text,{
-        compilerOptions:{
-          target: ts.ScriptTarget.ES2020,
-          module: ts.ModuleKind.ESNext,
-          esModuleInterop: true,
-          isolatedModules: true,
-        },
-        reportDiagnostics: true,
-      });
-    }
-    try{
-      const out=tryCompile();
-      if(out.diagnostics && out.diagnostics.length){
-        const d=out.diagnostics[0];
-        const msg=ts.flattenDiagnosticMessageText(d.messageText, ' ');
-        if(d.file && d.start!=null){
-          const {line}=d.file.getLineAndCharacterOfPosition(d.start);
-          throw new Error(`TypeScript syntax error at line ${line+1}: ${msg}`);
-        }
-        throw new Error(`TypeScript syntax error: ${msg}`);
+    // v1.35 / v8.26 — Try the off-main-thread Worker first. The Worker
+    // loads typescript@5.5 itself, runs transpileModule, and posts the
+    // result back. If it can't start (old browser, strict CSP, file://,
+    // etc.) we silently fall back to the inline compile path so every
+    // existing setup keeps working.
+    let workerResult = null;
+    try {
+      workerResult = await compileInWorker(text);
+    } catch (workerErr) {
+      // Log once (the first failure is the interesting one); subsequent
+      // failures stay quiet so we don't spam the console on every load.
+      if(!window.__tsWorkerWarned){
+        console.warn('[LBL] TS compile Worker unavailable, falling back to inline compile:', workerErr && workerErr.message);
+        window.__tsWorkerWarned = true;
       }
-      jsSrc=out.outputText;
-    }catch(e){
-      throw /^TypeScript syntax error/.test(e.message) ? e : new Error(`TypeScript syntax error: ${e.message}`);
+      workerResult = null;
     }
+    if(workerResult && workerResult.ok){
+      jsSrc = workerResult.compiledSource;
+    } else {
+      // Inline fallback — same compiler, same options, same diagnostics
+      // mapping as the Worker. Identical output to what the Worker would
+      // have produced, just slower because it blocks the main thread.
+      const ts=await getTsCompiler();
+      function tryCompile(){
+        return ts.transpileModule(text,{
+          compilerOptions:{
+            target: ts.ScriptTarget.ES2020,
+            module: ts.ModuleKind.ESNext,
+            esModuleInterop: true,
+            isolatedModules: true,
+          },
+          reportDiagnostics: true,
+        });
+      }
+      try{
+        const out=tryCompile();
+        if(out.diagnostics && out.diagnostics.length){
+          const d=out.diagnostics[0];
+          const msg=ts.flattenDiagnosticMessageText(d.messageText, ' ');
+          if(d.file && d.start!=null){
+            const {line}=d.file.getLineAndCharacterOfPosition(d.start);
+            throw new Error(`TypeScript syntax error at line ${line+1}: ${msg}`);
+          }
+          throw new Error(`TypeScript syntax error: ${msg}`);
+        }
+        jsSrc=out.outputText;
+      }catch(e){
+        throw /^TypeScript syntax error/.test(e.message) ? e : new Error(`TypeScript syntax error: ${e.message}`);
+      }
+    }
+    // Yield to the UI so the loading overlay repaints between the
+    // compile step and the factory invocation below (the factory is
+    // synchronous and can run for 100-1000ms depending on the model).
+    await yieldToUi();
   }
 
   const resolvedSrc=rewriteImportsForRuntime(jsSrc);
@@ -13769,6 +13881,19 @@ async function runTsBlueprint(text, filename){
   const {fn:factory, name:factoryName}=pickTsFactory(mod, filename);
   let group;
   try{
+    // v1.35 / v8.26 — Update the loading overlay before the factory
+    // call. The factory is synchronous and can run for 100-1000ms
+    // depending on model complexity, so this is the user's last
+    // chance to see progress before the freeze.
+    try {
+      lblLoadingUpdate({
+        message: `Building ${factoryName}…`,
+        progress: 0.85,
+      });
+    } catch (_) {}
+    // Yield to the UI so the overlay paints before the synchronous
+    // factory call blocks the main thread.
+    await yieldToUi();
     group=factory({});
   }catch(e){
     throw new Error(`Factory "${factoryName}" threw while building the model: ${e.message}`);
@@ -14167,11 +14292,18 @@ function renderTsRuntimeInspector(meta, group){
   });
 }
 
-function addTsModelToScene(group, meta, lightsGroup){
+async function addTsModelToScene(group, meta, lightsGroup){
+  // v1.35 / v8.26 — converted from sync to async (callers already
+  // await validateAndBuildTs which calls this) so the UI can yield
+  // mid-mount instead of freezing for the full ~50-200ms it takes to
+  // clear the previous scene, wrap the new one, and walk the mesh
+  // registration pass.
+  //
   // Same clear sequence buildScene()/finalizeSceneBuild() use elsewhere in
   // this file (e.g. the top of buildScene()) — keeps a stale blueprint
   // mesh, contact shadow, or convex hull from an earlier scene lingering.
   sceneGroup.clear(); meshMap.clear(); sceneObjects=[]; selectedId=null;
+  await yieldToUi();
   // LBL MULTI-FILE UPDATE — also wipe every previously loaded 3D model
   // (TS-model swaps should still present a clean canvas, same as blueprint rebuilds).
   window.__lblSelectedModelIndex = null;
@@ -14321,6 +14453,10 @@ function addTsModelToScene(group, meta, lightsGroup){
   updateFormatChip('ts');
   updateGenModeChip(null); // RJS UPDATE 2 — N2: meta.generationMode only applies to JSON/JS blueprints
   setTsExclusiveUiState(true);
+  // v1.35 / v8.26 — one final yield so the loading overlay paints its
+  // 100% complete frame before this async function returns to the
+  // caller (which then dismisses the overlay).
+  await yieldToUi();
 }
 
 // v8.0 PART 5 — root-level alias flattener. Some TS factories (e.g. the
