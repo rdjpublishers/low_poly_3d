@@ -14428,37 +14428,74 @@ async function addTsModelToScene(group, meta, lightsGroup){
       // catches 25+ mechanical issues immediately. Mirror the wiring the
       // user-triggered ACES button uses.
       //
-      // LBL FIX — gate the AO bake off when the model contains
-      // SkinnedMesh. The AO bake's Möller–Trumbore raycast operates on
-      // the un-deformed POSITION attribute, but the visible mesh extent
-      // is bone-driven — so a heavily-skinned model can get AO values
-      // computed against a triangle soup that has no relation to what
-      // actually gets drawn, plus the COLOR_0 write-back then feeds
-      // garbage vertex colors into the material. Skipping AO on
-      // SkinnedMesh keeps the auto-trigger useful for static meshes
-      // (where it was designed to work) without breaking rigged models.
+      // LBL FIX — gate the AO bake off when the model doesn't benefit
+      // from it. The AO bake's Möller–Trumbore raycast operates on the
+      // un-deformed POSITION attribute, walks a 24³ uniform grid over the
+      // entire bbox, and shoots 16 samples per vertex. Cost scales with
+      // bbox-diagonal³ × vertex-count, which on a model like Model_5 (a
+      // toy train with 7 high-segment smoke spheres blowing the bbox up
+      // to ~13 units and 50k+ vertices) blocks the main thread for many
+      // seconds — long enough that the user reads it as "Model_5 doesn't
+      // render". Two cases where we skip AO:
+      //   (a) SkinnedMesh — the raycast hits un-deformed geometry, so the
+      //       AO is meaningless for bone-driven visible extent and the
+      //       COLOR_0 write-back can corrupt vertex-color-aware materials.
+      //   (b) Static models with no AnimationMixer AND no SkinnedMesh —
+      //       vehicles / props / set-pieces like Model_5 (train) and
+      //       Model_2 (supercar). These have no organic soft mass to
+      //       benefit from AO and their triangle soup is dominated by
+      //       high-segment wheel/lathe geometries that make the bake
+      //       especially slow.
+      // The 25 mechanical checks (faceted body, soft mass, missing
+      // touch connections, value order, etc.) still fire in both cases.
+      // Also defer the whole ACES run to the next macrotask so first
+      // paint can fire before the (still synchronous) checks block.
       if (typeof window.ACES !== 'undefined' && window.ACES && typeof window.ACES.run === 'function') {
         const sceneGroupLocal = (typeof sceneGroup !== 'undefined') ? sceneGroup : scene;
-        try {
-          let hasSkinned = false;
-          sceneGroupLocal.traverse(o => { if (o && o.isSkinnedMesh) hasSkinned = true; });
-          const report = window.ACES.run({
-            scene: sceneGroupLocal,
-            spec: (typeof CURRENT_TS_META !== 'undefined' && CURRENT_TS_META) ? CURRENT_TS_META.spec : undefined,
-            shading: undefined,
-            ao: hasSkinned ? false : undefined,
-            checksOpts: { autoTrigger: true }
-          });
-          if (report && report.summary) {
-            console.log('[LBL v1.31] ACES auto-trigger:', report.summary, hasSkinned ? '(AO skipped: model has SkinnedMesh)' : '');
+        const __acesGroupRef = group;
+        const __acesRunNow = () => {
+          try {
+            let hasSkinned = false;
+            let hasAnim = false;
+            sceneGroupLocal.traverse(o => { if (o && o.isSkinnedMesh) hasSkinned = true; });
+            const __ud = __acesGroupRef && __acesGroupRef.userData;
+            const __rt = __ud && __ud.sculptRuntime;
+            if (__rt && __rt.animations){
+              if (__rt.animations.mixer) hasAnim = true;
+              if (Array.isArray(__rt.animations.clips) && __rt.animations.clips.length) hasAnim = true;
+              if (Array.isArray(__rt.animations) && __rt.animations.length) hasAnim = true;
+            }
+            const skipAO = !hasSkinned && !hasAnim;
+            const report = window.ACES.run({
+              scene: sceneGroupLocal,
+              spec: (typeof CURRENT_TS_META !== 'undefined' && CURRENT_TS_META) ? CURRENT_TS_META.spec : undefined,
+              shading: undefined,
+              ao: skipAO ? false : undefined,
+              checksOpts: { autoTrigger: true }
+            });
+            const reason = hasSkinned
+              ? '(AO skipped: model has SkinnedMesh)'
+              : (skipAO ? '(AO skipped: static model, no AnimationMixer)' : '');
+            if (report && report.summary) {
+              console.log('[LBL v1.31] ACES auto-trigger:', report.summary, reason);
+            }
+            if (typeof updateFidelityChip === 'function' && report && Array.isArray(report.warnings)) {
+              const blocks = report.warnings.filter(w => w && (w.severity === 'BLOCK' || w.severity === 'block'));
+              if (blocks.length) updateFidelityChip(`ACES: ${blocks.length} BLOCK warning(s)`);
+            }
+          } catch(acesErr) {
+            // ACES is non-blocking per PART 154; never throw out of the mount path.
+            console.warn('[LBL v1.31] ACES auto-trigger skipped:', acesErr && acesErr.message);
           }
-          if (typeof updateFidelityChip === 'function' && report && Array.isArray(report.warnings)) {
-            const blocks = report.warnings.filter(w => w && (w.severity === 'BLOCK' || w.severity === 'block'));
-            if (blocks.length) updateFidelityChip(`ACES: ${blocks.length} BLOCK warning(s)`);
-          }
-        } catch(acesErr) {
-          // ACES is non-blocking per PART 154; never throw out of the mount path.
-          console.warn('[LBL v1.31] ACES auto-trigger skipped:', acesErr && acesErr.message);
+        };
+        // Defer past first paint so the model is on screen immediately
+        // and the (potentially multi-second) AO/check pass runs in the
+        // background. requestIdleCallback isn't available everywhere, so
+        // fall back to setTimeout(0).
+        if (typeof window.requestIdleCallback === 'function') {
+          window.requestIdleCallback(__acesRunNow, { timeout: 100 });
+        } else {
+          setTimeout(__acesRunNow, 0);
         }
       }
     } catch(autoErr) {
