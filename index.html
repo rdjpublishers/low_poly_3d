@@ -14364,6 +14364,23 @@ async function addTsModelToScene(group, meta, lightsGroup){
   // lblRegisterTsMeshes / lblCollectAnimations so they pick up the
   // hoisted registries and AnimationMixer auto-tick.
   lblFlattenRuntimeAliases(group);
+  // LBL FIX (SkinnedMesh bounding-sphere / skeleton update — was silently
+  // culling Model_7). The anycreature spec path already does this at
+  // line 14847-14859 below; the TS-factory path didn't. Without an
+  // up-to-date bounding sphere, Three.js frustum-culls every SkinnedMesh
+  // on first render (the auto-compute uses the un-deformed geometry,
+  // which can be a tight sphere around the bind pose that misses the
+  // actual bone-driven extent). And without `skeleton.update()`, the
+  // inverseBindMatrices are out of sync with the bones' current world
+  // matrices, so even if the mesh isn't culled the skin math can land
+  // every vertex at the origin.
+  group.traverse(n => {
+    if (n.isMesh && n.geometry) {
+      n.geometry.computeBoundingSphere();
+      n.geometry.computeBoundingBox();
+      if (n.skeleton) n.skeleton.update();
+    }
+  });
   // LBL update H2/FIX — register every sub-mesh so the user can click and
   // select individual parts (gizmo, texture, face-texture all re-use the
   // meshMap infrastructure downstream). Skeleton / helper markers are
@@ -14410,17 +14427,30 @@ async function addTsModelToScene(group, meta, lightsGroup){
       // (PART 154) — auto-run ACES so the AI-factory pass checklist
       // catches 25+ mechanical issues immediately. Mirror the wiring the
       // user-triggered ACES button uses.
+      //
+      // LBL FIX — gate the AO bake off when the model contains
+      // SkinnedMesh. The AO bake's Möller–Trumbore raycast operates on
+      // the un-deformed POSITION attribute, but the visible mesh extent
+      // is bone-driven — so a heavily-skinned model can get AO values
+      // computed against a triangle soup that has no relation to what
+      // actually gets drawn, plus the COLOR_0 write-back then feeds
+      // garbage vertex colors into the material. Skipping AO on
+      // SkinnedMesh keeps the auto-trigger useful for static meshes
+      // (where it was designed to work) without breaking rigged models.
       if (typeof window.ACES !== 'undefined' && window.ACES && typeof window.ACES.run === 'function') {
         const sceneGroupLocal = (typeof sceneGroup !== 'undefined') ? sceneGroup : scene;
         try {
+          let hasSkinned = false;
+          sceneGroupLocal.traverse(o => { if (o && o.isSkinnedMesh) hasSkinned = true; });
           const report = window.ACES.run({
             scene: sceneGroupLocal,
             spec: (typeof CURRENT_TS_META !== 'undefined' && CURRENT_TS_META) ? CURRENT_TS_META.spec : undefined,
             shading: undefined,
+            ao: hasSkinned ? false : undefined,
             checksOpts: { autoTrigger: true }
           });
           if (report && report.summary) {
-            console.log('[LBL v1.31] ACES auto-trigger:', report.summary);
+            console.log('[LBL v1.31] ACES auto-trigger:', report.summary, hasSkinned ? '(AO skipped: model has SkinnedMesh)' : '');
           }
           if (typeof updateFidelityChip === 'function' && report && Array.isArray(report.warnings)) {
             const blocks = report.warnings.filter(w => w && (w.severity === 'BLOCK' || w.severity === 'block'));
