@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.34 / v8.25 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.35 / v8.26 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
@@ -7,6 +7,7 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 167-178 (v1.32 / v8.23) -- HARD-SURFACE / VEHICLE MODELING PIPELINE added canonically to Prompt_To_Ts.txt (the missing methodology layer for motorcycles / cars / planes / props with wheels / suspension / fairings); this file REFERENCES PART 167-178 from Prompt_To_Ts.txt rather than duplicating it. See CHANGES_v132.md.
   PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 in Prompt_To_Ts.txt; fixes the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. The Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) is the OVERRIDING directive of PART 179. Image_To_Ts.txt REFERENCES PART 179 from Prompt_To_Ts.txt the same way it references PART 167-178 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v133.md.
   PART 180-189 (v1.34 / v8.25) -- CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION added canonically to Prompt_To_Ts.txt (the missing reference-specification layer for the PART 177 worked example); codifies the user-supplied `SportMotorcycle_3D_Techniques_Specification.txt` (10-section authoritative spec at repo root) as 10 numbered PARTs (PART 180 spec layout / PART 181 core technologies stack / PART 182 authoritative geometry catalog / PART 183 reference materials + 6-band palette / PART 184 the 8 builder functions / PART 185 bike-forward coordinate system / PART 186 the 9-key sculptRuntime contract + 5 Actions API + tick + 9 options / PART 187 look-dev lighting factory with 3 modes / PART 188 ~8 500 tris + 8 architectural patterns / PART 189 style + LBL version stamp pair). Image_To_Ts.txt REFERENCES PART 180-189 from Prompt_To_Ts.txt the same way it references PART 167-178 / PART 179 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v134.md.
+  PART 190-199 (v1.35 / v8.26) -- ARCHITECTURAL MODELING PIPELINE added canonically to Prompt_To_Ts.txt (the missing methodology layer for buildings / interiors / procedural architecture / landscape). Distilled from `SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt` (post-mortem on the Modern Dual-Volume Villa build, 2026-09-16). Adds `public/modeling/mt-architectural.js` (1095 lines, 8 helpers + schema linter + look-dev lights + 9-key palette on `window.MT_architectural`) + `EXAMPLES_MT_ARCHITECTURAL.md` worked examples annex. Image_To_Ts.txt REFERENCES PART 190-199 from Prompt_To_Ts.txt the same way it references PART 167-178 / PART 179 / PART 180-189 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v135.md.
 ================================================================================
 >>> v1.34 / v8.25 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
 >>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
@@ -22,6 +23,13 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 >>> SportMotorcycle_3D_Techniques_Specification.txt at repo root.
 >>> The 4 sibling spec files reference these documents; see them
 >>> for the full technique vocabulary and pipeline steps.
+>>>
+>>> v1.35 / v8.26 DE-DUP NOTE — PART 190-199 (Architectural Modeling
+>>> Pipeline) is canonically documented in Prompt_To_Ts.txt. The
+>>> bundle lives at public/modeling/mt-architectural.js (8 helpers +
+>>> schema linter + look-dev lights + 9-key palette on
+>>> window.MT_architectural) with worked examples at
+>>> public/modeling/EXAMPLES_MT_ARCHITECTURAL.md. See CHANGES_v135.md.
 >>>
 
 ================================================================================
@@ -92,7 +100,7 @@ generate output from this spec; please read them before producing code.
   CROSS-REFS
   - The full audit is in /ANALYSIS_REPORT.txt (1 145 lines, 30
     problems ranked BLOCKING / HIGH / MEDIUM / LOW).
-  - The canonical LBL version pair is now v1.30 (TS) / v8.22 (JSON-JS).
+  - The canonical LBL version pair is now v1.35 (TS) / v8.26 (JSON-JS) — bumped from v1.34 / v8.25 in the v1.35 / v8.26 PART 190-199 release (see CHANGES_v135.md).
     The renderer's #lbl-spec-chip and meta description are aligned with
     this pair; the v1.29/v8.21 known issues from the audit remain
     valid historical context but are NOT re-fixed in v1.30.

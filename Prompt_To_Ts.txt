@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.34 / v8.25 — PROMPT-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.35 / v8.26 — PROMPT-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
@@ -7,6 +7,7 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 167-178 (v1.32 / v8.23) -- HARD-SURFACE / VEHICLE MODELING PIPELINE added canonically to this file (the missing methodology layer for motorcycles / cars / planes / props with wheels / suspension / fairings); 8-step vehicle pipeline + dimension & clearance contract + 4 new procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques (quadratic / bezier / lathe / swept extrusion / parametric) + seeded mulberry32 micro-roughness texture + hierarchical articulation tree (steering / swingarm / wheel pivots) + 3-point studio lighting rig + self-verification runtime hooks (triangle / drawcall / bbox / ground-clearance audits) + 8-section code architecture + 10 hard-surface pitfalls with fixes + canonical worked example + 12-step ship checklist. The 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt) REFERENCE PART 167-178 from this file rather than duplicating it.
   PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 to fix the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. Ships the "Hierarchy of Fidelity" rule (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) at the top of PART 167, RULE 167.1.1 (Form Preservation Mandate) in PART 167 STEP 1, RULE 169.1.2 (Filleted Box Usage Constraint) in PART 169.1, RULE 169.3.2 (Mandatory Wheel Profile Revolution) in PART 169.3, a restated PART 172.1 around the `Body_Fairings & FuelTank` continuous envelope group, and 10 new technical PARTs covering the lathed-tire + Catmull-Rom swept-tube + bezier-extrude fairing + shape-hole duct + TS1117 fix + socket attachment hierarchy techniques (PART 179.1-179.10). 3 new helpers (`createLathedTireGeometry` / `createSweptTube` / `createExhaustCanister`) added to `public/modeling/mt-hardsurface.js`. PART 179 is purely additive — PART 1-178 still works exactly as before. See CHANGES_v133.md.
   PART 180-189 (v1.34 / v8.25) -- CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION added canonically to this file (the missing reference-specification layer for the PART 177 worked example). Codifies the user-supplied `SportMotorcycle_3D_Techniques_Specification.txt` (10-section authoritative spec at repo root) as 10 numbered PARTs (PART 180 spec layout / PART 181 core technologies stack / PART 182 authoritative geometry catalog + BoxGeometry + CylinderGeometry constraints / PART 183 reference materials + 6-band palette + procedural micro-roughness / PART 184 the 8 builder functions (createChunkySportWheel + 7 build* builders) / PART 185 bike-forward coordinate system + deterministic posture contract / PART 186 the 9-key sculptRuntime contract + 5 Actions API + per-frame tick + 9 SportMotorcycleOpts / PART 187 look-dev lighting factory `createSportMotorcycleModelLookDevLights(mode)` with 'reference' / 'grazing' / 'neutral' modes + 2048 shadow map contract / PART 188 ~8 500 triangle target + 8 architectural patterns (factory + options object + runtime contract + modular builder + named registry + action/command + deterministic procedural + zero-dependency standalone) / PART 189 the 5-field style + LBL version stamp pair). PART 180-189 is purely additive — PART 1-179 still works exactly as before. See CHANGES_v134.md.
+  PART 190-199 (v1.35 / v8.26) -- ARCHITECTURAL MODELING PIPELINE added canonically to this file (the missing methodology layer for buildings / interiors / procedural architecture / landscape). Distilled from `SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt` (the post-mortem on the Modern Dual-Volume Villa build, 2026-09-16). Adds `public/modeling/mt-architectural.js` (1095 lines, 8 helpers + schema linter + look-dev lights + 9-key palette, on `window.MT_architectural`) + `EXAMPLES_MT_ARCHITECTURAL.md` worked examples annex. Covers: the 6 architectural pitfalls (CSG void / 2D→3D depth mismatch / pivot drift / schema naming vs mesh hierarchies / coplanar Z-fighting / monolithic code volume), the 4 reusable techniques (Piecewise Sub-Wall Aperture Framing / Dual-Pivot Kinematic Hinge Hierarchy / Micro-Epsilon Staggering Anti-Z-Fighting / Material Palette Consolidation), the 5 actionable roadmap items (pre-built procedural helpers / modular file decomposition / automated schema & regex namespacing linter / 8-pass sculpt runtime spec / one-click Report .txt export), and the 5 system-limitations catalog (headless spatial blindness / absence of architectural primitives / manual pipeline state stitching / lighting & tone-mapping discrepancies). PART 190-199 is purely additive — PART 1-189 still works exactly as before. See CHANGES_v135.md.
 ================================================================================
 
 ================================================================================
@@ -25045,6 +25046,16 @@ CHANGES_v133.md for the full v1.33 / v8.24 release notes.
 >>> 180-189 sections ever diverge, the .txt wins (and a CHANGES
 >>> entry is opened) — see RULE 180.0.1.
 >>>
+>>> v1.35 / v8.26 DE-DUP NOTE — PART 190-199 (Architectural Modeling
+>>> Pipeline) is canonically documented in THIS file (Prompt_To_Ts.txt).
+>>> The 5 sibling spec files (Prompt_To_Js.txt / Prompt_To_Json.txt
+>>> / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt)
+>>> reference this file for PART 190-199. The bundle lives at
+>>> public/modeling/mt-architectural.js and the worked examples at
+>>> public/modeling/EXAMPLES_MT_ARCHITECTURAL.md. Distilled from
+>>> SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt (post-mortem on the
+>>> Modern Dual-Volume Villa build, 2026-09-16). See CHANGES_v135.md.
+>>>
 
 ================================================================================
 END OF PART 145-152
@@ -27189,4 +27200,336 @@ See CHANGES_v134.md for the full v1.34 / v8.25 release notes.
 
 ================================================================================
 END OF PART 180-189
+================================================================================
+
+
+================================================================================
+PART 190-199 — v1.35 / v8.26 ADDITIONS: ARCHITECTURAL MODELING PIPELINE
+================================================================================
+
+PART 190 documents when to reach for the architectural helpers vs raw
+THREE primitives. PART 191 formalises the anti-Z-fighting micro-epsilon
+stacking ladder. PART 192-198 ship 7 parametric constructors. PART 199
+ships the schema namespacing linter + 4-mode look-dev lighting rig +
+the 9-key canonical material palette.
+
+PART 190-199 is the canonical LBL methodology layer for any building /
+interior / procedural-architecture / landscape prompt. The bundle is
+documented canonically in THIS file; the implementation lives at
+`public/modeling/mt-architectural.js`; the worked examples at
+`public/modeling/EXAMPLES_MT_ARCHITECTURAL.md`. Distilled from the
+user-supplied `SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt`
+(post-mortem on the Modern Dual-Volume Villa build, 2026-09-16).
+
+If you are authoring a TS factory for a building, ship a
+`createXxxModel()` function that uses the PART 192-198 helpers
+instead of raw BoxGeometry. If you are authoring a JSON/JS blueprint
+for a building, embed the helper calls into the build pipeline
+script. In both cases the output must pass the PART 199 schema
+linter against your `detailInventory` contract.
+
+────────────────────────────────────────────────────────────────────────
+PART 190 — OVERVIEW & WHEN TO USE THESE HELPERS
+────────────────────────────────────────────────────────────────────────
+The architectural helpers are designed for any model whose subject is a
+building, a building interior, an architectural element (door / window
+/ roof / vent), or a landscape element (planter / path). They are NOT
+designed for vehicles (use PART 167-178 instead), characters
+(use PART 145-152), or free-form organic / sculptural subjects
+(use the base PART 100-143 bundle).
+
+When to use which helper:
+
+  Subject class           Helper(s)
+  ─────────────────────── ──────────────────────────────────────────────
+  Exterior wall           createWallWithApertures (PART 192)
+  Door (hinged)           createHingedDoorUnit (PART 193)
+  Window (casement)       createGlazedWindowUnit (PART 194)
+  Roof (pitched / gable)  createPitchedGableRoof (PART 195)
+  Attic vent              createLouveredAtticVent (PART 196)
+  Potted plant            createPottedPlant (PART 197)
+  Stepping-stone path     createSteppingStonePath (PART 198)
+  Schema validation       schemaNamespacingLinter (PART 199.1)
+  Look-dev lighting       createArchitecturalLookDevLights (PART 199.3)
+  Material palette        materialPalette (PART 199.4)
+
+If the model combines multiple architectural elements (most buildings
+do), call each helper separately and assemble the resulting Groups
+into a single root Group. The schema linter (PART 199.1) will then
+verify that every `detailInventory` entry has a matching scene-graph
+subtree.
+
+────────────────────────────────────────────────────────────────────────
+PART 191 — STACKING INDEX (ANTI-Z-FIGHTING MICRO-EPSILON LADDER)
+────────────────────────────────────────────────────────────────────────
+The micro-epsilon staggering technique documented in
+`SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt` section 4 (Technique
+3) is enforced by the canonical STACK_INDEX table. Every concentric
+surface in an architectural model must respect the offsets below.
+
+  Key             Y offset (m)   Z offset (m)   Purpose
+  ──────────────  ────────────   ────────────   ─────────────────────
+  FOUNDATION      0.000          —              Foundation / slab base
+  GRAVEL          0.020          —              Gravel perimeter
+  PLAINTH         0.300          —              Finish floor plinth
+  PORCH_DECK      0.420          —              Porch deck / step
+  DOOR_SILL       0.450          —              Door threshold
+  PAVERS          0.370          —              Stepping stones
+  WALL_FACE       —              0.000          Wall centre
+  WALL_FACING     —              0.015          Cladding
+  WALL_TRIM       —              0.035          Moulding / trim
+  HARDWARE        —              0.065          Handles / pulls
+  GLASS           —              0.020          Window glass
+
+GOLDEN RULE: never offset < 5mm (still flickers on 24-bit depth
+buffers) or > 25mm (reads as a visible gap to the human eye). When
+in doubt, use the PART 199.2 linter to detect coplanar collisions.
+
+The `stackLevel(key, axis)` helper on `window.MT_architectural` is a
+typed accessor for these offsets. Use it instead of hard-coding the
+magic numbers in your factory.
+
+────────────────────────────────────────────────────────────────────────
+PART 192 — createWallWithApertures (PIECEWISE SUB-WALL DECOMPOSITION)
+────────────────────────────────────────────────────────────────────────
+The Aperture Framing Pattern. Instead of CSG-subtracting openings
+out of a solid wall box, the wall is built as a slab grid (X × Y) with
+cavities removed where apertures overlap. No CSG runtime cost, sharp
+UVs, no face overlaps, fully hollow cavities.
+
+Signature (from mt-architectural.js):
+
+  createWallWithApertures(
+    wallW: number,
+    wallH: number,
+    wallT: number,
+    openings: Array<{ x, y, w, h }>,
+    material: THREE.Material,
+    namePrefix: string
+  ): THREE.Group
+
+  - wallW, wallH, wallT  — wall dimensions in metres
+  - openings[]           — list of { x, y, w, h } apertures
+                           x is wall-local X (centred on midpoint)
+                           y is the sill height (above wall base)
+  - material             — shared THREE.Material for every slab
+  - namePrefix           — schema featureId prefix
+
+Returns a THREE.Group with userData.featureId set. Children are
+slab meshes, each named `${namePrefix}_Slab_${i}_${j}`.
+
+Worked example: see EXAMPLES_MT_ARCHITECTURAL.md Example 1.
+
+────────────────────────────────────────────────────────────────────────
+PART 193 — createHingedDoorUnit (DUAL-PIVOT KINEMATIC HIERARCHY)
+────────────────────────────────────────────────────────────────────────
+The dual-pivot kinematic pattern. For each door leaf:
+
+  RootGroup
+    └─ HingeGroup (local origin sits on the door jamb hinge axis)
+        └─ LeafMesh (centred at ±leafW/2 so its pivot is the hinge)
+            ├─ Glass insert (optional)
+            └─ Hardware (handle)
+
+The returned object exposes:
+  - rootGroup      — the THREE.Group to add to the scene
+  - hingeGroups[]  — for direct rotation animation
+  - toggle(open)   — convenience to swing both leaves inward
+  - open()/close() — same as toggle(true)/toggle(false)
+
+Signature:
+
+  createHingedDoorUnit(opts: {
+    width, height, depth,        // leaf bounding box (width is TOTAL)
+    leaves: 1 | 2,
+    hingeSide: 'left' | 'right' | 'split',
+    doorMaterial,                // required
+    handleMaterial,              // optional
+    glassMaterial,               // optional
+    withGlassInsert: bool,
+    namePrefix,                  // becomes userData.featureId
+  }): { rootGroup, hingeGroups, toggle, open, close }
+
+Leaf hinge offsets are computed automatically:
+  left leaf  : hingeX = -width/2 + leafW/2
+  right leaf : hingeX = +width/2 - leafW/2
+  leaf.position = sign * leafW/2  (so HingeGroup origin is the jamb)
+
+Worked example: see EXAMPLES_MT_ARCHITECTURAL.md Example 2.
+
+────────────────────────────────────────────────────────────────────────
+PART 194 — createGlazedWindowUnit (MULTI-PANE CASEMENT WINDOW)
+────────────────────────────────────────────────────────────────────────
+A frame + glass + mullion grid. Returns a THREE.Group with 4 frame
+slabs + 1 glass pane + (mullionsX-1) vertical mullions + (mullionsY-1)
+horizontal mullions. The glass is offset by STACK_INDEX.GLASS.z
+(+0.020 m) so the pane doesn't z-fight with the back face of the
+frame.
+
+Signature:
+
+  createGlazedWindowUnit(opts: {
+    width, height, depth,
+    frameThickness,              // default 0.06
+    frameMaterial,               // required
+    glassMaterial,               // optional (omit for frame-only)
+    mullionsX, mullionsY,        // default 1,1 (single pane)
+    sillMaterial,                // optional (defaults to frame)
+    namePrefix,
+  }): THREE.Group
+
+Worked example: see EXAMPLES_MT_ARCHITECTURAL.md Example 3.
+
+────────────────────────────────────────────────────────────────────────
+PART 195 — createPitchedGableRoof (GABLE ROOF + TILE ROWS)
+────────────────────────────────────────────────────────────────────────
+Two slanted slope slabs (custom BufferGeometry, no addon dep) meeting
+at a ridge, plus N tile rows per slope with PART 191 micro-epsilon Y
+staggering (+0.012 * (i % 2)) so adjacent rows never z-fight, plus a
+thin ridge cap along the apex.
+
+Signature:
+
+  createPitchedGableRoof(opts: {
+    width, depth,                // eave dimensions
+    pitch,                       // rise / run (default 0.45)
+    overhang,                    // per-side (default 0.5)
+    tileRows,                    // per slope (default 6)
+    eaveThickness,               // default 0.08
+    tileMaterial,                // required
+    ridgeMaterial,               // optional (defaults to tile)
+    namePrefix,
+  }): THREE.Group
+
+Worked example: see EXAMPLES_MT_ARCHITECTURAL.md Example 4.
+
+────────────────────────────────────────────────────────────────────────
+PART 196 — createLouveredAtticVent
+────────────────────────────────────────────────────────────────────────
+A gable-attic louvered vent: 4 frame slabs + N angled slats. Returns a
+THREE.Group with userData.featureId = `attic/<namePrefix>`.
+
+Signature:
+
+  createLouveredAtticVent(opts: {
+    width, height, depth,        // outer dimensions
+    louverCount,                 // default 6
+    louverAngle,                 // default Math.PI/6 (30°)
+    frameThickness,              // default 0.04
+    material,                    // required
+    namePrefix,                  // e.g. 'attic/louverVent'
+  }): THREE.Group
+
+────────────────────────────────────────────────────────────────────────
+PART 197 — createPottedPlant
+────────────────────────────────────────────────────────────────────────
+A truncated-cone pot + N foliage balls on top, deterministic via
+mulberry32 seed. Returns a THREE.Group with userData.featureId =
+`landscape/<namePrefix>`.
+
+Signature:
+
+  createPottedPlant(opts: {
+    potRadius,                   // base radius
+    potTopRadius,                // top radius (default potR * 1.15)
+    potHeight,
+    foliageCount,                // default 5
+    foliageMaterial,             // required
+    potMaterial,                 // required
+    seed,                        // mulberry32 (default 1)
+    namePrefix,                  // e.g. 'landscape/pottedPlant'
+  }): THREE.Group
+
+────────────────────────────────────────────────────────────────────────
+PART 198 — createSteppingStonePath
+────────────────────────────────────────────────────────────────────────
+A curving path of stepping-stone pavers, deterministic via mulberry32.
+Path is a quadratic Bezier in XZ between (baseX, baseZ) and
+(endX, endZ) with a perpendicular bow. Stones sit at
+STACK_INDEX.PAVERS.y by default (+0.370 m above origin).
+
+Signature:
+
+  createSteppingStonePath(opts: {
+    count,                       // default 8
+    baseX, baseZ,                // path start
+    endX, endZ,                  // path end (default baseX+3, baseZ)
+    stepSize,                    // not used directly; spacing is from count
+    radius,                      // default 0.18
+    material,                    // required
+    seed,                        // mulberry32 (default 1)
+    yLevel,                      // default STACK_INDEX.PAVERS.y
+    namePrefix,                  // e.g. 'landscape/steppingStones'
+  }): THREE.Group
+
+────────────────────────────────────────────────────────────────────────
+PART 199 — SCHEMA NAMESPACING LINTER + LOOK-DEV LIGHTING + PALETTE
+────────────────────────────────────────────────────────────────────────
+The schema namespacing linter (PART 199.1) walks a THREE.Object3D
+scene graph and verifies:
+
+  (a) every required `detailInventory` entry has at least one matching
+      scene-graph mesh (matched via userData.featureId OR mesh.name,
+      using a regex);
+  (b) the scene contains no coplanar collisions (two meshes whose
+      centroid sits in the same 5 mm world-space grid cell — an
+      anti-Z-fighting sanity check);
+  (c) the total mesh count is reported for budget audits.
+
+Signature:
+
+  schemaNamespacingLinter(
+    root: THREE.Object3D,
+    inventory: Array<{
+      id: string,
+      required?: bool,
+      regex?: RegExp,
+    }>
+  ): {
+    passed: bool,
+    missing: [{ id, reason }],
+    coplanar: [{ a, b, gridKey }],
+    totalMeshes: int,
+    featuresFound: [{ id, count, required }],
+  }
+
+The look-dev lighting rig (PART 199.3) returns a THREE.Group with
+ambient + hemi + directional + point lights configured for one of 4
+modes: 'day' / 'dusk' / 'night' / 'warmglow'.
+
+Signature:
+
+  createArchitecturalLookDevLights(mode: 'day'|'dusk'|'night'|'warmglow'):
+    THREE.Group
+
+The canonical material palette (PART 199.4) returns a 9-key object
+(stuccoWhite / darkCharcoal / teakWood / roofTile / windowGlass /
+stonePavers / darkMetalTrim / warmTeak / foliageGreen). All keys are
+fresh MeshStandardMaterial instances — share by reference where
+appropriate, clone before per-instance mutation (see PITFALL 5).
+
+────────────────────────────────────────────────────────────────────────
+PART 190-199 — SUMMARY (THE ONE-PARAGRAPH VERSION)
+────────────────────────────────────────────────────────────────────────
+The renderer now ships an architectural modeling pipeline as an
+additive bundle on top of PART 100-143 (44 helpers on window.MT) and
+PART 167-178 (hard-surface / vehicle modeling). PART 190 documents
+when to reach for these helpers vs raw THREE primitives. PART 191
+formalises the stacking index (the anti-Z-fighting micro-epsilon
+ladder) so every concentric surface has a deterministic Y/Z offset.
+PART 192-198 ship 7 parametric constructors (walls with apertures,
+hinged doors, glazed windows, pitched gable roofs, louvered attic
+vents, potted plants, stepping-stone paths). PART 199 ships the
+schema namespacing linter + a 4-mode look-dev lighting rig + a
+9-key canonical material palette. Together they let the AI factory
+author a fully hollow, fully z-fight-free, fully schema-compliant
+building in ~150 lines of TS where the previous monolithic approach
+needed ~1800.
+
+The renderer keeps every existing capability (PART 1-189 + PART 90
+ACES + PART 45 CS2 + PART 67 + PART 74 + PART 100-143 MT bundle +
+PART 167-179 hardsurface helpers); PART 190-199 is purely additive.
+
+================================================================================
+END OF PART 190-199
 ================================================================================

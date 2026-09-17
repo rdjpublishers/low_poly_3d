@@ -1,3 +1,66 @@
+# v1.35 / v8.26 — Architectural Modeling Pipeline (2026-09-17)
+
+This release ships the **ARCHITECTURAL MODELING PIPELINE** as a
+canonical top-level reference document, layered on top of the
+v1.34 / v8.25 Chunky 3D Sport Motorcycle Reference Specification
+(PART 180-189). PART 190-199 is the 10-section **authoritative
+specification** for procedural buildings, interiors, and landscape
+models. It is distilled from
+`SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt` (the post-mortem on
+the Modern Dual-Volume Villa build, 2026-09-16) and generalises to
+any architectural model whose subject is a building or building
+element. See `CHANGES_v135.md` for the full release notes.
+
+What ships in this release:
+  - 10 new spec PARTs (PART 190 → PART 199) added canonically to
+    Prompt_To_Ts.txt (the 5 sibling spec files reference them).
+  - PART 190 — OVERVIEW & WHEN TO USE THESE HELPERS (table of contents
+    + helper-vs-primitive decision rule for the 8 architectural
+    constructors).
+  - PART 191 — STACKING INDEX (the 11-key canonical STACK_INDEX table
+    FOUNDATION / GRAVEL / PLAINTH / PORCH_DECK / DOOR_SILL / PAVERS /
+    WALL_FACE / WALL_FACING / WALL_TRIM / HARDWARE / GLASS with Y + Z
+    offsets in metres; enforces the micro-epsilon staggering rule).
+  - PART 192 — createWallWithApertures (piecewise sub-wall
+    decomposition; solves the "CSG void in vanilla Three.js"
+    pitfall).
+  - PART 193 — createHingedDoorUnit (dual-pivot kinematic hinge
+    hierarchy; solves the "pivot drift" pitfall).
+  - PART 194 — createGlazedWindowUnit (multi-pane casement window
+    with PART 191 GLASS z-offset enforced).
+  - PART 195 — createPitchedGableRoof (two-slope slab + N tile rows +
+    ridge cap; PART 191 tile-row Y staggering; no addon dependency).
+  - PART 196 — createLouveredAtticVent (4-frame-slab + N-angled-slat
+    vent).
+  - PART 197 — createPottedPlant (truncated-cone pot + N foliage
+    balls; deterministic via mulberry32 seed).
+  - PART 198 — createSteppingStonePath (quadratic-Bezier path +
+    per-stone jitter; deterministic via mulberry32 seed).
+  - PART 199 — schemaNamespacingLinter (PART 199.1) +
+    createArchitecturalLookDevLights (PART 199.3, 4 modes: day /
+    dusk / night / warmglow) + materialPalette (PART 199.4, 9 keys).
+  - New helper bundle: `public/modeling/mt-architectural.js`
+    (47 KB / 1 095 lines) attached to `window.MT_architectural`.
+    11/11 selfTests pass headlessly.
+  - New worked-examples annex: `public/modeling/EXAMPLES_MT_ARCHITECTURAL.md`
+    (6 worked examples + 5 architectural pitfalls catalog + file-size
+    budget note).
+  - 6 sibling spec files (Prompt_To_Ts.txt / Prompt_To_Js.txt /
+    Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt /
+    Image_To_Json.txt) updated with v1.35 / v8.26 headers, de-dup
+    notes referencing PART 190-199, and the new canonical version
+    pair. PART 190-199 content is duplicated ONLY in Prompt_To_Ts.txt
+    (the canonical source).
+  - PART 190-199 is purely additive — PART 1-189 + the MT bundle +
+    the hardsurface helpers + ACES all still work exactly as before.
+  - No renderer-side changes in this release. Follow-up: add
+    `mt-architectural.js` to the importmap in `index.html` after
+    the existing `mt-hardsurface.js` import. This is a renderer-
+    touching change deferred to a separate commit; the spec + helpers
+    are independent of the renderer and shippable without it.
+
+---
+
 # v1.34 / v8.25 — Chunky 3D Sport Motorcycle Reference Specification (2026-09-16)
 
 This release ships the **CHUNKY 3D SPORT MOTORCYCLE (SUPERBIKE)
