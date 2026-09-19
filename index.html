@@ -1308,13 +1308,13 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
 
 /* H4 — center-top viewport environment cycle button (click = next preset) */
 .env-cycle{
-  position:absolute;top:10px;left:50%;transform:translateX(-50%);
-  display:flex;align-items:center;gap:8px;
-  padding:6px 12px 6px 8px;border-radius:999px;
+  position:absolute;top:96px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:9px;
+  padding:8px 16px 8px 10px;border-radius:999px;
   background:rgba(10,12,16,.62);color:var(--text);
   border:1px solid rgba(255,255,255,.10);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:600;
+  font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
   letter-spacing:.2px;cursor:pointer;user-select:none;
   box-shadow:0 4px 16px -4px rgba(0,0,0,.5);
   transition:transform .15s, background .15s, border-color .15s;
@@ -1323,7 +1323,7 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
 .env-cycle:hover{transform:translateX(-50%) translateY(-1px);border-color:var(--accent);}
 .env-cycle:active{transform:translateX(-50%) translateY(0);}
 .env-cycle .env-stripe{
-  width:18px;height:18px;border-radius:50%;flex-shrink:0;
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
   border:1px solid rgba(255,255,255,.18);
   background:var(--env-cycle-stripe, linear-gradient(180deg,#fff,#888));
   transition:background .25s;
@@ -1333,7 +1333,7 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .env-cycle .env-meta{
-  font-family:'Space Mono',monospace;font-size:9px;font-weight:400;
+  font-family:'Space Mono',monospace;font-size:10px;font-weight:400;
   color:var(--muted);margin-left:2px;
 }
 .env-cycle .env-caret{
@@ -1342,23 +1342,37 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
 }
 .env-cycle .env-caret svg{width:10px;height:10px;}
 .env-dots{
-  position:absolute;top:42px;left:50%;transform:translateX(-50%);
-  display:flex;gap:4px;z-index:7;padding:4px 8px;border-radius:999px;
+  position:absolute;top:135px;left:50%;transform:translateX(-50%);
+  display:flex;gap:5px;z-index:7;padding:5px 10px;border-radius:999px;
   background:rgba(10,12,16,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   border:1px solid rgba(255,255,255,.06);
 }
 .env-dots .dot{
-  width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.22);
+  width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.22);
   transition:background .2s, transform .2s;
+  cursor:pointer;
 }
-.env-dots .dot.active{background:var(--accent);transform:scale(1.25);}
+.env-dots .dot:hover{background:rgba(255,255,255,.5);}
+.env-dots .dot.active{background:var(--accent);transform:scale(1.3);}
 body.theme-light .env-cycle{background:rgba(255,255,255,.7);color:#1a1d24;border-color:rgba(0,0,0,.08);}
 body.theme-light .env-dots{background:rgba(255,255,255,.55);border-color:rgba(0,0,0,.08);}
 body.theme-light .env-dots .dot{background:rgba(0,0,0,.22);}
+body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
+/* H4 — pill + dots are hidden by default on first load (welcome
+   screen showing) and shown the moment a model mounts. Toggle the
+   .env-hidden class to flip. Matches the welcome's 0.4s fade. */
+.env-cycle.env-hidden,
+.env-dots.env-hidden{
+  opacity:0;transform:translateX(-50%) translateY(-4px);
+  pointer-events:none;
+}
+.env-cycle, .env-dots{transition:opacity .35s ease, transform .35s ease;}
 @media (max-width:520px){
-  .env-cycle{font-size:10.5px;padding:5px 10px 5px 7px;}
-  .env-cycle .env-stripe{width:16px;height:16px;}
+  .env-cycle{font-size:11px;padding:6px 12px 6px 8px;top:80px;gap:7px;}
+  .env-cycle .env-stripe{width:18px;height:18px;}
   .env-cycle .env-meta{display:none;}
+  .env-dots{top:115px;padding:4px 8px;gap:4px;}
+  .env-dots .dot{width:5px;height:5px;}
 }
 
 /* H9 — starter recipes panel (mirrors #parts-panel look) */
@@ -1964,14 +1978,16 @@ body.theme-light .env-dots .dot{background:rgba(0,0,0,.22);}
 
     <!-- LBL update H4 — center-top environment cycle button (must live
          inside #viewport-wrap so it positions below the topbar, not
-         behind it) -->
-    <div class="env-cycle" id="env-cycle-btn" role="button" aria-label="Cycle environment preset" title="Click to cycle environment preset">
+         behind it). Hidden by default (.env-hidden) on first load —
+         the welcome screen has nothing to cycle — and shown the moment
+         a model mounts via the hideWelcome() / showWelcome() pair. -->
+    <div class="env-cycle env-hidden" id="env-cycle-btn" role="button" aria-label="Cycle environment preset" title="Click to cycle environment preset">
       <span class="env-stripe"></span>
       <span class="env-name">Studio White</span>
       <span class="env-meta">1 / 10</span>
       <span class="env-caret"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </div>
-    <div class="env-dots" id="env-dots"></div>
+    <div class="env-dots env-hidden" id="env-dots"></div>
   </div>
 
   <!-- RIGHT PANEL -->
@@ -17929,8 +17945,24 @@ function toast(msg,type=''){
   const el=document.getElementById('toast'); el.textContent=msg; el.className='show '+(type||'');
   clearTimeout(_tt); _tt=setTimeout(()=>el.className='',3000);
 }
-function hideWelcome(){ const w=document.getElementById('welcome'); w.classList.add('hidden'); setTimeout(()=>w.classList.add('gone'),400); }
-function showWelcome(){ const w=document.getElementById('welcome'); w.classList.remove('gone'); requestAnimationFrame(()=>w.classList.remove('hidden')); }
+function hideWelcome(){
+  const w=document.getElementById('welcome'); w.classList.add('hidden'); setTimeout(()=>w.classList.add('gone'),400);
+  // Show the env-cycle button only when a model is actually mounted —
+  // it has nothing meaningful to cycle on the welcome screen.
+  const env=document.getElementById('env-cycle-btn');
+  const dots=document.getElementById('env-dots');
+  if(env) env.classList.remove('env-hidden');
+  if(dots) dots.classList.remove('env-hidden');
+}
+function showWelcome(){
+  const w=document.getElementById('welcome'); w.classList.remove('gone'); requestAnimationFrame(()=>w.classList.remove('hidden'));
+  // Hide the env-cycle button alongside the welcome so the page has
+  // one clean focal point on first load.
+  const env=document.getElementById('env-cycle-btn');
+  const dots=document.getElementById('env-dots');
+  if(env) env.classList.add('env-hidden');
+  if(dots) dots.classList.add('env-hidden');
+}
 
 // ───────────────────────────────────────────────────────────────────────
 // LBL UPDATE F6.2 — Loading overlay controller
