@@ -1332,10 +1332,17 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
 /* H4 — redesigned environment picker popover (clean grid of 10 named presets) */
 #env-presets-panel{
   position:fixed;display:none;z-index:60;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);box-shadow:var(--shadow-2);padding:14px;width:260px;
+  border-radius:var(--radius);box-shadow:var(--shadow-2);padding:14px;width:260px;max-width:calc(100vw - 16px);
   font-family:'Space Grotesk',sans-serif;
+  max-height:calc(100vh - 100px);overflow-y:auto;
 }
 #env-presets-panel.open{display:block;}
+@media (max-width:520px){
+  #env-presets-panel{width:200px;padding:10px;}
+  #env-presets-panel .ep-preset{font-size:9.5px;}
+  .ep-preset .ep-thumb{height:28px;}
+  .ep-preset .ep-name{font-size:9.5px;padding:4px 2px;}
+}
 #env-presets-panel .ep-title{
   font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:var(--muted);
   letter-spacing:1.4px;text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;gap:6px;
@@ -1556,7 +1563,7 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
   <button class="tbtn hide-xs" id="face-select-btn" title="Toggle face-select mode — click faces on a part to select them, Shift-click to add more">⬡ Faces</button>
   <div class="vdiv"></div>
   <!-- LBL update H4 — HDR environment presets -->
-  <button class="tbtn hide-xs" id="env-presets-btn" title="HDR environment presets, quality, intensity">🌐▾ Env</button>
+  <button class="tbtn" id="env-presets-btn" title="Toggle environment preset (Studio, Sunset, Forest, Neon …)">🌐▾ Env</button>
   <div class="vdiv"></div>
   <!-- LBL update H5 — theme accent swatches -->
   <div id="accent-swatches" title="Accent color">
