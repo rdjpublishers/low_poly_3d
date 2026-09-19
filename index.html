@@ -1961,6 +1961,17 @@ body.theme-light .env-dots .dot{background:rgba(0,0,0,.22);}
     </div>
     <button class="demo-nav-btn left" id="demo-prev" aria-label="Previous model" title="Previous model">‹</button>
     <button class="demo-nav-btn right" id="demo-next" aria-label="Next model" title="Next model">›</button>
+
+    <!-- LBL update H4 — center-top environment cycle button (must live
+         inside #viewport-wrap so it positions below the topbar, not
+         behind it) -->
+    <div class="env-cycle" id="env-cycle-btn" role="button" aria-label="Cycle environment preset" title="Click to cycle environment preset">
+      <span class="env-stripe"></span>
+      <span class="env-name">Studio White</span>
+      <span class="env-meta">1 / 10</span>
+      <span class="env-caret"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    </div>
+    <div class="env-dots" id="env-dots"></div>
   </div>
 
   <!-- RIGHT PANEL -->
@@ -2065,15 +2076,6 @@ body.theme-light .env-dots .dot{background:rgba(0,0,0,.22);}
     </div>
   </div>
 </div>
-
-<!-- LBL update H4 — center-top viewport environment cycle button (tap = next preset) -->
-<div class="env-cycle" id="env-cycle-btn" role="button" aria-label="Cycle environment preset" title="Click to cycle environment preset">
-  <span class="env-stripe"></span>
-  <span class="env-name">Loading…</span>
-  <span class="env-meta">1 / 10</span>
-  <span class="env-caret"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-</div>
-<div class="env-dots" id="env-dots"></div>
 
 <!-- LBL update H7 — keyboard shortcuts modal -->
 <div id="kb-modal-overlay">
@@ -20003,7 +20005,7 @@ function lblMakeGradientBG(stops){
   c.width = 1; c.height = size;
   const ctx = c.getContext('2d');
   const g = ctx.createLinearGradient(0, 0, 0, size);
-  stops.forEach(([pos, col]) => g.addColorStop(pos, col));
+  stops.forEach(([col, pos]) => g.addColorStop(pos, col));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 1, size);
   const tex = new THREE.CanvasTexture(c);
@@ -20106,8 +20108,20 @@ window.addEventListener('keydown', (e)=>{
 });
 
 // Bake the default preset once at startup so the very first paint
-// already has real IBL on the model.
-lblApplyEnvByIndex(0);
+// already has real IBL on the model. Wrapped in try/catch so a typo
+// in any preset definition (or a missing WebGL feature in some env)
+// can never freeze the rest of the init — worst case the page
+// renders with the original RoomEnvironment bake and the cycle
+// button shows "Studio White" with no env map applied.
+try {
+  lblApplyEnvByIndex(0);
+} catch (envInitErr) {
+  console.warn('[env] default preset failed to apply — falling back to procedural RoomEnvironment:', envInitErr && envInitErr.message);
+  // Fall back so the rest of the page keeps working
+  try {
+    if (typeof proceduralEnvMap !== 'undefined') scene.environment = proceduralEnvMap;
+  } catch(_) {}
+}
 
 // ───────────────────────────────────────────────────────────────────────
 // HDRI standalone button (kept on the toolbar) — re-wired so its
