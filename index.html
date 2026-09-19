@@ -1329,15 +1329,60 @@ html[data-accent="violet"],html[data-accent="violet"] body.theme-light{--accent:
 .lp-step .lp-check{margin-left:auto;opacity:0;color:var(--accent2);transition:opacity .2s;}
 .lp-step.done .lp-check{opacity:1;}
 
-/* H8 — live axis gizmo overlay */
-#axis-gizmo-overlay{
-  position:absolute;top:10px;right:10px;font-family:'Space Mono',monospace;font-size:10px;
-  background:rgba(10,12,16,.55);color:#dfe3ee;padding:6px 10px;border-radius:6px;
-  pointer-events:none;letter-spacing:.5px;z-index:5;backdrop-filter:blur(2px);
-  border:1px solid rgba(255,255,255,.08);
+/* H4 — redesigned environment picker popover (clean grid of 10 named presets) */
+#env-presets-panel{
+  position:fixed;display:none;z-index:60;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow-2);padding:14px;width:260px;
+  font-family:'Space Grotesk',sans-serif;
 }
-body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1d24;border-color:rgba(0,0,0,.08);}
-#axis-gizmo-overlay .ax-x{color:#ff8a8a;} #axis-gizmo-overlay .ax-y{color:#8aff9c;} #axis-gizmo-overlay .ax-z{color:#8ab4ff;}
+#env-presets-panel.open{display:block;}
+#env-presets-panel .ep-title{
+  font-family:'Space Mono',monospace;font-size:10px;font-weight:700;color:var(--muted);
+  letter-spacing:1.4px;text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;gap:6px;
+}
+#env-presets-panel .ep-title::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);}
+#env-presets-panel .ep-label{
+  font-family:'Space Mono',monospace;font-size:9px;font-weight:700;color:var(--muted);
+  letter-spacing:1.2px;text-transform:uppercase;margin:10px 0 6px;
+}
+#env-presets-panel .ep-label:first-of-type{margin-top:0;}
+.ep-preset-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:6px;
+}
+.ep-preset{
+  position:relative;display:flex;flex-direction:column;align-items:stretch;
+  border:1px solid var(--border);border-radius:7px;overflow:hidden;cursor:pointer;
+  background:var(--surface2);transition:border-color .15s, transform .15s, box-shadow .15s;
+  padding:0;font-family:inherit;color:var(--text2);
+}
+.ep-preset:hover{transform:translateY(-1px);border-color:var(--accent);box-shadow:var(--shadow-glow);}
+.ep-preset.active{
+  border-color:var(--accent);box-shadow:0 0 0 1px var(--accent), var(--shadow-glow);
+}
+.ep-preset .ep-thumb{
+  height:34px;width:100%;border-bottom:1px solid var(--border);
+  background-size:cover;background-position:center;display:block;
+}
+.ep-preset .ep-name{
+  font-size:10.5px;font-weight:600;text-align:center;padding:6px 4px;
+  letter-spacing:.2px;line-height:1.2;
+}
+.ep-preset.active .ep-name{color:var(--text);}
+.ep-swatch-row{display:flex;gap:6px;}
+.ep-swatch{
+  flex:1;height:28px;border-radius:6px;border:2px solid transparent;cursor:pointer;
+  background-size:cover;transition:border-color .15s,transform .15s;
+}
+.ep-swatch:hover{transform:translateY(-1px);}
+.ep-swatch.active{border-color:var(--accent);}
+.ep-quality-row,.ep-bg-row{display:flex;gap:4px;}
+.ep-quality-row button,.ep-bg-row button{
+  flex:1;height:26px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);font-size:10px;cursor:pointer;font-family:'Space Grotesk',sans-serif;
+}
+.ep-quality-row button.active,.ep-bg-row button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+#env-intensity-slider{width:100%;margin-top:4px;accent-color:var(--accent);}
+.ep-intensity-val{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);float:right;}
 
 /* H9 — starter recipes panel (mirrors #parts-panel look) */
 #recipes-panel{
@@ -1801,8 +1846,7 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
         <svg class="anim-ctrl-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.25l3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="anim-ctrl-badge" id="anim-name-display" aria-live="polite">—</div>
-    </div>    <!-- LBL update H8 — live axis gizmo overlay -->
-    <div id="axis-gizmo-overlay"><span class="ax-x">X 0.00</span>&nbsp; <span class="ax-y">Y 0.00</span>&nbsp; <span class="ax-z">Z 0.00</span></div>
+    </div>
     <!-- LBL update H9 — starter recipes panel -->
     <div id="recipes-panel">
       <div class="pp-head">📚 Starter Recipes <span style="font-weight:400;text-transform:none;color:var(--muted)">— no AI needed</span></div>
@@ -2045,22 +2089,16 @@ body.theme-light #axis-gizmo-overlay{background:rgba(255,255,255,.65);color:#1a1
   </div>
 </div>
 
-<!-- LBL update H4 — HDR environment presets popover (position set by JS next to its button) -->
+<!-- LBL update H4 — redesigned HDR environment presets popover with 10 named presets -->
 <div id="env-presets-panel">
-  <div class="ep-label">Preset</div>
-  <div class="ep-swatch-row" id="ep-swatch-row"></div>
-  <div class="ep-label">Quality</div>
-  <div class="ep-quality-row" id="ep-quality-row">
-    <button data-q="1">1K</button>
-    <button data-q="2" class="active">2K</button>
-    <button data-q="3">4K</button>
-  </div>
+  <div class="ep-title">ENVIRONMENT</div>
+  <div class="ep-preset-grid" id="ep-preset-grid"></div>
   <div class="ep-label">Intensity <span class="ep-intensity-val" id="ep-intensity-val">1.00</span></div>
   <input type="range" id="env-intensity-slider" min="0" max="2" step="0.05" value="1"/>
   <div class="ep-label">Background</div>
   <div class="ep-bg-row" id="ep-bg-row">
-    <button data-bg="on">On</button>
-    <button data-bg="off" class="active">Off</button>
+    <button data-bg="on">Show</button>
+    <button data-bg="off" class="active">Hide</button>
   </div>
 </div>
 
@@ -2880,7 +2918,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0;
 
 // v7.8 (PART 55, item 19) — ACESFilmicToneMapping was hardcoded above and
 // applied to every style, but it's a FILM-camera curve tuned to roll off
@@ -2961,9 +2999,11 @@ scene.add(grid);
 
 // Bloom — makes emissive materials (obj.emissive / the "glow" operation)
 // actually glow with a soft halo instead of just being a flat bright color,
-// matching the neon-panel look on glowing mech/sci-fi parts. Threshold is
-// kept fairly high so only genuinely emissive surfaces bloom, not every
-// bright-lit low-poly facet.
+// matching the neon-panel look on glowing mech/sci-fi parts. Strength was
+// lowered and threshold raised (was 0.55 / 0.92) so non-emissive bright-
+// white surfaces (low-poly architecture under bright studio lights, sunsets
+// with bright skies) no longer halo the whole model — only true
+// emissive/intensity>1 surfaces bloom now.
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
@@ -2979,7 +3019,7 @@ ssaoPass.enabled = false;
 composer.addPass(ssaoPass);
 let ssaoEnabled = false;
 
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(512,512), 0.55, 0.3, 0.92);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(512,512), 0.28, 0.4, 0.96);
 composer.addPass(bloomPass);
 
 // v7.2 A4 — screen-space depth+normal edge-detect outline. An alternative to
@@ -19890,26 +19930,184 @@ document.querySelectorAll('#view-preset-group .seg-btn').forEach(btn=>{
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// H4 — HDR ENVIRONMENT PRESETS WITH QUALITY TIERS
+// H4 — REDESIGNED ENVIRONMENT PICKER (10 named presets)
 // ───────────────────────────────────────────────────────────────────────
+//
+// Each preset owns:
+//   • stops   — 4-stop vertical equirectangular gradient (top→bottom) used
+//               to build both the PMREM environment map and the optional
+//               scene background.
+//   • bg      — gradient used for the page-level scene.background when the
+//               user picks "Show" Background. Tone-matched to the env map
+//               so the model reads correctly against it.
+//   • lighting — ambient + hemisphere + sun + fill RGB tweaks that match
+//               the preset (e.g. Sunset = warm orange sun, Cyberpunk =
+//               magenta/cyan neon fill, Cave = dim ember lights …).
+//
+// All environment maps are procedurally generated canvas textures — no
+// external HDR files, no fetch — so the picker still works fully offline.
 const LBL_ENV_PRESETS = {
-  'studio-cool': ['#e7edf5','#aebccb','#3d4650','#12151a'],
-  'studio-warm': ['#fbe9d6','#e9b98a','#7a5636','#241a12'],
-  'sunset':      ['#ffd9a0','#ff8f6b','#5b3a6b','#141022'],
-  'neutral':     ['#d9dde2','#9aa1aa','#565c64','#1a1d21']
+  'studio-white': {
+    name: 'Studio White',
+    stops:  ['#ffffff','#f0eef0','#cfd1d8','#9aa0aa'],
+    bg:     [['#ffffff',0],['#f4f6fa',0.5],['#dde2ec',1]],
+    lighting: {
+      ambient:  { color:0xffffff, intensity:0.55 },
+      hemi:     { sky:0xffffff, ground:0xd0d4dc, intensity:0.7 },
+      sun:      { color:0xffffff, intensity:2.6 },
+      fill:     { color:0xc8d2e8, intensity:0.55 },
+      rim:      { color:0xe6ecf5, intensity:0.35 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#ffffff,#f0eef0 35%,#cfd1d8 70%,#9aa0aa)',
+  },
+  'studio-dark': {
+    name: 'Studio Dark',
+    stops:  ['#3a3f48','#2c3038','#1c1f25','#0e1014'],
+    bg:     [['#262a32',0],['#1a1d23',0.55],['#0d0f13',1]],
+    lighting: {
+      ambient:  { color:0xffffff, intensity:0.45 },
+      hemi:     { sky:0x4a5060, ground:0x202024, intensity:0.6 },
+      sun:      { color:0xffe8c8, intensity:2.4 },
+      fill:     { color:0x6c63ff, intensity:0.9 },
+      rim:      { color:0xa78bfa, intensity:0.45 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#3a3f48,#2c3038 35%,#1c1f25 70%,#0e1014)',
+  },
+  'minimal-gradient': {
+    name: 'Minimal Gradient',
+    stops:  ['#e8eaef','#b9bec7','#7f8593','#3f4450'],
+    bg:     [['#eaeef4',0],['#b9bec7',0.5],['#525866',1]],
+    lighting: {
+      ambient:  { color:0xffffff, intensity:0.4 },
+      hemi:     { sky:0xeef0f4, ground:0x687080, intensity:0.6 },
+      sun:      { color:0xffffff, intensity:2.2 },
+      fill:     { color:0xa0b0d0, intensity:0.4 },
+      rim:      { color:0xc8d8f0, intensity:0.3 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#e8eaef,#b9bec7 35%,#7f8593 70%,#3f4450)',
+  },
+  'turntable-platform': {
+    name: 'Turntable Platform',
+    stops:  ['#3a3f4a','#202530','#0a0c12','#000000'],
+    bg:     [['#262a33',0],['#16191f',0.5],['#050608',1]],
+    lighting: {
+      ambient:  { color:0xffffff, intensity:0.35 },
+      hemi:     { sky:0x2a3140, ground:0x000000, intensity:0.4 },
+      sun:      { color:0xffffff, intensity:3.6 },
+      fill:     { color:0x4a5060, intensity:0.4 },
+      rim:      { color:0x6090d0, intensity:0.7 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#3a3f4a 0%,#202530 35%,#0a0c12 70%,#000000 100%)',
+  },
+  'sunset-outdoor': {
+    name: 'Sunset Outdoor',
+    stops:  ['#ffd5a0','#ff9b6e','#a04a78','#1a1738'],
+    bg:     [['#ffd9a4',0],['#ff8b6b',0.45],['#5b3a6b',0.78],['#1a1224',1]],
+    lighting: {
+      ambient:  { color:0xffd9b0, intensity:0.45 },
+      hemi:     { sky:0xffb078, ground:0x402838, intensity:0.7 },
+      sun:      { color:0xffb878, intensity:2.8 },
+      fill:     { color:0xa070d0, intensity:0.55 },
+      rim:      { color:0xff80a0, intensity:0.65 },
+      toneExp:  1.05,
+      exposureHint: 1.05,
+    },
+    thumb: 'linear-gradient(180deg,#ffd5a0 0%,#ff9b6e 38%,#a04a78 72%,#1a1738 100%)',
+  },
+  'treasure-cave': {
+    name: 'Treasure Cave',
+    stops:  ['#3a2a18','#4a2e10','#221408','#080400'],
+    bg:     [['#3a2818',0],['#241608',0.5],['#0c0604',1]],
+    lighting: {
+      ambient:  { color:0xffd0a0, intensity:0.28 },
+      hemi:     { sky:0x6b4830, ground:0x1a0a04, intensity:0.4 },
+      sun:      { color:0xffb060, intensity:2.2 },
+      fill:     { color:0xff8830, intensity:0.7 },
+      rim:      { color:0xffa050, intensity:0.55 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#3a2a18 0%,#4a2e10 35%,#221408 70%,#080400 100%)',
+  },
+  'enchanted-forest': {
+    name: 'Enchanted Forest',
+    stops:  ['#b8e8a8','#5fa060','#1a4a32','#081820'],
+    bg:     [['#c4e6b0',0],['#5fa05e',0.5],['#0d2820',1]],
+    lighting: {
+      ambient:  { color:0xc8e8c0, intensity:0.4 },
+      hemi:     { sky:0xa0d090, ground:0x1a3018, intensity:0.7 },
+      sun:      { color:0xfff0c0, intensity:2.4 },
+      fill:     { color:0x60c890, intensity:0.55 },
+      rim:      { color:0xa0ffc0, intensity:0.5 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#b8e8a8 0%,#5fa060 38%,#1a4a32 72%,#081820 100%)',
+  },
+  'cyberpunk-neon': {
+    name: 'Cyberpunk Neon',
+    stops:  ['#1a0830','#3a0a55','#08122e','#02060f'],
+    bg:     [['#220a40',0],['#180828',0.5],['#06040c',1]],
+    lighting: {
+      ambient:  { color:0x4060a0, intensity:0.32 },
+      hemi:     { sky:0x4a2080, ground:0x08101a, intensity:0.5 },
+      sun:      { color:0xff40c0, intensity:2.0 },
+      fill:     { color:0x40d0ff, intensity:1.4 },
+      rim:      { color:0xc040ff, intensity:0.95 },
+      toneExp:  1.05,
+      exposureHint: 1.05,
+    },
+    thumb: 'linear-gradient(180deg,#1a0830 0%,#3a0a55 38%,#08122e 72%,#02060f 100%)',
+  },
+  'alchemy-lab': {
+    name: 'Alchemy Lab',
+    stops:  ['#5a4870','#3a2858','#1a0e2a','#080410'],
+    bg:     [['#5a4878',0],['#321848',0.5],['#0a0410',1]],
+    lighting: {
+      ambient:  { color:0xa0a0c0, intensity:0.32 },
+      hemi:     { sky:0x6a4880, ground:0x1a0a18, intensity:0.5 },
+      sun:      { color:0xff9050, intensity:2.4 },
+      fill:     { color:0x60d080, intensity:0.95 },
+      rim:      { color:0xc060ff, intensity:0.7 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#5a4870 0%,#3a2858 38%,#1a0e2a 72%,#080410 100%)',
+  },
+  'cloud-top': {
+    name: 'Cloud Top',
+    stops:  ['#cce4f8','#9cc8ee','#5a98d8','#1a4880'],
+    bg:     [['#dcecf8',0],['#a8c8ec',0.5],['#5a90d0',0.85],['#2a5898',1]],
+    lighting: {
+      ambient:  { color:0xffffff, intensity:0.55 },
+      hemi:     { sky:0xbcd8ec, ground:0x88a8c8, intensity:0.85 },
+      sun:      { color:0xfff4e0, intensity:2.8 },
+      fill:     { color:0xa0c0e0, intensity:0.5 },
+      rim:      { color:0xc0d8f0, intensity:0.4 },
+      toneExp:  1.0,
+      exposureHint: 1.0,
+    },
+    thumb: 'linear-gradient(180deg,#cce4f8 0%,#9cc8ee 38%,#5a98d8 72%,#1a4880 100%)',
+  },
 };
-const LBL_ENV_QUALITY = {1:[256,128], 2:[512,256], 3:[1024,512]};
-let lblEnvPresetKey = 'studio-cool';
-let lblEnvQuality = 2;
+
+let lblEnvPresetKey = 'studio-white';
 let lblEnvIntensity = 1;
 let lblEnvBackground = false;
 let lblEnvTexCache = new Map();
 
-// Builds a simple 4-stop vertical gradient equirectangular texture from
-// the preset's colour stops (top→bottom), then bakes it through the
-// existing pmremGenerator — same "makeEquirect → fromEquirectangular"
-// chain the RJS reference app uses, just driven by canvas gradient stops
-// instead of a real photographic HDR (keeps this fully offline/no-API).
+// Build a simple 4-stop vertical gradient equirectangular CanvasTexture
+// from the preset's colour stops (top→bottom). Cheap, deterministic, no
+// fetch. Same makeEquirect→fromEquirectangular PMREM chain the original
+// H4 used, but driven by an in-memory canvas instead of a real HDR file.
 function lblMakeEquirectFromStops(stops, w, h){
   const c = document.createElement('canvas'); c.width=w; c.height=h;
   const ctx = c.getContext('2d');
@@ -19922,60 +20120,100 @@ function lblMakeEquirectFromStops(stops, w, h){
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
+
+// Build a vertical gradient background CanvasTexture for scene.background
+// using the 4-stop [position, css] pair list the preset declares.
+function lblMakeGradientBG(stops){
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = 1; c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, size);
+  stops.forEach(([pos, col]) => g.addColorStop(pos, col));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Apply (or refresh) the active preset — rebuilds the env map cache entry
+// once, swaps scene.environment / scene.background / lighting / tone
+// exposure in one place so the toolbar button stays in sync.
 function lblApplyEnvPreset(){
-  const cacheKey = lblEnvPresetKey+'|'+lblEnvQuality;
-  let bakedTex = lblEnvTexCache.get(cacheKey);
+  const preset = LBL_ENV_PRESETS[lblEnvPresetKey];
+  if(!preset) return;
+  // Bake the equirect → PMREM env map once per preset.
+  let bakedTex = lblEnvTexCache.get(lblEnvPresetKey);
   if(!bakedTex){
-    const [w,h] = LBL_ENV_QUALITY[lblEnvQuality];
-    const equirect = lblMakeEquirectFromStops(LBL_ENV_PRESETS[lblEnvPresetKey], w, h);
+    const equirect = lblMakeEquirectFromStops(preset.stops, 512, 256);
     bakedTex = pmremGenerator.fromEquirectangular(equirect).texture;
     equirect.dispose();
-    lblEnvTexCache.set(cacheKey, bakedTex);
+    lblEnvTexCache.set(lblEnvPresetKey, bakedTex);
   }
   proceduralEnvMapOverride = bakedTex;
-  if(hdriEnabled) scene.environment = bakedTex;
-  scene.background = lblEnvBackground ? bakedTex : null;
-  renderer.toneMappingExposure = lblEnvIntensity;
+  scene.environment = bakedTex;
+  hdriEnabled = true;
+  // Background: when "Show" is picked, render the preset's matching
+  // gradient behind the model; otherwise stay on the dark canvas gradient
+  // (theme default) so the popover feels neutral.
+  if(lblEnvBackground){
+    scene.background = lblMakeGradientBG(preset.bg);
+  } else {
+    scene.background = (currentThemeLP === 'light')
+      ? makeGradientBG([[0,'#5b9bdb'],[0.3,'#8ec3ef'],[0.62,'#c7e2f8'],[1,'#eef6fc']])
+      : makeGradientBG([[0,'#161a26'],[0.45,'#1f2434'],[1,'#262c40']]);
+  }
+  // Tone-mapping exposure (combines user intensity slider × preset's own
+  // exposure hint so e.g. Sunset stays a hair warmer without clipping).
+  renderer.toneMappingExposure = lblEnvIntensity * preset.lighting.exposureHint;
+  // Drive the in-scene lights to match the preset's mood.
+  const L = preset.lighting;
+  ambientLight.color.setHex(L.ambient.color); ambientLight.intensity = L.ambient.intensity * lblEnvIntensity;
+  hemiLight.color.setHex(L.hemi.sky); hemiLight.groundColor.setHex(L.hemi.ground); hemiLight.intensity = L.hemi.intensity * lblEnvIntensity;
+  sun.color.setHex(L.sun.color); sun.intensity = L.sun.intensity * lblEnvIntensity;
+  fillLight.color.setHex(L.fill.color); fillLight.intensity = L.fill.intensity * lblEnvIntensity;
+  rimBL.color.setHex(L.rim.color); rimBL.intensity = L.rim.intensity * lblEnvIntensity;
+  rim.color.setHex(L.rim.color); rim.intensity = (L.rim.intensity * lblEnvIntensity) * 0.5;
 }
-// Module-level override the H4 popover writes to and the HDRI toggle
-// button (original code) reads via this indirection — see the small
-// patch on the hdri-toggle-btn listener below.
 let proceduralEnvMapOverride = null;
 
 const envBtn = document.getElementById('env-presets-btn');
 const envPanel = document.getElementById('env-presets-panel');
-document.getElementById('ep-swatch-row').innerHTML = Object.entries(LBL_ENV_PRESETS).map(([key,stops])=>
-  `<button class="ep-swatch${key===lblEnvPresetKey?' active':''}" data-key="${key}" title="${key}"
-    style="background:linear-gradient(180deg,${stops.join(',')})"></button>`
+// Build the 10-card preset grid (replaces the old 4-swatch row).
+document.getElementById('ep-preset-grid').innerHTML = Object.entries(LBL_ENV_PRESETS).map(([key, preset])=>
+  `<button class="ep-preset${key===lblEnvPresetKey?' active':''}" data-key="${key}" title="${preset.name}">
+     <span class="ep-thumb" style="background:${preset.thumb}"></span>
+     <span class="ep-name">${preset.name}</span>
+   </button>`
 ).join('');
+
 function lblToggleEnvPanel(){
   const isOpen = envPanel.classList.contains('open');
   if(isOpen){ envPanel.classList.remove('open'); return; }
   const r = envBtn.getBoundingClientRect();
   envPanel.style.top = (r.bottom+6)+'px';
-  envPanel.style.left = Math.max(8, r.left)+'px';
+  envPanel.style.left = Math.max(8, Math.min(window.innerWidth - 280, r.left))+'px';
   envPanel.classList.add('open');
 }
-envBtn.addEventListener('click', lblToggleEnvPanel);
+envBtn.addEventListener('click', (e)=>{ e.stopPropagation(); lblToggleEnvPanel(); });
 document.addEventListener('click', (e)=>{
   if(!envPanel.classList.contains('open')) return;
   if(envPanel.contains(e.target) || e.target===envBtn) return;
   envPanel.classList.remove('open');
 });
-envPanel.querySelectorAll('.ep-swatch').forEach(btn=>{
+
+envPanel.querySelectorAll('.ep-preset').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     lblEnvPresetKey = btn.dataset.key;
-    envPanel.querySelectorAll('.ep-swatch').forEach(b=>b.classList.toggle('active', b===btn));
+    envPanel.querySelectorAll('.ep-preset').forEach(b=>b.classList.toggle('active', b===btn));
     lblApplyEnvPreset();
+    // Keep the toolbar button label in sync — refresh its text to match
+    // the active preset so users see what's selected at a glance.
+    envBtn.innerHTML = '🌐▾ ' + LBL_ENV_PRESETS[lblEnvPresetKey].name;
   });
 });
-document.getElementById('ep-quality-row').querySelectorAll('button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    lblEnvQuality = Number(btn.dataset.q);
-    document.getElementById('ep-quality-row').querySelectorAll('button').forEach(b=>b.classList.toggle('active', b===btn));
-    lblApplyEnvPreset();
-  });
-});
+
 document.getElementById('ep-bg-row').querySelectorAll('button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     lblEnvBackground = btn.dataset.bg==='on';
@@ -19983,21 +20221,25 @@ document.getElementById('ep-bg-row').querySelectorAll('button').forEach(btn=>{
     lblApplyEnvPreset();
   });
 });
+
 document.getElementById('env-intensity-slider').addEventListener('input', (e)=>{
   lblEnvIntensity = Number(e.target.value);
   document.getElementById('ep-intensity-val').textContent = lblEnvIntensity.toFixed(2);
   lblApplyEnvPreset();
 });
-// Bake the default preset once at startup and hand the HDRI toggle button
-// a texture to flip between (procedural RoomEnvironment bake stays as the
-// fallback if this hasn't run yet on very first paint).
+
+// Bake the default preset once at startup.
 lblApplyEnvPreset();
+// Toolbar button label reflects the active preset from the very first
+// frame so users don't see a "🌐▾ Env" placeholder when the page is fresh.
+envBtn.innerHTML = '🌐▾ ' + LBL_ENV_PRESETS[lblEnvPresetKey].name;
+envBtn.classList.add('active');
+
+// Re-wire the standalone HDRI toggle button so its on/off flip respects
+// whatever preset is currently active (was hardcoded to proceduralEnvMap).
 {
   const origHdriBtn = document.getElementById('hdri-toggle-btn');
   if(origHdriBtn){
-    // Re-wire (rather than add a second listener) so the ORIGINAL handler's
-    // `scene.environment = hdriEnabled ? proceduralEnvMap : null` line is
-    // fully replaced with one that respects whichever H4 preset is active.
     const freshBtn = origHdriBtn.cloneNode(true);
     origHdriBtn.parentNode.replaceChild(freshBtn, origHdriBtn);
     freshBtn.addEventListener('click', ()=>{
@@ -20148,22 +20390,11 @@ window.addEventListener('keydown', (e)=>{
 // ───────────────────────────────────────────────────────────────────────
 // H8 — LIVE AXIS GIZMO OVERLAY (current X/Y/Z in viewport)
 // ───────────────────────────────────────────────────────────────────────
-// Independent rAF loop (rather than editing the existing animate()) — the
-// overlay only needs to refresh the DOM text a few times a second, and
-// keeping it separate means this file's main render loop is untouched.
-(function lblAxisGizmoLoop(){
-  const el = document.getElementById('axis-gizmo-overlay');
-  function tick(){
-    requestAnimationFrame(tick);
-    if(!el) return;
-    const mesh = lblCurrentMesh();
-    const p = mesh ? mesh.position : {x:0,y:0,z:0};
-    el.innerHTML = `<span class="ax-x">X ${p.x.toFixed(2)}</span>&nbsp; <span class="ax-y">Y ${p.y.toFixed(2)}</span>&nbsp; <span class="ax-z">Z ${p.z.toFixed(2)}</span>`;
-  }
-  tick();
-})();
-
-// ───────────────────────────────────────────────────────────────────────
+// (H8 axis-gizmo-overlay removed — the X/Y/Z coordinate readout has been
+//  replaced by the redesigned Environment picker popover. The model's own
+//  transform gizmo (selected via the Translate / Rotate / Scale buttons)
+//  still appears in-scene when an object is selected.)
+//// ───────────────────────────────────────────────────────────────────────
 // H9 — "STARTER RECIPES" PANEL (built-in quick-pick templates)
 // ───────────────────────────────────────────────────────────────────────
 const STARTER_BLUEPRINTS = {
