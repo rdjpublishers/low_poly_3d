@@ -1420,15 +1420,27 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 .main-hero-inner{max-width:1200px;margin:0 auto;padding:14px 24px;}
 .main-hero h1{margin:0;font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.3px;line-height:1.2;}
 
-/* Content sections — the AdSense-friendly crawlable content that sits BELOW
-   the tool. Dark theme, responsive, and uses the existing design tokens. */
+/* Content sections — the AdSense-friendly long-form copy that used to
+   sit BELOW the tool in the document flow. We've moved it OFF the main
+   page and behind a hamburger-menu button ("ℹ️ About this tool"), same
+   pattern as the standalone /about.html and /contact.html pages. The
+   block is a position:fixed overlay that takes over the viewport when
+   `body.info-open` is set (toggled by showInfo() / hideInfo() via the
+   hamburger menu), and stays hidden + inert otherwise. */
 .content-sections{
+  position:fixed;top:var(--top-h);left:0;right:0;bottom:0;z-index:20;
   background:var(--bg);
-  border-top:1px solid var(--border);
   padding:48px 24px 64px;
   color:var(--text);
   font-family:'Space Grotesk',sans-serif;
+  overflow-y:auto;
+  display:none;
 }
+body.info-open .content-sections{display:block;}
+body.info-open .main-hero,
+body.info-open #main{display:none;}
+/* tighter padding inside the overlay so the long copy doesn't crowd the
+   topbar (the existing var(--top-h) above already reserves that band). */
 .content-sections-inner{max-width:920px;margin:0 auto;}
 .content-sections h2{
   font-size:22px;
@@ -1852,6 +1864,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   <button class="nav-link" id="nav-link-details" data-page="details">📖 Details</button>
   <button class="nav-link" id="nav-link-about" data-page="about">ℹ️ About</button>
   <button class="nav-link" id="nav-link-contact" data-page="contact">✉️ Contact</button>
+  <button class="nav-link" id="nav-link-info" data-page="info">ℹ️ About this Tool</button>
   <button class="nav-link" id="nav-link-kb">⌨ Keyboard Shortcuts</button>
   <div class="nav-menu-sep"></div>
   <a class="nav-link" href="https://rdjpublishers.com/privacy-policy.html">🔒 Privacy Policy</a>
@@ -32450,7 +32463,8 @@ animate();
   var navLinks = {
     viewer: document.getElementById('nav-link-viewer'),
     about: document.getElementById('nav-link-about'),
-    contact: document.getElementById('nav-link-contact')
+    contact: document.getElementById('nav-link-contact'),
+    info: document.getElementById('nav-link-info')
   };
 
   function openMenu(){
@@ -32474,15 +32488,14 @@ animate();
     var showMain = (page==='viewer' || page==='details');
     mainEl.style.display = showMain ? '' : 'none';
     if(mainHero) mainHero.hidden = !showMain;
-    // FIX: also hide the AdSense content sections when the user is on
-    // the standalone About / Contact pages. The about-page / contact-page
-    // divs are `position:fixed; top:var(--top-h); bottom:0` overlays, but
-    // the body underneath (which is now scrollable for the content
-    // sections) is still visible just past the overlay. Without this
-    // toggle, scrolling up through the about page would expose the empty
-    // banner area + start of the content sections, breaking the illusion.
-    var cs = document.getElementById('content-sections');
-    if(cs) cs.hidden = !showMain;
+    // Toggle the in-app "About this tool" overlay (the long-form FAQ /
+    // walkthrough / privacy copy that used to live inline below the
+    // tool). It is a position:fixed overlay controlled by the
+    // `body.info-open` class — opened via the hamburger menu's
+    // "ℹ️ About this Tool" entry, same flow as the standalone /about
+    // and /contact pages. Keeping the long copy behind a menu keeps the
+    // hero above the fold and lets users stay focused on the viewer.
+    document.body.classList.toggle('info-open', page==='info');
     aboutPage.hidden = (page!=='about');
     contactPage.hidden = (page!=='contact');
     window.scrollTo(0,0);
@@ -32498,6 +32511,8 @@ animate();
   });
   navLinks.about.addEventListener('click', function(){ showPage('about'); });
   navLinks.contact.addEventListener('click', function(){ showPage('contact'); });
+  var navLinkInfo = document.getElementById('nav-link-info');
+  if(navLinkInfo) navLinkInfo.addEventListener('click', function(){ showPage('info'); });
 
   // Details lives directly inside the main welcome/viewport overlay
   // (#welcome), not a separate page. Jumping to it re-shows that overlay —
