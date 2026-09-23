@@ -444,8 +444,18 @@ body{
   flex:0 0 auto;
   display:flex;overflow:hidden;position:relative;
   min-height:0;
-  height:calc(100vh - var(--top-h) - 51px); /* topbar (54) + main-hero (~50) + 1px border */
+  height:calc(100vh - var(--top-h));   /* default = topbar only (model-loaded) */
 }
+/* When no model is mounted we keep the welcome-screen H1 banner visible
+   and reserve space for it. hideWelcome() flips `body.model-loaded` on,
+   showWelcome() flips it back off — so the viewer fills the viewport the
+   moment a scene loads and the banner returns when the user goes back to
+   the welcome screen. */
+body:not(.model-loaded) #main{
+  height:calc(100vh - var(--top-h) - 51px);
+}
+/* Banner itself collapses in loaded mode. */
+body.model-loaded #main-hero{display:none;}
 
 /* ── LEFT PANEL ── */
 #left-panel{
@@ -1209,7 +1219,8 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
   /* On mobile the bottom tab strip (#mob-tabs) is fixed-height and always
      visible — subtract it from #main so the app still fills exactly the
      available viewport instead of getting clipped behind the tabs. */
-  #main{height:calc(100vh - var(--top-h) - 51px - var(--mob-panel-h) - var(--safe-b));}
+  #main{height:calc(100vh - var(--top-h) - var(--mob-panel-h) - var(--safe-b));}   /* default = model-loaded, no banner */
+  body:not(.model-loaded) #main{height:calc(100vh - var(--top-h) - 51px - var(--mob-panel-h) - var(--safe-b));}
   /* The AdSense content is reached by scrolling, so give it a little
      bottom padding on mobile so the fixed #mob-tabs never covers the
      last paragraph when the user scrolls to the very bottom. */
@@ -18313,6 +18324,10 @@ function hideWelcome(){
   const dots=document.getElementById('env-dots');
   if(env) env.classList.remove('env-hidden');
   if(dots) dots.classList.remove('env-hidden');
+  // Collapse the welcome-only H1 banner and reclaim its vertical space
+  // in #main — the viewer fills the viewport the moment a model loads,
+  // exactly like it did before the SEO copy was added.
+  document.body.classList.add('model-loaded');
 }
 function showWelcome(){
   const w=document.getElementById('welcome'); w.classList.remove('gone'); requestAnimationFrame(()=>w.classList.remove('hidden'));
@@ -18322,6 +18337,9 @@ function showWelcome(){
   const dots=document.getElementById('env-dots');
   if(env) env.classList.add('env-hidden');
   if(dots) dots.classList.add('env-hidden');
+  // Bring the H1 banner back into the layout so the welcome screen has
+  // the same proportions it had on first load.
+  document.body.classList.remove('model-loaded');
 }
 
 // ───────────────────────────────────────────────────────────────────────
