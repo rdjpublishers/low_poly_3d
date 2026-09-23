@@ -273,8 +273,10 @@ body.theme-light .hud-chip{
 #theme-toggle:hover { border-color:var(--accent2); color:var(--accent2); transform:translateY(-1px); }
 #theme-toggle:active { transform:translateY(0); }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
+html{height:100%;}
+html,body{overflow-x:hidden;}
 body{
+  height:100%;overflow-y:auto;
   font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
@@ -428,7 +430,22 @@ body{
 #shading-mode-select.locked{border-color:var(--accent2);color:var(--accent2);}
 
 /* ── LAYOUT ── */
-#main{flex:1;display:flex;overflow:hidden;position:relative;}
+/* FIX (recent text-content additions pushed #main to height:0 because
+   #content-sections — a 3400px tall block that lives below the app in the
+   document flow — was given natural height and ate all of #main's flex:1
+   allocation while `html,body{overflow:hidden}` clipped the rest. That
+   meant the new AdSense content sections silently covered the entire
+   viewer area (zero-height) and intercepted pointer events for the
+   inspector tabs + export buttons. Fix: pin #main to fill exactly the
+   viewport minus the topbar minus the new main-hero strip, and let the
+   page scroll vertically (body overflow-y:auto) so the content sections
+   remain reachable below the fold instead of stealing the viewer. */
+#main{
+  flex:0 0 auto;
+  display:flex;overflow:hidden;position:relative;
+  min-height:0;
+  height:calc(100vh - var(--top-h) - 51px); /* topbar (54) + main-hero (~50) + 1px border */
+}
 
 /* ── LEFT PANEL ── */
 #left-panel{
@@ -1177,7 +1194,26 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 @media(max-width:700px){
   :root{--panel-w:100%;--insp-w:100%;}
   #left-panel,#right-panel{display:none;}
-  #mob-tabs{display:flex;}
+  /* On mobile the bottom tab strip is pinned to the bottom of the
+     viewport (position:fixed) instead of sitting at the end of the
+     document flow. Without this, the new <section class="content-sections">
+     at the bottom of the page would push #mob-tabs far past the user's
+     viewport — they would have to scroll all the way through 4 800 px of
+     AdSense content to reach the navigation controls. Pinning them keeps
+     Scene / Inspector / Export one tap away no matter how far they scroll. */
+  #mob-tabs{
+    display:flex;
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    box-shadow:0 -4px 16px -6px rgba(0,0,0,.4);
+  }
+  /* On mobile the bottom tab strip (#mob-tabs) is fixed-height and always
+     visible — subtract it from #main so the app still fills exactly the
+     available viewport instead of getting clipped behind the tabs. */
+  #main{height:calc(100vh - var(--top-h) - 51px - var(--mob-panel-h) - var(--safe-b));}
+  /* The AdSense content is reached by scrolling, so give it a little
+     bottom padding on mobile so the fixed #mob-tabs never covers the
+     last paragraph when the user scrolls to the very bottom. */
+  #content-sections{padding-bottom:calc(64px + var(--mob-panel-h) + var(--safe-b));}
   #mob-left,#mob-right{
     display:flex;flex-direction:column;
     transform:translateY(14px);opacity:0;visibility:hidden;
@@ -32420,6 +32456,15 @@ animate();
     var showMain = (page==='viewer' || page==='details');
     mainEl.style.display = showMain ? '' : 'none';
     if(mainHero) mainHero.hidden = !showMain;
+    // FIX: also hide the AdSense content sections when the user is on
+    // the standalone About / Contact pages. The about-page / contact-page
+    // divs are `position:fixed; top:var(--top-h); bottom:0` overlays, but
+    // the body underneath (which is now scrollable for the content
+    // sections) is still visible just past the overlay. Without this
+    // toggle, scrolling up through the about page would expose the empty
+    // banner area + start of the content sections, breaking the illusion.
+    var cs = document.getElementById('content-sections');
+    if(cs) cs.hidden = !showMain;
     aboutPage.hidden = (page!=='about');
     contactPage.hidden = (page!=='contact');
     window.scrollTo(0,0);
