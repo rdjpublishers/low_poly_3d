@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Low Poly 3D — AI 3D Scene Builder (any style) | RDJ Publishers</title>
+<title>Low Poly 3D — Free Browser-Based AI 3D Blueprint Tool | RDJ Publishers</title>
 <!-- v1.34 / v8.25 — PART 180-189 Chunky 3D Sport Motorcycle Reference Specification layered additively on top of PART 179 (v1.33 / v8.24 baseline; PART 179 + PART 167-178 retained). PART 180-189 elevates the PART 177 Chunky Sport Motorcycle worked example from summary-level to a fully-authoritative 10-section reference specification (codifying the user-supplied SportMotorcycle_3D_Techniques_Specification.txt at repo root): PART 180 10-section spec layout + RULE 180.0.1 Reference Authority + RULE 180.0.2 Generalisation Beyond the Sport Motorcycle + PART 181 Core Technologies Stack (Three.js / TypeScript / ES modules / WebGL / Canvas 2D / Mulberry32 PRNG + zero external asset dependency) + PART 182 Authoritative Geometry Catalog with PART-to-PRIMITIVE LOOKUP TABLE (CylinderGeometry for rotated structural members, ExtrudeGeometry for organic panels, TorusGeometry for tires and rims, CapsuleGeometry for mirrors and headlights, TubeGeometry along CatmullRomCurve3 for exhaust header, BoxGeometry ONLY for straight structural members) + RULE 182.0.1 BoxGeometry Constraint + RULE 182.0.2 CylinderGeometry Constraint (motorcycle-paint-aware extensions of the v1.33 PART 167.0.2 forbidden-fairing list) + PART 183 Reference Materials & Color Palette (3-tier MeshStandardMaterial / MeshPhysicalMaterial-with-clearcoat / MeshBasicMaterial system + procedural 256×256 seeded Mulberry32 micro-roughness texture with RepeatWrapping at 4×4 + 6-band reference-sampled palette: fairing orange 0xf5821b/0xdc6b0a/0xff9429 + charcoal 6 shades + accent silver 5 shades + headlight white + taillight red + shock spring yellow) + PART 184 Modular Component Architecture (8 builder functions: createChunkySportWheel() + buildFrontForkAssembly() + buildFairingAndCockpit() + buildFuelTank() + buildSeatAndTailSection() + buildChassisAndEngine() + buildExhaustSystem() + buildRearSwingarm() — each returning { group, meshes, sockets?, colliders? } and accepting a shared materials map parameter) + PART 185 Authoritative Coordinate System & Proportions (+X front / -X rear / +Y up / +Z right; origin (0,0,0) between the axles; axles at Y ≈ 0.30 so lathed tires touch ground at Y = 0; ~22° rake angle on steering_pivot; deterministic posture contract) + PART 186 sculptRuntime Runtime Contract (9-key contract on root.userData: nodes / meshes / sockets / colliders / destructionGroups / materials / actions / animation / vfx + 5 Actions API methods revEngine / steer / setDriveSpeed / toggleHeadlight / resetPose + per-frame Tick System + 9 SportMotorcycleOpts fields scale / shadows / wireframe / fairingColor / frameColor / accentColor / driveSpeed / steeringAngle / idleVibration + Audit #E186 contract conformance) + PART 187 Look-Dev Lighting System (createSportMotorcycleModelLookDevLights(mode) with 3 modes 'reference' / 'grazing' / 'neutral' + 2048 shadow map contract + { lights, shadowCatcher } return shape) + PART 188 Architectural & Performance Targets (~8 500 tris target + shadow cast+receive on all major meshes + wireframe diagnostic mode + the 8 architectural patterns factory + options object + runtime contract + modular builder + named registry + action/command + deterministic procedural + zero-dependency standalone) + PART 189 Style Metadata + LBL Version Stamp (5-field pair: style-label 'chunky-mascot' / subject 'sport-motorcycle' / source-reference 'bd5da92411032501f007edb073f06372.jpg' / reference-views 'isometric-front-right' / lbl-version 'v1.34 / v8.25' + dual-version stamp rule TS-v1.x paired with JSON-JS-v8.x always released together + Audit #E189 surface on load). PART 180-189 is purely additive methodology + reference specification; no new renderer-side helpers this release (PART 179's 3 helpers createLathedTireGeometry / createSweptTube / createExhaustCanister are reused as-is for tire + exhaust in the canonical bike). PART 180-189 generalises beyond the sport motorcycle to any chunky-mascot / smooth-3D-vinyl-clay vehicle whose source reference is single-image-grounded. The 6 LBL spec files (Prompt_To_Ts.txt / Prompt_To_Js.txt / Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt) all carry v1.34 / v8.25 banners and reference PART 180-189 from Prompt_To_Ts.txt; the authoritative 10-section source-of-truth lives byte-identical at SportMotorcycle_3D_Techniques_Specification.txt (repo root). See CHANGES_v134.md. v1.33 / v8.24 PART 179 baseline (v1.33 / v8.24) retained: Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) + RULE 167.1.1 Form Preservation Mandate + RULE 169.1.2 Filleted Box Usage Constraint (PROHIBITED for fairings / cowls / tanks / visors / tires) + RULE 169.3.2 Mandatory Wheel Profile Revolution (lathed toroidal tire — flat cylinders fail audit E41) + Body_Fairings & FuelTank continuous envelope group (PART 172.1.1) + 10 new technical PARTs 179.1-179.10 (lathed tire / Catmull-Rom swept tube / exhaust canister / bezier extrude / shape-hole duct / egg-visor fix / TS1117 fix / socket attachment hierarchy / form-preservation ship-list addendum). 3 new helpers added to public/modeling/mt-hardsurface.js: createLathedTireGeometry / createSweptTube / createExhaustCanister. PART 167-178 baseline (v1.32 / v8.23) retained: 8-step vehicle pipeline + dimension & clearance contract + 4 procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques (quadratic / bezier / lathe / swept extrusion / parametric) + seeded mulberry32 micro-roughness texture + hierarchical articulation tree + 3-point studio lighting rig + self-verification runtime hooks + 8-section code architecture + 10 hard-surface pitfalls + canonical worked example + 12-step ship checklist. Layered additively over PART 145-152 (perfect-shape pipeline) + PART 153-166 (image-driven factory defaults) + PART 100-143 (44-Technique Modeling Bundle) + PART 74 (procedural texturing). -->
-<meta name="description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser. Supports low-poly, mid-poly, high-poly, stylized, toon and more. Free, no sign-up, 100% private."/>
+<meta name="description" content="Drop an AI-generated LBL blueprint JSON into this free, browser-based Low Poly 3D tool to instantly render, edit, and export it as GLB, OBJ, or STL. No sign-up."/>
 <meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.34, LBL v8.25, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.34 v8.25, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 180-189 ChunkySportMotorcycle ReferenceSpecification chunky-mascot sport-motorcycle createChunkySportWheel buildFrontForkAssembly buildFairingAndCockpit buildFuelTank buildSeatAndTailSection buildChassisAndEngine buildExhaustSystem buildRearSwingarm sculptRuntime revEngine steer setDriveSpeed toggleHeadlight resetPose createSportMotorcycleModelLookDevLights reference grazing neutral Mulberry32 microRoughnessBike FairingOrange AccentSilver Charcoal ShockSpringYellow TubeGeometry CatmullRomCurve3 BezierExtrude ShapeHoles LathedTire DeepDishRim RimStarPattern, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments, PART 100-143 44-Technique Modeling Bundle Primitive BMesh Procedural Parametric Generative SDF Voxel CSG Boolean L-System Fractal NURBS Non-Manifold Subdivision Remeshing Retopology Decimation Triangulation Quad Smoothing Sculpting Displace SMPL Blendshapes ShapeKeys MorphTargets LBS DQS ImplicitSkinning DeltaMush CageDeformation MuscleSim SoftBody Hair AutoRig PBRNodes ProceduralTex UVUnwrap Baking TexturePainting AtlasPacking LOD Instancing GeometryNodes PhysicsSim, MakePrimitive BmeshFromGeometry ProceduralGenerate MakeParametric GenerativeGrow SdfEvaluate VoxelCarve CsgUnion LSystem FractalMandelbulb MakeNurbsCurve DetectNonManifold SubdivideCatmullClark IsotropicRemesh AutoRetopologize QemDecimate Triangulate Quadify LaplacianSmooth SculptBrush DisplaceSurface SmplSkeleton MakeBlendshape ShapeKeyStore ComputeLBS ComputeDQS ImplicitSkin DeltaMush CageDeform MuscleSim SoftBodySim HairStrands AutoRig PbrMaterialGraph ProceduralTextureCanvas UvUnwrap BakeMap PaintTexture PackAtlases GenerateLOD MakeInstanced GeoNodesEvaluate PhysicsStep"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
@@ -17,38 +17,149 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="RDJ Publishers"/>
-<meta property="og:title" content="Low Poly 3D — AI 3D Scene Builder (any style)"/>
-<meta property="og:description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser. Supports low-poly, mid-poly, high-poly, stylized, toon and more. Free, no sign-up, 100% private."/>
+<meta property="og:title" content="Low Poly 3D — Free Browser-Based AI 3D Blueprint Tool"/>
+<meta property="og:description" content="Drop an AI-generated LBL blueprint JSON into this free, browser-based Low Poly 3D tool to instantly render, edit, and export it as GLB, OBJ, or STL. No sign-up."/>
 <meta property="og:url" content="https://rdjpublishers.com/low_poly_3d/"/>
 <meta property="og:image" content="https://rdjpublishers.com/low_poly_3d/Logo.png"/>
 <meta property="og:locale" content="en_US"/>
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:title" content="Low Poly 3D — AI 3D Scene Builder (any style)"/>
-<meta name="twitter:description" content="Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser. Supports low-poly, mid-poly, high-poly, stylized, toon and more. Free, no sign-up, 100% private."/>
+<meta name="twitter:title" content="Low Poly 3D — Free Browser-Based AI 3D Blueprint Tool"/>
+<meta name="twitter:description" content="Drop an AI-generated LBL blueprint JSON into this free, browser-based Low Poly 3D tool to instantly render, edit, and export it as GLB, OBJ, or STL. No sign-up."/>
 <meta name="twitter:image" content="https://rdjpublishers.com/low_poly_3d/Logo.png"/>
 
-<!-- Structured data -->
+<!-- Structured data: SoftwareApplication -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
+  "@type": "SoftwareApplication",
   "name": "Low Poly 3D",
+  "alternateName": "Low Poly 3D — AI 3D Scene Builder",
   "url": "https://rdjpublishers.com/low_poly_3d/",
   "applicationCategory": "DesignApplication",
-  "operatingSystem": "Any (runs in browser)",
+  "applicationSubCategory": "3D Modeling / Blueprint Renderer",
+  "operatingSystem": "Any modern browser (Chrome, Firefox, Edge, Safari)",
+  "browserRequirements": "Requires WebGL 2.0 and JavaScript",
+  "softwareVersion": "v1.35 / v8.26",
+  "inLanguage": "en",
+  "isAccessibleForFree": true,
   "offers": {
     "@type": "Offer",
     "price": "0",
-    "priceCurrency": "USD"
+    "priceCurrency": "USD",
+    "availability": "https://schema.org/InStock"
   },
-  "description": "Convert AI-generated LBL blueprint JSON into editable 3D scenes in your browser. Supports low-poly, mid-poly, high-poly, stylized, toon and more. Free, no sign-up, 100% private.",
+  "description": "Drop an AI-generated LBL blueprint JSON into this free, browser-based Low Poly 3D tool to instantly render, edit, and export it as GLB, OBJ, or STL. No sign-up.",
+  "featureList": [
+    "Drop-in AI blueprint JSON / JS / TS renderer",
+    "In-browser editing, re-texturing and re-lighting",
+    "Export to GLB, OBJ, STL, and TypeScript factory source",
+    "LOD generation, mesh cleanup, and triangle-budget tools",
+    "Client-side only — no server, no upload, no API key"
+  ],
+  "image": "https://rdjpublishers.com/low_poly_3d/Logo.png",
+  "screenshot": "https://rdjpublishers.com/low_poly_3d/Logo.png",
   "publisher": {
     "@type": "Organization",
     "name": "RDJ Publishers",
-    "url": "https://rdjpublishers.com/"
+    "url": "https://rdjpublishers.com/",
+    "email": "rdjpublishers@gmail.com"
   }
+}
+</script>
+
+<!-- Structured data: FAQPage -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What does this tool actually do?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Low Poly 3D is a browser-based viewer and editor for a JSON, JavaScript, or TypeScript 'blueprint' format. It does not generate anything by itself — you get the blueprint from your own AI chat, then load it here to render, tweak, and export a low-poly 3D model."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need an API key or account?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. There is nothing to sign up for and no key to paste in. You use whichever AI chat you already have access to; this app only renders what it is given."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which mode should I choose?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Start with Standard (JSON) — it works with almost any AI and is easiest to fix by hand if something looks off. Move to Advanced (JavaScript) for more detailed geometry, or Pro (TypeScript) if you want real Three.js code, animation support, and are using a strong coding model."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the difference between the Prompt and Image files?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Use a Prompt file when you are describing your model in words. Use an Image file when you are giving the AI a reference picture to turn into a blueprint instead."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my data private?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Blueprints, images, and exports are processed entirely on your device. Nothing you load or build in the viewer is uploaded anywhere — see the Privacy-First section on this page for details."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "The AI output will not load — what now?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Check the Validator panel on the left for the specific error, then paste that error back to your AI and ask it to fix the blueprint. The downloaded file already includes the format rules your AI needs to follow."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I edit a model after it loads?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, or .ts."
+      }
+    }
+  ]
+}
+</script>
+
+<!-- Structured data: BreadcrumbList -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://rdjpublishers.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Tools",
+      "item": "https://rdjpublishers.com/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Low Poly 3D",
+      "item": "https://rdjpublishers.com/low_poly_3d/"
+    }
+  ]
 }
 </script>
 
@@ -1261,6 +1372,91 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 .main-hero{border-bottom:1px solid var(--border);background:var(--surface);}
 .main-hero-inner{max-width:1200px;margin:0 auto;padding:14px 24px;}
 .main-hero h1{margin:0;font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.3px;line-height:1.2;}
+
+/* Content sections — the AdSense-friendly crawlable content that sits BELOW
+   the tool. Dark theme, responsive, and uses the existing design tokens. */
+.content-sections{
+  background:var(--bg);
+  border-top:1px solid var(--border);
+  padding:48px 24px 64px;
+  color:var(--text);
+  font-family:'Space Grotesk',sans-serif;
+}
+.content-sections-inner{max-width:920px;margin:0 auto;}
+.content-sections h2{
+  font-size:22px;
+  font-weight:700;
+  color:var(--text);
+  margin:0 0 14px;
+  letter-spacing:-0.3px;
+  line-height:1.25;
+}
+.content-sections h3{
+  font-size:15px;
+  font-weight:600;
+  color:var(--text);
+  margin:22px 0 8px;
+}
+.content-sections p{
+  font-size:14px;
+  color:var(--text2);
+  line-height:1.7;
+  margin:0 0 12px;
+}
+.content-sections ul,.content-sections ol{
+  font-size:14px;
+  color:var(--text2);
+  line-height:1.7;
+  margin:0 0 14px;
+  padding-left:22px;
+}
+.content-sections li{margin-bottom:6px;}
+.content-sections a{color:var(--accent2);}
+.content-sections a:hover{color:var(--accent3);text-decoration:underline;}
+.content-section{margin-bottom:48px;scroll-margin-top:80px;}
+.content-section:last-child{margin-bottom:0;}
+.content-section .cs-intro{font-size:14.5px;color:var(--text2);line-height:1.7;margin:0 0 14px;}
+.cs-table-wrap{overflow-x:auto;margin:14px 0 18px;border:1px solid var(--border);border-radius:var(--radius);}
+.cs-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+.cs-table th,.cs-table td{
+  text-align:left;
+  padding:10px 12px;
+  border-bottom:1px solid var(--border);
+  vertical-align:top;
+}
+.cs-table th{background:var(--surface2);color:var(--text);font-weight:600;font-size:13px;}
+.cs-table tr:last-child td{border-bottom:none;}
+.cs-table tr:nth-child(even) td{background:var(--surface);}
+.cs-callout{
+  border:1px solid var(--border);
+  border-left:3px solid var(--accent);
+  background:var(--surface);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  margin:14px 0 18px;
+  color:var(--text2);
+  font-size:14px;
+  line-height:1.65;
+}
+.cs-callout strong{color:var(--text);}
+.cs-tag{
+  display:inline-block;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.3px;
+  color:var(--accent2);
+  background:rgba(167,139,250,.12);
+  border:1px solid rgba(167,139,250,.25);
+  padding:2px 8px;
+  border-radius:999px;
+  margin-bottom:10px;
+  text-transform:uppercase;
+}
+@media (max-width:720px){
+  .content-sections{padding:32px 16px 48px;}
+  .content-sections h2{font-size:19px;}
+  .content-sections p,.content-sections ul,.content-sections ol,.content-section .cs-intro{font-size:13.5px;}
+}
 /* ══════════════════════════════════════════════════════════════
    LBL SYSTEM UPDATE — added CSS (Part A items H1-H10, Part B T1-T9)
    ══════════════════════════════════════════════════════════════ */
@@ -1621,7 +1817,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
 <div id="about-page" class="site-page" hidden>
   <div class="site-page-inner">
     <section class="site-hero">
-      <h1>Crafting Tools People Actually Use</h1>
+      <h2>Crafting Tools People Actually Use</h2>
       <p>RDJ Publishers is an independent web studio dedicated to building free, fast, and privacy‑respecting tools for students, professionals, and everyday users – with zero sign‑ups and zero costs.</p>
     </section>
     <section class="site-cards">
@@ -1653,7 +1849,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
 <div id="contact-page" class="site-page" hidden>
   <div class="site-page-inner">
     <section class="site-hero">
-      <h1>We'd Love to Hear From You</h1>
+      <h2>We'd Love to Hear From You</h2>
       <p>Questions, bug reports, tool requests, or just say hello – we read every message.</p>
     </section>
     <section class="site-contact-grid">
@@ -1808,9 +2004,9 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
 
         <footer class="site-footer">
           <div class="site-footer-links">
-            <a class="site-footer-link" href="#about-page" id="footer-link-about">About</a>
+            <a class="site-footer-link" href="https://rdjpublishers.com/about.html">About</a>
             <span class="site-footer-sep" aria-hidden="true">·</span>
-            <a class="site-footer-link" href="#contact-page" id="footer-link-contact">Contact</a>
+            <a class="site-footer-link" href="https://rdjpublishers.com/contact.html">Contact</a>
             <span class="site-footer-sep" aria-hidden="true">·</span>
             <a class="site-footer-link" href="https://rdjpublishers.com/privacy-policy.html">Privacy Policy</a>
             <span class="site-footer-sep" aria-hidden="true">·</span>
@@ -1960,7 +2156,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
           <label>Master texture image <span style="font-weight:400;color:var(--muted)">— PART 55 item 22, paints onto meta.textureImage</span></label>
           <input type="file" id="pb-texture-input" accept="image/*" style="display:none">
           <button id="pb-texture-btn" class="pb-btn-secondary" style="width:auto">🖼 Choose image…</button>
-          <img id="pb-texture-preview" style="display:none;width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);margin-top:6px;vertical-align:middle">
+          <img id="pb-texture-preview" alt="" aria-hidden="true" style="display:none;width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);margin-top:6px;vertical-align:middle">
           <div class="pb-hint">Applies to any object with "useMasterTexture":true, or its own "textureImage".</div>
         </div>
         <div class="pb-field">
@@ -2079,6 +2275,122 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   </div>
 
 </div>
+
+<!-- CONTENT SECTIONS — AdSense-friendly crawlable content that lives BELOW the
+     interactive tool so the viewer stays the hero above the fold. -->
+<section class="content-sections" id="content-sections" aria-label="About Low Poly 3D">
+<div class="content-sections-inner">
+
+<article class="content-section" id="cs-what-is">
+  <span class="cs-tag">Overview</span>
+  <h2>What Is Low Poly 3D?</h2>
+  <p class="cs-intro">Low Poly 3D is a free, browser-based viewer and editor for a small, well-documented "blueprint" format that describes 3D scenes in JSON, JavaScript, or TypeScript. You describe a subject to any AI chat, get a blueprint back as text, drop the file into the tool, and you have an editable 3D scene a second later — no install, no sign-up, no API key.</p>
+  <p>The name says "low poly," but the renderer does not lock you into that style. The same viewer handles mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon and cel-shaded, and retro-PSX scenes. Triangles, materials, lighting rigs, skeletons, and animations all come from the blueprint; the viewer just renders and edits what it is given.</p>
+  <p>Everything happens on your device. There is no backend to sign in to, no cloud model to rent, and no telemetry on what you load. If a model can be described in code, it can be opened, tweaked, and exported from this page.</p>
+</article>
+
+<article class="content-section" id="cs-who-for">
+  <span class="cs-tag">Audience</span>
+  <h2>Who This Tool Is For</h2>
+  <p class="cs-intro">If you have ever wanted to turn an idea or a rough sketch into a real 3D model without paying per-asset fees, learning a full DCC pipeline, or waiting on a render farm, this tool is for you. The audience we had in mind while building it:</p>
+  <ul>
+    <li><strong>Game developers</strong> prototyping props, characters, or vehicles for jam games, vertical slices, or grey-box scenes.</li>
+    <li><strong>Indie creators and hobbyists</strong> exploring 3D for the first time, who want quick visual feedback without a Blender-sized learning curve.</li>
+    <li><strong>Students and educators</strong> demonstrating geometry, materials, lighting, or skeletal animation in a classroom setting.</li>
+    <li><strong>Web developers</strong> building interactive 3D scenes for landing pages, product configurators, or portfolios.</li>
+    <li><strong>AR / VR authors</strong> who want a clean GLB to drop straight into a WebXR viewer or a mobile app.</li>
+    <li><strong>3D-printing hobbyists</strong> who need an STL export from a sketch, a prompt, or an AI-generated model.</li>
+  </ul>
+</article>
+
+<article class="content-section" id="cs-how-to-use">
+  <span class="cs-tag">Walkthrough</span>
+  <h2>How to Use the Tool — Step-by-Step</h2>
+  <p class="cs-intro">The full loop — from idea to exported model — takes about two minutes once you have done it once. Here is the shortest path that works.</p>
+  <ol>
+    <li><strong>Pick a starting mode.</strong> Standard (JSON) is the easiest and works with almost any AI chat. Move to JavaScript for richer geometry, or TypeScript if your AI model is strong at code and you want real animation hooks.</li>
+    <li><strong>Download the matching prompt file</strong> from the welcome panel. It is a small plain-text file that tells your AI exactly how a blueprint should look.</li>
+    <li><strong>Open any AI chat</strong> you already have access to — ChatGPT, Claude, Gemini, or a local model. Paste the prompt, describe your subject (or attach a reference image), and ask for the blueprint back as JSON.</li>
+    <li><strong>Drop the AI's response onto the dropzone</strong> on the left side of the page, or paste the text into the text area. The viewer validates the file and renders it within a second or two.</li>
+    <li><strong>Orbit, pan, and zoom</strong> with your mouse or touch. Toggle skeleton markers, shadows, toon outlines, AO, and HDRI lighting from the topbar to see the model under different conditions.</li>
+    <li><strong>Click any object</strong> in the Scene Objects panel to move, rotate, scale, recolor, or delete it. Use Cleanup to weld coincident vertices and LODs to drop the triangle count for big scenes.</li>
+    <li><strong>Export</strong> as GLB for the web, OBJ for most 3D apps, STL for 3D printing, or the original <code>.ts</code> factory if you want to remix the source.</li>
+  </ol>
+  <div class="cs-callout"><strong>Tip:</strong> If the AI's first attempt does not load, paste the validator's red error back to the chat and ask for a fix. The downloaded prompt file already contains every rule the AI needs to follow.</div>
+</article>
+
+<article class="content-section" id="cs-formats">
+  <span class="cs-tag">Export</span>
+  <h2>Supported Formats and What Each Is Best For</h2>
+  <p class="cs-intro">The viewer exports to the formats most 3D pipelines actually use. Pick the one that matches where the file is going next.</p>
+  <div class="cs-table-wrap">
+  <table class="cs-table">
+    <thead><tr><th>Format</th><th>Best for</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>GLB / glTF</strong></td><td>Web, AR/VR, game engines, mobile apps</td><td>Smallest file size, includes textures and animations. The recommended default.</td></tr>
+      <tr><td><strong>OBJ</strong></td><td>Older 3D apps, ZBrush, Blender imports</td><td>Geometry only — no textures or animation. Widest compatibility.</td></tr>
+      <tr><td><strong>STL</strong></td><td>3D printing, slicers, CAD workflows</td><td>Geometry only, no color or texture. Units are metres by default.</td></tr>
+      <tr><td><strong>.ts factory</strong></td><td>Power users who want to remix the source</td><td>TypeScript code that rebuilds the same scene — useful for learning the format.</td></tr>
+      <tr><td><strong>.zip bundle</strong></td><td>Ships model + rig + assets in one file</td><td>The viewer exports this when your blueprint includes separate rig or texture files.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</article>
+
+<article class="content-section" id="cs-tips">
+  <span class="cs-tag">Get better results</span>
+  <h2>Tips for Better AI Low-Poly Results</h2>
+  <p class="cs-intro">A good blueprint is mostly about what you ask the AI to do. These are the moves that reliably improve the first render:</p>
+  <ul>
+    <li><strong>Be specific about polygon count, silhouette, and pose.</strong> "Low-poly knight, around 600 triangles, T-pose, faceted shading" works far better than "make a knight."</li>
+    <li><strong>Demand schema validity up front.</strong> Ask the AI to make the output parse against the schema in the downloaded prompt file. If validation fails, paste the error back and ask for a repair.</li>
+    <li><strong>Lock the camera angle and lighting in the prompt.</strong> Different light directions produce wildly different "low-poly" looks, so naming them keeps the result consistent.</li>
+    <li><strong>For characters, mention the rig and T-pose early.</strong> Skeletons and skinning are much easier to get right the first time than to retrofit after the fact.</li>
+    <li><strong>Cap the palette.</strong> Ask for 3 to 6 named colors. AI tools tend to over-color without an explicit cap, which kills the cohesive low-poly feel.</li>
+    <li><strong>Use seeded randomness</strong> if your AI supports it. The same seed gives you the same model, which is useful for versioning, reviews, and re-rolling variants.</li>
+    <li><strong>Iterate in small steps.</strong> After the first good render, ask the AI to swap one part at a time — a different helmet, a longer cape, a new material — instead of rewriting everything.</li>
+  </ul>
+</article>
+
+<article class="content-section" id="cs-problems">
+  <span class="cs-tag">Troubleshooting</span>
+  <h2>Common Problems and Fixes</h2>
+  <p class="cs-intro">Most load failures come down to one of a handful of root causes. Work through these in order and you will clear nine out of ten issues without leaving the page.</p>
+  <ul>
+    <li><strong>"Blueprint failed to load" or red validator messages.</strong> Open the Validator panel on the left, read the error line, and paste it back to your AI. Almost every load issue is a missing comma, a wrong key, or stray text outside the JSON block.</li>
+    <li><strong>Model loads but textures are missing or pink.</strong> The AI may have stripped image references. If the file is a <code>.zip</code>, make sure it includes the texture files alongside the blueprint. Re-exporting from the AI with the asset manifest usually fixes it.</li>
+    <li><strong>Scale is wrong — model is a speck or a giant.</strong> The renderer uses metres by default. Ask the AI to add a <code>meta.targetSize</code> field or to scale a reference object to 1 m so the rest of the scene sizes correctly.</li>
+    <li><strong>Export produces an empty or tiny file.</strong> Run Cleanup first (it welds coincident vertices and rebuilds broken normals), then try the export again. Generating LODs also helps for very dense scenes.</li>
+    <li><strong>Browser lags or the canvas feels sticky.</strong> Drop the quality preset to Low, turn off HDRI and SSAO, and lower the pixel ratio. As a permanent fix, run Cleanup + LODs once after the model loads.</li>
+    <li><strong>Auto-rig or skinning looks wrong.</strong> Reset to T-Pose from the topbar, then re-trigger the rig. Most skinning bugs come from a pose the AI imagined that the rig was never built for.</li>
+  </ul>
+</article>
+
+<article class="content-section" id="cs-use-cases">
+  <span class="cs-tag">In the wild</span>
+  <h2>Use Cases and Examples</h2>
+  <p class="cs-intro">The viewer is intentionally format-agnostic, which makes it useful for a surprising range of small 3D jobs. A few we have seen work well:</p>
+  <ul>
+    <li><strong>Game props and characters</strong> for prototypes, jam games, or grey-box scenes where art quality matters less than having something to walk around.</li>
+    <li><strong>Stylized environment pieces</strong> — rocks, trees, buildings, signage — for WebGL scenes that need to ship quickly.</li>
+    <li><strong>Icons and UI illustrations in 3D</strong>, exported as GLB and embedded inline on a marketing or product page.</li>
+    <li><strong>3D-printable toys, dice, figurines, and desk objects</strong> from STL exports of an AI-sketched concept.</li>
+    <li><strong>AR markers and WebXR demo assets</strong> where the file has to be small enough to load on a phone.</li>
+    <li><strong>Educational demos</strong> of geometry, materials, lighting, and skeletal animation in a classroom or workshop.</li>
+    <li><strong>Mockup art</strong> for product pages, social posts, blog headers, and pitch decks.</li>
+  </ul>
+</article>
+
+<article class="content-section" id="cs-privacy">
+  <span class="cs-tag">Trust</span>
+  <h2>Privacy-First by Design</h2>
+  <p>Low Poly 3D runs entirely on your device. There is no backend, no API key, no account, and no analytics on your blueprints, your model data, or your exports. The only network requests the page makes are to download the plain-text prompt files and the Three.js bundle at first load.</p>
+  <p>Your blueprints, uploaded reference images, scene edits, and exported files never leave the page. You can verify this yourself by opening the Network tab in DevTools while you work — you will see downloads, but no uploads of your data. If you want to use the tool completely offline, save the page once with your browser's "Save Page As" feature and run it from disk; nothing else changes.</p>
+  <p>Advertising on this page, when shown, is served by Google AdSense. AdSense uses cookies or device-level identifiers to deliver and measure ads. You can opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" rel="noopener noreferrer" target="_blank">Google Ads Settings</a>, or by using your browser's privacy controls. See the full <a href="https://rdjpublishers.com/privacy-policy.html">Privacy Policy</a> for details on third-party cookies, data retention, and how to contact us about your data.</p>
+</article>
+
+</div>
+</section>
 
 <!-- MOBILE TABS -->
 <div id="mob-tabs">
@@ -11866,7 +12178,7 @@ async function addReferenceImage(file){
 }
 function renderReferenceThumbs(){
   const wrap = document.getElementById('pb-ref-thumbs');
-  wrap.innerHTML = referenceImages.map((r,i)=>`<div class="pb-ref-thumb"><img src="${r.dataUrl}"/><button class="pb-thumb-x" data-idx="${i}">✕</button></div>`).join('');
+  wrap.innerHTML = referenceImages.map((r,i)=>`<div class="pb-ref-thumb"><img src="${r.dataUrl}" alt=""/><button class="pb-thumb-x" data-idx="${i}">✕</button></div>`).join('');
   wrap.querySelectorAll('.pb-thumb-x').forEach(btn=>{
     btn.addEventListener('click',()=>{ referenceImages.splice(Number(btn.dataset.idx),1); renderReferenceThumbs(); });
   });
@@ -12036,7 +12348,7 @@ function renderReferenceLibraryPanel(){
   el.innerHTML = keys.map(k=>{
     const parts = k.split('__'); const style=parts[0], category=parts[1];
     const thumbs = lib[k].map(entry=>entry.thumbnail
-      ? `<img class="pb-reflib-thumb" src="${entry.thumbnail}" title="${new Date(entry.ts).toLocaleString()}">`
+      ? `<img class="pb-reflib-thumb" src="${entry.thumbnail}" alt="" title="${new Date(entry.ts).toLocaleString()}">`
       : `<span class="pb-reflib-thumb pb-reflib-thumb-empty" title="${new Date(entry.ts).toLocaleString()}">—</span>`
     ).join('');
     return `<div class="pb-reflib-item"><div class="pb-reflib-item-head"><span>${style} · ${category} <span style="color:var(--muted)">(${lib[k].length})</span></span><button class="pb-reflib-del" data-key="${k}">✕</button></div><div class="pb-reflib-thumbs">${thumbs}</div></div>`;
@@ -32141,10 +32453,10 @@ animate();
     }
   }
   if(navLinkDetails) navLinkDetails.addEventListener('click', goToDetails);
-  var footerAboutLink = document.getElementById('footer-link-about');
-  if(footerAboutLink) footerAboutLink.addEventListener('click', function(e){ e.preventDefault(); showPage('about'); });
-  var footerContactLink = document.getElementById('footer-link-contact');
-  if(footerContactLink) footerContactLink.addEventListener('click', function(e){ e.preventDefault(); showPage('contact'); });
+  // Footer About / Contact links now point to the standalone /about.html and
+  // /contact.html pages on the publisher site, so no JS handler is needed —
+  // they navigate normally. The top-nav buttons still trigger showPage() for
+  // the in-page sections.
 
   // Details section — download the generator blueprint files straight from
   // this same GitHub repo (fetched fresh, saved as a real file via a Blob
