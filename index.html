@@ -304,7 +304,9 @@ body{
 #logo{
   font-family:'Space Mono',monospace;font-weight:700;font-size:15px;color:var(--accent);
   white-space:nowrap;letter-spacing:-0.3px;display:flex;align-items:center;gap:7px;
+  text-decoration:none;cursor:pointer;transition:opacity .15s;
 }
+#logo:hover{opacity:.85;}
 #logo::before{
   content:'';width:13px;height:13px;flex-shrink:0;background:var(--accent);
   clip-path:polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
@@ -1414,6 +1416,29 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 .site-footer-link:hover{color:var(--accent2);background:var(--surface2);}
 .site-footer-sep{color:var(--muted);font-size:11px;user-select:none;padding:0 4px;opacity:.7;}
 .site-footer-copy{font-size:10px;color:var(--muted);text-align:center;}
+.site-footer-byline{font-size:10.5px;color:var(--text2);text-align:center;margin:4px 0;line-height:1.55;}
+.site-footer-byline a{color:var(--accent2);text-decoration:none;}
+.site-footer-byline a:hover{text-decoration:underline;}
+.site-footer-meta{font-size:10px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.55;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px;}
+.site-footer-meta .meta-sep{opacity:.55;padding:0 2px;}
+.site-footer-feedback{font-size:10.5px;color:var(--text2);text-align:center;margin:6px 0 2px;line-height:1.55;}
+.site-footer-feedback a{color:var(--accent2);text-decoration:none;}
+.site-footer-feedback a:hover{text-decoration:underline;}
+.site-footer-adsense{font-size:9.5px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;}
+.site-footer-adsense a{color:var(--muted);text-decoration:underline;}
+.site-footer-adsense a:hover{color:var(--accent2);}
+
+/* Visual breadcrumb — sits just below the topbar */
+.site-breadcrumb{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  font-size:11.5px;color:var(--muted);padding:7px 24px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.site-breadcrumb a{color:var(--text2);text-decoration:none;transition:color .15s;}
+.site-breadcrumb a:hover{color:var(--accent2);}
+.site-breadcrumb .bc-sep{color:var(--muted);opacity:.6;user-select:none;}
+.site-breadcrumb .bc-current{color:var(--text);font-weight:600;}
+@media (max-width:520px){.site-breadcrumb{padding:7px 14px;font-size:11px;}}
 
 /* Main hero — the H1 banner shown above the viewer when on the main page */
 .main-hero{border-bottom:1px solid var(--border);background:var(--surface);}
@@ -1697,7 +1722,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   <button id="hamburger-btn" aria-label="Open menu" aria-expanded="false" aria-controls="site-nav-menu">
     <span></span><span></span><span></span>
   </button>
-  <div id="logo">Low Poly<span>3D</span></div>
+  <a id="logo" href="https://rdjpublishers.com/" title="Back to RDJ Publishers home" aria-label="Back to RDJ Publishers home">Low Poly<span>3D</span></a>
   <div class="vdiv"></div>
   <button class="tbtn" id="upload-btn">📂 Upload</button>
   <!-- RJS UPDATE — Tools dropdown (3D Mockup Generator, etc.). Sits next to Upload so it's always visible even when the topbar overflows. -->
@@ -1933,6 +1958,15 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   </div>
 </div>
 
+<!-- BREADCRUMB — visual trail below the topbar -->
+<nav class="site-breadcrumb" aria-label="Breadcrumb">
+  <a href="https://rdjpublishers.com/" rel="home">Home</a>
+  <span class="bc-sep" aria-hidden="true">›</span>
+  <a href="https://rdjpublishers.com/">Tools</a>
+  <span class="bc-sep" aria-hidden="true">›</span>
+  <span class="bc-current" aria-current="page">Low Poly 3D</span>
+</nav>
+
 <!-- MAIN -->
 <section class="main-hero" id="main-hero">
   <div class="main-hero-inner">
@@ -2071,7 +2105,17 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
             <a class="site-footer-link" href="https://rdjpublishers.com/privacy-policy.html">Privacy Policy</a>
             <span class="site-footer-sep" aria-hidden="true">·</span>
             <a class="site-footer-link" href="https://rdjpublishers.com/terms.html">Terms</a>
+            <span class="site-footer-sep" aria-hidden="true">·</span>
+            <a class="site-footer-link" href="https://rdjpublishers.com/">Homepage</a>
           </div>
+          <div class="site-footer-byline">Built by <a href="https://rdjpublishers.com/about.html">Ratheesh M</a>, Developer at RDJ Publishers.</div>
+          <div class="site-footer-meta">
+            <span>Last updated: September 2026</span>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span>Version 1.0 — Maintained by Ratheesh M</span>
+          </div>
+          <div class="site-footer-feedback">Report a bug or suggest a feature — <a href="https://rdjpublishers.com/contact.html">contact Ratheesh M</a></div>
+          <div class="site-footer-adsense">Advertising on this page may be served by Google AdSense using cookies or device-level identifiers. See our <a href="https://rdjpublishers.com/privacy-policy.html">Privacy Policy</a> for details and opt-out information.</div>
           <div class="site-footer-copy">© 2026 RDJ Publishers. All rights reserved.</div>
         </footer>
       </div>
