@@ -184,7 +184,7 @@
   --accent:#6c63ff; --accent-dim:#5a52e0; --accent2:#a78bfa; --accent3:#4fc3f7;
   --warn:#f87171; --gold:#ffd700;
   --text:#eaeaf4; --text2:#7070a0; --muted:#7070a0;
-  --panel-w:280px; --insp-w:230px; --top-h:54px; --mob-panel-h:50px;
+  --panel-w:280px; --insp-w:230px; --top-h:54px; --breadcrumb-h:32px; --mob-panel-h:50px;
   --radius:9px; --radius-sm:6px; --radius-lg:14px;
   --shadow-1:0 1px 2px rgba(0,0,0,.4);
   --shadow-2:0 8px 24px -8px rgba(0,0,0,.55);
@@ -290,9 +290,15 @@ body{
 #topbar{
   height:var(--top-h);background:linear-gradient(180deg,var(--surface),var(--bg));
   border-bottom:1px solid var(--border);box-shadow:var(--shadow-1);
-  display:flex;align-items:center;padding:0 14px;gap:9px;flex-shrink:0;z-index:20;
+  display:flex;align-items:center;padding:0 14px;gap:9px;flex-shrink:0;z-index:30;
   overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  /* Desktop: stick the topbar to the viewport top so it never scrolls
+     out of reach. Mobile overrides this to position:fixed below. */
+  position:sticky;top:0;
 }
+/* RJS UPDATE 17 — sticky breadcrumb: keep the nav trail pinned just
+   below the topbar so it stays visible while the user scrolls content. */
+.site-breadcrumb{position:sticky;top:var(--top-h);z-index:29;}
 #topbar::-webkit-scrollbar{display:none;}
 /* RJS UPDATE 15 — keep the right-edge status chips (spec / mode / status)
    visible even when the topbar overflows horizontally. The spec chip
@@ -1204,8 +1210,29 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 
 /* Mobile responsive */
 @media(max-width:700px){
-  :root{--panel-w:100%;--insp-w:100%;}
+  :root{--panel-w:100%;--insp-w:100%;--top-h:50px;--breadcrumb-h:32px;}
   #left-panel,#right-panel{display:none;}
+  /* MOBILE TOPBAR FIX — pin the topbar to the top of the viewport.
+     After loading a model, the page is almost exactly viewport-height
+     and any touch-scroll pushes the toolbar off-screen with no way to
+     bring it back. position:fixed keeps the toolbar always reachable. */
+  #topbar{
+    position:fixed;top:0;left:0;right:0;
+    height:var(--top-h);
+    z-index:40;
+  }
+  /* Pin the breadcrumb just below the fixed topbar so the navigation
+     trail also stays visible no matter how far the user scrolls. */
+  .site-breadcrumb{
+    position:fixed;top:var(--top-h);left:0;right:0;
+    height:var(--breadcrumb-h);
+    z-index:39;
+    background:var(--surface);
+  }
+  /* Push the document content below the fixed topbar + breadcrumb band
+     so nothing is hidden behind them. box-sizing:border-box (set globally)
+     means this padding is taken from inside the body's 100% height. */
+  body{padding-top:calc(var(--top-h) + var(--breadcrumb-h));}
   /* On mobile the bottom tab strip is pinned to the bottom of the
      viewport (position:fixed) instead of sitting at the end of the
      document flow. Without this, the new <section class="content-sections">
@@ -1220,9 +1247,11 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
   }
   /* On mobile the bottom tab strip (#mob-tabs) is fixed-height and always
      visible — subtract it from #main so the app still fills exactly the
-     available viewport instead of getting clipped behind the tabs. */
-  #main{height:calc(100vh - var(--top-h) - var(--mob-panel-h) - var(--safe-b));}   /* default = model-loaded, no banner */
-  body:not(.model-loaded) #main{height:calc(100vh - var(--top-h) - 51px - var(--mob-panel-h) - var(--safe-b));}
+     available viewport instead of getting clipped behind the tabs.
+     Also subtract the fixed topbar + breadcrumb band so the viewport
+     doesn't sit underneath those fixed elements. */
+  #main{height:calc(100vh - var(--top-h) - var(--breadcrumb-h) - var(--mob-panel-h) - var(--safe-b));}   /* default = model-loaded, no banner */
+  body:not(.model-loaded) #main{height:calc(100vh - var(--top-h) - 51px - var(--breadcrumb-h) - var(--mob-panel-h) - var(--safe-b));}
   /* The AdSense content is reached by scrolling, so give it a little
      bottom padding on mobile so the fixed #mob-tabs never covers the
      last paragraph when the user scrolls to the very bottom. */
@@ -1280,7 +1309,7 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
     right:8px !important;top:8px !important;
     max-width:90px;overflow:hidden;text-overflow:ellipsis;
     box-shadow:-4px 0 8px -2px rgba(0,0,0,0.5);
-    z-index:30;
+    z-index:50;   /* sits ABOVE the fixed topbar (z-index 40) */
   }
   #mode-chip{display:none;}
   #status-pill{display:none;}
