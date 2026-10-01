@@ -1954,7 +1954,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
     </section>
     <section class="site-privacy">
       <h3>🔒 Privacy, by design</h3>
-      <p>All tools process your data entirely inside your browser. Nothing is ever sent to any server, stored, or seen by anyone else.</p>
+      <p>Your blueprints, reference images, and exported models are processed in your browser and are not uploaded to our servers. We use Google Analytics and Google AdSense, which may set cookies — see our Privacy Policy for details.</p>
     </section>
   </div>
 </div>
@@ -2090,7 +2090,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
 
         <div class="lp-privacy">
           <h3>🔒 Privacy, by design</h3>
-          <p>Everything renders locally in your browser. Your blueprints, uploaded images, and exported models are never sent to any server — the only network calls this section makes are to download the plain-text prompt files above.</p>
+          <p>Everything renders locally in your browser. Your blueprints, uploaded images, and exported models are not uploaded to our servers — the only network calls this section makes are to download the plain-text prompt files above.</p>
         </div>
 
         <div class="lp-faq">
@@ -2192,8 +2192,8 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
     </div>
     <!-- v7.7 PART 52.1/52.4/52.5 — structured prompt template + reference
          image attach (for on-screen comparison only — this renderer makes
-         no network/AI calls anywhere, so nothing here is ever sent
-         anywhere) + regenerate-with-context + reference library. -->
+         no network/AI calls anywhere, so nothing here is uploaded
+         to any server) + regenerate-with-context + reference library. -->
     <div id="prompt-builder-panel">
       <div class="pp-head">📝 Prompt Builder <span style="text-transform:none;font-weight:400">· PART 52.1</span></div>
       <div id="prompt-builder-body">
@@ -2259,7 +2259,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
           <textarea id="pb-notes" rows="3" placeholder="Anything else the AI should know about this subject…"></textarea>
         </div>
         <div class="pb-field">
-          <label>Reference image(s) <span style="font-weight:400;color:var(--muted)">— for on-screen comparison only, never sent anywhere</span></label>
+          <label>Reference image(s) <span style="font-weight:400;color:var(--muted)">— for on-screen comparison only, not uploaded to any server</span></label>
           <div id="pb-ref-dropzone" class="pb-ref-dropzone">
             <input type="file" id="pb-ref-input" accept="image/*" multiple style="display:none">
             <span>Tap to attach a photo/reference</span>
@@ -2520,7 +2520,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   <span class="cs-tag">Trust</span>
   <h2>Privacy-First by Design</h2>
   <p>Low Poly 3D runs entirely on your device. There is no backend, no API key, no account, and no analytics on your blueprints, your model data, or your exports. The only network requests the page makes are to download the plain-text prompt files and the Three.js bundle at first load.</p>
-  <p>Your blueprints, uploaded reference images, scene edits, and exported files never leave the page. You can verify this yourself by opening the Network tab in DevTools while you work — you will see downloads, but no uploads of your data. If you want to use the tool completely offline, save the page once with your browser's "Save Page As" feature and run it from disk; nothing else changes.</p>
+  <p>Your blueprints, uploaded reference images, scene edits, and exported files are not uploaded from this page. You can verify this yourself by opening the Network tab in DevTools while you work — you will see downloads, but no uploads of your data. If you want to use the tool completely offline, save the page once with your browser's "Save Page As" feature and run it from disk; nothing else changes.</p>
   <p>Advertising on this page, when shown, is served by Google AdSense. AdSense uses cookies or device-level identifiers to deliver and measure ads. You can opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" rel="noopener noreferrer" target="_blank">Google Ads Settings</a>, or by using your browser's privacy controls. See the full <a href="https://rdjpublishers.com/privacy-policy.html">Privacy Policy</a> for details on third-party cookies, data retention, and how to contact us about your data.</p>
 </article>
 
@@ -12272,8 +12272,8 @@ document.getElementById('pb-copy-btn').addEventListener('click', async ()=>{
 
 // v7.7 PART 52.1/53.1/53.2 — reference image attach (click or drag/drop).
 // Purely local: read as a data URL, keep in memory for on-screen
-// comparison (Compare mode / Fidelity tab) — never sent anywhere, since
-// this renderer makes no network/AI calls at all.
+// comparison (Compare mode / Fidelity tab) — not uploaded to any server,
+// since this renderer makes no network/AI calls at all.
 function readImageAsDataURL(file){
   return new Promise((resolve,reject)=>{
     const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=()=>reject(r.error); r.readAsDataURL(file);
