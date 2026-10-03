@@ -1,0 +1,502 @@
+================================================================================
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.36 / v8.27 — IMAGE-TO-PYTHON AI SPECIFICATION
+For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
+  https://rdjpublishers.com/low_poly_3d/
+================================================================================
+
+WHAT'S NEW IN v1.36 / v8.27 (this release)
+================================================================================
+PART 220-229 — IMAGE-TO-PYTHON PIPELINE. Extends the v1.31 / v8.22
+image-driven factory defaults (PART 153-166, originally part of Image_To_Ts.txt)
+to Python factories. Adds an image-specific Python workflow on top of
+the v1.36 / v8.27 Python factory pipeline (PART 200-219 in Prompt_To_Py.txt).
+
+  PART 220 — Image-to-Python output contract (image → factory → renderer)
+  PART 221 — Reading a reference image (silhouette / color / proportion)
+  PART 222 — Translating image features to lbl.* primitives (Style A)
+  PART 223 — Translating image features to THREE.* primitives (Style B)
+  PART 224 — Color sampling (the 6-band palette discipline)
+  PART 225 — Proportion declaration (the PART 49.1 contract)
+  PART 226 — Image-driven worked example (image → .py factory)
+  PART 227 — When to reach for Style A vs. Style B for image-driven work
+  PART 228 — Image noise / scale / lighting pitfalls
+  PART 229 — Cross-references + file metadata
+
+This file is the IMAGE-specific Python layer. The Python-specific
+non-image methodology (PART 200-219) lives canonically in
+Prompt_To_Py.txt — this file cross-references it rather than
+duplicating it.
+
+Cross-references — image-to-Python factories should ALSO follow:
+  PART 153-166 — Image-Driven Factory Defaults (PART 153-166 — this is
+             the canonical image layer; this file mirrors it for Python
+             in PART 226. PART 153-166 itself is duplicated inline below)
+  PART 200-219 — Python factory contract — see Prompt_To_Py.txt
+  PART 1   — Output contract (factory export pattern, options)
+  PART 3   — Geometry: what to use, in order
+  PART 7   — Materials: PBR recipes, one per preset
+  PART 10  — Color & palette discipline
+  PART 12  — Validation checklist
+  PART 15  — Common mistakes
+  PART 32  — Canonical helpers
+  PART 100-143 — 44-Technique Modeling Bundle
+  PART 145-152 — Perfect-Shape Modeling Pipeline
+  PART 167-178 — Hard-Surface / Vehicle Modeling Pipeline
+  PART 179 — Artist-First Geometry Flow
+  PART 180-189 — Chunky 3D Sport Motorcycle Reference Specification
+  PART 190-199 — Architectural Modeling Pipeline
+
+  See Prompt_To_Ts.txt for the full text of each reference PART.
+
+CANONICAL LBL VERSION PAIR
+  v1.36 (Python + TS) / v8.27 (JSON / JS) is the current canonical pair.
+  Python factories are the 4th input format, alongside JSON / JS / TS.
+  Image-to-Python is the 4th image-driven workflow, alongside
+  image-to-JSON / image-to-JS / image-to-TS.
+
+================================================================================
+PART 220 — IMAGE-TO-PYTHON OUTPUT CONTRACT
+================================================================================
+
+The image-to-Python workflow is identical to the prompt-to-Python
+workflow (Prompt_To_Py.txt PART 200) except the FACTORY the AI writes
+is informed by a reference IMAGE rather than a prompt. The renderer's
+contract is the same:
+
+  1. AI receives the user's reference image (provided as an attachment
+     to the chat, or as a URL the AI can fetch).
+  2. AI analyses the image (silhouette, color palette, proportions,
+     mechanical details, surface texture) — see PART 221.
+  3. AI writes a .py file following the prompt-to-Python contract
+     (PART 200-219) but with the image analysis as the design source
+     rather than the user's text prompt.
+  4. User drops the .py file on the page. The renderer loads it via
+     the same Python pipeline as a prompt-driven .py file.
+
+The output file format is identical — a .py file with a factory that
+returns either a blueprint dict (Style A) or a THREE.Group (Style B).
+What differs is the AI's INPUT BAKING — the analysis pass that goes
+from "pixels" to "Python code".
+
+The factory name convention, return type, options interface, file
+layout, and pre-output checklist are ALL inherited from Prompt_To_Py.txt
+PART 200 — do NOT duplicate them here.
+
+================================================================================
+PART 221 — READING A REFERENCE IMAGE
+================================================================================
+
+The first pass over a reference image extracts four things the Python
+factory needs:
+
+221.1 — SILHOUETTE
+  What is the overall shape? What's the bounding box aspect ratio?
+  Where are the major volumes (legs, body, head, base, top)?
+  Look for:
+    • Aspect ratio (W:H) — drives the scale of primitives
+    • Primary axis orientation (portrait / landscape / square)
+    • Visual weight distribution (top-heavy / bottom-heavy / balanced)
+    • Symmetry axis (bilateral, 4-fold, 6-fold, or none)
+    • Major sub-volumes (count them; name them; estimate their bbox)
+
+221.2 — COLOR PALETTE
+  What 3-12 colors dominate the image? Sample the image at the
+  centroid of each major sub-volume and write down what you see.
+  Look for:
+    • Primary color (the largest visible area)
+    • Secondary colors (accents, surface details, decals)
+    • Material differentiation (matte vs. glossy vs. metallic)
+    • Edge cases (highlights, shadows, gradient regions)
+  Then define those colours in `lbl.define_palette({...})` (Style A)
+  or as Python variables (Style B). Use semantic names:
+    - "shell" for the main body color
+    - "accent" for the brightest highlight
+    - "frame" / "darkMetal" for darker structural elements
+    - "glass" / "screen" for transparent or emissive parts
+
+221.3 — PROPORTIONS
+  Estimate the proportions of the major volumes relative to each
+  other. The PART 225 contract (PART 49.1 from Prompt_To_Ts.txt)
+  formalises this as a `meta.proportions` field — see PART 225 below.
+
+221.4 — SURFACE DETAIL
+  What's the silhouette beyond the major volumes? Are there:
+    • Decorative details (rivets, panel lines, decals) — usually skip
+      them in low-poly unless they're identity features
+    • Mechanical details (joints, hinges, springs) — these become
+      Mesh primitives if they're prominent
+    • Surface texture (smooth / rough / metallic / matte) — drives the
+      material's roughness / metalness values
+
+PART 221 is the AI's job to perform; the renderer does NOT do image
+analysis. The AI's analysis is what makes the difference between a
+recognisable low-poly model and a generic box.
+
+================================================================================
+PART 222 — TRANSLATING IMAGE FEATURES TO lbl.* PRIMITIVES (Style A)
+================================================================================
+
+For Style A (Blueprint-Return, simple path), the translation is
+direct: each major sub-volume becomes one or more `lbl.attach_box()`,
+`lbl.attach_cylinder()`, `lbl.attach_chain()`, or `lbl.create_anchor()`
+call.
+
+Recipe (use this order, repeat per sub-volume):
+
+  1. Estimate the sub-volume's bbox (width, depth, height) in
+     proportion to the overall model.
+  2. Decide the sub-volume's primitive type:
+       • Box-like → lbl.attach_box(id, footprint_size=(W, D), length=H)
+       • Cylinder-like (rotationally symmetric) → lbl.attach_cylinder(...)
+       • Long thin element → lbl.attach_chain(...) with keypoints
+       • Reference point only → lbl.create_anchor(id, position=...)
+  3. Decide the position relative to the world origin (the centre of
+     the bbox base is the easiest anchor).
+  4. Decide the rotation (default Y-up; rotate the aim for sideways
+     parts).
+  5. Pick a material from the palette (PART 224).
+  6. Repeat for the next sub-volume. Adjust positions so parts touch
+     cleanly (no gaps, no overlaps).
+
+Example (a coffee mug):
+  Image analysis:
+    • Silhouette: cylinder with handle. Height ≈ 1.4 × diameter.
+    • Palette: matte ceramic white, dark brown ring around top.
+    • Proportions: diameter 1.0 × height 1.4. Handle protrudes 0.25.
+  Style A factory:
+    lbl.name("Coffee Mug")
+    lbl.define_palette({
+        "ceramic": {"color": "#f4f0e6", "roughness": 0.65, "metalness": 0.0},
+        "rim":     {"color": "#5a3a00", "roughness": 0.4,  "metalness": 0.0},
+    })
+    # Body — cylinder
+    lbl.attach_cylinder("body", radius=0.5, length=1.4,
+                        position=(0, 0.7, 0), material="ceramic")
+    # Rim accent
+    lbl.attach_cylinder("rim", radius=0.52, length=0.06,
+                        position=(0, 1.37, 0), material="rim")
+    # Handle — chain (3 cylinders along a half-loop)
+    lbl.attach_chain("handle",
+                     segments=[(0.5, 1.0, 0), (0.75, 0.7, 0), (0.5, 0.4, 0)],
+                     base_radius=0.06,
+                     position=(0, 0, 0),
+                     material="ceramic")
+    return lbl.blueprint()
+
+That's 3 attach calls → coffee mug. The rim accent is a stylistic
+choice; the handle is the only complex part (a chain). Most low-poly
+mugs are 4-6 attach calls total.
+
+================================================================================
+PART 223 — TRANSLATING IMAGE FEATURES TO THREE.* PRIMITIVES (Style B)
+================================================================================
+
+For Style B (Three.js Direct, advanced path), the translation is the
+same shape as Style A but you reach for Three.js primitives directly.
+Reach for Style B when the image shows:
+  - Anything non-primitive (a character with a non-cylindrical head shape)
+  - Anything with holes / cutouts (the engine block of a motorcycle)
+  - Anything with detailed mechanical articulation (a folding knife)
+  - Anything with custom surface materials (clearcoat, transmission, etc.)
+
+Recipe (Style B):
+  1. Estimate the bbox and primitive type (same as Style A).
+  2. Reach for the right Three.js geometry constructor:
+       • Box-like → THREE.BoxGeometry.new(w, h, d) OR
+                    THREE.RoundedBoxGeometry.new(w, h, d, segments, radius) (from three/addons)
+       • Cylinder-like → THREE.CylinderGeometry.new(rT, rB, h, segs)
+       • Sphere-like → THREE.SphereGeometry.new(r, w, h)
+       • Lathe-symmetric → THREE.LatheGeometry.new(points, segs)
+       • Extrude-from-2D-shape → THREE.ExtrudeGeometry.new(shape, opts)
+       • Tube-along-curve → THREE.TubeGeometry.new(curve, segs, radius, ...)
+  3. Compose the geometry + a MeshStandardMaterial into a Mesh.
+  4. Set castShadow / receiveShadow / name (PART 207 sculptRuntime).
+  5. Position, rotate, add to the Group.
+  6. Repeat per sub-volume.
+  7. (Optional) Add a tick for per-frame animation (PART 208).
+
+Example (a chunky motor scooter):
+  Image analysis:
+    • Silhouette: low-poly retro scooter with a front shield, a step-
+      through frame, 2 wheels, a headlight, and a saddle.
+    • Palette: matte red body, chrome accents, black wheels, glass headlight.
+    • Proportions: width 1.4 × length 2.2 × height 1.4. Wheels at corners.
+  Style B factory:
+    (See the full example in Prompt_To_Py.txt PART 212 — the same code
+     applies to image-driven factories; the only difference is the
+     analysis input that drove the choice of primitives.)
+
+================================================================================
+PART 224 — COLOR SAMPLING (THE 6-BAND PALETTE DISCIPLINE)
+================================================================================
+
+The image-driven path requires the AI to extract a coherent palette
+from the reference image. The discipline (same as Prompt_To_Ts.txt
+PART 153-166 §2):
+
+  1. Sample the dominant color in 6 representative regions:
+       ├── top-of-body
+       ├── mid-body
+       ├── bottom-of-body
+       ├── accent / feature
+       ├── structural (frame, edges)
+       └── wheel / base
+  2. Each region contributes ONE palette entry (sometimes two, if the
+     region has a sharp color boundary).
+  3. Name the entries semantically:
+       shell, accent, frame, darkMetal, glass, wheel, saddle, ...
+  4. Optional: declare a "primary" palette entry (the most visible
+     color) and 5 "accent" entries.
+
+The 6-band discipline is a guideline, not a hard rule. If the image
+shows a 3-color palette (a banana is yellow with brown tips and green
+stem), use 3 palette entries. If it shows 12 colors (a peacock), use
+as many as the scene needs — but group semantically.
+
+Define the palette in `lbl.define_palette()` (Style A) or as Python
+variables (Style B). Reference each palette entry from the relevant
+attach* call.
+
+PART 224.1 — COLOR FORMAT
+  Python accepts the same color formats as the JSON pipeline:
+    - Hex strings: "#ff6b35"
+    - Hex integers: 0xff6b35
+    - Named CSS colors: "orange", "tomato", "cornflowerblue"
+  Pick whichever is cleanest for the value. Hex strings read best in
+  palette declarations; hex integers read best in tight code.
+
+================================================================================
+PART 225 — PROPORTION DECLARATION (the PART 49.1 contract)
+================================================================================
+
+For image-driven factories, declare the model's proportions explicitly
+in the returned dict's `meta.proportions` field. This is the PART 49.1
+contract from Prompt_To_Ts.txt, formalised for the Python path.
+
+Shape (Style A):
+  return {
+      "meta": {
+          "name": "My Model",
+          "proportions": {
+              "W_over_H": 1.0,   # width / height ratio
+              "fill": 0.85,      # overall silhouette fullness 0..1
+              "leg_fraction": 0.4,  # leg height / total height (if any)
+              "head_share_of_length": 0.25,
+              "belly_y_over_H": 0.45,
+              # ... other fields as relevant
+          },
+      },
+      "materials": {...},
+      "objects": [...],
+  }
+
+For Style B, the proportions live in `g.userData.sculptRuntime.proportions`
+(Style B doesn't have a meta dict, but the sculptRuntime is the same
+thing semantically):
+
+  g.userData.sculptRuntime = {
+      "proportions": {...},
+      "nodes": {...},
+      "meshes": {...},
+  }
+
+The validator (validateBlueprintSchema) checks the proportions are
+plausible (W_over_H between 0.1 and 10, etc.). Plausible proportions
++ image-aligned primitives → low render failure rate.
+
+PART 225.1 — WHAT TO DECLARE
+  Always include W_over_H (the bbox aspect ratio). Include other
+  fields only if the model has the corresponding feature:
+    • leg_fraction — only if the model has legs (mascot / creature)
+    • head_share_of_length — only if the model has a head
+    • wheel_radius_over_H — only if the model has wheels
+    • fin_count / wing_count — only if the model has fins / wings
+
+PART 225.2 — HOW TO MEASURE
+  Estimate from the reference image:
+    • Trace the bounding box of the silhouette.
+    • W_over_H = bbox.width / bbox.height (in image-space)
+    • leg_fraction ≈ 0.4 means the legs take up 40% of the total height
+    • Don't agonise over precision — a ±20% estimate is fine.
+
+================================================================================
+PART 226 — IMAGE-DRIVEN WORKED EXAMPLE
+================================================================================
+
+To exercise the full pipeline end-to-end, follow this recipe with the
+AI:
+
+  1. Provide a single reference image (a chunky low-poly motor scooter,
+     or any subject — the example assumes a chunky retro scooter).
+  2. Ask the AI to analyse the image (PART 221).
+  3. Ask the AI to declare a 6-band palette (PART 224).
+  4. Ask the AI to write a .py file using the Blueprint-Return style
+     (Prompt_To_Py.txt PART 200 + PART 222 style A recipe).
+  5. Drop the .py file on the page.
+
+Example output the AI would produce for a chunky motor scooter image:
+
+  """
+  scooter.py — image-driven Style A factory.
+  Analysis: silhouette is low-poly retro scooter; primary color is
+  coral red body with chrome accents, black wheels, glass headlight.
+  """
+  import lbl
+
+  def create_model():
+      lbl.name("Chunky Retro Scooter")
+      lbl.define_palette({
+          "shell":      {"color": "#e8553d", "roughness": 0.55, "metalness": 0.05},
+          "accent":     {"color": "#f7d959", "roughness": 0.4,  "metalness": 0.1,
+                          "emissive": "#5a3a00", "emissiveIntensity": 0.2},
+          "frame":      {"color": "#2a2a2e", "roughness": 0.8,  "metalness": 0.2},
+          "glass":      {"color": "#aef5ff", "roughness": 0.05, "metalness": 0.0,
+                          "transparent": True, "opacity": 0.7},
+          "wheel":      {"color": "#1a1a1e", "roughness": 0.95, "metalness": 0.0},
+          "saddle":     {"color": "#3a2a1a", "roughness": 0.85, "metalness": 0.0},
+      })
+
+      # Body — main shell (boxes front-shield + step-through + rear)
+      lbl.attach_box("body_front",  footprint_size=(1.0, 0.4), length=1.0,
+                     position=( 0.55, 0.7, 0), material="shell")
+      lbl.attach_box("body_step",   footprint_size=(0.8, 0.4), length=0.6,
+                     position=( 0.0, 0.5, 0), material="shell")
+      lbl.attach_box("body_rear",   footprint_size=(1.0, 0.4), length=0.7,
+                     position=(-0.55, 0.55, 0), material="shell")
+
+      # Headlight (glass + accent)
+      lbl.attach_cylinder("headlight_glass", radius=0.18, length=0.05,
+                          position=(1.04, 1.05, 0), material="glass")
+      lbl.attach_cylinder("headlight_glow", radius=0.12, length=0.04,
+                          position=(1.02, 1.05, 0), material="accent")
+
+      # Frame underneath the step-through
+      lbl.attach_box("frame",       footprint_size=(0.7, 0.3), length=0.18,
+                     position=( 0.0, 0.25, 0), material="frame")
+
+      # Wheels
+      for i, x in enumerate(( 0.65, -0.65)):
+          lbl.attach_cylinder(f"wheel_{i}", radius=0.3, length=0.18,
+                              position=(x, 0.3, 0), material="wheel")
+
+      # Saddle on top
+      lbl.attach_box("saddle",      footprint_size=(0.6, 0.25), length=0.15,
+                     position=(-0.35, 1.0, 0), material="saddle")
+
+      return lbl.blueprint()
+
+That's ~30 lines → 11-object low-poly scooter. Most image-driven
+factories are in this size range (15-50 attach calls).
+
+================================================================================
+PART 227 — WHEN TO REACH FOR STYLE A vs. STYLE B FOR IMAGE-DRIVEN WORK
+================================================================================
+
+The choice is the same as the prompt-driven path (Prompt_To_Py.txt
+PART 217) — Style A for procedural primitives, Style B for Three.js
+features. But for image-driven work, Style A covers more ground, because:
+
+  1. Most reference images map cleanly to the primitive vocabulary
+     (box, cylinder, sphere, lathe). Style A is the right choice for
+     ~80% of images.
+  2. Style B is needed when the image shows:
+       • Character mascots with non-primitive shapes (use lathe / extrude)
+       • Skeletal / rigged subjects (need AnimationMixer)
+       • Vehicles with detailed mechanical articulation (need
+         rotation joints, hinge groups)
+       • Anything with custom shaders (clearcoat, transmission, etc.)
+
+The bias toward Style A for image-driven work is a feature, not a
+limitation — Style A is faster to iterate (the validator catches
+schema errors with helpful messages), easier to debug (no Three.js
+roundtrip), and produces smaller files.
+
+================================================================================
+PART 228 — IMAGE NOISE / SCALE / LIGHTING PITFALLS
+================================================================================
+
+228.1 — IMAGE NOISE
+  Reference images often have photographic noise, JPEG artefacts, or
+  surface texture that doesn't translate to primitives. Ignore it —
+  the renderer is a low-poly tool, not a photorealistic one. Focus on
+  the major volumes.
+
+228.2 — SCALE
+  The reference image has its own scale (in pixels). The factory's
+  primitives are unitless. Pick a convention: the model's bounding
+  box should fit within roughly [-1, +1] in each axis. If your
+  primitives overflow, the renderer auto-frames the camera but the
+  model will look small relative to the viewport. If your primitives
+  are too small (sub-0.1), they'll be hard to see.
+
+228.3 — LIGHTING
+  Reference images are lit. The renderer's scene has its own lighting.
+  Don't try to bake the image's lighting into the model — instead, let
+  the renderer's PBR materials + scene lights handle it. The factory
+  just sets material colours; the renderer does the rest.
+
+228.4 — BACKGROUND
+  Most reference images have a background (sky, table, gradient).
+  Ignore it — the factory only models the subject. If the AI tries
+  to model the background too, the model will have lots of irrelevant
+  geometry that clutters the scene.
+
+228.5 — TRANSPARENCY / GLASS
+  Some reference images show glass / transparent materials (a glass
+  jar, a clear phone screen). The renderer supports transparency via
+  `transparent: True` in the material definition. Don't try to fake
+  transparency with a low-saturation color — set the flag.
+
+228.6 — MULTIPLE OBJECTS
+  If the reference image shows multiple objects (a coffee cup on a
+  saucer next to a spoon), the factory models ALL of them in one
+  blueprint — not just the most prominent. The renderer mounts the
+  whole blueprint, and the inspector lets the user pick any part.
+
+================================================================================
+PART 229 — CROSS-REFERENCES + FILE METADATA
+================================================================================
+
+Cross-references (read these for full methodology):
+
+  Prompt_To_Py.txt
+    The Python-specific contract (PART 200-219). The image-specific
+    layer (PART 220-229 here) is layered ON TOP of this — read this
+    file for the output contract, the lbl helper module, the THREE
+    bridge, the materials vocabulary, etc.
+
+  Prompt_To_Ts.txt
+    The TS factory contract (PART 1-50; PART 100-199). The image-
+    driven layer (PART 153-166) is duplicated in this file in PART
+    226. Read PART 153-166 in Prompt_To_Ts.txt for the full canonical
+    image-driven methodology.
+
+  Image_To_Ts.txt
+    The TS equivalent of this file. Has the same PART 153-166 layer
+    duplicated inline, plus TS-specific extensions (PART 18 — pixel-
+    perfect fidelity pass). Use this file as a reference for the image-
+    driven methodology even when writing Python.
+
+  Prompt_To_Js.txt, Prompt_To_Json.txt, Image_To_Js.txt, Image_To_Json.txt
+    The JSON / JS blueprint contracts. The Python Style A path mirrors
+    the JSON path's blueprint schema — read Prompt_To_Json.txt for
+    the full dict schema.
+
+Companion files:
+
+  Prompt_To_Py.txt — Python factory spec (the file this one references
+                     most heavily)
+  public/modeling/lbl_py.py — the standalone `lbl` Python helper module
+  public/models/Model_10.py — Python worked example (Style A + Style B)
+  index.html (Python section) — the renderer-side wiring
+  CHANGES_v136.md — changelog entry for v1.36 / v8.27
+
+The 7 sibling spec files are released together; the canonical LBL
+version pair is v1.36 / v8.27.
+
+================================================================================
+END OF Image_To_Py.txt
+For the prompt-to-Python path, see Prompt_To_Py.txt.
+For the underlying methodology shared across all 4 formats, see
+Prompt_To_Ts.txt.
+================================================================================

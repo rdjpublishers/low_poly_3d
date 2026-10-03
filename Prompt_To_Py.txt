@@ -1,0 +1,1163 @@
+================================================================================
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.36 / v8.27 — PROMPT-TO-PYTHON AI SPECIFICATION
+For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
+  https://rdjpublishers.com/low_poly_3d/
+================================================================================
+
+WHAT'S NEW IN v1.36 / v8.27 (this release)
+================================================================================
+PART 200-219 — PYTHON FACTORY PIPELINE. Adds a Pyodide-backed Python
+factory path that mirrors the TS factory path one-for-one, plus a
+Blueprint-Return style for users who want a simpler dict-only workflow.
+The Python file format is fully integrated with the existing renderer
+pipeline — drop a .py file onto the page and it Just Works.
+
+  PART 200 — Python output contract (factory name, return type, options)
+  PART 201 — Two authoring styles (Blueprint-Return vs. Three.js Direct)
+  PART 202 — The `lbl` Python helper module (mirrors the JS builder API)
+  PART 203 — The `from js import THREE` bridge (advanced style)
+  PART 204 — Geometry choices (mirror of TS PART 3 — same primitives)
+  PART 205 — PBR materials vocabulary (mirror of TS PART 7)
+  PART 206 — Palette discipline (mirror of TS PART 10)
+  PART 207 — sculptRuntime contract (mirror of TS PART 6, Python form)
+  PART 208 — tick(dt, elapsed) for per-frame animation (mirror of TS PART 5)
+  PART 209 — Procedural canvas textures (mirror of TS PART 8)
+  PART 210 — Validation checklist (mirror of TS PART 12)
+  PART 211 — Minimal worked example (Blueprint-Return style)
+  PART 212 — Advanced worked example (Three.js Direct style)
+  PART 213 — Common mistakes (mirror of TS PART 15, Python-specific)
+  PART 214 — Pre-output checklist for AI authors
+  PART 215 — Cross-references to the 6 existing spec files
+  PART 216 — Differences from the TS path (Pyodide constraints, perf)
+  PART 217 — When to reach for Python vs. JS blueprint vs. TS factory
+  PART 218 — Runtime error reference (what each Pyodide error means)
+  PART 219 — File metadata + companion files (lbl_py.py / Model_10.py)
+
+This file is the canonical LBL spec source for the prompt-to-Python
+path. The 5 sibling files (Prompt_To_Ts.txt / Prompt_To_Js.txt /
+Prompt_To_Json.txt / Image_To_Py.txt / Image_To_Ts.txt / Image_To_Js.txt
+/ Image_To_Json.txt) all reference the Python-specific PARTs from this
+file rather than duplicating them.
+
+Cross-references — Python factories should ALSO follow these PARTs
+(unchanged from Prompt_To_Ts.txt, the methodology is language-neutral):
+  PART 1   — Output contract (factory export pattern, options interface)
+  PART 3   — Geometry: what to use, in order
+  PART 7   — Materials: PBR recipes, one per preset
+  PART 10  — Color & palette discipline
+  PART 12  — Validation checklist
+  PART 15  — Common mistakes
+  PART 32  — Canonical helpers (additive — read if you reference any
+             helper that exists in public/modeling/)
+  PART 34  — Pre-bundled rig helpers (only if the model has a rig)
+  PART 74  — Procedural texturing (PART 209 here, in Python form)
+  PART 100-143 — 44-Technique Modeling Bundle (renderer capability)
+  PART 145-152 — Perfect-Shape Modeling Pipeline (8-step methodology)
+  PART 153-166 — Image-Driven Factory Defaults (only if writing from an
+             image; see Image_To_Py.txt for the image-specific layer)
+  PART 167-178 — Hard-Surface / Vehicle Modeling Pipeline
+  PART 179 — Artist-First Geometry Flow & Form-Preservation Patch
+  PART 180-189 — Chunky 3D Sport Motorcycle Reference Specification
+  PART 190-199 — Architectural Modeling Pipeline
+
+  See the 7 sibling spec files for the full text of each reference PART.
+  This file's PART 200-219 is the ONLY Python-specific layer — every
+  other PART in the LBL system applies identically to Python factories
+  (because the underlying renderer is the same).
+
+CANONICAL LBL VERSION PAIR
+  v1.36 (Python + TS) / v8.27 (JSON / JS) is the current canonical pair.
+  Python factories are the 4th input format, alongside the existing
+  JSON blueprint, JS blueprint, and TS factory formats. They share
+  one renderer, one validator, one inspector, one export pipeline.
+
+================================================================================
+PART 200 — PYTHON OUTPUT CONTRACT (the renderer-enforced shape of your .py file)
+================================================================================
+
+The renderer loads your .py file by:
+  1. Lazy-loading Pyodide (CPython in WebAssembly) from
+     https://cdn.jsdelivr.net/pyodide/v0.26.2/full/ on the first .py
+     load. Subsequent loads reuse the cached interpreter.
+  2. Registering the LBL Python helper module (`lbl`) as both a sys.module
+     and a builtin global, so user code can `import lbl` OR use the
+     bare `lbl.attach_box(...)` form without an explicit import.
+  3. Exposing the page's Three.js instance to Python via the standard
+     Pyodide `from js import THREE` bridge.
+  4. Running your .py source at module scope in the interpreter's
+     main globals.
+  5. Finding the first callable matching the factory-name heuristic
+     (see PART 200.2 below) and calling it with `None` as the options
+     argument.
+  6. Inspecting the return value: a Python dict matching the blueprint
+     schema goes through the buildScene() pipeline; a THREE.Object3D
+     (or any Three.js Object3D subclass) goes through addTsModelToScene
+     so runtime hooks, tick, sculptRuntime, and GLB export all work.
+  7. Adding the resulting model to the scene.
+
+To make that pipeline work, your file must satisfy the contract below.
+Every rule in this PART is enforced by the renderer — violations are
+runtime errors, not style notes.
+
+--------------------------------------------------------------------------
+200.1 — MODULE SHAPE
+--------------------------------------------------------------------------
+The file is a regular Python 3 source file (Pyodide is CPython 3.11).
+Top-level `def` declarations are normal Python functions. The renderer
+runs your file once, in module scope, and then calls the factory.
+
+You may import anything from the Python standard library (`math`,
+`random`, `itertools`, etc.). You may also import `lbl` (the LBL
+builder helper — see PART 202) and `from js import THREE` (the Three.js
+bridge — see PART 203). No other JS modules are exposed.
+
+DO NOT import from external pip packages — Pyodide doesn't have them
+preinstalled, and the renderer runs offline-first. If you need numpy-
+like math, the `math` module covers 99% of geometry cases. If you need
+PIL-like image manipulation, use the procedural canvas helpers in
+PART 209 (Three.js CanvasTexture — same as TS PART 8).
+
+DO NOT use `subprocess`, `os.system`, `socket`, or any other I/O
+syscall. The renderer is sandboxed; the WASM layer would block them
+anyway, but the error message is friendlier if you don't try.
+
+--------------------------------------------------------------------------
+200.2 — FACTORY EXPORT
+--------------------------------------------------------------------------
+You MUST define at least one callable that the renderer can identify as
+a factory. The heuristic looks for, in order:
+
+  1. Any function whose name matches /^create_\w+(_model|_mascot)?$/ or
+     /^create\w+Model$/ (snake_case or camelCase both work).
+  2. A function named `build`, `make`, or `main`.
+  3. A class named similarly, or any callable that ends in `_model`,
+     `_mascot`, or `_factory` (case-insensitive).
+
+If exactly one candidate exists, the renderer calls it. If multiple
+exist, the renderer picks the first one and logs a warning to the
+console. Renaming or removing the others is recommended for production
+factories (see PART 211 / 212 for the worked examples).
+
+Factory signature (RECOMMENDED — match this exactly):
+  def create_model(options=None):
+      ...
+      return blueprint_dict_or_group
+
+The renderer calls your factory with a single argument (currently always
+`None`; reserved for future per-load options). Your signature MUST
+accept that argument — `def create_model():` would also work (the
+renderer calls it with a kwarg-like pattern that allows zero-arg
+factories), but accepting `options=None` is the documented contract.
+
+The factory's return value MUST be one of:
+  (a) A Python dict matching the blueprint schema:
+        {"meta": {...}, "materials": {...}, "objects": [...]}
+      (see PART 201.1 + the JSON spec for the full schema).
+  (b) A THREE.Object3D (typically a THREE.Group with at least one
+      child Mesh) built via `from js import THREE` (see PART 203).
+
+Anything else (a list, a single Mesh, a string, None without builder
+state) is rejected with a clear error message. If you use the `lbl`
+builder helpers and forget to `return lbl.blueprint()`, the renderer
+also recognises that case and calls `lbl.blueprint()` automatically
+(mirroring the JS path's `if(typeof blueprint!=='undefined') return
+blueprint;` shim).
+
+--------------------------------------------------------------------------
+200.3 — OPTIONS INTERFACE (currently a placeholder)
+--------------------------------------------------------------------------
+The renderer currently always calls your factory with `None` as the
+options argument. PART 200.3 is reserved for the future per-load
+options contract (model scale, shadow toggle, etc.) — match the TS
+path's `XxxModelOptions` shape (Prompt_To_Ts.txt PART 1.2) so a
+future renderer change that wires options through doesn't break your
+factory.
+
+  Recommended signature (forward-compatible):
+    def create_model(options=None):
+        scale = (options or {}).get('scale', 1.0)
+        shadows = (options or {}).get('shadows', True)
+        ...
+
+--------------------------------------------------------------------------
+200.4 — TOP-LEVEL FILE LAYOUT
+--------------------------------------------------------------------------
+Recommended reading order top-to-bottom. Each section gets a
+`# ----` banner comment so the file is greppable in the editor:
+
+  1.  Module docstring (5-15 lines describing what the model is)
+  2.  Standard library imports (math, random, etc.)
+  3.  `from js import THREE`  (only if you use the Three.js Direct style)
+  4.  `import lbl`  (only if you prefer explicit imports; otherwise skip
+      and use the bare `lbl.attach_box(...)` form that the renderer
+      auto-injects)
+  5.  Palette constants (PART 206)
+  6.  Helper functions (small reusable functions for parts of the model)
+  7.  Per-part builder functions (build_receiver(), build_wheel(), ...)
+  8.  MAIN FACTORY (create_model(options=None)) (PART 200.2)
+  9.  (Optional) Look-dev lights factory — only Three.js Direct style
+
+This order matches the two example files shipped with this spec:
+  public/models/Model_10.py — both styles side-by-side
+  public/modeling/lbl_py.py  — the standalone lbl helper module
+
+--------------------------------------------------------------------------
+200.5 — PYTHON-SPECIFIC PRE-OUTPUT CHECKLIST
+--------------------------------------------------------------------------
+  [ ] File starts with `import math` or another stdlib import (or no
+      imports at all). A bare `import three` or `from three import *`
+      would not work — Three.js is exposed via `from js import THREE`,
+      NOT via a Python package.
+  [ ] At least one factory function is defined (PART 200.2).
+  [ ] The factory returns either a blueprint dict OR a THREE.Object3D
+      with at least one child Mesh.
+  [ ] No top-level side effects that depend on a specific Three.js
+      build (no `THREE.REVISION` reads at module scope — read inside
+      the factory instead, where it's available).
+  [ ] No `subprocess` / `os.system` / `socket` / I/O syscalls.
+  [ ] No pip-package imports (numpy, scipy, PIL, etc.). Pyodide doesn't
+      ship them by default, and the renderer runs offline-first. If you
+      absolutely need numpy, see the PART 216 note on the
+      `pyodide.loadPackage(['numpy'])` call — but this costs a ~3 MB
+      download and is rarely needed.
+  [ ] If your model has per-frame animation, the returned THREE.Group
+      has `userData.tick = lambda dt, elapsed: ...` (PART 208). For the
+      Blueprint-Return style, attach-tick is not supported (the JSON
+      pipeline doesn't wire tick); if you need tick, use the Three.js
+      Direct style.
+  [ ] If your model exposes runtime hooks, the returned THREE.Group
+      has `userData.sculptRuntime` matching PART 207. For the
+      Blueprint-Return style, sculptRuntime is read from the
+      `meta.sculptRuntime` field of the returned dict (mirroring the
+      JSON pipeline).
+  [ ] No `print()` left in production code — use it for debugging only.
+      The renderer captures stdout (PART 216) and surfaces it in the
+      validator log, so a noisy print() will clutter the log.
+
+================================================================================
+PART 201 — TWO AUTHORING STYLES
+================================================================================
+
+Python factories have two distinct authoring styles. Pick one per file;
+don't mix them in a single factory (the rendering pipeline would still
+work, but the file gets hard to read).
+
+--------------------------------------------------------------------------
+201.1 — STYLE A: BLUEPRINT-RETURN (SIMPLE)
+--------------------------------------------------------------------------
+This is the easier path. Define a factory that uses the `lbl.*` builder
+helpers and returns a dict. The renderer routes the dict through the
+existing buildScene() pipeline unchanged, so every existing feature
+(palette / proportions / fidelity gate / runtime hooks / GLB export /
+inspector live-edit) just works.
+
+  import lbl  # or use the auto-injected global
+
+  def create_model():
+      lbl.name("My Model")
+      lbl.define_palette({
+          "shell":  {"color": "#f5821b", "roughness": 0.55},
+          "accent": {"color": "#ffd54f", "emissive": "#5a3a00",
+                     "emissiveIntensity": 0.4},
+      })
+      lbl.attach_box("body", footprint_size=(1.6, 1.0), length=1.0,
+                     position=(0, 0.5, 0), material="shell")
+      lbl.attach_cylinder("wheel1", radius=0.3, length=0.2,
+                          position=(0.6, 0.2, 0.5), material="shell")
+      return lbl.blueprint()
+
+Pros:
+  • Shortest path from prompt to working 3D model.
+  • Same builder API as the JS blueprint style — switching between the
+    two formats is mostly a syntax swap.
+  • Validator (the JSON / blueprint schema validator) catches schema
+    errors with helpful line numbers.
+
+Cons:
+  • Less flexible than raw Three.js — limited to the primitive
+    vocabulary buildScene() understands.
+  • Per-frame tick() isn't supported (the JSON pipeline doesn't wire
+    tick into the render loop).
+  • Hard to use Three.js-only features (custom shaders, instanced
+    meshes, AnimationMixer, etc.).
+
+When to use:
+  • Pure-procedural models with primitive geometry.
+  • Models the JSON / JS blueprint style can already express.
+  • When you want the simplest path and the validator to catch errors.
+
+--------------------------------------------------------------------------
+201.2 — STYLE B: THREE.JS DIRECT (ADVANCED)
+--------------------------------------------------------------------------
+This is the more powerful path. Pull Three.js through Pyodide's
+`from js import THREE` bridge and build a Group the same way a TS
+factory does. The renderer mounts it via addTsModelToScene(), so the
+full runtime-hooks / tick / inspector / GLB export pipeline kicks in.
+
+  from js import THREE
+
+  def create_model():
+      g = THREE.Group.new()
+      g.name = "My Model"
+      box = THREE.Mesh.new(
+          THREE.BoxGeometry.new(1, 1, 1),
+          THREE.MeshStandardMaterial.new({"color": "orange"}),
+      )
+      g.add(box)
+      g.userData.sculptRuntime = {
+          "nodes": {"root": g, "box": box},
+          "meshes": {"box": box},
+      }
+      return g
+
+Pros:
+  • Full Three.js power (custom shaders, instanced meshes, AnimationMixer,
+    skeletal skinning, BufferGeometry, ShaderMaterial, post-processing).
+  • Per-frame tick() is supported (set `g.userData.tick`).
+  • sculptRuntime is the same shape as TS factories, so the inspector
+    recognises named parts.
+
+Cons:
+  • More verbose than Style A for simple models.
+  • Type errors are runtime-only (Pyodide's Python type checker doesn't
+    understand THREE.Group, etc. — you get attribute errors at runtime).
+  • Some Three.js idioms (like setting `.position.x = 5`) require the
+    `.new()`-constructor pattern in Pyodide; see PART 203.
+
+When to use:
+  • Models that need Three.js-only features (AnimationMixer, custom
+    shaders, skinned meshes, InstancedMesh, ShaderMaterial).
+  • Models with per-frame animation (tick is required).
+  • Porting a TS factory to Python (style B is essentially the same
+    code, just with `THREE.Group.new()` instead of `new THREE.Group()`).
+
+================================================================================
+PART 202 — THE `lbl` PYTHON HELPER MODULE
+================================================================================
+
+`lbl` is a Python module the renderer auto-injects before running your
+factory. It mirrors the JS blueprint builder API in index.html so
+authors can move between the two formats without rewriting their model
+code.
+
+The full source is shipped at `public/modeling/lbl_py.py` and also
+inlined into the renderer (search for `LBL_PY_HELPER_SRC` in index.html
+— the inlined copy is byte-identical to the file and is the one that
+actually runs).
+
+Public surface:
+  Metadata
+    lbl.name(s)                       — set the blueprint's meta.name
+    lbl.define_palette(d)             — merge a dict of material defs
+  Primitive attachment
+    lbl.create_anchor(id, **opts)     — drop a free point in space
+    lbl.attach_box(id, **opts)        — box primitive
+    lbl.attach_cylinder(id, **opts)   — cylinder primitive
+    lbl.attach_chain(id, **opts)      — chain of cylinders
+    lbl.paint_rectangle(id, **opts)   — flat textured quad
+  Modifiers
+    lbl.hollow(id, **opts)            — append a "hollow" operation
+    lbl.group(name, opts=None, fn)    — run fn() inside a mirrored group
+  Snapshots
+    lbl.blueprint()                   — return current state as a dict
+    lbl.reset()                       — clear state (auto-called between runs)
+
+All kwargs are spelled in snake_case (Python convention) but accept
+camelCase aliases for the field names that exist in the JSON schema
+(e.g. `footprint_size=(1,1)` or `footprintSize=(1,1)` both work;
+`base_radius=0.1` or `baseRadius=0.1` both work). This makes the
+helper friendly to authors coming from the JSON / TS specs without
+making it feel un-Pythonic.
+
+Example — a 3-block stack with palette:
+  lbl.name("Stacked Block Toy")
+  lbl.define_palette({
+      "shell":  {"color": "#f5821b"},
+      "accent": {"color": "#ffd54f", "emissive": "#5a3a00",
+                 "emissiveIntensity": 0.4},
+  })
+  for i, (w, h, d) in enumerate([(1.6, 1.0, 1.0), (1.4, 0.7, 0.9), (1.1, 0.55, 0.7)]):
+      lbl.attach_box(
+          f"block_{i}",
+          footprint_size=(w, d),
+          length=h,
+          position=(0, sum(s[1] for s in [(1.6,1.0,1.0),(1.4,0.7,0.9),(1.1,0.55,0.7)][:i+1]), 0),
+          material="shell",
+      )
+  return lbl.blueprint()
+
+The renderer captures `lbl.blueprint()` even if you forget the explicit
+return — see PART 200.2 for the auto-snapshot behaviour.
+
+================================================================================
+PART 203 — THE `from js import THREE` BRIDGE
+================================================================================
+
+Pyodide's JS interop lets Python access the page's Three.js instance
+via the `js` module. The renderer pre-binds the page's `THREE` so the
+import is one line:
+
+  from js import THREE
+
+This gives you the same THREE module the page's renderer code uses.
+Every class, every constant, every helper is available.
+
+Idiom translation — JS to Python:
+  new THREE.Group()                  THREE.Group.new()
+  new THREE.Mesh(g, m)               THREE.Mesh.new(g, m)
+  new THREE.BoxGeometry(w, h, d)     THREE.BoxGeometry.new(w, h, d)
+  g.add(child)                       g.add(child)                  # same
+  g.position.set(0, 1, 0)            g.position.set(0, 1, 0)       # same
+  g.rotation.z = 0.5                 g.rotation.z = 0.5            # same
+  g.userData.foo = "bar"             g.userData.foo = "bar"        # same
+  g.children                         g.children                    # same
+  g.children.length                  len(g.children)               # Python idiom
+  g.children[0]                      g.children[0]                 # same
+  for c in g.children:               for c in g.children:          # same
+
+The `.new()` form is the Pyodide idiom for calling a JS constructor
+from Python. It works for any class. For methods on existing objects
+(like `.add()`, `.position.set()`, `.userData.foo = ...`), you use
+the regular Python attribute-access syntax — Pyodide delegates those
+to the underlying JS object.
+
+Gotchas (the only ones worth knowing):
+  1. JS objects with `null` properties come through as `None` in
+     Python. `g.material is None` works.
+  2. JS arrays become Python list-like via Pyodide's JsProxy — len(),
+     indexing, iteration, and `in` all work.
+  3. Property setters that the JS engine would normally chain
+     (e.g. `g.position.set(0,1,0)`) work as-is; chained constructors
+     do not (`new THREE.Mesh().rotateX(0.5)` would need an extra var).
+  4. Some Three.js types are abstract and you can't instantiate them
+     directly (e.g. `new THREE.Material()`) — use a concrete subclass
+     like `MeshStandardMaterial`.
+  5. You CAN return a JS object to Python and pass it back to JS, but
+     you should NOT destroy the proxy mid-use (PART 216.2 covers this).
+
+Example — a complete Three.js Direct factory (PART 212 expanded):
+  from js import THREE
+
+  def create_model():
+      g = THREE.Group.new()
+      g.name = "Tiny Motorcycle"
+
+      # Body — RoundedBoxGeometry from three/addons
+      from js import RoundedBoxGeometry
+      body = THREE.Mesh.new(
+          RoundedBoxGeometry.new(1.0, 0.5, 0.4, 4, 0.1),
+          THREE.MeshStandardMaterial.new({
+              "color": 0xf5821b,
+              "roughness": 0.45,
+              "metalness": 0.05,
+          }),
+      )
+      body.position.set(0, 0.5, 0)
+      body.castShadow = True
+      body.receiveShadow = True
+      body.name = "body"
+      g.add(body)
+
+      # Wheels
+      for i, x in enumerate((-0.45, 0.45)):
+          wheel = THREE.Mesh.new(
+              THREE.CylinderGeometry.new(0.25, 0.25, 0.2, 16),
+              THREE.MeshStandardMaterial.new({"color": 0x222831}),
+          )
+          wheel.position.set(x, 0.25, 0)
+          wheel.rotation.x = 1.5707963267948966  # 90deg → axis along Z
+          wheel.name = f"wheel_{i}"
+          g.add(wheel)
+
+      g.userData.sculptRuntime = {
+          "nodes": {"root": g, "body": body, "wheel_0": g.children[1],
+                    "wheel_1": g.children[2]},
+          "meshes": {"body": body, "wheel_0": g.children[1],
+                     "wheel_1": g.children[2]},
+      }
+      return g
+
+The renderer auto-frames the camera on the returned Group, sets
+castShadow / receiveShadow based on the renderer's defaults, and
+wires the optional look-dev lights factory (see PART 209.4).
+
+================================================================================
+PART 204 — GEOMETRY CHOICES
+================================================================================
+
+Identical to Prompt_To_Ts.txt PART 3 — the underlying renderer is
+the same, so the same primitive vocabulary applies. The cheat sheet:
+
+  In order of vertex economy:
+    1. RoundedBoxGeometry (from three/addons) — soft-beveled box
+    2. ExtrudeGeometry — 2D Shape with optional holes
+    3. TubeGeometry — along a CatmullRomCurve3
+    4. LatheGeometry — rotationally symmetric
+    5. CapsuleGeometry — limbs, fingers, rounded pegs
+    6. TorusGeometry — rims, halos, ribs, D-rings
+    7. CylinderGeometry — axles, pegs, struts
+    8. IcosahedronGeometry — tree canopies, faceted blobs
+    9. SphereGeometry — eyes, earbuds, face caps
+   10. PlaneGeometry — decal planes only (back-face culled)
+   11. BoxGeometry — true flat slabs only (NOT for fairings/tanks)
+
+For full rationale, see Prompt_To_Ts.txt PART 3.
+
+================================================================================
+PART 205 — PBR MATERIALS VOCABULARY
+================================================================================
+
+The renderer uses Three.js MeshStandardMaterial / MeshPhysicalMaterial /
+MeshBasicMaterial. The full material vocabulary is in Prompt_To_Ts.txt
+PART 7 — the same fields apply in Python.
+
+Style A (Blueprint-Return) — pass materials via `lbl.define_palette()`:
+  lbl.define_palette({
+      "shell": {
+          "color": "#f5821b",
+          "roughness": 0.55,
+          "metalness": 0.05,
+      },
+      "accent": {
+          "color": "#ffd54f",
+          "emissive": "#5a3a00",
+          "emissiveIntensity": 0.4,
+      },
+  })
+
+  lbl.attach_box("body", footprint_size=(1.6, 1.0), length=1.0,
+                 material="shell")  # references the "shell" palette entry
+
+Style B (Three.js Direct) — pass materials via Three.js constructors:
+  shell_mat = THREE.MeshStandardMaterial.new({
+      "color": 0xf5821b,    # can be hex int, hex string, or named CSS color
+      "roughness": 0.55,
+      "metalness": 0.05,
+  })
+
+  body = THREE.Mesh.new(THREE.BoxGeometry.new(1, 1, 1), shell_mat)
+
+Color formats accepted by the JSON pipeline: hex strings "#rrggbb",
+hex ints 0xrrggbb, named CSS colors ("orange", "tomato"). The
+Blueprint-Return style (Style A) follows the JSON spec exactly.
+
+================================================================================
+PART 206 — PALETTE DISCIPLINE
+================================================================================
+
+Same as Prompt_To_Ts.txt PART 10 — keep palette entries small (3-12
+colors), name them semantically (shell, accent, frame, glass, ...),
+and reuse them across many objects. Don't create per-object materials.
+
+For Style A, palette lives in the `lbl.define_palette()` call.
+For Style B, materials are local variables you reference by name.
+
+================================================================================
+PART 207 — sculptRuntime CONTRACT (Python form)
+================================================================================
+
+sculptRuntime is the renderer's "what parts does this model have" hook.
+For Style A, it's read from the returned dict's `meta.sculptRuntime`
+field (mirroring the JSON pipeline). For Style B, it's set as
+`g.userData.sculptRuntime = {...}` on the returned Group (mirroring
+the TS pipeline).
+
+Both paths produce the same 9-key shape (Prompt_To_Ts.txt PART 6):
+
+  g.userData.sculptRuntime = {
+      "nodes":              {"root": g, "body": body, "wheel_0": wheel_0, ...},
+      "meshes":             {"body": body, "wheel_0": wheel_0, ...},
+      "sockets":            {},   # optional — modular attach points
+      "colliders":          {},   # optional — physics shapes
+      "destructionGroups":  {},   # optional — for breakable models
+      "materials":          {},   # optional — name → material reference
+      "actions":            {},   # optional — named actions for inspector
+      "animation":          {},   # optional — AnimationClips + mixer
+      "vfx":                {},   # optional — particle/light/effect handles
+  }
+
+At minimum, populate `nodes` and `meshes` so the inspector can list the
+named parts. The other keys are optional but unlock more inspector
+features.
+
+Example — minimal sculptRuntime for a 2-part model:
+  body = THREE.Mesh.new(...)
+  wheel = THREE.Mesh.new(...)
+  g = THREE.Group.new()
+  g.add(body); g.add(wheel)
+  g.userData.sculptRuntime = {
+      "nodes":  {"root": g, "body": body, "wheel": wheel},
+      "meshes": {"body": body, "wheel": wheel},
+  }
+
+The renderer's detail-inventory gate (Prompt_To_Ts.txt PART 20) checks
+that every high-priority entry in detailInventory has at least one
+matching Mesh in the userData tree. For Python, set detailInventory on
+sculptRuntime (or via meta.detailInventory in Style A).
+
+================================================================================
+PART 208 — tick(dt, elapsed) FOR PER-FRAME ANIMATION
+================================================================================
+
+For per-frame animation, attach a tick function to the returned Group:
+
+  def tick(dt, elapsed):
+      g.rotation.y = elapsed * 0.5
+      for c in g.children:
+          if c.name == "wheel_0" or c.name == "wheel_1":
+              c.rotation.x += dt * 2.0
+  g.userData.tick = tick
+
+The renderer calls this every frame. `dt` is the time since the last
+frame in seconds, `elapsed` is the total time since the model loaded.
+Don't store state in module-level variables — use the closure on `g`
+or a list/dict inside the factory.
+
+Style A (Blueprint-Return) does NOT support tick — the JSON pipeline
+doesn't wire tick into the render loop. If you need tick, use Style B.
+
+For complex animation (bone rigs, blend shapes, etc.), use the
+AnimationMixer pattern from Prompt_To_Ts.txt PART 5.6:
+
+  from js import THREE
+  mixer = THREE.AnimationMixer.new(g)
+  clip = THREE.AnimationClip.findByName(g.animations, "walk")  # or build one
+  action = mixer.clipAction(clip)
+  action.play()
+  g.userData.tick = lambda dt, elapsed: mixer.update(dt)
+
+The renderer doesn't auto-create the mixer — your factory is
+responsible for the rig, the clips, the mixer, and the tick. The
+renderer's contribution is to call tick every frame.
+
+================================================================================
+PART 209 — PROCEDURAL CANVAS TEXTURES (Python form)
+================================================================================
+
+Same as Prompt_To_Ts.txt PART 8 — use Three.js CanvasTexture for
+procedural textures. The HTML canvas API is exposed via Pyodide:
+
+  from js import document, Image
+
+  def make_checker_texture(size=256, c1="#ff6b35", c2="#222831"):
+      canvas = document.createElement("canvas")
+      canvas.width = size
+      canvas.height = size
+      ctx = canvas.getContext("2d")
+      ctx.fillStyle = c1
+      ctx.fillRect(0, 0, size, size)
+      ctx.fillStyle = c2
+      ctx.fillRect(0, 0, size/2, size/2)
+      ctx.fillRect(size/2, size/2, size/2, size/2)
+      tex = THREE.CanvasTexture.new(canvas)
+      tex.wrapS = THREE.RepeatWrapping
+      tex.wrapT = THREE.RepeatWrapping
+      tex.repeat.set(2, 2)
+      return tex
+
+The canvas is a real DOM element under the page's `document` — the
+same `document.createElement` the JS path uses. The result wraps in
+a Three.js CanvasTexture that you can apply to a material's `.map`.
+
+Note: Pyodide's `from js import document` returns the actual document
+object (not a proxy); you can call all standard DOM methods on it.
+
+For seed-based determinism, use the same Mulberry32 helper as the JS
+spec (Prompt_To_Ts.txt PART 8.1):
+
+  def mulberry32(seed):
+      state = [seed & 0xFFFFFFFF]
+      def f():
+          state[0] = (state[0] + 0x6D2B79F5) & 0xFFFFFFFF
+          t = state[0]
+          t = ((t ^ (t >> 15)) * (t | 1)) & 0xFFFFFFFF
+          t = (t ^ (t + (((t ^ (t >> 7)) * (t | 61)) & 0xFFFFFFFF))) & 0xFFFFFFFF
+          return ((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296
+      return f
+
+  rng = mulberry32(42)
+  noise = rng()  # always 0.6766635134574026 for seed=42
+
+================================================================================
+PART 210 — VALIDATION CHECKLIST
+================================================================================
+
+Before outputting a Python factory, walk through this checklist
+silently (same idea as Prompt_To_Ts.txt PART 12):
+
+  [ ] File starts with a module docstring (5-15 lines).
+  [ ] At least one factory function is defined (PART 200.2).
+  [ ] The factory returns either a blueprint dict OR a THREE.Object3D
+      with at least one child Mesh.
+  [ ] Style A: `lbl.blueprint()` is the LAST thing the factory returns.
+      Style B: the factory returns a `THREE.Group.new()` (not a list of
+      meshes, not a single Mesh).
+  [ ] All material references exist (Style A: every `material="xxx"`
+      resolves to a `lbl.define_palette({...})` entry; Style B: every
+      variable is defined before use).
+  [ ] No top-level side effects.
+  [ ] No `print()` calls left in production code.
+  [ ] If the model has per-frame animation, tick is attached
+      (PART 208) — only valid for Style B.
+  [ ] If the model has named parts, sculptRuntime is populated
+      (PART 207) — strongly recommended.
+  [ ] The factory accepts `options=None` even if it doesn't use it.
+
+================================================================================
+PART 211 — MINIMAL WORKED EXAMPLE (Blueprint-Return style)
+================================================================================
+
+Save as `hello_block.py`:
+
+  """
+  hello_block.py — minimal Blueprint-Return style Python factory.
+
+  Renders a single 1x1x1 orange box on the world origin. The smallest
+  valid Python factory that exercises every part of the Blueprint-Return
+  pipeline: lbl.name() / lbl.define_palette() / lbl.attach_box() /
+  lbl.blueprint().
+  """
+
+  def create_model():
+      lbl.name("Hello Block")
+      lbl.define_palette({
+          "shell": {"color": "#f5821b", "roughness": 0.55},
+      })
+      lbl.attach_box(
+          "body",
+          footprint_size=(1.0, 1.0),
+          length=1.0,
+          material="shell",
+      )
+      return lbl.blueprint()
+
+That's it. Drop the file on the page and an orange box appears.
+
+================================================================================
+PART 212 — ADVANCED WORKED EXAMPLE (Three.js Direct style)
+================================================================================
+
+Save as `tiny_motorcycle.py`:
+
+  """
+  tiny_motorcycle.py — Three.js Direct style Python factory.
+
+  A 5-piece chunky motorcycle that uses AnimationMixer + tick for
+  wheel rotation. Demonstrates Style B end-to-end: THREE.Group / Mesh /
+  CylinderGeometry / MeshStandardMaterial / userData.sculptRuntime /
+  userData.tick.
+  """
+
+  from js import THREE
+
+  def create_model():
+      g = THREE.Group.new()
+      g.name = "Tiny Motorcycle"
+
+      # Body — soft-beveled box (RoundedBoxGeometry from three/addons)
+      from js import RoundedBoxGeometry
+      body = THREE.Mesh.new(
+          RoundedBoxGeometry.new(1.2, 0.5, 0.4, 4, 0.08),
+          THREE.MeshStandardMaterial.new({
+              "color": 0xf5821b,
+              "roughness": 0.45,
+              "metalness": 0.05,
+          }),
+      )
+      body.position.set(0, 0.55, 0)
+      body.castShadow = True
+      body.receiveShadow = True
+      body.name = "body"
+      g.add(body)
+
+      # Tank — half-sphere on top of the body
+      tank = THREE.Mesh.new(
+          THREE.SphereGeometry.new(0.28, 16, 12, 0, 6.283185307, 0, 1.570796327),
+          THREE.MeshStandardMaterial.new({
+              "color": 0xdc6b0a, "roughness": 0.4,
+          }),
+      )
+      tank.position.set(0.1, 0.95, 0)
+      tank.castShadow = True
+      tank.name = "tank"
+      g.add(tank)
+
+      # Wheels — 2 cylinders, axis aligned to Z
+      wheels = []
+      for i, x in enumerate((-0.45, 0.45)):
+          wheel = THREE.Mesh.new(
+              THREE.CylinderGeometry.new(0.25, 0.25, 0.18, 16),
+              THREE.MeshStandardMaterial.new({"color": 0x222831}),
+          )
+          wheel.position.set(x, 0.25, 0)
+          wheel.rotation.x = 1.5707963267948966
+          wheel.castShadow = True
+          wheel.receiveShadow = True
+          wheel.name = f"wheel_{i}"
+          g.add(wheel)
+          wheels.append(wheel)
+
+      # Per-frame animation: spin the wheels
+      def tick(dt, elapsed):
+          for w in wheels:
+              w.rotation.y += dt * 4.0
+      g.userData.tick = tick
+
+      # Inspector hooks
+      g.userData.sculptRuntime = {
+          "nodes":  {"root": g, "body": body, "tank": tank,
+                     "wheel_0": wheels[0], "wheel_1": wheels[1]},
+          "meshes": {"body": body, "tank": tank,
+                     "wheel_0": wheels[0], "wheel_1": wheels[1]},
+          "detailInventory": [
+              {"id": "body", "region": "chassis", "kind": "feature",
+               "priority": "high", "reviewThreshold": 0.7},
+              {"id": "tank", "region": "chassis", "kind": "feature",
+               "priority": "high", "reviewThreshold": 0.6},
+              {"id": "wheel_0", "region": "running_gear", "kind": "feature",
+               "priority": "high", "reviewThreshold": 0.8},
+              {"id": "wheel_1", "region": "running_gear", "kind": "feature",
+               "priority": "high", "reviewThreshold": 0.8},
+          ],
+      }
+      return g
+
+Drop on the page → orange chunky motorcycle with spinning wheels.
+
+================================================================================
+PART 213 — COMMON MISTAKES
+================================================================================
+
+(Subset of Prompt_To_Ts.txt PART 15, with Python-specific additions.)
+
+213.1 — `import three` instead of `from js import THREE`
+  ❌ import three
+  ❌ from three import *
+  ✅ from js import THREE
+
+  The `three` Python package doesn't exist; Three.js is exposed via
+  Pyodide's `js` module, not a Python package.
+
+213.2 — Forgetting `.new()` on constructors
+  ❌ g = THREE.Group()         # returns a class, not an instance
+  ✅ g = THREE.Group.new()     # Pyodide idiom for `new THREE.Group()`
+
+  Pyodide requires the `.new()` form for constructors; the
+  parenthesised form returns the constructor itself.
+
+213.3 — Returning a single Mesh instead of a Group
+  ❌ return THREE.Mesh.new(...)
+  ✅ g = THREE.Group.new(); g.add(mesh); return g
+
+  The renderer expects an Object3D with children. A bare Mesh
+  technically works (Mesh.isObject3D === true) but you lose the
+  ability to add more parts later, and the inspector's "select
+  parent" UI doesn't have anything to grab.
+
+213.4 — Returning a Python list of dicts
+  ❌ return [{"id": "box1", "type": "frustum_box", ...}]
+  ✅ return lbl.blueprint()    # returns {"meta":..., "objects":...}
+
+  The Blueprint-Return style requires the dict shape, not a list.
+  If you only want to pass `objects`, wrap it: `{"meta": {}, "objects":
+  your_list}`.
+
+213.5 — Top-level print() calls
+  ❌ print("loading model...")
+  ❌ print(f"scale = {scale}")
+  ✅ Use lbl.* / userData / sculptRuntime for debug signals.
+
+  Pyodide captures stdout into the validator log, so a noisy print()
+  will clutter the validator. Save print() for actual runtime
+  diagnostics you want to see in the log.
+
+213.6 — Tick on Style A
+  ❌ return lbl.blueprint();  g.userData.tick = tick  # `g` not defined
+  ✅ Switch to Style B (Three.js Direct) for tick support.
+
+  Style A doesn't have a Group to attach tick to. If you need tick,
+  use Style B.
+
+213.7 — Module-level state that bleeds between runs
+  ❌ counter = 0
+     def create_model():
+         global counter
+         counter += 1
+  ✅ Pass state through the factory's return value (e.g. via
+     `meta.run_id = counter`).
+
+  The renderer doesn't reset module globals between runs. If you
+  must use a global, reset it inside the factory.
+
+213.8 — I/O syscalls
+  ❌ import subprocess; subprocess.run(["ls"])
+  ❌ import os; os.system("...")
+  ❌ import urllib.request; urllib.request.urlopen(...)
+
+  The renderer runs in a sandboxed WASM environment. These will
+  throw. If you need data, see PART 216 on the `pyodide.loadPackage`
+  / `pyodide.open_url` workaround.
+
+================================================================================
+PART 214 — PRE-OUTPUT CHECKLIST FOR AI AUTHORS
+================================================================================
+
+Before sending a .py file to the user, run through this list silently.
+Catching issues here saves the user a debug cycle.
+
+  [ ] The factory function name is one the renderer recognises
+      (create_model, create_xxx_model, build, make, or any callable
+      ending in _model / _mascot / _factory).
+  [ ] The factory returns either:
+      • A Python dict with `meta` and `objects` (Style A), OR
+      • A `THREE.Group.new()` (Style B).
+  [ ] For Style A, every `material="..."` reference resolves to a
+      `lbl.define_palette()` entry. No typos.
+  [ ] For Style B, every `THREE.Xxx.new()` call uses the `.new()`
+      idiom, not the parens-only form.
+  [ ] If using RoundedBoxGeometry, RectAreaLightUniformsLib, or
+      TextGeometry, the `from js import Xxx` import is present.
+  [ ] sculptRuntime is populated (PART 207) — at minimum nodes +
+      meshes, ideally also detailInventory.
+  [ ] Per-frame animation, if any, uses tick (PART 208) — Style B only.
+  [ ] The model is centred on the origin (the renderer auto-frames,
+      but off-centre models look weird in screenshots).
+  [ ] No `print()` debug calls left in.
+  [ ] No `import three` / `from three import *` (use `from js import
+      THREE`).
+  [ ] No `subprocess` / `os.system` / `socket` / I/O syscalls.
+
+================================================================================
+PART 215 — CROSS-REFERENCES TO THE 6 EXISTING SPEC FILES
+================================================================================
+
+Python factories share the same renderer, same validator, same
+inspector, same export pipeline as JSON / JS / TS. The Python-specific
+layer is the 20 PARTs in this file (PART 200-219). Every other PART
+in the LBL system applies identically to Python — the methodology is
+language-neutral. The 6 sibling files contain the methodology you
+should follow:
+
+  Prompt_To_Ts.txt   — TS factory contract (PART 1-50; PART 100-199
+                        methodology) — read this for the underlying
+                        output contract that Python's Three.js Direct
+                        style mirrors one-for-one
+  Prompt_To_Js.txt   — JS blueprint contract (PART 1-50; PART 100-199
+                        cross-refs) — read this for the builder API
+                        lbl.* mirrors
+  Prompt_To_Json.txt — JSON blueprint contract (PART 1-50; PART
+                        100-199 cross-refs) — read this for the dict
+                        shape Style A returns
+  Image_To_Ts.txt    — Same as Prompt_To_Ts.txt, but with the image-
+                        specific layer (PART 153-166 + PART 167-178 +
+                        PART 180-189) front-and-centre for factory
+                        generation from a reference image
+  Image_To_Js.txt    — Same as Prompt_To_Js.txt, image-driven
+  Image_To_Json.txt  — Same as Prompt_To_Json.txt, image-driven
+
+The image-driven layer is image-specific regardless of the output
+format, so for the image-to-Python path see Image_To_Py.txt — it
+duplicates the image-specific layer (PART 153-166) but cross-references
+the Python-specific PARTs (PART 200-219) from this file.
+
+================================================================================
+PART 216 — DIFFERENCES FROM THE TS PATH (Pyodide constraints, perf)
+================================================================================
+
+216.1 — PYODIDE LOAD COST
+  The first .py file load in a session downloads Pyodide from
+  cdn.jsdelivr.net (~10 MB compressed) and initialises the WASM
+  runtime. This takes 2-5 seconds on a fast connection, longer on
+  mobile. Subsequent .py loads in the same session reuse the cached
+  Pyodide instance and take ~50-200 ms.
+  If your factory needs to be fast on first load, prefer JSON / JS
+  blueprint files. If you need the language features, pay the
+  Pyodide cost once and reuse.
+
+216.2 — JS PROXY LIFETIME
+  When Python returns a JS object (like a THREE.Group), Pyodide wraps
+  it in a JsProxy. The proxy is kept alive as long as something holds
+  a reference to it. In the renderer's case, the scene graph holds
+  the Group via `g.add(...)` / `scene.add(group)`, so the proxy stays
+  alive for the life of the scene.
+  The renderer releases the proxy after the model is mounted
+  (addTsModelToScene). This is a normal lifecycle — don't try to
+  hold raw Python references to scene objects after the factory
+  returns, because Python references don't keep the JS object alive
+  in Pyodide's reference counting scheme.
+
+216.3 — STDOUT/STDERR CAPTURE
+  Pyodide captures print() / sys.stdout output and the renderer
+  surfaces it in the validator log. Don't print() in tight loops
+  (100+ lines per second floods the log). The validator log has
+  roughly 5000-character display limit; longer logs get truncated.
+
+216.4 — NO MULTI-THREADING
+  Python factories run on the main thread. The Pyodide WebAssembly
+  build the renderer uses is the single-threaded variant. Don't
+  try to use threading or multiprocessing — the runtime doesn't
+  support it and the import will fail.
+
+216.5 — NO EXTERNAL PYTHON PACKAGES (BY DEFAULT)
+  Pyodide ships with a small subset of the standard library and
+  micropip. You can `import micropip; micropip.install("package")`
+  but the install needs network access and the package must have a
+  Pyodide build. The renderer's offline-first philosophy is at odds
+  with this — if your factory needs numpy/scipy, document it
+  explicitly in the docstring so the user knows the first load will
+  be slow.
+  For most geometry cases, the `math` module covers what numpy would.
+  For image manipulation, use Three.js CanvasTexture (PART 209).
+
+216.6 — PERF COMPARISON
+  Roughly: a Python factory takes 1.5-2x the wall-clock time of the
+  same factory in TypeScript (compiled + dynamic import) for simple
+  procedural models. For models with deep per-frame animation, the
+  cost is dominated by tick() execution, which is ~10-20x slower in
+  Python than in JS (Pyodide is single-threaded and proxies every
+  property access). If your factory has heavy per-frame work, prefer
+  Style A's static-mesh path or move the per-frame work into a Three.js
+  AnimationMixer that runs in compiled JS.
+
+216.7 — DEBUGGING
+  Pyodide errors include Python stack traces in the browser console.
+  The validator log shows the LAST exception message (with file/line
+  info from Pyodide). For deeper debugging, open the browser devtools
+  console — the full Python traceback is logged there.
+
+================================================================================
+PART 217 — WHEN TO REACH FOR PYTHON vs. JS BLUEPRINT vs. TS FACTORY
+================================================================================
+
+The 3 code-producing formats trade off against each other:
+
+  JSON blueprint
+    + Simplest for any AI to generate (just a dict).
+    + Schema validator catches errors with helpful messages.
+    + Easiest to hand-edit in a text editor.
+    - No per-frame animation (no tick).
+    - No full Three.js power (limited to buildScene's primitive
+      vocabulary).
+    - No programmatic cleverness (every primitive is a literal dict).
+
+  JS blueprint
+    + Programmatic cleverness (loops, conditionals, helper functions).
+    + Same builder API as Python's lbl module.
+    + Runs as a Function() body — no separate compile step.
+    - No per-frame animation (no tick).
+    - No full Three.js power.
+
+  TS factory
+    + Full Three.js power.
+    + Per-frame animation (tick).
+    + TypeScript type safety catches many bugs at compile time.
+    + Skeletal animation, custom shaders, instanced meshes, etc.
+    - Most complex of the 3 (TS compilation, type errors can be opaque).
+    - Larger output files (full module + imports).
+
+  Python factory (NEW in v1.36)
+    + All the cleverness of JS blueprints + full Three.js power + tick.
+    + Python's expressiveness (list comprehensions, generators, etc.).
+    + Familiar language for AI models (most code LLMs know Python well).
+    - Pyodide first-load cost (~10 MB, 2-5s).
+    - 1.5-2x slower than TS for procedural models; ~10-20x slower for
+      per-frame animation (PART 216.6).
+    - Single-threaded (no parallelism).
+
+Decision tree:
+  - Pure procedural model, no animation needed?
+      → JSON or JS blueprint (faster, smaller)
+  - Procedural model + per-frame animation?
+      → Python or TS factory (Style B)
+  - Skeletal / skinned / shader-heavy model?
+      → TS or Python (Style B), prefer TS for perf
+  - AI is better at Python than TS for this prompt?
+      → Python (Style A or B depending on the model)
+  - AI doesn't know what the renderer expects?
+      → Show it this spec (Prompt_To_Py.txt)
+
+In practice, the AI author's choice matters more than the format. A
+Python factory with a clear Style A / B separation and a well-chosen
+factory name will be more correct than a TS factory that uses 5
+imports and 12 type assertions.
+
+================================================================================
+PART 218 — RUNTIME ERROR REFERENCE
+================================================================================
+
+When a .py file fails to build, the renderer shows one of these errors
+in the validator log. Match the error to the cause:
+
+  "Could not load Pyodide from jsDelivr..."
+    Network/CDN failure. Check connectivity. Fall back to a JSON file
+    or a JS blueprint (which doesn't need Pyodide).
+
+  "Python syntax/runtime error: <message>"
+    Your Python code has a syntax error or runtime exception. The
+    message comes from Pyodide; it includes the file/line number.
+    Open browser devtools for the full traceback.
+
+  "Python file did not define a factory."
+    The renderer ran your file but found no callable matching the
+    factory-name heuristic (PART 200.2). Add a `def create_model():`
+    (or similar).
+
+  "Python factory did not return a blueprint dict."
+    Your factory returned something other than a dict or Object3D.
+    For Style A, return `lbl.blueprint()`. For Style B, return
+    `THREE.Group.new()`.
+
+  "Factory 'X' returned an empty THREE.Object3D (no children)."
+    Style B: your factory returned a Group with no children. The
+    renderer treats this as a build error. Add at least one Mesh.
+
+  "Factory 'X' returned an unsupported value (type=...)."
+    The factory returned something exotic (a number, a string, a list).
+    Return a dict (Style A) or a Group (Style B).
+
+  "schema errors" / "X schema error(s) — see validation log"
+    Style A only: the dict your factory returned has structural
+    problems (missing required fields, wrong types). The validator
+    log lists each error. Fix the offending object(s).
+
+  "Failed to load the compiled module"
+    TS path error, shouldn't appear for Python. If it does, the
+    renderer has a bug — file an issue.
+
+================================================================================
+PART 219 — FILE METADATA + COMPANION FILES
+================================================================================
+
+This section points at the other files in the Python pipeline:
+
+  public/modeling/lbl_py.py
+    The standalone copy of the `lbl` Python helper module. Byte-
+    identical to the inlined copy in index.html (`LBL_PY_HELPER_SRC`).
+    Keep them in sync if you change one. The file is also the
+    canonical human-readable spec for the lbl API.
+
+  public/models/Model_10.py
+    The shipped worked example for Python. Demonstrates BOTH Style A
+    and Style B in a single file (with one style active at a time via
+    the `create_model` alias at the bottom). Load it to see the full
+    pipeline work end-to-end.
+
+  index.html (Python section)
+    The renderer-side wiring. The new code lives in the "v1.36 /
+    v8.27 — PYTHON FACTORY PIPELINE" section, between the JS
+    blueprint executor and the TS-spec comment block. Functions:
+      getPyodide()        — lazy load + cache Pyodide
+      runPyBlueprint()    — run a .py file, return dict or Group
+      validateAndBuildPy() — mount the result in the scene
+    Plus the LBL_PY_HELPER_SRC string (the inlined copy of lbl_py.py).
+
+  CHANGES_v136.md
+    The changelog entry for this release. Has the production sign-off
+    checklist, performance numbers, and backwards-compatibility note.
+
+================================================================================
+END OF Prompt_To_Py.txt
+For the IMAGE-to-Python path, see Image_To_Py.txt.
+For the underlying methodology shared across all 4 formats, see
+Prompt_To_Ts.txt (the canonical methodology source).
+================================================================================

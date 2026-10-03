@@ -6,7 +6,7 @@
 <title>Low Poly 3D — Free Browser-Based AI 3D Blueprint Tool | RDJ Publishers</title>
 <!-- v1.34 / v8.25 — PART 180-189 Chunky 3D Sport Motorcycle Reference Specification layered additively on top of PART 179 (v1.33 / v8.24 baseline; PART 179 + PART 167-178 retained). PART 180-189 elevates the PART 177 Chunky Sport Motorcycle worked example from summary-level to a fully-authoritative 10-section reference specification (codifying the user-supplied SportMotorcycle_3D_Techniques_Specification.txt at repo root): PART 180 10-section spec layout + RULE 180.0.1 Reference Authority + RULE 180.0.2 Generalisation Beyond the Sport Motorcycle + PART 181 Core Technologies Stack (Three.js / TypeScript / ES modules / WebGL / Canvas 2D / Mulberry32 PRNG + zero external asset dependency) + PART 182 Authoritative Geometry Catalog with PART-to-PRIMITIVE LOOKUP TABLE (CylinderGeometry for rotated structural members, ExtrudeGeometry for organic panels, TorusGeometry for tires and rims, CapsuleGeometry for mirrors and headlights, TubeGeometry along CatmullRomCurve3 for exhaust header, BoxGeometry ONLY for straight structural members) + RULE 182.0.1 BoxGeometry Constraint + RULE 182.0.2 CylinderGeometry Constraint (motorcycle-paint-aware extensions of the v1.33 PART 167.0.2 forbidden-fairing list) + PART 183 Reference Materials & Color Palette (3-tier MeshStandardMaterial / MeshPhysicalMaterial-with-clearcoat / MeshBasicMaterial system + procedural 256×256 seeded Mulberry32 micro-roughness texture with RepeatWrapping at 4×4 + 6-band reference-sampled palette: fairing orange 0xf5821b/0xdc6b0a/0xff9429 + charcoal 6 shades + accent silver 5 shades + headlight white + taillight red + shock spring yellow) + PART 184 Modular Component Architecture (8 builder functions: createChunkySportWheel() + buildFrontForkAssembly() + buildFairingAndCockpit() + buildFuelTank() + buildSeatAndTailSection() + buildChassisAndEngine() + buildExhaustSystem() + buildRearSwingarm() — each returning { group, meshes, sockets?, colliders? } and accepting a shared materials map parameter) + PART 185 Authoritative Coordinate System & Proportions (+X front / -X rear / +Y up / +Z right; origin (0,0,0) between the axles; axles at Y ≈ 0.30 so lathed tires touch ground at Y = 0; ~22° rake angle on steering_pivot; deterministic posture contract) + PART 186 sculptRuntime Runtime Contract (9-key contract on root.userData: nodes / meshes / sockets / colliders / destructionGroups / materials / actions / animation / vfx + 5 Actions API methods revEngine / steer / setDriveSpeed / toggleHeadlight / resetPose + per-frame Tick System + 9 SportMotorcycleOpts fields scale / shadows / wireframe / fairingColor / frameColor / accentColor / driveSpeed / steeringAngle / idleVibration + Audit #E186 contract conformance) + PART 187 Look-Dev Lighting System (createSportMotorcycleModelLookDevLights(mode) with 3 modes 'reference' / 'grazing' / 'neutral' + 2048 shadow map contract + { lights, shadowCatcher } return shape) + PART 188 Architectural & Performance Targets (~8 500 tris target + shadow cast+receive on all major meshes + wireframe diagnostic mode + the 8 architectural patterns factory + options object + runtime contract + modular builder + named registry + action/command + deterministic procedural + zero-dependency standalone) + PART 189 Style Metadata + LBL Version Stamp (5-field pair: style-label 'chunky-mascot' / subject 'sport-motorcycle' / source-reference 'bd5da92411032501f007edb073f06372.jpg' / reference-views 'isometric-front-right' / lbl-version 'v1.34 / v8.25' + dual-version stamp rule TS-v1.x paired with JSON-JS-v8.x always released together + Audit #E189 surface on load). PART 180-189 is purely additive methodology + reference specification; no new renderer-side helpers this release (PART 179's 3 helpers createLathedTireGeometry / createSweptTube / createExhaustCanister are reused as-is for tire + exhaust in the canonical bike). PART 180-189 generalises beyond the sport motorcycle to any chunky-mascot / smooth-3D-vinyl-clay vehicle whose source reference is single-image-grounded. The 6 LBL spec files (Prompt_To_Ts.txt / Prompt_To_Js.txt / Prompt_To_Json.txt / Image_To_Ts.txt / Image_To_Js.txt / Image_To_Json.txt) all carry v1.34 / v8.25 banners and reference PART 180-189 from Prompt_To_Ts.txt; the authoritative 10-section source-of-truth lives byte-identical at SportMotorcycle_3D_Techniques_Specification.txt (repo root). See CHANGES_v134.md. v1.33 / v8.24 PART 179 baseline (v1.33 / v8.24) retained: Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) + RULE 167.1.1 Form Preservation Mandate + RULE 169.1.2 Filleted Box Usage Constraint (PROHIBITED for fairings / cowls / tanks / visors / tires) + RULE 169.3.2 Mandatory Wheel Profile Revolution (lathed toroidal tire — flat cylinders fail audit E41) + Body_Fairings & FuelTank continuous envelope group (PART 172.1.1) + 10 new technical PARTs 179.1-179.10 (lathed tire / Catmull-Rom swept tube / exhaust canister / bezier extrude / shape-hole duct / egg-visor fix / TS1117 fix / socket attachment hierarchy / form-preservation ship-list addendum). 3 new helpers added to public/modeling/mt-hardsurface.js: createLathedTireGeometry / createSweptTube / createExhaustCanister. PART 167-178 baseline (v1.32 / v8.23) retained: 8-step vehicle pipeline + dimension & clearance contract + 4 procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques (quadratic / bezier / lathe / swept extrusion / parametric) + seeded mulberry32 micro-roughness texture + hierarchical articulation tree + 3-point studio lighting rig + self-verification runtime hooks + 8-section code architecture + 10 hard-surface pitfalls + canonical worked example + 12-step ship checklist. Layered additively over PART 145-152 (perfect-shape pipeline) + PART 153-166 (image-driven factory defaults) + PART 100-143 (44-Technique Modeling Bundle) + PART 74 (procedural texturing). -->
 <meta name="description" content="Drop an AI-generated LBL blueprint JSON into this free, browser-based Low Poly 3D tool to instantly render, edit, and export it as GLB, OBJ, or STL. No sign-up."/>
-<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.34, LBL v8.25, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.34 v8.25, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 180-189 ChunkySportMotorcycle ReferenceSpecification chunky-mascot sport-motorcycle createChunkySportWheel buildFrontForkAssembly buildFairingAndCockpit buildFuelTank buildSeatAndTailSection buildChassisAndEngine buildExhaustSystem buildRearSwingarm sculptRuntime revEngine steer setDriveSpeed toggleHeadlight resetPose createSportMotorcycleModelLookDevLights reference grazing neutral Mulberry32 microRoughnessBike FairingOrange AccentSilver Charcoal ShockSpringYellow TubeGeometry CatmullRomCurve3 BezierExtrude ShapeHoles LathedTire DeepDishRim RimStarPattern, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments, PART 100-143 44-Technique Modeling Bundle Primitive BMesh Procedural Parametric Generative SDF Voxel CSG Boolean L-System Fractal NURBS Non-Manifold Subdivision Remeshing Retopology Decimation Triangulation Quad Smoothing Sculpting Displace SMPL Blendshapes ShapeKeys MorphTargets LBS DQS ImplicitSkinning DeltaMush CageDeformation MuscleSim SoftBody Hair AutoRig PBRNodes ProceduralTex UVUnwrap Baking TexturePainting AtlasPacking LOD Instancing GeometryNodes PhysicsSim, MakePrimitive BmeshFromGeometry ProceduralGenerate MakeParametric GenerativeGrow SdfEvaluate VoxelCarve CsgUnion LSystem FractalMandelbulb MakeNurbsCurve DetectNonManifold SubdivideCatmullClark IsotropicRemesh AutoRetopologize QemDecimate Triangulate Quadify LaplacianSmooth SculptBrush DisplaceSurface SmplSkeleton MakeBlendshape ShapeKeyStore ComputeLBS ComputeDQS ImplicitSkin DeltaMush CageDeform MuscleSim SoftBodySim HairStrands AutoRig PbrMaterialGraph ProceduralTextureCanvas UvUnwrap BakeMap PaintTexture PackAtlases GenerateLOD MakeInstanced GeoNodesEvaluate PhysicsStep"/>
+<meta name="keywords" content="3D scene builder, blueprint JSON, GLB export, OBJ export, STL export, Three.js, browser 3D tool, free 3D generator, LBL blueprint, RDJ Publishers, LBL v1.36, LBL v8.27, Python factory, Pyodide, CPython in WebAssembly, prompt-to-Python, image-to-Python, zip bundle, model rig, character pipeline, skeletal skinning, low poly, mid poly, high poly, smooth shaded, stylized, photoreal, voxel, hand painted, toon shading, cel shading, retro PSX, 3D modeling techniques, ExtrudeGeometry, LatheGeometry, InstancedMesh, Tweakpane, parametric modeling, silhouette test, bbox validator, PBR materials, multi-stage generation, mesh cleanup, watertight, hard constraints, target triangle budget, seeded random, Mulberry32, QEM, scene composition, high detail, geometric density, detail inventory, mesh count target, layered armor, overlapping plates, multi-layer cloth, micro-chips, silhouette pass, material variants, plate cloth leather stone, 5-stage pipeline, Blockout Structure Density Surface Polish, character production, 7 production techniques, 60/25/15 polygon distribution, 11-step pipeline, 85-bone skeleton, 5-LOD chain, LOD0 LOD1 LOD2 LOD3 LOD4, deformation risk, blend shapes, half-budget cut, film quality, 30k triangle hero, refinement, normal-guided refinement, view-by-view refinement, detail enhancement networks, segmentation, part-aware generation, style lock, style consistency, family density, hard-surface, organic topology, silhouette-first optimization, variant ranking, multiple variants, Meshy 6, Tripo, rank variants, user feedback, favorite seed, average rating, professional pipeline, GLB-first, viewer adapter, three-mesh-bvh, BVH raycast, MeshBVH, look-dev lights, 3-light setup, key fill rim, HDRI environment, RoomEnvironment, fitted clothing, fit-over-body, animation clip baking, idle walk attack hit, multi-view validation, 18-render grid, silhouette IoU, house style, coding rules, blank line, config object, CS2 PBR material profile, CS2 finish styles, CS2 wear system, Anodized Anodized Multicolored Custom Paint Job Gunsmith Hydrographic Patina Solid Color Sprayed Damascus Steel, iridescence iridescenceIOR iridescenceThicknessRange, specularIntensity specularColor, CS2 float value wear, factory new minimal wear field-tested well-worn battle-scarred FN MW FT WW BS, wear_remap_min wear_remap_max, brushed steel gunmetal, case hardened blue gem Doppler Fade, knife weapon blade finish, deform modifier stack taper twist bend spherize inflate noise, cross-primitive vocabulary disc ring arc hemisphere ribbon cross-planes helix, packed vertex channels uv1 uv2 uv3, UV projection planar radial cylindrical spherical box alongLength, converge faces, recolor by palette, chain placement, material animation, preflight check, procedural texturing, procedural textures, micro texture, micro-roughness, microRoughnessMap, punctate, striate, height-to-normal, Sobel operator, wrap-around sampling, tileable texture, seam-free texture, FBM, fractional Brownian motion, value noise, Perlin noise, quintic smoothstep, Voronoi, Worley noise, domain warp, slope blur, height field, normal map generation, roughness map, AO map, curvature map, cavity dirt, cavity mask, F2-F1 Worley, faceted hex pattern, hexagonal facet, compound eye, honeycomb, scaly skin, triangular lattice Voronoi, even-row tiling, loft geometry, cross-section extrusion, spindle, segmented abdomen, surface decoration, chitin material, elytra material, beetle shell, iridescence recipe, membrane material, insect wing, velvet material, sheen material, BSSRDF, transmission, ior, clearcoat cap, ACES tonemap, bricks pattern, Truchet curves, Cairo tiling, splatter pattern, deterministic PRNG, mulberry32, FNV-1a hash, derive sub-seed, seed-driven determinism, hash-bashed geometry, CanvasTexture generator, no external image assets, zero asset pipeline, organic procedural geometry, creature PBR, chitin elytra membrane velvet, PART 74 microRoughnessMap punctateMaps striateMaps heightToNormal domainWarpFBM loft spindle segmentedAbdomen facetHeightField chitin elytra membrane velvet, low_poly_3d, v1.36 v8.27, PART 45 cs2PbrProfile applyWear cs2WearMaskTexture wearSlider, PART 180-189 ChunkySportMotorcycle ReferenceSpecification chunky-mascot sport-motorcycle createChunkySportWheel buildFrontForkAssembly buildFairingAndCockpit buildFuelTank buildSeatAndTailSection buildChassisAndEngine buildExhaustSystem buildRearSwingarm sculptRuntime revEngine steer setDriveSpeed toggleHeadlight resetPose createSportMotorcycleModelLookDevLights reference grazing neutral Mulberry32 microRoughnessBike FairingOrange AccentSilver Charcoal ShockSpringYellow TubeGeometry CatmullRomCurve3 BezierExtrude ShapeHoles LathedTire DeepDishRim RimStarPattern, PART 67 makeDisc makeRing makeArc makeHelix taper twist bend applyNoise applyModifierStack fillVertexChannel convergeFaces projectUV recolorByPalette placeChain applyMaterialAnimation preflightCheck, PART 68-71 StarGeometry PolygonGeometry AnnulusGeometry HeartGeometry SpadeGeometry BurstGeometry ArchGeometry EdgedBoxGeometry MoldingGeometry PumpkinGeometry LeafGeometry ArchedSlabGeometry makeCheckerboard makeRadialGradient makeLinearGradient mulberry32 splitmix32 deriveSubSeed createRandom alignToEdge alignToRow alignToSurface center atmosphereRain skyFullMoon skyStarField cyclorama groundGrid contactShadows helixPath spiralPath buildMatRamp makeObjectPool makeAssetLoader frame easing falloff boneSegments, PART 100-143 44-Technique Modeling Bundle Primitive BMesh Procedural Parametric Generative SDF Voxel CSG Boolean L-System Fractal NURBS Non-Manifold Subdivision Remeshing Retopology Decimation Triangulation Quad Smoothing Sculpting Displace SMPL Blendshapes ShapeKeys MorphTargets LBS DQS ImplicitSkinning DeltaMush CageDeformation MuscleSim SoftBody Hair AutoRig PBRNodes ProceduralTex UVUnwrap Baking TexturePainting AtlasPacking LOD Instancing GeometryNodes PhysicsSim, MakePrimitive BmeshFromGeometry ProceduralGenerate MakeParametric GenerativeGrow SdfEvaluate VoxelCarve CsgUnion LSystem FractalMandelbulb MakeNurbsCurve DetectNonManifold SubdivideCatmullClark IsotropicRemesh AutoRetopologize QemDecimate Triangulate Quadify LaplacianSmooth SculptBrush DisplaceSurface SmplSkeleton MakeBlendshape ShapeKeyStore ComputeLBS ComputeDQS ImplicitSkin DeltaMush CageDeform MuscleSim SoftBodySim HairStrands AutoRig PbrMaterialGraph ProceduralTextureCanvas UvUnwrap BakeMap PaintTexture PackAtlases GenerateLOD MakeInstanced GeoNodesEvaluate PhysicsStep, PART 200-219 Python factory contract lbl.attach_box lbl.attach_cylinder lbl.attach_chain lbl.paint_rectangle lbl.create_anchor lbl.hollow lbl.group lbl.blueprint lbl.define_palette lbl.name from js import THREE Pyodide v0.26.2"/>
 <meta name="author" content="RDJ Publishers"/>
 <meta name="robots" content="index, follow, max-image-preview:large"/>
 <meta name="theme-color" content="#0a0c10"/>
@@ -41,7 +41,7 @@
   "applicationSubCategory": "3D Modeling / Blueprint Renderer",
   "operatingSystem": "Any modern browser (Chrome, Firefox, Edge, Safari)",
   "browserRequirements": "Requires WebGL 2.0 and JavaScript",
-  "softwareVersion": "v1.35 / v8.26",
+  "softwareVersion": "v1.36 / v8.27",
   "inLanguage": "en",
   "isAccessibleForFree": true,
   "offers": {
@@ -80,7 +80,7 @@
       "name": "What does this tool actually do?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Low Poly 3D is a browser-based viewer and editor for a JSON, JavaScript, or TypeScript 'blueprint' format. It does not generate anything by itself — you get the blueprint from your own AI chat, then load it here to render, tweak, and export a low-poly 3D model."
+        "text": "Low Poly 3D is a browser-based viewer and editor for a JSON, JavaScript, TypeScript, or Python 'blueprint' format. It does not generate anything by itself — you get the blueprint from your own AI chat, then load it here to render, tweak, and export a low-poly 3D model."
       }
     },
     {
@@ -96,7 +96,7 @@
       "name": "Which mode should I choose?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Start with Standard (JSON) — it works with almost any AI and is easiest to fix by hand if something looks off. Move to Advanced (JavaScript) for more detailed geometry, or Pro (TypeScript) if you want real Three.js code, animation support, and are using a strong coding model."
+        "text": "Start with Standard (JSON) — it works with almost any AI and is easiest to fix by hand if something looks off. Move to Advanced (JavaScript) for more detailed geometry, Pro (TypeScript) for real Three.js code and animation support, or Elite (Python) for full Three.js power with Python's expressiveness (runs in the browser via Pyodide; first load downloads ~10 MB). Elite is the right choice when your AI model is strongest at Python."
       }
     },
     {
@@ -128,7 +128,7 @@
       "name": "Can I edit a model after it loads?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, or .ts."
+        "text": "Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, .ts, or .py."
       }
     }
   ]
@@ -387,6 +387,7 @@ body{
   transition:all .3s;white-space:nowrap;
 }
 #format-chip.format-ts{border-color:var(--accent3);color:var(--accent3);}
+#format-chip.format-py{border-color:#ffd54f;color:#ffd54f;}
 
 /* RJS UPDATE 2 — N1: "No-API Mode" badge, same shape as the other chips.
    Read-only (no toggle) — the system is always No-API, so a toggle would
@@ -1410,6 +1411,9 @@ body.theme-light #anim-controls-panel .anim-ctrl-badge{
 
 .lp-modes{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
 .lp-mode-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:var(--shadow-1);}
+.lp-mode-card.elite{border-color:#ffd54f;box-shadow:var(--shadow-1),0 0 0 1px rgba(255,213,79,.18);}
+.lp-mode-card.elite .lp-mode-tag{color:#ffd54f;border-color:rgba(255,213,79,.4);background:rgba(255,213,79,.08);}
+.lp-mode-card.elite .lp-mode-card-badge{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#ffd54f;background:rgba(255,213,79,.08);border:1px solid rgba(255,213,79,.35);border-radius:999px;padding:2px 8px;margin-left:auto;}
 .lp-mode-head h3{margin:0 0 4px;font-size:13px;color:var(--text);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
 .lp-mode-tag{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent2);background:var(--surface2);border:1px solid var(--border2);border-radius:999px;padding:2px 7px;}
 .lp-mode-desc{margin:0 0 10px;font-size:11.5px;color:var(--text2);line-height:1.5;}
@@ -1876,11 +1880,11 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   <button class="tbtn hide-xs" id="compare-btn" title="PART 52.2 — overlay a reference image over the viewport">🖼 Compare</button>
   <div id="spacer"></div>
   <div id="fidelity-chip" title="PART 51.2 — post-render fidelity gate">Fidelity: n/a</div>
-  <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint or a TS factory">Format: —</div>
+  <div id="format-chip" title="Which LBL input format built the current scene — JSON/JS blueprint, TS factory, or Python factory (Pyodide)">Format: —</div>
   <!-- RJS UPDATE 14 — LBL spec version chip. Shows the active LBL spec version the renderer is targeting.
        TS factories target v1.35 (PART 33 architectural features + PART 167-178 HARD-SURFACE / VEHICLE MODELING PIPELINE — added in v1.32 / v8.23; the missing methodology layer for motorcycles / cars / planes / props with wheels + suspension + fairings + articulated mechanical sub-systems, with 8-step vehicle pipeline + dimension & clearance contract + 4 procedural primitive helpers (FilletedBox / TaperedTube / RimStarPattern / BeveledWasher) + 5 fairing techniques + seeded mulberry32 micro-roughness texture + hierarchical articulation tree + 3-point studio lighting rig + self-verification runtime hooks + 8-section code architecture + 10 hard-surface pitfalls + canonical worked example + 12-step ship checklist + PART 179 ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH — added in v1.33 / v8.24; the Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) + RULE 167.1.1 / 169.1.2 / 169.3.2 + Body_Fairings & FuelTank continuous envelope group (PART 172.1.1) + 10 new technical PARTs 179.1-179.10 (lathed tire / Catmull-Rom swept tube / exhaust canister / bezier extrude / shape-hole duct / egg-visor fix / TS1117 fix / socket attachment hierarchy / form-preservation ship-list addendum) + PART 180-189 CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION — added in v1.34 / v8.25; the missing reference-specification layer that elevates the PART 177 Chunky Sport Motorcycle worked example from summary-level to a fully-authoritative 10-section reference (PART 180 spec layout / PART 181 core technologies stack / PART 182 authoritative geometry catalog / PART 183 reference materials + 6-band color palette / PART 184 the 8 builder functions createChunkySportWheel + 7 build* / PART 185 bike-forward coordinate system + deterministic posture contract / PART 186 9-key sculptRuntime contract + 5 Actions API + tick + 9 options + Audit #E186 / PART 187 look-dev lighting factory with 3 modes 'reference' / 'grazing' / 'neutral' + 2048 shadow map / PART 188 ~8 500 tris + 8 architectural patterns / PART 189 5-field style + LBL version stamp pair + Audit #E189, AND PART 190-199 ARCHITECTURAL MODELING PIPELINE added in v1.35 / v8.26 (the missing methodology layer for buildings / interiors / procedural architecture / landscape, distilled from SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt — the post-mortem on the Modern Dual-Volume Villa build, 2026-09-16): PART 190 overview & when-to-use rule / PART 191 11-key STACK_INDEX anti-Z-fighting ladder / PART 192 createWallWithApertures — piecewise sub-wall decomposition (solves the CSG-void pitfall) / PART 193 createHingedDoorUnit — dual-pivot kinematic hinge hierarchy (solves the pivot-drift pitfall) / PART 194 createGlazedWindowUnit — multi-pane casement window / PART 195 createPitchedGableRoof — gable roof + tile rows / PART 196 createLouveredAtticVent — gable attic vent / PART 197 createPottedPlant — deterministic seeded planter / PART 198 createSteppingStonePath — quadratic-Bezier path / PART 199.1 schemaNamespacingLinter — regex feature-coverage + Z-fight detector / PART 199.3 createArchitecturalLookDevLights — 4 modes day/dusk/night/warmglow / PART 199.4 materialPalette — 9-key canonical palette; 8 NEW renderer-side helpers exposed on window.MT_architectural)) + (PART 33 architectural features + PART 34 rig helpers + PART 35 tris + PART 36 multi-file + PART 37 zip + PART 38 character pipeline + PART 39 3D modeling techniques + PART 40 better models through better generation + PART 41 high-detail generation + PART 42 character production discipline + PART 43 refinement + style locking + variant ranking + PART 44 professional pipeline: GLB-first + BVH + look-dev lights + coding rules + PART 45 CS2 PBR material profile: 9 finish styles, 5-tier wear system, 4 new MeshPhysicalMaterial properties, 5 new canonical helpers, opt-in via meta.cs2Finish / meta.cs2Wear + PART 67 OPT-IN capability bundle: 7 cross-primitive shape generators, 6 deform modifiers, 1 vertex-channel helper, 1 converge helper, 1 recolor helper, 1 chain placement, 1 material animation, 1 preflight check — especially useful for weapons, blades, and metal-finish subjects + PART 74 procedural texturing & shading techniques OPT-IN capability bundle: 6 noise helpers + 3 procedural micro-texture generators + 5 height-to-X conversions + 4 PBR creature recipes (chitin / elytra / membrane / velvet) + 4 loft-based organic geometry helpers + 1 hex-facet helper + 3 cross-cutting tricks + 4 procedural pattern helpers + 4 determinism contract items — especially useful for creatures, insects, organic shapes with skin / shell / wing / membrane + PART 100-143 44-Technique Modeling Bundle + PART 145-152 PERFECT-SHAPE MODELING PIPELINE: PART 145 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate) / PART 146 8 shape-creation techniques (profile lofting / lathe / extrude / CSG / SDF+MarchingCubes / subdivision / NURBS / procedural deformers) / PART 147 5 material techniques (microRoughnessMap / striate / punctate / curvature / cavity-dirt AO) / PART 148 6 rigging techniques (pivot offsets = mesh lengths / hierarchy = anatomy / naming convention / rigid vs smooth binding / auto-rig validation) / PART 149 6 animation techniques (rest pose first / phase-offset / NodeName.property track names / loop frame equality / headless playback test / secondary motion) / PART 150 6 validation techniques (silhouette from 4 angles / multi-view IoU / triangle budget / bbox overlap / height match / cheat-sheet check) / PART 151 10 named pitfalls with fixes / PART 152 reference cheat-sheet as a 10-step ship list — layered additively over PART 100-143 + PART 74 + PART 34 to turn 'place a bunch of primitives' into 'build a real shape'), JSON/JS blueprints target v8.26 (PART 66 feature bridge + PART 167-178 HARD-SURFACE / VEHICLE MODELING PIPELINE added + PART 179 ARTIST-FIRST GEOMETRY FLOW PATCH added + PART 180-189 Chunky 3D Sport Motorcycle Reference Specification added + PART 190-199 Architectural Modeling Pipeline added) (PART 66 feature bridge + PART 34-37 + PART 38 + PART 39 + PART 40 + PART 41 + PART 42 + PART 43 + PART 44 + PART 45 + PART 67 + PART 74 + PART 100-143 + PART 145-152 + PART 167-178 + PART 179 + PART 180-189).
        Pairs with the on-load lblValidateAgainstSpec() check that catches the 50 anti-pattern guards (E1-E50, with 3 reserved slots E4/E9/E10) from PART 32/65/38/39/40/41/42/43/44/45/67/68/72. -->
-  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.35 TS / v8.26 JSON-JS, with PART 100-143 44-Technique Modeling Bundle, PART 145-152 Perfect-Shape Modeling Pipeline, PART 153-166 Image-Driven Factory Defaults, PART 167-178 Hard-Surface / Vehicle Modeling Pipeline, PART 179 Artist-First Geometry Flow & Form-Preservation Patch — Hierarchy of Fidelity + RULE 167.1.1 / 169.1.2 / 169.3.2 + 10 new procedural PARTs 179.1-179.10 + 3 new mt-hardsurface helpers createLathedTireGeometry / createSweptTube / createExhaustCanister, PART 180-189 Chunky 3D Sport Motorcycle Reference Specification — the missing reference-specification layer that elevates the PART 177 Chunky Sport Motorcycle worked example from summary-level to a fully authoritative 10-section reference (PART 180 spec layout + RULE 180.0.1 Reference Authority / PART 181 core technologies stack / PART 182 authoritative geometry catalog with part-to-primitive lookup table + BoxGeometry + CylinderGeometry constraints / PART 183 reference materials + 6-band color palette + procedural micro-roughness / PART 184 8 builder functions createChunkySportWheel + 7 build* / PART 185 bike-forward coordinate system + deterministic posture contract / PART 186 9-key sculptRuntime contract + 5 Actions API + tick + 9 options + Audit #E186 / PART 187 look-dev lighting factory with 3 modes 'reference' / 'grazing' / 'neutral' + 2048 shadow map / PART 188 ~8 500 tris + 8 architectural patterns / PART 189 5-field style + LBL version stamp pair + Audit #E189), AND PART 190-199 ARCHITECTURAL MODELING PIPELINE — the missing methodology layer for buildings / interiors / procedural architecture / landscape (PART 190 overview & when-to-use rule / PART 191 11-key STACK_INDEX anti-Z-fighting ladder with the FOUNDATION/GRAVEL/PLAINTH/PORCH_DECK/DOOR_SILL/PAVERS/WALL_FACE/WALL_FACING/WALL_TRIM/HARDWARE/GLASS micro-epsilon offsets in metres / PART 192 createWallWithApertures — piecewise sub-wall decomposition, solves the CSG-void pitfall / PART 193 createHingedDoorUnit — dual-pivot kinematic hinge hierarchy, solves the pivot-drift pitfall / PART 194 createGlazedWindowUnit — multi-pane casement window with PART 191 GLASS z-offset enforced / PART 195 createPitchedGableRoof — gable roof + tile rows with PART 191 tile-row Y staggering / PART 196 createLouveredAtticVent — gable attic vent / PART 197 createPottedPlant — deterministic seeded planter / PART 198 createSteppingStonePath — quadratic-Bezier path / PART 199.1 schemaNamespacingLinter — regex feature-coverage + Z-fight detector / PART 199.3 createArchitecturalLookDevLights — 4 modes day/dusk/night/warmglow / PART 199.4 materialPalette — 9-key canonical palette); 8 NEW renderer-side helpers exposed on window.MT_architectural, distilled from SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt (post-mortem on the Modern Dual-Volume Villa build, 2026-09-16)). PART 179 fixes the Before-vs-After visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt; PART 180-189 codifies the user-supplied SportMotorcycle_3D_Techniques_Specification.txt at repo root; PART 190-199 codifies SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt (the 6 architectural pitfalls + 4 reusable techniques + 5 actionable roadmap items + 5 system limitations). Models generated against older specs (≤v1.28 / ≤v8.20) still load — the validator surfaces any PART 32/65 anti-patterns (E1-E12, 9 active), PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), PART 68-71 OPT-IN validators (E37 sub-seed usage, E38 lifetime color ramp validity, E39 gizmo shape range, E40 bone segment coverage — ALL opt-in), PART 72 img2threejs structural-fidelity validators (E41 distinct-Z test — flat cylindrical wheels now FAIL audit E41, the v1.33 PART 179.2 lathed-tire requirement — E42 loft trap-warnings, E43 cavity axis rule, E44 chirality gate, E45 assembly contract — Socket_Headlight must be parented to NoseCowl or SteeringHeadPivot per PART 179.9, E46 detail-inventory mapsTo, E47 quality-contract tier, E48 diagnostic-discipline, E49 tube-network vs single-sweep — exhaust headers now require Catmull-Rom per PART 179.4, E50 implicit-SDF schema — total 10, all non-blocking), PART 74 OPT-IN validators (covered by E19/E20/E22 + extended PART 21 checklist — see PART 74.10.4) as non-blocking warnings, PART 100-143 OPT-IN 44-Technique Modeling Bundle helpers exposed on window.MT (12 CORE + 9 MESH + 13 ORGANIC + 6 MATERIALS + 4 ADVANCED) for catalog-driven scene authoring, PART 145-152 PERFECT-SHAPE MODELING PIPELINE (PART 145 8-step pipeline / PART 146 8 shape-creation techniques / PART 147 5 material & surface techniques / PART 148 6 rigging techniques / PART 149 6 animation techniques / PART 150 6 validation & QA techniques / PART 151 10 named pitfalls with fixes / PART 152 reference cheat-sheet) as additive AI-factory guidance, PART 167-179 HARD-SURFACE / VEHICLE / PROP methodology, PART 180-189 CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION, AND PART 190-199 ARCHITECTURAL MODELING PIPELINE (PART 190 overview / PART 191 STACK_INDEX / PART 192 createWallWithApertures / PART 193 createHingedDoorUnit / PART 194 createGlazedWindowUnit / PART 195 createPitchedGableRoof / PART 196 createLouveredAtticVent / PART 197 createPottedPlant / PART 198 createSteppingStonePath / PART 199 schemaNamespacingLinter + createArchitecturalLookDevLights + materialPalette). The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), PART 74 (procedural texturing & shading techniques), PART 100-143 (44-Technique Modeling Bundle), PART 145-152 (Perfect-Shape Modeling Pipeline), PART 167-178 (Hard-Surface / Vehicle Modeling Pipeline), PART 179 (Artist-First Geometry Flow Patch), PART 180-189 (Chunky 3D Sport Motorcycle Reference Specification), and PART 190-199 (Architectural Modeling Pipeline) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.35 / v8.26</div>
+  <div id="lbl-spec-chip" title="LBL spec version this renderer targets (v1.36 TS+Python / v8.27 JSON-JS, with PART 100-143 44-Technique Modeling Bundle, PART 145-152 Perfect-Shape Modeling Pipeline, PART 153-166 Image-Driven Factory Defaults, PART 167-178 Hard-Surface / Vehicle Modeling Pipeline, PART 179 Artist-First Geometry Flow & Form-Preservation Patch — Hierarchy of Fidelity + RULE 167.1.1 / 169.1.2 / 169.3.2 + 10 new procedural PARTs 179.1-179.10 + 3 new mt-hardsurface helpers createLathedTireGeometry / createSweptTube / createExhaustCanister, PART 180-189 Chunky 3D Sport Motorcycle Reference Specification — the missing reference-specification layer that elevates the PART 177 Chunky Sport Motorcycle worked example from summary-level to a fully authoritative 10-section reference (PART 180 spec layout + RULE 180.0.1 Reference Authority / PART 181 core technologies stack / PART 182 authoritative geometry catalog with part-to-primitive lookup table + BoxGeometry + CylinderGeometry constraints / PART 183 reference materials + 6-band color palette + procedural micro-roughness / PART 184 8 builder functions createChunkySportWheel + 7 build* / PART 185 bike-forward coordinate system + deterministic posture contract / PART 186 9-key sculptRuntime contract + 5 Actions API + tick + 9 options + Audit #E186 / PART 187 look-dev lighting factory with 3 modes 'reference' / 'grazing' / 'neutral' + 2048 shadow map / PART 188 ~8 500 tris + 8 architectural patterns / PART 189 5-field style + LBL version stamp pair + Audit #E189), AND PART 190-199 ARCHITECTURAL MODELING PIPELINE — the missing methodology layer for buildings / interiors / procedural architecture / landscape (PART 190 overview & when-to-use rule PART 191 11-key STACK_INDEX anti-Z-fighting ladder with the FOUNDATION/GRAVEL/PLAINTH/PORCH_DECK/DOOR_SILL/PAVERS/WALL_FACE/WALL_FACING/WALL_TRIM/HARDWARE/GLASS micro-epsilon offsets in metres / PART 192 createWallWithApertures — piecewise sub-wall decomposition, solves the CSG-void pitfall / PART 193 createHingedDoorUnit — dual-pivot kinematic hinge hierarchy, solves the pivot-drift pitfall / PART 194 createGlazedWindowUnit — multi-pane casement window with PART 191 GLASS z-offset enforced / PART 195 createPitchedGableRoof — gable roof + tile rows with PART 191 tile-row Y staggering / PART 196 createLouveredAtticVent — gable attic vent / PART 197 createPottedPlant — deterministic seeded planter / PART 198 createSteppingStonePath — quadratic-Bezier path / PART 199.1 schemaNamespacingLinter — regex feature-coverage + Z-fight detector / PART 199.3 createArchitecturalLookDevLights — 4 modes day/dusk/night/warmglow / PART 199.4 materialPalette — 9-key canonical palette); 8 NEW renderer-side helpers exposed on window.MT_architectural, distilled from SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt (post-mortem on the Modern Dual-Volume Villa build, 2026-09-16)). PART 179 fixes the Before-vs-After visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt; PART 180-189 codifies the user-supplied SportMotorcycle_3D_Techniques_Specification.txt at repo root; PART 190-199 codifies SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt (the 6 architectural pitfalls + 4 reusable techniques + 5 actionable roadmap items + 5 system limitations). Models generated against older specs (≤v1.28 / ≤v8.20) still load — the validator surfaces any PART 32/65 anti-patterns (E1-E12, 9 active), PART 38 character-pipeline validators (E13-E16), PART 39 modeling-techniques validators (E17 bbox-overlap gap detector, E18 draw-call / mesh-count sanity), PART 40 better-generation validators (E19 PBR + UV completeness, E20 thin-spike / hard-constraint compliance, E21 target triangle budget), PART 41 high-detail validators (E22 detail-inventory compliance, E23 minimum-mesh-count target), PART 42 character-production validators (E24 production-completeness, E25 polygon-distribution compliance), PART 43 refinement + style-locking + variant-ranking validators (E26 style-lock compliance, E27 multi-view consistency), PART 44 professional-pipeline validators (E28 BVH index presence, E29 look-dev lights present), PART 45 CS2-profile validators (E30 CS2 profile compliance — fires ONLY when meta.cs2Finish is set, so a non-CS2 model is unchanged), PART 67 OPT-IN validators (E31 modifier stack order, E32 UV projection vs geometry sanity, E33 modifier stack safety, E34 converge direction sanity, E35 recolor roles complete, E36 preflight check used — ALL fire ONLY when the corresponding opt-in meta flag is set, so a non-weapon / non-metal-finish model is unchanged), PART 68-71 OPT-IN validators (E37 sub-seed usage, E38 lifetime color ramp validity, E39 gizmo shape range, E40 bone segment coverage — ALL opt-in), PART 72 img2threejs structural-fidelity validators (E41 distinct-Z test — flat cylindrical wheels now FAIL audit E41, the v1.33 PART 179.2 lathed-tire requirement — E42 loft trap-warnings, E43 cavity axis rule, E44 chirality gate, E45 assembly contract — Socket_Headlight must be parented to NoseCowl or SteeringHeadPivot per PART 179.9, E46 detail-inventory mapsTo, E47 quality-contract tier, E48 diagnostic-discipline, E49 tube-network vs single-sweep — exhaust headers now require Catmull-Rom per PART 179.4, E50 implicit-SDF schema — total 10, all non-blocking), PART 74 OPT-IN validators (covered by E19/E20/E22 + extended PART 21 checklist — see PART 74.10.4) as non-blocking warnings, PART 100-143 OPT-IN 44-Technique Modeling Bundle helpers exposed on window.MT (12 CORE + 9 MESH + 13 ORGANIC + 6 MATERIALS + 4 ADVANCED) for catalog-driven scene authoring, PART 145-152 PERFECT-SHAPE MODELING PIPELINE (PART 145 8-step pipeline / PART 146 8 shape-creation techniques / PART 147 5 material & surface techniques / PART 148 6 rigging techniques / PART 149 6 animation techniques / PART 150 6 validation & QA techniques / PART 151 10 named pitfalls with fixes / PART 152 reference cheat-sheet) as additive AI-factory guidance, PART 167-179 HARD-SURFACE / VEHICLE / PROP methodology, PART 180-189 CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION, AND PART 190-199 ARCHITECTURAL MODELING PIPELINE (PART 190 overview / PART 191 STACK_INDEX / PART 192 createWallWithApertures / PART 193 createHingedDoorUnit / PART 194 createGlazedWindowUnit / PART 195 createPitchedGableRoof / PART 196 createLouveredAtticVent / PART 197 createPottedPlant / PART 198 createSteppingStonePath / PART 199 schemaNamespacingLinter + createArchitecturalLookDevLights + materialPalette), AND PART 200-229 PYTHON FACTORY PIPELINE (v1.36 / v8.27 — the 4th input format alongside JSON / JS / TS, Pyodide-backed CPython 3.11 in WebAssembly, lazy-loaded from cdn.jsdelivr.net/pyodide/v0.26.2/ on first .py load, cached for subsequent loads; PART 200 output contract (factory name heuristic, return type, options interface) / PART 201 two authoring styles (Style A Blueprint-Return via lbl.attach_box(...) etc., Style B Three.js Direct via from js import THREE) / PART 202 the lbl Python helper module (name / define_palette / attach_box / attach_cylinder / attach_chain / paint_rectangle / hollow / group / blueprint — mirrors the JS blueprint builder API) / PART 203 the from js import THREE bridge (Pyodide JS interop, .new() constructor idiom, full Three.js power including AnimationMixer + custom shaders + skinned meshes) / PART 204-208 mirrors of TS PART 3 / 7 / 10 / 6 / 5 (geometry choices / PBR materials / palette discipline / sculptRuntime contract / tick) / PART 209 procedural canvas textures via Pyodide document.createElement / PART 210-214 worked examples + common mistakes + pre-output checklist / PART 215-219 cross-references to the 6 existing spec files + differences from the TS path + when to reach for Python vs JS vs TS + runtime error reference + file metadata; PART 220-229 image-to-Python layer in Image_To_Py.txt — reading a reference image / translating to lbl.* primitives / translating to THREE.* primitives / color sampling / proportion declaration / image-driven worked example). The renderer supports any 3D model style (low-poly is the project name and the default, but mid-poly, high-poly, smooth-shaded, stylized, photoreal, voxel, hand-painted, toon / cel, retro-PSX are all valid — see PART 38.22 in the spec). PART 45 (CS2 PBR), PART 67 (cross-primitive + modifier stack + recolor + chain + animation), PART 74 (procedural texturing & shading techniques), PART 100-143 (44-Technique Modeling Bundle), PART 145-152 (Perfect-Shape Modeling Pipeline), PART 167-178 (Hard-Surface / Vehicle Modeling Pipeline), PART 179 (Artist-First Geometry Flow Patch), PART 180-189 (Chunky 3D Sport Motorcycle Reference Specification), and PART 190-199 (Architectural Modeling Pipeline) are EXTRA CAPABILITIES — NOT a rule every model must follow.">LBL: v1.36 / v8.27</div>
   <!-- RJS UPDATE 2 — N1: read-only, no toggle; the system is always No-API -->
   <div id="mode-chip" title="This tool runs entirely in your browser. Generation happens in your own AI chat (no API key needed); this viewer only renders and edits LBL blueprints.">Mode: 🔒 No-API</div>
   <!-- RJS UPDATE 2 — N2: hidden unless the loaded blueprint sets meta.generationMode:"api" -->
@@ -1904,7 +1908,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   <button class="tbtn hide-xs" id="usdz-btn" title="Export USDZ — Apple AR Quick Look format. Degrades gracefully if the loaded Three.js build doesn't ship USDZExporter.">USDZ</button>
   <button class="tbtn primary" id="glb-btn">Export GLB</button>
 </div>
-<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts,.zip" multiple style="display:none"/>
+<input type="file" id="file-input" accept=".json,.js,.ts,.mts,.cts,.py,.zip" multiple style="display:none"/>
 <input type="file" id="file3d-input" accept=".glb,.gltf,.fbx,.obj,.stl,.dae,.usdz,.zip" multiple style="display:none"/>
 <!-- 3D-model uploads intentionally keep their own format list — .ts/.mts/.cts
      are source code for the LBL TS factory pipeline (#file-input above), not
@@ -2009,10 +2013,10 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="dropzone">
-        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,.zip,image/*" multiple/>
+        <input type="file" id="dz-input" accept=".json,.js,.ts,.mts,.cts,.py,.zip,image/*" multiple/>
         <div class="dz-icon">📄</div>
-        <div class="dz-title">Drop JSON / JS / TS / ZIP here</div>
-        <div class="dz-sub">or click to browse · drop several files at once · drop a .zip with model.ts + rig.ts · drop an image onto a selected part to texture it</div>
+        <div class="dz-title">Drop JSON / JS / TS / Python / ZIP here</div>
+        <div class="dz-sub">or click to browse · drop several files at once · drop a .zip with model.ts + rig.ts · .py files run through Pyodide (Python in WebAssembly) · drop an image onto a selected part to texture it</div>
       </div>
     </div>
     <div class="panel-section">
@@ -2086,6 +2090,18 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
             </div>
             <p class="lp-dl-hint">Download this file → Paste it into any AI (ChatGPT, Claude, Gemini, etc.) together with your prompt or image.</p>
           </div>
+
+          <div class="lp-mode-card elite">
+            <div class="lp-mode-head">
+              <h3>Elite <span class="lp-mode-tag">Python</span><span class="lp-mode-card-badge">New in v1.36</span></h3>
+              <p class="lp-mode-desc">Full Three.js power with Python's expressiveness. Runs in your browser via Pyodide (CPython in WebAssembly). Best for procedural models, custom geometry, and AI authors who prefer Python.</p>
+            </div>
+            <div class="lp-dl-row">
+              <button class="lp-dl-btn" data-file="Prompt_To_Py.txt">⬇ Prompt_To_Py.txt</button>
+              <button class="lp-dl-btn" data-file="Image_To_Py.txt">⬇ Image_To_Py.txt</button>
+            </div>
+            <p class="lp-dl-hint">First load downloads ~10 MB of Pyodide (cached for next time). Then the AI's <code>.py</code> file runs in the browser, no install needed.</p>
+          </div>
         </div>
 
         <div class="lp-privacy">
@@ -2097,7 +2113,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
           <h2>Frequently Asked Questions</h2>
           <details class="lp-faq-item">
             <summary>What does this tool actually do?</summary>
-            <p>Low Poly 3D is a browser-based viewer and editor for a JSON/JS/TS "blueprint" format. It doesn't generate anything by itself — you get the blueprint from your own AI chat, then load it here to render, tweak, and export a low-poly 3D model.</p>
+            <p>Low Poly 3D is a browser-based viewer and editor for a JSON, JavaScript, TypeScript, or Python "blueprint" format. It doesn't generate anything by itself — you get the blueprint from your own AI chat, then load it here to render, tweak, and export a low-poly 3D model.</p>
           </details>
           <details class="lp-faq-item">
             <summary>Do I need an API key or account?</summary>
@@ -2105,7 +2121,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
           </details>
           <details class="lp-faq-item">
             <summary>Which mode should I choose?</summary>
-            <p>Start with Standard (JSON) — it works with almost any AI and is easiest to fix by hand if something looks off. Move to Advanced (JavaScript) for more detailed geometry, or Pro (TypeScript) if you want real Three.js code, animation support, and are using a strong coding model.</p>
+            <p>Start with Standard (JSON) — it works with almost any AI and is easiest to fix by hand if something looks off. Move to Advanced (JavaScript) for more detailed geometry, Pro (TypeScript) for real Three.js code and animation support, or Elite (Python) for full Three.js power with Python's expressiveness (runs in the browser via Pyodide; first load downloads ~10 MB). Elite is the right choice when your AI model is strongest at Python.</p>
           </details>
           <details class="lp-faq-item">
             <summary>What's the difference between the "Prompt" and "Image" files?</summary>
@@ -2121,7 +2137,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
           </details>
           <details class="lp-faq-item">
             <summary>Can I edit a model after it loads?</summary>
-            <p>Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, or .ts.</p>
+            <p>Yes — select any part in the Scene Objects panel to move, rotate, scale, retexture, or delete it, then export as GLB, OBJ, STL, .ts, or .py.</p>
           </details>
         </div>
 
@@ -2369,7 +2385,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
     <div class="panel-section">
       <div class="plabel">Blueprint JSON</div>
       <div id="mob-dropzone" class="dropzone-box">
-        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,.zip,image/*" class="dropzone-input" multiple/>
+        <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,.py,.zip,image/*" class="dropzone-input" multiple/>
         <div class="dz-icon">📄</div>
         <div class="dz-title">Tap to browse JSON</div>
       </div>
@@ -2443,7 +2459,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
   <h2>How to Use the Tool — Step-by-Step</h2>
   <p class="cs-intro">The full loop — from idea to exported model — takes about two minutes once you have done it once. Here is the shortest path that works.</p>
   <ol>
-    <li><strong>Pick a starting mode.</strong> Standard (JSON) is the easiest and works with almost any AI chat. Move to JavaScript for richer geometry, or TypeScript if your AI model is strong at code and you want real animation hooks.</li>
+    <li><strong>Pick a starting mode.</strong> Standard (JSON) is the easiest and works with almost any AI chat. Move to JavaScript for richer geometry, TypeScript if your AI model is strong at code and you want real animation hooks, or Elite (Python) for full Three.js power with Python's expressiveness.</li>
     <li><strong>Download the matching prompt file</strong> from the welcome panel. It is a small plain-text file that tells your AI exactly how a blueprint should look.</li>
     <li><strong>Open any AI chat</strong> you already have access to — ChatGPT, Claude, Gemini, or a local model. Paste the prompt, describe your subject (or attach a reference image), and ask for the blueprint back as JSON.</li>
     <li><strong>Drop the AI's response onto the dropzone</strong> on the left side of the page, or paste the text into the text area. The viewer validates the file and renders it within a second or two.</li>
@@ -13687,7 +13703,538 @@ function runJsBlueprint(code){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// v8.0 — HIGH-QUALITY LOW-POLY TS MODEL SPECIFICATION (consolidated)
+// v1.36 / v8.27 — PYTHON FACTORY PIPELINE (Pyodide-backed)
+//
+// Accepts .py files that follow either of two authoring styles:
+//
+//   A) BLUEPRINT-RETURN style (simple). Define a top-level callable that
+//      returns the same {meta, objects} dict a JSON blueprint uses. The
+//      renderer routes the result through the existing JSON pipeline
+//      unchanged, so every existing feature (palette / proportions /
+//      fidelity gate / runtime hooks) keeps working.
+//
+//        import lbl
+//        def create_model(options=None):
+//            lbl.name("My Model")
+//            lbl.define_palette({"shell": {"color": "#ff6b35"}})
+//            lbl.attach_box("box1", footprint_size=(1, 1), length=1)
+//            lbl.attach_cylinder("wheel1", radius=0.3, length=0.2)
+//            return lbl.blueprint()
+//
+//   B) THREE.JS DIRECT style (advanced). Pull Three.js through Pyodide's
+//      `from js import THREE` bridge and build a Group the same way a TS
+//      factory does. The result is mounted via addTsModelToScene() so the
+//      full runtime-hooks / tick / inspector / GLB export pipeline kicks
+//      in unchanged.
+//
+//        from js import THREE
+//        def create_model(options=None):
+//            g = THREE.Group()
+//            g.name = "My Model"
+//            box = THREE.Mesh(
+//                THREE.BoxGeometry(1, 1, 1),
+//                THREE.MeshStandardMaterial.new({"color": "orange"}),
+//            )
+//            g.add(box)
+//            return g
+//
+// The renderer auto-detects which style a given script uses by checking
+// the return value's type at runtime — plain dicts go through the
+// blueprint path, Object3D instances go through the TS-style path. No
+// `import` style hints are needed.
+//
+// Pyodide is loaded lazily from cdn.jsdelivr.net on first use (~10 MB
+// WASM), cached on window.__pyodide after that. Subsequent loads take
+// ~50-200 ms for a typical factory.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// v1.36 / v8.27 — Lazy Pyodide loader. The first .py load fetches the
+// multi-MB Pyodide runtime; later loads reuse the cached instance. Mirrors
+// the getTsCompiler() pattern above so the cost only hits once per session.
+let __pyodidePromise = null;
+function getPyodide(){
+  if(window.__pyodide) return Promise.resolve(window.__pyodide);
+  if(__pyodidePromise) return __pyodidePromise;
+  // We import the Pyodide ESM loader from jsDelivr. The version is pinned
+  // so cached user code keeps working across visits — bump deliberately
+  // when you want new Pyodide features.
+  const PYODIDE_VERSION = 'v0.26.2';
+  const PYODIDE_BASE = 'https://cdn.jsdelivr.net/pyodide/' + PYODIDE_VERSION + '/full/';
+  __pyodidePromise = import(PYODIDE_BASE + 'pyodide.mjs')
+    .then(mod => {
+      const loadPyodide = mod.loadPyodide || (mod.default && mod.default.loadPyodide);
+      if(typeof loadPyodide !== 'function'){
+        throw new Error('Pyodide loader did not expose loadPyodide() — CDN URL may have changed.');
+      }
+      return loadPyodide({ indexURL: PYODIDE_BASE });
+    })
+    .then(py => {
+      window.__pyodide = py;
+      // Pre-register the LBL Python helper module — see
+      // public/modeling/lbl_py.py. We ship it as an inlined string rather
+      // than a separate fetch so a single .py file load needs zero extra
+      // network round-trips. The helper exposes the same builder API the
+      // JS blueprint path uses (name/define_palette/attach_box/...), so
+      // authors can move between the two formats without rewriting their
+      // model code.
+      py.runPython(LBL_PY_HELPER_SRC);
+      // Bind `lbl` as a top-level global too so user scripts can use
+      // lbl.attach_box(...) without an explicit `import lbl`. The
+      // sys.modules registration above is for the explicit-import path.
+      py.runPython(`
+import builtins
+builtins.lbl = sys.modules['lbl']
+`);
+      // Expose the page's THREE module to Python so style-B scripts can
+      // `from js import THREE`. We re-bind on every call to runPyBlueprint
+      // too, in case the import map resolved a different build.
+      py.globals.set('THREE', THREE);
+      return py;
+    })
+    .catch(err => {
+      __pyodidePromise = null; // let the next attempt retry
+      throw new Error('Could not load Pyodide from jsDelivr. Either come back online, or transpile your .py to .json locally and load the JSON file instead. (' + (err && err.message || err) + ')');
+    });
+  return __pyodidePromise;
+}
+
+// The LBL Python helper module — inlined into the renderer so the first
+// .py file load doesn't need a second network round-trip. Mirrors the
+// JS blueprint builder API: name() / define_palette() / attach_box() /
+// attach_cylinder() / attach_chain() / paint_rectangle() / hollow() /
+// group() / blueprint(). Each helper pushes into a thread-local builder
+// context, exactly like the JS version does, and blueprint() snapshots
+// that context into a {meta, objects} dict.
+//
+// IMPORTANT: this source is registered as a real Python module called
+// `lbl` so the user's `import lbl` works. We don't dump the helpers
+// into globals (which would pollute the user namespace). The standalone
+// copy at public/modeling/lbl_py.py is byte-identical except the class
+// wrapper at the bottom.
+const LBL_PY_HELPER_SRC = `
+# LBL Python builder helper (mirrors the JS blueprint API).
+# Used by Blueprint-Return style .py factories (Prompt_To_Py.txt PART 1).
+# This source is loaded by runPyBlueprint() and registered as a real
+# Python module called lbl, so user scripts can do "import lbl" (or use
+# the auto-injected lbl global the renderer hands them).
+
+class _LBLBuilder:
+    """Module-style helper — registered in sys.modules as 'lbl'."""
+
+    def __init__(self):
+        # Each instance gets a fresh context so multiple factories don't
+        # share state across runs. Same shape as the JS __builderCtx.
+        self._ctx = {"meta": {}, "materials": {}, "objects": [], "group_stack": []}
+
+    def _resolve_on(self, opts, keys=("on", "in", "place")):
+        if not isinstance(opts, dict):
+            return {}
+        out = {}
+        for k in keys:
+            v = opts.get(k)
+            if v is None:
+                continue
+            if isinstance(v, (list, tuple)) and len(v) == 3:
+                out.setdefault("position", list(v))
+            elif isinstance(v, dict):
+                for vk, vv in v.items():
+                    out.setdefault(vk, vv)
+            elif isinstance(v, str):
+                out.setdefault("on", v)
+        return out
+
+    def _rotation_from_aim(self, aim):
+        if not isinstance(aim, str):
+            return None
+        axis_to_idx = {"x": 0, "y": 1, "z": 2}
+        sign = -1 if aim.startswith("-") else 1
+        axis = aim[-1].lower()
+        if axis not in axis_to_idx:
+            return None
+        rot = [0.0, 0.0, 0.0]
+        rot[axis_to_idx[axis]] = sign * 1.5707963267948966  # pi/2
+        return rot
+
+    def _push_object(self, o):
+        if self._ctx["group_stack"]:
+            top = self._ctx["group_stack"][-1]
+            if isinstance(top, dict) and "mirrorFace" in top and "mirrorFace" not in o:
+                o["mirrorFace"] = top["mirrorFace"]
+        self._ctx["objects"].append(o)
+        return o
+
+    def name(self, s):
+        self._ctx["meta"]["name"] = s
+
+    def define_palette(self, defs):
+        if defs:
+            self._ctx["materials"].update(defs)
+
+    def create_anchor(self, id, **opts):
+        o = {"id": id, "type": "point"}
+        o.update(self._resolve_on(opts))
+        if "aim" in opts:
+            o["aim"] = opts["aim"]
+        return self._push_object(o)
+
+    def attach_box(self, id, **opts):
+        fp = opts.get("footprint_size") or opts.get("footprintSize") or [1, 1]
+        if not isinstance(fp, (list, tuple)):
+            fp = [fp, fp]
+        o = {"id": id, "type": "frustum_box", "footprintSize": list(fp), "length": opts.get("length", 1)}
+        o.update(self._resolve_on(opts))
+        tip = opts.get("tip_size") or opts.get("tipSize")
+        tip_ratio = opts.get("tip_ratio") or opts.get("tipRatio")
+        if tip is not None:
+            o["tipSize"] = list(tip) if isinstance(tip, (list, tuple)) else [tip, tip]
+        elif tip_ratio is not None:
+            if isinstance(tip_ratio, (list, tuple)):
+                o["tipSize"] = [fp[0] * tip_ratio[0], fp[1] * tip_ratio[1]]
+            else:
+                o["tipSize"] = [fp[0] * tip_ratio, fp[1] * tip_ratio]
+        if "aim" in opts:
+            rot = self._rotation_from_aim(opts["aim"])
+            if rot:
+                o["rotation"] = rot
+        elif "rotation" in opts:
+            o["rotation"] = opts["rotation"]
+        for k in ("material", "mirrorFace", "smoothing", "colorVariation",
+                  "toneVariant", "emissive", "emissiveIntensity"):
+            if k in opts:
+                o[k] = opts[k]
+        return self._push_object(o)
+
+    def attach_cylinder(self, id, **opts):
+        o = {
+            "id": id,
+            "type": "generated",
+            "generator": "cylinder",
+            "params": {
+                "radius": opts.get("radius", 1),
+                "height": opts.get("length", opts.get("height", 1)),
+                "segs": opts.get("segs"),
+            },
+        }
+        o.update(self._resolve_on(opts))
+        if "aim" in opts:
+            rot = self._rotation_from_aim(opts["aim"])
+            if rot:
+                o["rotation"] = rot
+        elif "rotation" in opts:
+            o["rotation"] = opts["rotation"]
+        if "material" in opts:
+            o["material"] = opts["material"]
+        return self._push_object(o)
+
+    def attach_chain(self, id, **opts):
+        o = {
+            "id": id,
+            "type": "generated",
+            "generator": "chain",
+            "params": {
+                "segments": opts.get("segments", []),
+                "baseRadius": opts.get("base_radius", opts.get("baseRadius")),
+                "segs": opts.get("segs"),
+            },
+        }
+        o.update(self._resolve_on(opts))
+        if "material" in opts:
+            o["material"] = opts["material"]
+        return self._push_object(o)
+
+    def paint_rectangle(self, id, **opts):
+        o = {"id": id, "type": "quad"}
+        o.update(self._resolve_on(opts))
+        size = opts.get("size") or [1, 1]
+        o["scale"] = [size[0], size[1], 1]
+        if "material" in opts:
+            o["material"] = opts["material"]
+        return self._push_object(o)
+
+    def hollow(self, id, **opts):
+        for o in self._ctx["objects"]:
+            if o.get("id") == id:
+                o.setdefault("operations", []).append({"type": "hollow", "params": opts or {}})
+                return
+        print("[hollow] no object with id", id, "— call attach_* for it first")
+
+    def group(self, name_=None, opts=None, fn=None):
+        if callable(opts):
+            fn = opts
+            opts = None
+        if callable(name_):
+            fn = name_
+            name_ = None
+        self._ctx["group_stack"].append(opts or {})
+        try:
+            if fn is not None:
+                fn()
+        finally:
+            self._ctx["group_stack"].pop()
+
+    def blueprint(self):
+        return {
+            "meta": dict(self._ctx["meta"]),
+            "materials": dict(self._ctx["materials"]),
+            "objects": list(self._ctx["objects"]),
+        }
+
+    def reset(self):
+        self._ctx["meta"].clear()
+        self._ctx["materials"].clear()
+        self._ctx["objects"].clear()
+        self._ctx["group_stack"].clear()
+
+import sys
+_lbl = _LBLBuilder()
+sys.modules['lbl'] = _lbl
+`;
+
+// Run a Python file via Pyodide. Returns one of:
+//   - { kind: 'blueprint', data: {...} } when the script returns a dict
+//     (the standard blueprint path)
+//   - { kind: 'group', group: THREE.Group, factoryName, mod } when the
+//     script returns a THREE.Object3D (the TS-style direct path)
+async function runPyBlueprint(text, filename){
+  const py = await getPyodide();
+  // Rebind THREE every call so a hot-reloaded import map or a different
+  // three build is reflected without restarting Pyodide.
+  py.globals.set('THREE', THREE);
+  py.runPython('lbl.reset()');
+  // Capture stdout/stderr so we can surface them in the validator log.
+  const stdoutLines = [];
+  const stderrLines = [];
+  py.setStdout({ batched: line => stdoutLines.push(line) });
+  py.setStderr({ batched: line => stderrLines.push(line) });
+
+  // Wrap the user's source in a controlled namespace. We run it once
+  // at module scope so `def create_model(...)` becomes importable.
+  // Then we call it with `options or None` and look at what came back.
+  let resultProxy;
+  try {
+    py.runPython(text, { filename: filename || '<python blueprint>' });
+  }catch(e){
+    throw new Error(`Python syntax/runtime error: ${e.message || e}`);
+  }
+
+  // Find the factory: any callable whose name matches /^create\\w+(Model)?$/
+  // or any callable named `build` / `make`. Falls back to the script's
+  // module-level variable named `model` / `result` / `blueprint`.
+  const factoryInfo = py.runPython(`
+import inspect
+_candidates = [
+    name for name, obj in globals().items()
+    if not name.startswith('_')
+    and callable(obj)
+    and not inspect.isclass(obj)
+    and (name == 'create_model' or name.startswith('create_')
+         or name in ('build', 'make', 'main'))
+]
+# Also accept any callable whose name ends in 'model' or 'Model'.
+for n, o in list(globals().items()):
+    if (not n.startswith('_')) and callable(o) and not inspect.isclass(o):
+        ln = n.lower()
+        if (ln.endswith('model') or ln.endswith('mascot') or ln.endswith('factory')) and n not in _candidates:
+            _candidates.append(n)
+_candidates
+`);
+  const candidates = factoryInfo.toJs ? factoryInfo.toJs({ dict_converter: Object.fromEntries }) : [];
+  if(!Array.isArray(candidates) || candidates.length === 0){
+    throw new Error('Python file did not define a factory. Define a top-level `def create_model(options=None):` (or any function named create_*, build, make, or *Model/*Mascot/*Factory).');
+  }
+  // Pick the first candidate. If multiple exist, log a warning just like
+  // the TS path does.
+  const factoryName = candidates[0];
+  if(candidates.length > 1){
+    console.warn('[Python] multiple candidate factories found in ' + (filename||'(pasted script)') + ': ' + candidates.join(', ') + '. Using "' + factoryName + '".');
+  }
+
+  // Invoke the factory.
+  const factoryPy = py.globals.get(factoryName);
+  if(!factoryPy){
+    throw new Error('Could not retrieve factory "' + factoryName + '" from Python globals.');
+  }
+  let raw;
+  try{
+    raw = factoryPy(null);  // call with None (treated as options=None)
+  }catch(e){
+    throw new Error(`Python factory "${factoryName}" threw while building the model: ${e.message || e}`);
+  }finally{
+    factoryPy.destroy && factoryPy.destroy();
+  }
+
+  // Inspect the return value's JS type.
+  if(raw == null){
+    // The script may have used the builder API and forgotten to return —
+    // honour the lbl.blueprint() snapshot in that case, exactly like the
+    // JS path honours its `blueprint` variable.
+    const b = py.runPython('lbl.blueprint()');
+    const dict = b.toJs({ dict_converter: Object.fromEntries });
+    if(dict && Array.isArray(dict.objects) && dict.objects.length){
+      return { kind: 'blueprint', data: dict, factoryName, stdoutLines, stderrLines };
+    }
+    throw new Error('Python factory returned None and no builder-API objects were registered. Return a blueprint dict, a THREE.Group, or call lbl.blueprint().');
+  }
+  // If it looks like a Pyodide proxy of a JS object, check the constructor.
+  // Plain dicts come back as Python dicts (PyProxy of dict), Groups come
+  // back as PyProxies of JS objects.
+  const isJsObject = raw && (typeof raw === 'object' || typeof raw === 'function')
+    && raw.constructor && raw.constructor.name && raw.constructor.name !== 'dict';
+  // Detect dict-like (Python dict → toJs) vs THREE.Object3D (use directly).
+  // Easiest cross-check: try .toJs() — for a Python dict it succeeds, for a
+  // JS-bound proxy it returns the proxy itself or throws.
+  let asDict = null;
+  if(raw && typeof raw.toJs === 'function'){
+    try{
+      asDict = raw.toJs({ dict_converter: Object.fromEntries });
+    }catch(_){
+      asDict = null;
+    }
+  }
+  // If toJs produced a plain dict-shaped value, treat as blueprint.
+  if(asDict && typeof asDict === 'object' && !Array.isArray(asDict)
+     && (('objects' in asDict) || ('meta' in asDict))){
+    // Python dict path
+    if(typeof raw.destroy === 'function') raw.destroy();
+    return { kind: 'blueprint', data: asDict, factoryName, stdoutLines, stderrLines };
+  }
+  // Otherwise, treat as a JS object returned through Pyodide's proxy —
+  // should be a THREE.Object3D.
+  if(raw && raw.isObject3D){
+    const group = raw;  // proxy of the underlying JS object
+    if(!group.children || group.children.length === 0){
+      if(typeof raw.destroy === 'function') raw.destroy();
+      throw new Error(`Factory "${factoryName}" returned an empty THREE.Object3D (no children) — see Prompt_To_Py.txt PART 1.2.`);
+    }
+    // We keep the proxy alive by stashing it on the resulting meta so the
+    // renderer can hold a strong reference until addTsModelToScene finishes
+    // ownership transfer. After that we destroy the proxy to release Pyodide
+    // bookkeeping.
+    const stableRef = group;
+    return { kind: 'group', group: stableRef, factoryName, stdoutLines, stderrLines, _proxy: raw };
+  }
+  // Last resort: stringify and complain.
+  if(typeof raw.destroy === 'function') raw.destroy();
+  throw new Error(`Factory "${factoryName}" returned an unsupported value (type=${raw && raw.constructor && raw.constructor.name}). Return either a Python dict matching the blueprint schema or a THREE.Object3D.`);
+}
+
+// Mount helper used by validateAndBuildPy(). For the blueprint path it just
+// runs the existing build pipeline. For the THREE.Group path it goes
+// through addTsModelToScene so the renderer treats it exactly like a TS
+// factory — runtime hooks, tick, inspector, GLB export all work.
+async function validateAndBuildPy(text, source){
+  updateAllValLogs(`<span class="ok">✓ Detected Python factory file (${source||'pasted'})</span><br><span class="info">→ loading Pyodide…</span>`);
+  setStatus('loading pyodide…', true);
+  let result;
+  try{
+    result = await runPyBlueprint(text, source);
+  }catch(e){
+    updateAllValLogs(`<span class="err">✗ ${e.message}</span>`);
+    setStatus('Python error', false);
+    toast('Python build failed — see validation log', 'err');
+    return;
+  }
+  if(result.kind === 'group'){
+    // THREE.Group path — hand to addTsModelToScene like a TS factory.
+    try{
+      addTsModelToScene(result.group, {
+        source,
+        factoryName: result.factoryName,
+        mod: { default: () => result.group, [result.factoryName]: () => result.group },
+        text,
+      });
+      const rt = result.group.userData && result.group.userData.sculptRuntime || {};
+      const hookLine = ['nodes','sockets','meshes','destructionGroups','colliders']
+        .filter(k => rt[k] && Object.keys(rt[k]).length)
+        .map(k => `${Object.keys(rt[k]).length} ${k}`)
+        .join(', ') || 'none populated';
+      const lines = [
+        `<span class="ok">✓ Ran Python factory "${result.factoryName}" (${source||'pasted'})</span>`,
+        `<span class="info">→ ${result.group.children.length} top-level child(ren) on the returned Group</span>`,
+        `<span class="info">→ sculptRuntime: ${hookLine}</span>`,
+        typeof (result.group.userData && result.group.userData.tick) === 'function'
+          ? `<span class="ok">✓ tick(dt, elapsed) wired into the render loop</span>`
+          : `<span class="info">→ no tick() on this model — static</span>`,
+      ];
+      if(result.stdoutLines && result.stdoutLines.length){
+        lines.push(`<span class="info">→ Python stdout: ${result.stdoutLines.length} line(s)</span>`);
+      }
+      updateAllValLogs(lines.join('<br>'));
+      setStatus('Python model loaded', true);
+      // Release Pyodide proxy now that the Group has been transferred to
+      // the renderer's scene graph (the underlying JS object lives on).
+      if(result._proxy && typeof result._proxy.destroy === 'function'){
+        try{ result._proxy.destroy(); }catch(_){}
+      }
+    }catch(e){
+      updateAllValLogs(`<span class="err">✗ ${e.message}</span>`);
+      setStatus('Python error', false);
+      toast('Python model mount failed — see validation log', 'err');
+    }
+    return;
+  }
+  // Blueprint path — reuse the JSON pipeline. The buildScene() pipeline
+  // validates schema, runs the pre-flight checklist, builds the scene.
+  try{
+    const data = result.data;
+    if(!data || typeof data !== 'object'){
+      throw new Error('Python factory did not return a blueprint dict.');
+    }
+    const isJs = false;  // treat as JSON for chip labelling
+    const lines = [`<span class="ok">✓ Valid Python blueprint (${source})</span>`];
+    if(result.stdoutLines && result.stdoutLines.length){
+      lines.push(`<span class="info">→ Python stdout: ${result.stdoutLines.length} line(s)</span>`);
+    }
+    // Coerce any non-serialisable bits (numpy types etc.) — toJs on the
+    // Python side already produced plain JS values, so we just need to
+    // make sure arrays / numbers / strings are JSON-safe. The downstream
+    // pipeline is happy with plain objects.
+    data.objects = Array.isArray(data.objects) ? data.objects : [];
+    data.meta = data.meta || {};
+    if(isNestedTree(data)){
+      lines.push(`<span class="info">→ Detected nested group/children tree — converting to flat objects</span>`);
+      data = convertNestedTreeToFlat(data);
+    }
+    // v5.3 expansion passes.
+    if(Array.isArray(data.objects)){
+      const before = data.objects.length;
+      data.objects = expandGenerateBlocks(data.objects);
+      data.objects = expandPhyllotaxisGroups(data.objects);
+      const after = data.objects.length;
+      if(after !== before) lines.push(`<span class="info">→ v5.3 expansion: ${before} → ${after} objects</span>`);
+    }
+    if(!data.objects || !data.objects.length){
+      lines.push(`<span class="err">✗ Python factory returned no objects — define some via lbl.attach_box(...) or return a populated "objects" array.</span>`);
+      updateAllValLogs(lines.join('<br>'));
+      return;
+    }
+    lines.push(`<span class="info">→ ${data.objects.length} object(s) from Python factory "${result.factoryName}"</span>`);
+    data = applyPalette(data);
+    const schemaResult = validateBlueprintSchema(data, parseProportionDeclaration(''));
+    schemaResult.errors.forEach(e => lines.push(`<span class="err">✗ ${e}</span>`));
+    schemaResult.warnings.forEach(w => lines.push(`<span class="err">⚠ ${w}</span>`));
+    if(!schemaResult.errors.length && !schemaResult.warnings.length) lines.push(`<span class="ok">✓ All objects pass schema validation</span>`);
+    updateAllValLogs(lines.join('<br>'));
+    if(schemaResult.errors.length){
+      setStatus('schema errors', false);
+      toast(`${schemaResult.errors.length} schema error(s) — see validation log`, 'err');
+      return;
+    }
+    CURRENT_BLUEPRINT = data;
+    buildScene(data);
+    setStatus(`${data.objects.length} objects`, true);
+    updateFormatChip(isJs ? 'js' : 'json');
+    setTsExclusiveUiState(false);
+    updateGenModeChip(data.meta);
+    // Re-stamp "Format: Python" AFTER the JSON path's stamp, so the chip
+    // reflects the actual source format the user loaded.
+    updateFormatChip('py');
+  }catch(e){
+    updateAllValLogs(`<span class="err">✗ Python blueprint parse error: ${e.message}</span>`);
+    setStatus('parse error', false);
+    toast('Python blueprint parse error', 'err');
+  }
+}
 //
 // This is the canonical spec every code-only .ts/.mts/.cts factory that
 // targets THIS renderer must follow. It synthesises:
@@ -14074,6 +14621,7 @@ function runJsBlueprint(code){
 function detectInputFormat(text, sourceOrFilename){
   const name=(sourceOrFilename||'').toLowerCase();
   if(/\.(ts|mts|cts)$/.test(name)) return 'ts';
+  if(/\.py$/.test(name)) return 'py';
   if(typeof text!=='string') return 'json'; // already-parsed object (e.g. a demo entry) is always a blueprint
   const trimmed=text.trim();
   if(/^(import|export)\s/.test(trimmed) && /THREE/.test(trimmed.slice(0,400))) return 'ts';
@@ -14198,9 +14746,14 @@ function rewriteImportsForRuntime(jsSrc){
   );
 }
 
-// Which OUTPUT CONTRACT spec a given filename should point to. Only the
-// .ts pair is shipped now (no JSX variants).
+// Which OUTPUT CONTRACT spec a given filename should point to. Each input
+// format pairs with a (prompt, image) tuple so error messages can point
+// the user at the right contract document. Python factories get their own
+// pair (Prompt_To_Py.txt / Image_To_Py.txt) following the same pattern.
 function specNameFor(filename){
+  const name=(filename||'').toLowerCase();
+  if(/\.py$/.test(name)) return {prompt:'Prompt_To_Py.txt', image:'Image_To_Py.txt'};
+  if(/\.(ts|mts|cts)$/.test(name)) return {prompt:'Prompt_To_Ts.txt', image:'Image_To_Ts.txt'};
   return {prompt:'Prompt_To_Ts.txt', image:'Image_To_Ts.txt'};
 }
 
@@ -14457,7 +15010,7 @@ function updateFormatChip(fmt){
   // 'ts' bucket (they share one pipeline — see runTsBlueprint()), so
   // the chip stays a general "Format: TS" rather than growing a label
   // per extension.
-  const labels={json:'Format: JSON', js:'Format: JS', ts:'Format: TS'};
+  const labels={json:'Format: JSON', js:'Format: JS', ts:'Format: TS', py:'Format: Python'};
   chip.textContent=labels[fmt] || 'Format: —';
   chip.classList.toggle('format-ts', fmt==='ts');
 }
@@ -15271,8 +15824,16 @@ async function validateAndBuild(json, source){
   // Checked before the JSON/JS branches below (not as a fallback after
   // JSON.parse() throws) because a .ts file's text would otherwise just
   // fail as a JS blueprint script instead of compiling.
-  if(detectInputFormat(json, source)==='ts'){
+  const fmt0 = detectInputFormat(json, source);
+  if(fmt0 === 'ts'){
     await validateAndBuildTs(json, source);
+    return;
+  }
+  // v1.36 / v8.27 — Python factory pipeline. Pyodide-backed; supports
+  // both the blueprint-return style (a Python dict) and the direct
+  // THREE.js style (a Group returned via `from js import THREE`).
+  if(fmt0 === 'py'){
+    await validateAndBuildPy(json, source);
     return;
   }
   // LBL UPDATE — PART 97 (anyCreature 1.3.1 spec). When the input parses
@@ -18798,6 +19359,20 @@ async function __lblReadBlueprintOrRig(file){
       r.readAsText(file);
     });
   }
+  // Python factory — hand to the Python pipeline. Same dispatch shape as
+  // the JSON/JS branch (text in, validateAndBuild on the result); the
+  // .py detection inside validateAndBuild() picks the Pyodide path.
+  if(ext === 'py'){
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = e => {
+        try { validateAndBuild(e.target.result, filename); resolve('blueprint:py'); }
+        catch(err){ reject(err); }
+      };
+      r.onerror = () => reject(r.error);
+      r.readAsText(file);
+    });
+  }
   // TS / MTS / CTS — try the regular model pipeline first.
   try{
     const origRead = readFile;
@@ -18855,7 +19430,7 @@ async function __lblReadBlueprintOrRig(file){
 //   • zip       → __lblExtractZip → recurse with the extracted FileList
 //                 (PART 37 — bundles model.ts + rig.ts + any other assets)
 const __LBL_MODEL_EXTS  = new Set(['glb','gltf','fbx','obj','stl','dae','usdz']);
-const __LBL_BLUEPRT_EXTS= new Set(['json','js','ts','mts','cts']);
+const __LBL_BLUEPRT_EXTS= new Set(['json','js','mjs','ts','mts','cts','py']);
 const __LBL_IMAGE_EXTS  = new Set(['png','jpg','jpeg','gif','webp','bmp','svg','avif','heic','heif']);
 const __LBL_ZIP_EXTS    = new Set(['zip']);
 
@@ -18888,7 +19463,7 @@ async function __lblExtractZip(file){
   // resource-fork junk, and dotfiles; everything else becomes a File.
   const kept = [];
   const skipped = [];
-  const TEXT_EXTS = /^(ts|mts|cts|js|mjs|json|svg|html|htm|md|txt|glsl|vs|fs|vert|frag|xml|yaml|yml|css|map)$/i;
+  const TEXT_EXTS = /^(ts|mts|cts|js|mjs|json|svg|html|htm|md|txt|glsl|vs|fs|vert|frag|xml|yaml|yml|css|map|py)$/i;
   for(const [name, data] of Object.entries(entries)){
     if(!(data instanceof Uint8Array)) continue; // directory marker
     const basename = name.split('/').pop();
@@ -24307,7 +24882,7 @@ window.lblSpec = (function(){
   // The chip in the topbar shows both.
   // Updating these constants is the only place to bump for a new spec
   // release — every check below reads from this single source.
-  const VERSION = { ts: 'v1.35', json: 'v8.26' };
+  const VERSION = { ts: 'v1.36', json: 'v8.27', py: 'v1.36' };
 
   // The 50 anti-patterns the validator looks for. Mirrors PART 32 (TS)
   // and PART 65 (JSON/JS) for the first 12, PART 38 (character
