@@ -14194,7 +14194,7 @@ async function validateAndBuildPy(text, source){
   // Blueprint path — reuse the JSON pipeline. The buildScene() pipeline
   // validates schema, runs the pre-flight checklist, builds the scene.
   try{
-    const data = result.data;
+    let data = result.data;   // let (not const) — reassigned below by nested-tree conversion + applyPalette
     if(!data || typeof data !== 'object'){
       throw new Error('Python factory did not return a blueprint dict.');
     }

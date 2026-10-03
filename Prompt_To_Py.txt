@@ -87,8 +87,11 @@ The renderer loads your .py file by:
   4. Running your .py source at module scope in the interpreter's
      main globals.
   5. Finding the first callable matching the factory-name heuristic
-     (see PART 200.2 below) and calling it with `None` as the options
-     argument.
+     (see PART 200.2 below) and calling it. The renderer inspects
+     the function signature first and calls with 0 args if the factory
+     is zero-arity (`def create_model():`) or with `None` if it accepts
+     at least one argument (`def create_model(options=None):`). Both
+     styles Just Work.
   6. Inspecting the return value: a Python dict matching the blueprint
      schema goes through the buildScene() pipeline; a THREE.Object3D
      (or any Three.js Object3D subclass) goes through addTsModelToScene
@@ -830,6 +833,23 @@ PART 213 — COMMON MISTAKES
 
 (Subset of Prompt_To_Ts.txt PART 15, with Python-specific additions.)
 
+213.0 — Wrong factory signature
+  ❌ def create_model():                 # the renderer used to crash here
+     def create_model(options=None):     # recommended, future-compatible
+  ✅ Either form works — the renderer inspects the function's signature
+     with `inspect.signature` and calls with 0 args if it's zero-arity
+     or with `None` if it accepts at least one argument.
+
+  History: in the original v1.36 / v8.27 release, the renderer always
+  called factories with `None` (treating the `options` parameter as
+  always-present), which crashed zero-arity factories with:
+      TypeError: create_model() takes 0 positional arguments but 1 was given
+  Fixed in v1.36 / v8.27 patch 1 — the arity is now detected per-call
+  so both `def create_model():` and `def create_model(options=None):`
+  work. New factories should still use the `options=None` form for
+  forward-compatibility (per PART 200.2 / 200.3), but old / hand-written
+  zero-arg factories keep working too.
+
 213.1 — `import three` instead of `from js import THREE`
   ❌ import three
   ❌ from three import *
@@ -1106,6 +1126,14 @@ in the validator log. Match the error to the cause:
     Your factory returned something other than a dict or Object3D.
     For Style A, return `lbl.blueprint()`. For Style B, return
     `THREE.Group.new()`.
+
+  "Python blueprint parse error: Assignment to constant variable."
+    Internal renderer bug (fixed in v1.36 / v8.27 patch 1). The
+    blueprint-path code reassigned a `const` local — visible only to
+    a Style A factory whose dict was nested and needed flattening.
+    If you see this on a current build, your local `index.html` is
+    out of date; the fix is `let data = result.data;` (not `const`).
+    See CHANGES_v136.md for the full patch notes.
 
   "Factory 'X' returned an empty THREE.Object3D (no children)."
     Style B: your factory returned a Group with no children. The
