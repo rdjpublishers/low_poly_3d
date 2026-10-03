@@ -13824,7 +13824,10 @@ class _LBLBuilder:
     def __init__(self):
         # Each instance gets a fresh context so multiple factories don't
         # share state across runs. Same shape as the JS __builderCtx.
-        self._ctx = {"meta": {}, "materials": {}, "objects": [], "group_stack": []}
+        # We use "palette" (matching the JSON pipeline's wire format) so
+        # the dict returned by blueprint() can be fed straight into
+        # buildScene() without any transformation.
+        self._ctx = {"meta": {}, "palette": {}, "objects": [], "group_stack": []}
 
     def _resolve_on(self, opts, keys=("on", "in", "place")):
         if not isinstance(opts, dict):
@@ -13868,7 +13871,22 @@ class _LBLBuilder:
 
     def define_palette(self, defs):
         if defs:
-            self._ctx["materials"].update(defs)
+            self._ctx["palette"].update(defs)
+
+    def _ref(self, name):
+        # Wrap a palette name in the JSON-spec '$name' reference syntax.
+        # The JSON blueprint pipeline uses "material": "$shell" to reference
+        # the palette entry "shell". Bare strings like "material": "shell"
+        # are treated as material-defining dicts and warned-about by the
+        # validator. This helper adds the "$" prefix when needed so the
+        # Python-side API stays clean (lbl.attach_box(material="shell"))
+        # while the wire format matches what the JSON pipeline expects.
+        # Idempotent: if the name already starts with "$", it's returned
+        # unchanged. Non-string values (dict material defs, etc.) are
+        # returned unchanged.
+        if isinstance(name, str) and not name.startswith("$"):
+            return "$" + name
+        return name
 
     def create_anchor(self, id, **opts):
         o = {"id": id, "type": "point"}
@@ -13901,7 +13919,7 @@ class _LBLBuilder:
         for k in ("material", "mirrorFace", "smoothing", "colorVariation",
                   "toneVariant", "emissive", "emissiveIntensity"):
             if k in opts:
-                o[k] = opts[k]
+                o[k] = self._ref(opts[k]) if k == "material" else opts[k]
         return self._push_object(o)
 
     def attach_cylinder(self, id, **opts):
@@ -13923,7 +13941,7 @@ class _LBLBuilder:
         elif "rotation" in opts:
             o["rotation"] = opts["rotation"]
         if "material" in opts:
-            o["material"] = opts["material"]
+            o["material"] = self._ref(opts["material"])
         return self._push_object(o)
 
     def attach_chain(self, id, **opts):
@@ -13939,7 +13957,7 @@ class _LBLBuilder:
         }
         o.update(self._resolve_on(opts))
         if "material" in opts:
-            o["material"] = opts["material"]
+            o["material"] = self._ref(opts["material"])
         return self._push_object(o)
 
     def paint_rectangle(self, id, **opts):
@@ -13948,7 +13966,7 @@ class _LBLBuilder:
         size = opts.get("size") or [1, 1]
         o["scale"] = [size[0], size[1], 1]
         if "material" in opts:
-            o["material"] = opts["material"]
+            o["material"] = self._ref(opts["material"])
         return self._push_object(o)
 
     def hollow(self, id, **opts):
@@ -13975,13 +13993,13 @@ class _LBLBuilder:
     def blueprint(self):
         return {
             "meta": dict(self._ctx["meta"]),
-            "materials": dict(self._ctx["materials"]),
+            "palette": dict(self._ctx["palette"]),
             "objects": list(self._ctx["objects"]),
         }
 
     def reset(self):
         self._ctx["meta"].clear()
-        self._ctx["materials"].clear()
+        self._ctx["palette"].clear()
         self._ctx["objects"].clear()
         self._ctx["group_stack"].clear()
 
