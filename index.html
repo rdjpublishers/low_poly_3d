@@ -14056,7 +14056,25 @@ _candidates
   }
   let raw;
   try{
-    raw = factoryPy(null);  // call with None (treated as options=None)
+    // v1.36 / v8.27 — call the factory with 0 arguments by default. The
+    // documented signature is `def create_model(options=None):` (so the
+    // AI author can be future-compatible with per-load options), but we
+    // detect the actual arity and pass None ONLY if the function accepts
+    // at least one argument. A bare `def create_model():` (zero-arg form)
+    // is supported too — both styles Just Work.
+    const acceptsOptionsProxy = py.runPython(`
+import inspect as _inspect
+try:
+    _sig = _inspect.signature(${factoryName})
+    bool(_sig.parameters)
+except (TypeError, ValueError):
+    True   # builtins / C functions — assume options-capable, pass None
+`);
+    const acceptsOptions = Boolean(acceptsOptionsProxy);
+    if(acceptsOptionsProxy && typeof acceptsOptionsProxy.destroy === 'function'){
+      acceptsOptionsProxy.destroy();
+    }
+    raw = acceptsOptions ? factoryPy(null) : factoryPy();
   }catch(e){
     throw new Error(`Python factory "${factoryName}" threw while building the model: ${e.message || e}`);
   }finally{
