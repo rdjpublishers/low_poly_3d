@@ -10413,6 +10413,56 @@ low-poly" clarification. It does NOT introduce any new rule.
 It just makes the existing scope of the system explicit so
 the AI does not self-limit.
 
+────────────────────────────────────────────────────────────────────
+PART 38.22.1 — HIGH-POLY CAPABILITY SURFACE (v1.36 / v8.30)
+────────────────────────────────────────────────────────────────────
+To make PART 38.22 actionable, the v1.36 / v8.30 release adds
+PART 235-242 — concrete high-poly capability. When the AI picks
+a high-poly style (pbr-realistic, photogrammetry, voxel-detail,
+hand-painted, smooth-shaded, mid-poly, high-poly), the
+recommended PART surface is:
+
+  Geometry:
+    PART 240  lbl.subdivide_for_highpoly(geom)  — Catmull-Clark
+    PART 241  lbl.decimate_for_lowpoly(geom)    — QEM (round-trip)
+    PART 235  lbl.import_external_mesh(url)     — load external file
+
+  UVs:
+    PART 236  lbl.make_atlas_uv(geom)           — MaxRects packing
+    PART 234  lbl.progressive_uv(geom)          — visibility-priority
+                                                  (low-poly shortcut)
+
+  Materials:
+    PART 238  lbl.highpoly_pbr(opts)            — pbr-realistic recipe
+    PART 239  lbl.photogrammetry_pbr(opts)      — photogrammetry recipe
+    PART 230  lbl.style_field(prompt)           — text→palette (any style)
+
+  Textures:
+    PART 242  lbl.make_image_texture(url)       — image→UV texture
+    PART 231  lbl.multi_scale_pattern(spec)     — multi-octave procedural
+    PART 232  lbl.cavity_aware_pattern(spec,g)  — curvature-modulated
+    PART 233  lbl.geodesic_field(g, anchors)     — vertex distances
+
+  Performance:
+    PART 237  lbl.fast_curvature(geom)          — BVH-accelerated
+                                                  (100K+ verts)
+
+Style override (Style A):
+    bp = lbl.blueprint()
+    bp["meta"]["style"] = "pbr-realistic"     # or "photogrammetry"
+    return bp
+
+Style override (Style B):
+    g.userData.meta = { "style": "pbr-realistic", "category": "prop", ... }
+
+The renderer's look-dev lighting rig (PART 187 / 199.3) and
+triangle-budget guidance (PART 50.4) read meta.style and switch
+to the matching preset — pbr-realistic uses the 4-mode look-dev
+with envmap intensity 1.0, photogrammetry uses flat overcast
+lighting with envmap intensity 0.5, etc. The default
+"smooth-low-poly" stays because that's what the demo models
+use; it's not a constraint on what the user can declare.
+
 ================================================================================
 END OF PART 38.22 — STYLE AGNOSTICISM
 The system supports any 3D model style — low-poly, mid-poly,

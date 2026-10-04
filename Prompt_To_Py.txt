@@ -421,13 +421,22 @@ return — see PART 200.2 for the auto-snapshot behaviour.
   When you call `lbl.blueprint()`, the returned dict's `meta` block is
   auto-populated with sensible defaults if you didn't set them:
 
-    meta["style"]        = "low-poly"  (overridable)
-    meta["category"]     = "general"   (overridable)
+    meta["style"]        = "smooth-low-poly"  (overridable, canonical PART 48.1)
+    meta["category"]     = "prop"             (overridable, canonical PART 49.1)
     meta["proportions"]  = {"W_over_H": 1.0, "fill": 0.85}  (overridable)
 
-  This silences two common validator warnings:
+  This silences the common validator warnings:
     • PART 49.1 proportion declaration not found
     • PART 51.2 fidelity gate: no meta.style/meta.category set
+    • PART 48.1 "meta.style:'low-poly' is not one of the canonical
+       styles" — the pre-v1.36 default "low-poly" was NOT in the
+       13-style canonical list; replaced with "smooth-low-poly"
+       which IS (the project default; matches the chunky 3D look
+       most of the demo models ship).
+    • PART 49.1 "meta.category:'general' is not one of the
+       SUBJECT_CATEGORY values" — "general" was NOT in the
+       11-category canonical list; replaced with "prop" which IS
+       (safe catch-all for unclassified objects).
 
   To override, just set them yourself before calling `lbl.blueprint()`:
 
@@ -437,6 +446,41 @@ return — see PART 200.2 for the auto-snapshot behaviour.
     blueprint_dict["meta"]["style"] = "voxel"      # override default
     blueprint_dict["meta"]["category"] = "creature"  # override default
     return blueprint_dict
+
+202.2.1 — STYLE B (THREE.Group RETURN) GETS THE SAME DEFAULTS FOR FREE
+  If you return a THREE.Group instead of calling `lbl.blueprint()`
+  (Style B — see PART 203), the renderer auto-injects the same
+  canonical defaults onto `group.userData.meta` when you don't set
+  them yourself. Setting them explicitly is still preferred (it
+  makes your code self-documenting and lets you pick a non-prop
+  category like "character" / "vehicle" / etc.) — see PART 203.2
+  for the Style B userData.meta contract.
+
+202.3 — PART 49.1 PROPORTION DECLARATION (PYTHON CONVENTION)
+  The PART 49.1 contract requires a 10-line "proportion declaration"
+  before any JSON/code, so the validator can extract the model's
+  intent and grade it. For Python files, use `#` comments (the
+  renderer's parseProportionDeclaration() accepts both `//` and `#`
+  since v1.36 / v8.28):
+
+    # STYLE: smooth-low-poly
+    # CAMERA: isometric-front-right
+    # SUBJECT_CATEGORY: character
+    # HEAD_TO_BODY: 0.45
+    # PRIMARY_ASPECT: 0.8 width / 1.2 height / 0.6 depth
+    # LIMB_TO_TORSO: 0.6
+    # SUBJECT_HEIGHT: 1.7
+    # DOMINANT_COLORS: #6c7280, #ff9aa2, #2c2f36
+    # BACKGROUND: #e8edf2
+    # DISTINCTIVE_DETAIL: rounded-box chassis with glowing antenna orb
+
+  Place this block BEFORE any code (imports are fine — the validator
+  only cares about the leading comment lines). The 10 fields are
+  taken directly from PART 49.1's enumerated set; see
+  Prompt_To_Ts.txt PART 49.1 for the full contract.
+
+  A working example lives at public/models/Model_10.py — see the
+  header comment there for the canonical "robot companion" case.
 
 ================================================================================
 PART 203 — THE `from js import THREE` BRIDGE
@@ -468,6 +512,27 @@ Every class, every constant, every helper is available.
   THREE class that happens to be a built-in JS name) are silently
   skipped via a try/catch — the user can still reach them via
   `THREE.X` instead.
+
+  IMPORTANT (v1.36 / v8.28 fix): the THREE addon classes imported
+  via the import-map (`'three/addons/...'`) are NOT properties of
+  `THREE` itself, so the loops above never find them. RoundedBoxGeometry
+  in particular was the most common offender — a Style B factory
+  that wrote `from js import RoundedBoxGeometry` failed at import
+  time with `ImportError: cannot import name 'RoundedBoxGeometry'
+  from 'js'`. The renderer now ALSO mirrors every addon class it
+  imports at the top of index.html (RoundedBoxGeometry,
+  TransformControls, GLTFExporter, DecalGeometry, ConvexGeometry,
+  MarchingCubes, SimplifyModifier) onto `window` at module-load
+  time, so the natural Style B idiom:
+
+      from js import RoundedBoxGeometry
+      geo = RoundedBoxGeometry.new(w, h, d, segs, radius)
+
+  works the first time, not on the second visit. If you need an
+  addon class the renderer doesn't import (say, a `TextGeometry`
+  from a non-default three addons path), just import it from
+  THREE and call `THREE.TextGeometry.new(...)` instead of
+  `from js import TextGeometry`.
 
   Style A (Blueprint-Return) authors don't usually need this — the
   `lbl.*` helpers cover the common primitive vocabulary. Style B
@@ -1009,6 +1074,39 @@ PART 213 — COMMON MISTAKES
      any `THREE.X` (see PART 203.0). If you need a class that ISN'T in
      THREE, use the `from js import THREE; THREE.X` form instead.
 
+213.11 — Saturated small part without `emissive` (PART 50.3 warning)
+  ❌ A tiny accent piece with `color: "#f5821b"` and no `emissive` set
+     → validator warns:
+        ⚠ obj[0] "block_0": saturated color (#f5821b) on a small part
+          with no "emissive" set — double check this isn't meant to
+          glow (PART 50.1)
+        ⚠ obj[0] "block_0": baseColor #f5821b is saturated and bright
+          with no "emissive" set — PART 50.3's glow rule: if this part
+          should glow (lamp/screen/lava/magic/eyes), set "emissive" +
+          "emissiveIntensity" 1.0-3.0
+  ✅ Either:
+     (a) It SHOULD glow (a headlight, screen, lava, eye, magic crystal,
+         LED, etc.) — add emissive + emissiveIntensity:
+           "glow": {
+               "color": "#ffd66b",
+               "roughness": 0.25,
+               "emissive": "#ffae3a",
+               "emissiveIntensity": 2.4,
+           }
+     (b) It's a decorative part that just happens to be saturated
+         (a brand-orange accent, a red button, etc.) — use a less
+         saturated color so it doesn't trigger the rule:
+           "accent": {"color": "#c97550", ...}  # muted
+         or alternatively set `roughness` very high (≥ 0.95) and
+         `metalness` 0 so the material reads as matte plastic, which
+         the rule also exempts.
+
+  The rule fires when baseColor.saturation > 0.7 AND
+  `objectMaxScaleDim(o) < 0.3 * blueprintBBoxDiag` AND `emissive` is
+  undefined. PART 50.3 enumerates the intended-glow cases
+  (lamp/screen/lava/magic/eyes) — if your part matches any of those,
+  option (a) is the right fix; otherwise option (b).
+
 ================================================================================
 PART 214 — PRE-OUTPUT CHECKLIST FOR AI AUTHORS
 ================================================================================
@@ -1249,12 +1347,38 @@ in the validator log. Match the error to the cause:
 
   "PART 49.1 proportion declaration not found at all"
     Style A (Blueprint-Return) only — the renderer was warning about
-    a missing `meta.proportions` block. Fixed in v1.36 / v8.27 patch
-    2: `lbl.blueprint()` auto-injects sensible defaults
-    (`{"W_over_H": 1.0, "fill": 0.85}`) so the warning no longer
-    fires for lbl-based factories. Override by setting
-    `blueprint_dict["meta"]["proportions"]` before returning. See
-    PART 202.2.
+    a missing `meta.proportions` block AND a missing text-level
+    proportion declaration. Two separate issues, two separate fixes:
+
+    (a) Missing `meta.proportions` — fixed in v1.36 / v8.27 patch
+        2: `lbl.blueprint()` auto-injects sensible defaults
+        (`{"W_over_H": 1.0, "fill": 0.85}`) so the warning no
+        longer fires for lbl-based factories. Override by setting
+        `blueprint_dict["meta"]["proportions"]` before returning.
+        See PART 202.2.
+
+    (b) Missing text-level declaration — fixed in v1.36 / v8.28:
+        parseProportionDeclaration() now also recognises Python-
+        style `#` comments (in addition to the JSON/JS/TS `//`
+        form), AND the Python blueprint validator now passes the
+        actual source text (not the empty string) to it. So a
+        factory that ships the 10-line PART 49.1 declaration as
+        Python comments at the top of the file:
+
+            # STYLE: smooth-low-poly
+            # CAMERA: isometric-front-right
+            # SUBJECT_CATEGORY: character
+            # HEAD_TO_BODY: 0.45
+            # PRIMARY_ASPECT: 0.8 / 1.2 / 0.6
+            # LIMB_TO_TORSO: 0.6
+            # SUBJECT_HEIGHT: 1.7
+            # DOMINANT_COLORS: #6c7280, #ff9aa2, #2c2f36
+            # BACKGROUND: #e8edf2
+            # DISTINCTIVE_DETAIL: rounded-box chassis with
+            #                     glowing antenna orb
+
+        no longer trips this warning. See PART 202.3 for the
+        full convention.
 
   "Factory 'X' returned an empty THREE.Object3D (no children)."
     Style B: your factory returned a Group with no children. The
@@ -1303,6 +1427,63 @@ This section points at the other files in the Python pipeline:
   CHANGES_v136.md
     The changelog entry for this release. Has the production sign-off
     checklist, performance numbers, and backwards-compatibility note.
+
+================================================================================
+PART 230-234 — PROCEDURAL TEXTURE EXTENSIONS (v1.36 / v8.29)
+================================================================================
+
+Five new helpers shipped in v1.36 / v8.29 (also documented in
+Image_To_Py.txt with the full PART 230-234 block). Apply to both
+prompt-driven and image-driven factories; the only difference is
+the palette/style source (image samples vs text description).
+
+Summary (full reference at the end of Image_To_Py.txt):
+
+  PART 230  lbl.style_field(prompt)             — text→palette + style
+  PART 231  lbl.multi_scale_pattern(spec)       — multi-octave texture
+  PART 232  lbl.cavity_aware_pattern(spec, g)   — curvature-modulated
+  PART 233  lbl.geodesic_field(g, anchors)       — vertex distances
+  PART 234  lbl.progressive_uv(g)                — visibility UV
+
+These all layer on top of the PART 74 procedural-texturing bundle
+(noise / voronoi / brick / stripe / splatter / truchet / cairo /
+microRoughnessMap / heightToNormal / etc.). They do NOT replace
+PART 74 — they extend it. See Image_To_Py.txt for the full
+reference including the research-repo provenance of each PART.
+
+================================================================================
+PART 235-242 — HIGH-POLY / STYLE-AGNOSTIC SURFACE (v1.36 / v8.30)
+================================================================================
+
+The "low_poly_3d" project name is a brand, not a constraint. The
+system is style-agnostic (PART 38.22) and supports all 13 canonical
+styles including pbr-realistic + photogrammetry (inherently
+high-poly). PART 235-242 backstops that claim with concrete
+high-poly capability. Full reference in Image_To_Py.txt — summary
+here.
+
+  PART 235  lbl.import_external_mesh(url, format)  — OBJ/GLTF/FBX/STL/DAE
+  PART 236  lbl.make_atlas_uv(geom)                 — MaxRects atlas packing
+  PART 237  lbl.fast_curvature(geom)               — BVH-accelerated
+  PART 238  lbl.highpoly_pbr(opts)                  — pbr-realistic recipe
+  PART 239  lbl.photogrammetry_pbr(opts)            — photogrammetry recipe
+  PART 240  lbl.subdivide_for_highpoly(geom)        — low→high boost
+  PART 241  lbl.decimate_for_lowpoly(geom)          — high→low reduce
+  PART 242  lbl.make_image_texture(url)             — image→UV texture
+
+To switch the renderer from the default chunky 3D look to a
+high-poly PBR look, override meta.style on the returned blueprint
+dict (Style A) or on g.userData.meta (Style B):
+
+    bp = lbl.blueprint()
+    bp["meta"]["style"] = "pbr-realistic"     # or "photogrammetry"
+    return bp
+
+The renderer's look-dev lighting rig (PART 187 / 199.3) and
+triangle-budget guidance (PART 50.4) read meta.style and switch
+to the matching preset. The renderer's auto-injected default
+(smooth-low-poly) stays because that's what the demo models
+use; it's not a constraint on what the user can declare.
 
 ================================================================================
 END OF Prompt_To_Py.txt

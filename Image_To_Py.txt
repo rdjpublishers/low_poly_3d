@@ -269,9 +269,51 @@ PART 224.1 — COLOR FORMAT
 PART 225 — PROPORTION DECLARATION (the PART 49.1 contract)
 ================================================================================
 
-For image-driven factories, declare the model's proportions explicitly
-in the returned dict's `meta.proportions` field. This is the PART 49.1
-contract from Prompt_To_Ts.txt, formalised for the Python path.
+For image-driven factories, declare the model's proportions in TWO
+places — they serve different purposes:
+
+  1. AS A `#` COMMENT BLOCK AT THE TOP OF THE FILE (the text-level
+     declaration). This is the canonical PART 49.1 contract — a
+     10-line `# FIELD: value` block placed BEFORE any code, so the
+     renderer's parseProportionDeclaration() can extract it. Without
+     this, the validator warns "PART 49.1 proportion declaration
+     not found at all".
+
+  2. IN THE RETURNED DICT'S `meta.proportions` FIELD (the data-level
+     declaration). This is the structured form the validator's
+     schema check uses to grade the build.
+
+Both are required. The comment block survives a copy-paste through
+chat (a paper trail for the audit); the meta.proportions field is
+what the fidelity grader actually reads.
+
+────────────────────────────────────────────────────────────────────
+225.0 — THE TEXT-LEVEL `#` COMMENT DECLARATION
+────────────────────────────────────────────────────────────────────
+
+The validator (v1.36 / v8.28+) accepts both `//` (JSON/JS/TS) and
+`#` (Python) comment styles. For a .py factory, place this block
+BEFORE any code/imports:
+
+    # STYLE: smooth-low-poly
+    # CAMERA: isometric-front-right
+    # SUBJECT_CATEGORY: character
+    # HEAD_TO_BODY: 0.45
+    # PRIMARY_ASPECT: 0.8 width / 1.2 height / 0.6 depth
+    # LIMB_TO_TORSO: 0.6
+    # SUBJECT_HEIGHT: 1.7
+    # DOMINANT_COLORS: #6c7280, #ff9aa2, #2c2f36
+    # BACKGROUND: #e8edf2
+    # DISTINCTIVE_DETAIL: rounded-box chassis with glowing antenna orb
+
+The 10 fields are the same 10 from PART 49.1's enumerated set. The
+PROPORTION_DECL_FIELDS list in index.html is the authoritative source
+for the canonical field names — don't rename them or the regex won't
+match.
+
+────────────────────────────────────────────────────────────────────
+225.1 — THE DATA-LEVEL meta.proportions DICT
+────────────────────────────────────────────────────────────────────
 
 Shape (Style A):
   return {
@@ -290,19 +332,29 @@ Shape (Style A):
       "objects": [...],
   }
 
-For Style B, the proportions live in `g.userData.sculptRuntime.proportions`
-(Style B doesn't have a meta dict, but the sculptRuntime is the same
-thing semantically):
+For Style B, the proportions live in `g.userData.meta.proportions`
+(Style B doesn't have a meta dict, but userData.meta is the
+cross-path equivalent — see PART 202.2.1 in Prompt_To_Py.txt):
 
-  g.userData.sculptRuntime = {
-      "proportions": {...},
-      "nodes": {...},
-      "meshes": {...},
+  g.userData.meta = {
+      "style": "smooth-low-poly",
+      "category": "character",
+      "proportions": {
+          "W_over_H": 0.55,
+          "fill": 0.78,
+          "head_share_of_length": 0.21,
+      },
   }
 
 The validator (validateBlueprintSchema) checks the proportions are
 plausible (W_over_H between 0.1 and 10, etc.). Plausible proportions
 + image-aligned primitives → low render failure rate.
+
+If you omit `meta.proportions` entirely, `lbl.blueprint()` auto-
+injects the canonical defaults `{"W_over_H": 1.0, "fill": 0.85}` —
+same shape as the Style A case. Style B factories that omit
+`userData.meta` get the same defaults auto-injected by the renderer
+in v1.36 / v8.28+ (see PART 202.2.1).
 
 PART 225.1 — WHAT TO DECLARE
   Always include W_over_H (the bbox aspect ratio). Include other
@@ -493,6 +545,357 @@ Companion files:
 
 The 7 sibling spec files are released together; the canonical LBL
 version pair is v1.36 / v8.27.
+
+================================================================================
+PART 230-234 — PROCEDURAL TEXTURE EXTENSIONS (v1.36 / v8.29)
+================================================================================
+
+Five new helpers shipped in v1.36 / v8.29, sourced from a survey of
+17 external texturing research repos. Only the procedural /
+deterministic / UV-space-aware ideas made it in — the diffusion /
+NeRF / high-poly repos (Paint3D, ITEM3D, CLIP-Mesh, TEXTure, Text2Tex,
+Texturify, NeuralTexGen, Textured-3D-GAN, stable-dreamfusion,
+threestudio, CRM, SyncDreamer, Zero-1-to-3, mesh-texture-synthesis
+the CNN variant) were filtered out because they don't fit a low-poly
+procedural WebGL renderer. The adopted repos:
+
+  text2mesh             (Michel et al., CVPR 2022)      → PART 230
+  geometric-textures    (Hertz et al., SIGGRAPH 2020)   → PART 231
+  mesh-texture-synth    (Kovacs et al., CGF 2024)       → PART 232
+  UV3-TeD + Point-UV-D  (Foti, Yu et al., 2023)         → PART 233
+  Text2Tex              (Richardson et al., ICCV 2023)  → PART 234
+
+────────────────────────────────────────────────────────────────────
+230. STYLE FIELD (text → palette + style hints)
+────────────────────────────────────────────────────────────────────
+The problem: an AI / user says "rusty iron with a glowing seam" or
+"matte ceramic with brass fittings" and the factory has to translate
+that into a 6-band palette. Real systems (text2mesh, CLIP-Mesh) use
+CLIP embeddings. We use a curated text→mood-color lookup table —
+deterministic, no ML, no GPU, instant, runs in Pyodide.
+
+Python:
+    sf = lbl.style_field("rusty iron with brass fittings")
+    # sf = {
+    #   palette: [
+    #     { name: "shell",  color: "#3a3d42", roughness: 0.55, metalness: 0.85 },
+    #     { name: "metal",  color: "#b5965a", roughness: 0.40, metalness: 0.80 },
+    #     { name: "accent", color: "#8b3a1a", roughness: 0.85, metalness: 0.30 },
+    #     ...
+    #   ],
+    #   style: { mtlMood: "rusty", glossLevel: 0.45, emissiveLevel: 0,
+    #            matchedKeywords: ["iron", "brass"] }
+    # }
+    for entry in sf["palette"]:
+        lbl.define_palette({ entry["name"]: entry })
+
+Style B:
+    from js import MT_textures
+    sf = MT_textures.makeStyleField("ceramic vase with neon glow")
+
+Reference repos: text2mesh (Michel et al., CVPR 2022),
+                  CLIP-Mesh (Khalid et al., SIGGRAPH ASIA 2022).
+Mood table lives in `mt-texture-extensions.js` (window.MT_textures
+.moodTable). ~50 keywords across metals / plastics / organics /
+stones / naturals / glow / specials. Extend via opts.moodOverrides
+when authoring a new domain.
+
+────────────────────────────────────────────────────────────────────
+231. MULTI-SCALE PATTERN (multi-octave procedural)
+────────────────────────────────────────────────────────────────────
+Stack the same procedural pattern at 2-4 scales with weighted
+blending. From geometric-textures (Hertz et al., SIGGRAPH 2020):
+"Multi-scale generator approach — learns texture statistics at
+multiple scales and progressively applies finer details."
+
+Python:
+    r = lbl.multi_scale_pattern(
+        {"type": "noise", "seed": 1, "octaves": 4},
+        size=512,
+    )
+    # r = { canvas, texture }
+    # Apply the texture to a material:
+    #   material.map = r["texture"]
+    #   material.needsUpdate = True
+
+Default levels: [{1, 0.5}, {4, 0.3}, {16, 0.15}, {64, 0.05}] — base
+pattern at 1×, fine detail at 4×, micro-detail at 16×, sparkle at
+64×. Override via opts.levels = [{scale, weight}, ...] for
+domain-specific patterns (e.g. a single 1× level with weight 1.0
+for a clean wood-grain, or 6 levels for a fractal dirt).
+
+────────────────────────────────────────────────────────────────────
+232. CAVITY-AWARE PATTERN (curvature-modulated)
+────────────────────────────────────────────────────────────────────
+Wraps a procedural pattern with curvature-driven intensity
+modulation: cavities boost contrast (dirt-in-crevices, the PART 74
+cavity-dirt trick); ridges pull toward the base color (polished
+rim). From mesh-texture-synthesis (Kovacs et al., CGF 2024):
+"tracks oriented patches surrounding each texel on mesh surfaces,
+enabling seamless texture synthesis that accounts for geometric
+content."
+
+Python:
+    from js import THREE  # or via your lbl.attach_box chain
+    geom = THREE.SphereGeometry.new(1, 24, 16)
+    r = lbl.cavity_aware_pattern(
+        {"type": "noise", "seed": 7},
+        geom,
+        size=256,
+        curvatureMode="both",     # "cavity" | "ridge" | "both"
+        curvatureStrength=0.6,    # 0..1
+    )
+    # r.texture, r.curvature (per-vertex Float32Array)
+
+────────────────────────────────────────────────────────────────────
+233. GEODESIC FIELD (geodesic distance on a mesh)
+────────────────────────────────────────────────────────────────────
+For each vertex, compute the approximate geodesic distance to the
+nearest anchor. Useful for procedural placement of patches /
+detail / UV islands along the surface. The same idea as UV3-TeD
+(Foti et al., 3DV 2023) and Point-UV Diffusion (Yu et al.,
+ICCV 2023), which use geodesic heat diffusion for UV-free texture
+synthesis, but reduced to a vertex-distance field that composes
+with the renderer's UV pipeline.
+
+Python:
+    distances = lbl.geodesic_field(
+        geom,
+        [[0, 1, 0]],   # anchor at top of sphere
+    )
+    # distances is a Float32Array, length = vertex count
+    # Use it to mask an existing material:
+    #   for i, v in enumerate(vertices):
+    #       v.material.opacity = 1.0 - min(1.0, distances[i] / 0.5)
+
+────────────────────────────────────────────────────────────────────
+234. PROGRESSIVE UV (visibility-priority UV unwrap)
+────────────────────────────────────────────────────────────────────
+Like uvUnwrap, but processes the mesh in a visibility-priority
+order so the most-seen faces get assigned UV space first with
+the highest texel density. From Text2Tex (Richardson et al.,
+ICCV 2023): "Tracks each texel's generation status, dynamically
+segments rendered views into a generation mask tracking each
+texel's generation status." We adapt that to UV space: the
+texture-space atlas is filled in visibility order, so the
+"first painted" faces always have the best texel density.
+
+Python:
+    result = lbl.progressive_uv(
+        geom,
+        cameraDir=[0, 0, 1],   # view direction
+        method="planar",        # "planar" | "box"
+        axis="y",               # for planar
+        atlasSize=1024,
+    )
+    # result.faceOrder   — visibility-priority face indices
+    # result.tilesPerRow — atlas grid (sqrt(triCount))
+    # UVs written to geom.attributes.uv in place
+
+────────────────────────────────────────────────────────────────────
+Reference index (which research repo inspired which PART)
+────────────────────────────────────────────────────────────────────
+  PART 230  makeStyleField          text2mesh (CVPR 2022),
+                                      CLIP-Mesh (SIGGRAPH ASIA 2022)
+  PART 231  makeMultiScalePattern   geometric-textures (SIGGRAPH 2020)
+  PART 232  makeCavityAwarePattern  mesh-texture-synthesis (CGF 2024)
+  PART 233  makeGeodesicField       UV3-TeD (3DV 2023),
+                                      Point-UV Diffusion (ICCV 2023)
+  PART 234  makeProgressiveUV       Text2Tex (ICCV 2023)
+
+  Filtered out (not adopted) — all research-grade diffusion / NeRF /
+  high-poly reconstruction repos that don't fit a low-poly procedural
+  WebGL renderer footprint:
+    Paint3D (OpenTexture)         — diffusion-based 2K UV textures
+    ITEM3D (Liu et al.)            — NeRF-based texture editing
+    CLIP-Mesh (Khalid et al.)      — only PART 230's text→palette
+                                      idea adopted; the mesh-gen
+                                      half doesn't fit
+    TEXTure (Richardson et al.)    — diffusion inpainting
+    Text2Tex (Richardson et al.)   — only PART 234's "track texel
+                                      generation status" idea
+                                      adopted; the diffusion half
+                                      doesn't fit
+    Texturify (Siddiqui et al.)    — StyleGAN2-ADA
+    NeuralTexGen (Thies et al.)    — neural texture generation
+    Textured-3D-GAN (Pavllo et al.)— GAN-based
+    stable-dreamfusion             — text-to-3D via NeRF
+    threestudio                    — modular 3D generation framework
+    CRM                            — single-image to 3D mesh recon
+    SyncDreamer                    — multiview-consistent diffusion
+    Zero-1-to-3                    — single-image novel view synthesis
+    mesh-texture-synthesis (CNN)   — only PART 232's "surface-aware"
+                                      idea adopted; the CNN itself
+                                      doesn't fit the procedural
+                                      renderer
+
+================================================================================
+PART 235-242 — HIGH-POLY / STYLE-AGNOSTIC SURFACE (v1.36 / v8.30)
+================================================================================
+
+The "low_poly_3d" project name is a brand, not a constraint.
+PART 38.22 of the spec already declares the system style-agnostic —
+13 canonical styles including `pbr-realistic` and `photogrammetry`,
+which are inherently high-poly. PART 235-242 backstops that
+declaration with concrete high-poly capability:
+
+  235. importExternalMesh(url, format)  — OBJ / GLTF / FBX / STL / DAE
+  236. makeAtlasUV(geom, opts)          — MaxRects BSSF atlas packing
+  237. makeFastCurvature(geom, opts)    — BVH-accelerated curvature
+  238. highPolyPBR(opts)                — pbr-realistic material recipe
+  239. photogrammetryPBR(opts)          — photogrammetry material recipe
+  240. subdivideForHighPoly(geom, opts)  — boost low-poly → high-poly
+  241. decimateForLowPoly(geom, opts)    — reduce high-poly → low-poly
+  242. makeImageTexture(url, opts)      — image → UV texture
+
+JS surface (window.MT_highpoly): the 8 helpers + a selfTest.
+Python surface (lbl.*): 8 pass-through methods
+(lbl.import_external_mesh / make_atlas_uv / fast_curvature /
+highpoly_pbr / photogrammetry_pbr / subdivide_for_highpoly /
+decimate_for_lowpoly / make_image_texture).
+
+────────────────────────────────────────────────────────────────────
+Style-agnosticism contract
+────────────────────────────────────────────────────────────────────
+The renderer's auto-injected default meta.style is still
+"smooth-low-poly" (matches the project name; the chunky 3D look
+the demo models ship). To use this module's high-poly surface,
+override the default explicitly:
+    bp = lbl.blueprint()
+    bp["meta"]["style"] = "pbr-realistic"     # for high-poly meshes
+    # or
+    bp["meta"]["style"] = "photogrammetry"   # for scanned meshes
+
+The renderer reads meta.style to pick the matching look-dev
+lighting rig (PART 187 / 199.3) and to apply the triangle-budget
+guidance (PART 50.4). The default is low-poly because that's
+what the demo models use; it's NOT because the renderer can't
+do high-poly — see the catalog table below.
+
+────────────────────────────────────────────────────────────────────
+235. IMPORT EXTERNAL MESH (load any 3D model file)
+────────────────────────────────────────────────────────────────────
+Python:
+    import asyncio
+    g = await asyncio.ensure_future(
+        lbl.import_external_mesh(
+            "https://example.com/scan.glb", format="glb",
+        )
+    )
+
+Style B:
+    from js import MT_highpoly
+    g = await MT_highpoly.importExternalMesh(url, "glb")
+
+Supports: OBJ, GLTF (.gltf + .glb), FBX, STL, Collada (.dae).
+Auto-normalises: computes vertex normals if missing, generates
+planar UVs if missing (STL files often have no UVs), assigns a
+neutral MeshStandardMaterial if missing. Stashes loader metadata
+on g.userData.__gltf so animation clips can be picked up by
+the renderer's animation player.
+
+────────────────────────────────────────────────────────────────────
+236. ATLAS UV (MaxRects BSSF packing for high-poly)
+────────────────────────────────────────────────────────────────────
+Python:
+    r = lbl.make_atlas_uv(geom, atlasSize=2048, padding=4)
+    # r = { uv, atlasSize, faceCount, packed }
+    # UVs written into geom.attributes.uv in place
+
+For meshes with 1K+ faces, this is the right way to assign UVs.
+makeProgressiveUV (PART 234) is the visibility-priority shortcut
+for low-poly (≤100 faces). For meshes where every face is equally
+visible and texel density matters, use makeAtlasUV.
+
+────────────────────────────────────────────────────────────────────
+237. FAST CURVATURE (BVH-accelerated for 100K+ verts)
+────────────────────────────────────────────────────────────────────
+Python:
+    curv = lbl.fast_curvature(geom, scale=0.02)
+    # curv is a Float32Array, length = vertex count
+
+For meshes with 100K+ verts (photogrammetry scans, etc.), use
+this instead of lbl.cavity_aware_pattern (PART 232) which uses
+a 3×3×3 hash (O(N×27)). The BVH path is O(N log N). Falls back
+to the spatial-hash version if MeshBVH isn't loaded.
+
+────────────────────────────────────────────────────────────────────
+238-239. HIGH-POLY MATERIAL RECIPES
+────────────────────────────────────────────────────────────────────
+Python:
+    mat = lbl.highpoly_pbr(color=0x885533, roughness=0.4)
+    # MeshPhysicalMaterial: roughness 0.45, metalness 0.05,
+    # clearcoat 0.3, envMapIntensity 1.0 — the "realistic surface"
+    # canonical preset.
+
+    mat = lbl.photogrammetry_pbr()  # uses opts.normalMap if provided
+    # MeshStandardMaterial: roughness 0.85, metalness 0.0,
+    # envMapIntensity 0.5 — matte + strong normal-map response for
+    # scanned meshes with baked-in detail.
+
+────────────────────────────────────────────────────────────────────
+240-241. RESOLUTION TRANSITIONS
+────────────────────────────────────────────────────────────────────
+Python:
+    high_geom = lbl.subdivide_for_highpoly(low_geom, { rates: 2 })
+    # Catmull-Clark subdivision. ~4× verts per level.
+
+    low_geom = lbl.decimate_for_lowpoly(high_geom, { ratio: 0.3 })
+    # QEM decimation. Keeps the silhouette + topology.
+
+The two together form a "convert between low-poly and high-poly"
+round-trip workflow — useful when an AI generates a chunky low-poly
+model and you want to render it in a high-poly style, or when a
+photogrammetry scan is too heavy and you want to simplify it for
+real-time rendering.
+
+────────────────────────────────────────────────────────────────────
+242. IMAGE TEXTURE (image URL → UV texture)
+────────────────────────────────────────────────────────────────────
+Python:
+    tex = await asyncio.ensure_future(
+        lbl.make_image_texture("https://example.com/diffuse.jpg")
+    )
+    material.map = tex
+    material.needsUpdate = True
+
+Wraps image loading → CanvasTexture with the right color-space
+(SRGBColorSpace) + wrap defaults (RepeatWrapping) + anisotropy
+(4). For high-poly meshes that come with a real-world photograph
+or hand-painted texture (the standard photogrammetry pipeline).
+
+────────────────────────────────────────────────────────────────────
+Quick reference: which PART for which style?
+────────────────────────────────────────────────────────────────────
+  Style (canonical)        Recommended PART surface
+  ────────────────────────  ─────────────────────────────────────
+  smooth-low-poly          PART 100-143 + PART 230-234
+  flat-low-poly            PART 100-143 + PART 230-234 (subset)
+  voxel                    PART 100-143 (CORE primitives)
+  chibi                    PART 100-143 + PART 230-234
+  anime-cel                PART 100-143 + PART 230-234
+  pbr-realistic            PART 235-242 + PART 230 (style field)
+  papercraft               PART 100-143 (flat shading)
+  toon                     PART 100-143 + PART 230-234 (subset)
+  photogrammetry           PART 235-242 (highpoly_pbr / photogrammetry_pbr)
+  isometric-flat           PART 100-143 (ortho camera)
+  low-poly-painterly       PART 100-143 + PART 230-234
+  wireframe                PART 100-143 (geometry-only)
+  x-ray                    PART 100-143 (translucent)
+
+  Subject (canonical)      Recommended material recipe
+  ────────────────────────  ─────────────────────────────────────
+  character                lbl.style_field("...") → see PART 230
+  vehicle                  lbl.style_field("rusty iron") or lbl.highpoly_pbr()
+  architecture             lbl.highpoly_pbr() with strong envMap
+  weapon                   lbl.style_field("steel / chrome / iron")
+  creature                 lbl.style_field("chitin / organic / scaly")
+  plant                    lbl.style_field("leaf / grass / organic")
+  furniture                lbl.style_field("wood / oak / pine / matte")
+  prop                     lbl.style_field("plastic / ceramic / matte")
+  environment              lbl.style_field("stone / concrete / sand")
+  abstract                 lbl.style_field("neon / glow / magic")
+  other                    anything
 
 ================================================================================
 END OF Image_To_Py.txt

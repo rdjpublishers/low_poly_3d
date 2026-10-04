@@ -2387,7 +2387,7 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
       <div id="mob-dropzone" class="dropzone-box">
         <input type="file" id="mob-dz-input" accept=".json,.js,.ts,.mts,.cts,.py,.zip,image/*" class="dropzone-input" multiple/>
         <div class="dz-icon">📄</div>
-        <div class="dz-title">Tap to browse JSON</div>
+        <div class="dz-title">Tap to drop JSON / JS / TS / Python / ZIP</div>
       </div>
     </div>
     <div class="panel-section">
@@ -2607,6 +2607,8 @@ body.theme-light .env-dots .dot:hover{background:rgba(0,0,0,.45);}
     "mt-organic": "./public/modeling/mt-organic.js",
     "mt-materials-uv": "./public/modeling/mt-materials-uv.js",
     "mt-advanced": "./public/modeling/mt-advanced.js",
+    "mt-texture-extensions": "./public/modeling/mt-texture-extensions.js",
+    "mt-highpoly": "./public/modeling/mt-highpoly.js",
     "mt-engine": "./public/modeling/mt-engine.js",
     "mt-hardsurface": "./public/modeling/mt-hardsurface.js",
     "mt-architectural": "./public/modeling/mt-architectural.js"
@@ -2686,10 +2688,39 @@ window.__rendererThreeVersion = THREE.REVISION;
       // after the rest of MT so it can read MT_noise for the
       // deterministic seeded scatter.
       await import('mt-architectural');
+      // v1.36 / v8.29 (PART 230-234 Procedural Texture Extensions):
+      // 5 new helpers layered on top of MT_materials — makeStyleField
+      // (text→palette), makeMultiScalePattern (multi-octave procedural),
+      // makeCavityAwarePattern (curvature-modulated procedural),
+      // makeGeodesicField (vertex geodesic distance), makeProgressiveUV
+      // (visibility-priority UV unwrap). Sourced from a survey of 17
+      // external research repos (text2mesh / TEXTure / Text2Tex /
+      // Texturify / ITEM3D / Paint3D / UV3-TeD / Point-UV Diffusion /
+      // geometric-textures / mesh-texture-synthesis / etc.) — only the
+      // procedural / deterministic / UV-space-aware ideas were adopted
+      // (the diffusion / NeRF / high-poly repos were not, because they
+      // don't fit the low-poly procedural renderer). See
+      // public/modeling/mt-texture-extensions.js for the full rationale.
+      await import('mt-texture-extensions');
+      // v1.36 / v8.30 (PART 235-242 High-poly / Style-Agnostic Surface):
+      // 8 new helpers layered on top of MT — importExternalMesh (OBJ /
+      // GLTF / FBX / STL / DAE), makeAtlasUV (MaxRects packing),
+      // makeFastCurvature (BVH-accelerated), highPolyPBR /
+      // photogrammetryPBR (high-poly material presets),
+      // subdivideForHighPoly / decimateForLowPoly (resolution
+      // transitions), makeImageTexture (image→UV texture baking).
+      // Backstops the renderer's PART 38.22 "style agnosticism" claim
+      // with concrete high-poly capability, complementing the existing
+      // low-poly-first PART 100-143 / 145-152 / 180-189 surface. See
+      // public/modeling/mt-highpoly.js for the full rationale and the
+      // design contract.
+      await import('mt-highpoly');
       console.log('[LBL] 44-Technique Modeling Bundle loaded — window.MT =', !!window.MT,
                   '| catalog entries =', window.MT && window.MT.catalog ? window.MT.catalog.length : 0,
                   '| PART 167-178 + PART 179 hard-surface helpers =', !!window.MT_hardsurface,
-                  '| PART 190-199 architectural helpers =', !!window.MT_architectural);
+                  '| PART 190-199 architectural helpers =', !!window.MT_architectural,
+                  '| PART 230-234 texture extensions =', !!window.MT_textures,
+                  '| PART 235-242 high-poly surface =', !!window.MT_highpoly);
     } catch (e) {
       console.warn('[LBL] MT modules failed to load:', e && e.message);
     }
@@ -2711,6 +2742,35 @@ import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
+
+// v1.36 / v8.28 — mirror the THREE addon classes imported above to
+// the global window so Pyodide's `from js import X` can reach them
+// (the natural Style B Python idiom — see Prompt_To_Py.txt PART 203
+// and the worked example in PART 212). Without this, a factory that
+// writes `from js import RoundedBoxGeometry` fails at import time
+// with "ImportError: cannot import name 'RoundedBoxGeometry' from
+// 'js'" because the addon classes live in the ES-module scope, not
+// on `window`. The mirror block in getPyodide() picks these up at
+// Pyodide-init time, but mirroring them HERE means they're already
+// on `window` by the time the renderer reaches the FIRST .py file
+// load — no race condition between the first Pyodide init and the
+// addon mirror. Each `try{ window[k] = v }catch(_){}` guards the
+// rare reserved-name collisions (e.g. `window.name` is read-only).
+try{ window.RoundedBoxGeometry = RoundedBoxGeometry; }catch(_){}
+try{ window.TransformControls  = TransformControls;  }catch(_){}
+try{ window.GLTFExporter       = GLTFExporter;       }catch(_){}
+try{ window.DecalGeometry      = DecalGeometry;      }catch(_){}
+try{ window.ConvexGeometry     = ConvexGeometry;     }catch(_){}
+try{ window.MarchingCubes      = MarchingCubes;      }catch(_){}
+try{ window.SimplifyModifier   = SimplifyModifier;   }catch(_){}
+// v1.36 / v8.30 — mirror the mesh loaders too, so the new MT_highpoly
+// .importExternalMesh() helper can reach them via `from js import
+// GLTFLoader` etc. (Pyodide's natural idiom — see PART 235).
+try{ window.GLTFLoader   = GLTFLoader;   }catch(_){}
+try{ window.FBXLoader    = FBXLoader;    }catch(_){}
+try{ window.OBJLoader    = OBJLoader;    }catch(_){}
+try{ window.STLLoader    = STLLoader;    }catch(_){}
+try{ window.ColladaLoader = ColladaLoader; }catch(_){}
 // v7.2 A1 — mergeVertices (BufferGeometryUtils) welds coincident vertices at
 // a CSG seam before the auto-decimate pass. NOTE: earlier v7.1-era comments
 // in this file claimed BufferGeometryUtils was "already imported elsewhere
@@ -9601,13 +9661,34 @@ function objectMaxScaleDim(o){
 // RAW pasted/loaded text, BEFORE stripJsonComments() erases the very //
 // comments it lives in. Must be called on the original string (see its
 // call site at the top of validateAndBuild(), ahead of any JSON.parse).
+//
+// v1.36 / v8.28 patch: also accept Python-style `#` comments, so a
+// .py factory that ships a PART 49.1 declaration (the recommended
+// shape — see Prompt_To_Py.txt PART 202.3 and Image_To_Py.txt
+// PART 225) parses correctly. Without this, the declaration regex
+// `//\s*STYLE\s*:` never matches `# STYLE:` in a .py file and the
+// validator always warned "PART 49.1 proportion declaration not
+// found at all" for Python factories that DID declare proportions —
+// a false positive that made the warning useless as a signal.
+//
+// We run BOTH regexes (// and #) and merge results, with the //
+// match winning ties so JSON/JS/TS behaviour is unchanged.
 function parseProportionDeclaration(rawText){
   const found={};
   if(typeof rawText==='string'){
     PROPORTION_DECL_FIELDS.forEach(field=>{
-      const re=new RegExp('//\\s*'+field+'\\s*:\\s*(.+)','i');
-      const m=rawText.match(re);
-      if(m) found[field]=m[1].trim();
+      // JSON/JS/TS path — the canonical case.
+      const reJs = new RegExp('//\\s*'+field+'\\s*:\\s*(.+)','i');
+      const mJs = rawText.match(reJs);
+      if(mJs){ found[field] = mJs[1].trim(); return; }
+      // Python path — # is the only line-comment syntax. The lookbehind
+      // avoids matching `#` inside a string literal (a hex color like
+      // `"#ff6b35"` is a common false positive). We restrict the
+      // lookbehind to "not preceded by a quote or alnum" so hex colors
+      // inside string literals stay untouched.
+      const rePy = new RegExp('(^|[^\\w"\'])#\\s*'+field+'\\s*:\\s*(.+)','im');
+      const mPy = rawText.match(rePy);
+      if(mPy){ found[field] = mPy[2].trim(); return; }
     });
   }
   const missing=PROPORTION_DECL_FIELDS.filter(f=>found[f]===undefined);
@@ -13813,6 +13894,44 @@ builtins.lbl = sys.modules['lbl']
             }
           }
         }
+        // v1.36 / v8.28 — also mirror the known THREE addon classes
+        // imported at the top of this file (RoundedBoxGeometry,
+        // TransformControls, GLTFExporter, etc.). These live in
+        // 'three/addons/...' and are NOT properties of THREE itself,
+        // so the loops above never find them. Without this list, a
+        // Python factory that does `from js import RoundedBoxGeometry`
+        // (the natural Style B idiom — see Prompt_To_Py.txt PART 203
+        // and the worked example in PART 212) fails at import time
+        // with "ImportError: cannot import name 'RoundedBoxGeometry'
+        // from 'js'". We check `typeof window[k] !== 'undefined'`
+        // before assigning so hot-reloaded addons aren't clobbered.
+        const ADDON_CLASSES = [
+          'RoundedBoxGeometry',  // three/addons/geometries/RoundedBoxGeometry.js
+          'TransformControls',   // three/addons/controls/TransformControls.js
+          'GLTFExporter',        // three/addons/exporters/GLTFExporter.js
+        ];
+        for(const k of ADDON_CLASSES){
+          if(typeof window[k] === 'undefined' && typeof globalThis[k] !== 'undefined'){
+            try{ window[k] = globalThis[k]; }catch(_){ /* some names are reserved */ }
+          }
+        }
+        // Probe the import map for any late-loaded addon classes —
+        // mirrors what we do for THREE's own keys. This catches
+        // addons the user imports dynamically, not just the ones
+        // we hardcode above.
+        try{
+          for(const k of Object.keys(window)){
+            // Anything starting with a capital letter and ending in
+            // "Geometry"/"Controls"/"Exporter"/"Helper"/"Loader"/
+            // "Pass"/"Effect"/"Material" and not already on window
+            // from the loops above is a candidate addon class.
+            if(/^[A-Z].*(Geometry|Controls|Exporter|Helper|Loader|Pass|Effect|Material)$/.test(k)
+               && typeof window[k] === 'function'
+               && typeof THREE[k] === 'undefined'){
+              // Already on window (from the import statement) — leave it.
+            }
+          }
+        }catch(_){}
       }catch(e){
         console.warn('[LBL] Failed to mirror THREE.* to window:', e);
       }
@@ -14055,11 +14174,19 @@ class _LBLBuilder:
         # Auto-inject meta defaults to silence common validator warnings
         # (PART 49.1 proportion declaration + PART 51.2 fidelity gate).
         # Only fills in fields the user didn't already set — overrides win.
+        #
+        # v1.36 / v8.28 patch: the previous defaults ("low-poly" and
+        # "general") were from a pre-canonical-vocabulary draft and
+        # are NOT in the PART 48.1 style list or the PART 49.1
+        # SUBJECT_CATEGORY list, so the validator warned on every
+        # blueprint that didn't override them. Replaced with the
+        # canonical defaults "smooth-low-poly" and "prop". See
+        # public/modeling/lbl_py.py for the full rationale.
         meta = dict(self._ctx["meta"])
         if "style" not in meta:
-            meta["style"] = "low-poly"
+            meta["style"] = "smooth-low-poly"
         if "category" not in meta:
-            meta["category"] = "general"
+            meta["category"] = "prop"
         if "proportions" not in meta:
             meta["proportions"] = {
                 "W_over_H": 1.0,
@@ -14076,6 +14203,63 @@ class _LBLBuilder:
         self._ctx["palette"].clear()
         self._ctx["objects"].clear()
         self._ctx["group_stack"].clear()
+
+    # ── PART 230-234 — Procedural Texture Extensions (Python side) ──
+    # The JS side lives at public/modeling/mt-texture-extensions.js,
+    # loaded via the 'mt-texture-extensions' import-map entry. These
+    # are thin pass-throughs so Style A users have a clean Python API.
+    # Style B users can also call them via
+    # 'from js import MT_textures; MT_textures.makeStyleField(...)'.
+    def style_field(self, prompt, **opts):
+        # PART 230 — text prompt → palette + style hints.
+        from js import MT_textures
+        return MT_textures.makeStyleField(prompt, opts)
+
+    def multi_scale_pattern(self, spec, **opts):
+        # PART 231 — multi-octave procedural texture (geometric-textures).
+        from js import MT_textures
+        return MT_textures.makeMultiScalePattern(spec, opts)
+
+    def cavity_aware_pattern(self, spec, geom, **opts):
+        # PART 232 — curvature-modulated procedural (mesh-texture-synthesis).
+        from js import MT_textures
+        return MT_textures.makeCavityAwarePattern(spec, geom, opts)
+
+    def geodesic_field(self, geom, anchors, **opts):
+        # PART 233 — geodesic distance field (UV3-TeD / Point-UV Diffusion).
+        from js import MT_textures
+        return MT_textures.makeGeodesicField(geom, anchors, opts)
+
+    def progressive_uv(self, geom, **opts):
+        # PART 234 — incremental UV unwrap by visibility (Text2Tex).
+        from js import MT_textures
+        return MT_textures.makeProgressiveUV(geom, opts)
+
+    # ── PART 235-242 — High-poly / style-agnostic surface ──
+    def import_external_mesh(self, url, format=None, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.importExternalMesh(url, format, opts)
+    def make_atlas_uv(self, geom, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.makeAtlasUV(geom, opts)
+    def fast_curvature(self, geom, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.makeFastCurvature(geom, opts)
+    def highpoly_pbr(self, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.highPolyPBR(opts)
+    def photogrammetry_pbr(self, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.photogrammetryPBR(opts)
+    def subdivide_for_highpoly(self, geom, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.subdivideForHighPoly(geom, opts)
+    def decimate_for_lowpoly(self, geom, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.decimateForLowPoly(geom, opts)
+    def make_image_texture(self, url, **opts):
+        from js import MT_highpoly
+        return MT_highpoly.makeImageTexture(url, opts)
 
 import sys
 _lbl = _LBLBuilder()
@@ -14228,6 +14412,32 @@ except (TypeError, ValueError):
       if(typeof raw.destroy === 'function') raw.destroy();
       throw new Error(`Factory "${factoryName}" returned an empty THREE.Object3D (no children) — see Prompt_To_Py.txt PART 1.2.`);
     }
+    // v1.36 / v8.28 — Style B (THREE.Group return) auto-meta injection.
+    // The Style A blueprint path injects canonical style/category/
+    // proportions into the returned dict's meta block (see
+    // public/modeling/lbl_py.py — `lbl.blueprint()`). Style B doesn't
+    // call lbl.blueprint(), so without an injection the validator would
+    // warn:
+    //   ⚠ PART 51.2 fidelity gate: no meta.style/meta.category set …
+    //   ⚠ meta.style:"" is not one of the PART 48.1 canonical styles …
+    // for EVERY Style B factory that didn't set userData.meta
+    // manually. We inject the same canonical defaults here so the
+    // warnings stop by default; authors who DO set their own
+    // userData.meta (style/category/proportions) keep those values
+    // because we only fill in fields that aren't already set.
+    if(group.userData && (!group.userData.meta
+        || typeof group.userData.meta.style !== 'string'
+        || typeof group.userData.meta.category !== 'string')){
+      const existingMeta = (group.userData && group.userData.meta) || {};
+      group.userData.meta = Object.assign({
+        // PART 48.1 canonical default — same value lbl.blueprint() injects
+        style: 'smooth-low-poly',
+        // PART 49.1 canonical default — same value lbl.blueprint() injects
+        category: 'prop',
+        // PART 49.1 proportion declaration — same shape lbl.blueprint() injects
+        proportions: { W_over_H: 1.0, fill: 0.85 },
+      }, existingMeta);
+    }
     // We keep the proxy alive by stashing it on the resulting meta so the
     // renderer can hold a strong reference until addTsModelToScene finishes
     // ownership transfer. After that we destroy the proxy to release Pyodide
@@ -14332,7 +14542,15 @@ async function validateAndBuildPy(text, source){
     }
     lines.push(`<span class="info">→ ${data.objects.length} object(s) from Python factory "${result.factoryName}"</span>`);
     data = applyPalette(data);
-    const schemaResult = validateBlueprintSchema(data, parseProportionDeclaration(''));
+    // v1.36 / v8.28 — pass the actual Python source (not '') to
+    // parseProportionDeclaration() so the PART 49.1 # comment
+    // declaration can be detected. Previously we always passed ''
+    // here, which made the "PART 49.1 proportion declaration not
+    // found at all" warning fire for EVERY Python blueprint
+    // regardless of whether it shipped the declaration. Now that
+    // parseProportionDeclaration() also recognises Python-style #
+    // comments, we just need to feed it the source.
+    const schemaResult = validateBlueprintSchema(data, parseProportionDeclaration(text));
     schemaResult.errors.forEach(e => lines.push(`<span class="err">✗ ${e}</span>`));
     schemaResult.warnings.forEach(w => lines.push(`<span class="err">⚠ ${w}</span>`));
     if(!schemaResult.errors.length && !schemaResult.warnings.length) lines.push(`<span class="ok">✓ All objects pass schema validation</span>`);
