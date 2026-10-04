@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.35 / v8.26 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.36 / v8.27 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
@@ -8,6 +8,7 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 in Prompt_To_Ts.txt; fixes the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. The Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) is the OVERRIDING directive of PART 179. Image_To_Ts.txt REFERENCES PART 179 from Prompt_To_Ts.txt the same way it references PART 167-178 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v133.md.
   PART 180-189 (v1.34 / v8.25) -- CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION added canonically to Prompt_To_Ts.txt (the missing reference-specification layer for the PART 177 worked example); codifies the user-supplied `SportMotorcycle_3D_Techniques_Specification.txt` (10-section authoritative spec at repo root) as 10 numbered PARTs (PART 180 spec layout / PART 181 core technologies stack / PART 182 authoritative geometry catalog / PART 183 reference materials + 6-band palette / PART 184 the 8 builder functions / PART 185 bike-forward coordinate system / PART 186 the 9-key sculptRuntime contract + 5 Actions API + tick + 9 options / PART 187 look-dev lighting factory with 3 modes / PART 188 ~8 500 tris + 8 architectural patterns / PART 189 style + LBL version stamp pair). Image_To_Ts.txt REFERENCES PART 180-189 from Prompt_To_Ts.txt the same way it references PART 167-178 / PART 179 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v134.md.
   PART 190-199 (v1.35 / v8.26) -- ARCHITECTURAL MODELING PIPELINE added canonically to Prompt_To_Ts.txt (the missing methodology layer for buildings / interiors / procedural architecture / landscape). Distilled from `SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt` (post-mortem on the Modern Dual-Volume Villa build, 2026-09-16). Adds `public/modeling/mt-architectural.js` (1095 lines, 8 helpers + schema linter + look-dev lights + 9-key palette on `window.MT_architectural`) + `EXAMPLES_MT_ARCHITECTURAL.md` worked examples annex. Image_To_Ts.txt REFERENCES PART 190-199 from Prompt_To_Ts.txt the same way it references PART 167-178 / PART 179 / PART 180-189 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v135.md.
+  PART 250-254 (v1.36 / v8.27) -- FLOATING-PARTS & PRIMITIVE-ASSEMBLY FIX PATCH (canonical in BOTH Image_To_Ts.txt AND Prompt_To_Ts.txt with equal priority): 5 mandatory validation gates that close the "floating parts / stacked-cylinder / smooth-plastic / blind-delivery" regression class observed in the chunky robot build (2026-10-04). PART 250 forces `MT.core.sdfUnion` + `MT.core.sdfMarch` whenever >2 contiguous body parts touch (amends PART 146.5 / PART 159). PART 251 forbids magic-number pivot offsets and requires bounding-box-derived offsets (amends PART 148.1). PART 252 enforces `flatShading: true` + OutlinePass + `THREE.NoToneMapping` for `chunky-mascot` / `flat-low-poly` / `voxel` style locks (amends PART 156). PART 253 forbids stacked CylinderGeometry rings for limbs and requires `MT.core.loft()` with a cross-section profile (amends PART 153 / PART 161). PART 254 requires `window.lblSpec.helpers.compareToReference()` after construction with a retry loop if IoU < 0.80, gracefully skipped in pure Prompt_To_Ts mode when no reference image is provided (amends PART 150 / PART 158). See CHANGES_v136.md.
 ================================================================================
 >>> v1.34 / v8.25 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
 >>> Bundle + Perfect-Shape Modeling Pipeline) is canonically
@@ -30,6 +31,15 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
 >>> schema linter + look-dev lights + 9-key palette on
 >>> window.MT_architectural) with worked examples at
 >>> public/modeling/EXAMPLES_MT_ARCHITECTURAL.md. See CHANGES_v135.md.
+>>>
+>>> v1.36 / v8.27 DE-DUP NOTE — PART 250-254 (Floating-Parts &
+>>> Primitive-Assembly Fix Patch) is canonically mirrored in BOTH
+>>> Image_To_Ts.txt AND Prompt_To_Ts.txt with equal priority (this
+>>> is the first release in the LBL spec system that ships a layer
+>>> canonical in both system prompts at once). The 5 PARTs amend
+>>> PART 146.5 / 148.1 / 150 / 153 / 156 / 158 / 159 / 161 — they do
+>>> NOT replace them; the amendment is binding, and the stricter rule
+>>> wins when two rules conflict. See CHANGES_v136.md.
 >>>
 
 ================================================================================
@@ -100,7 +110,7 @@ generate output from this spec; please read them before producing code.
   CROSS-REFS
   - The full audit is in /ANALYSIS_REPORT.txt (1 145 lines, 30
     problems ranked BLOCKING / HIGH / MEDIUM / LOW).
-  - The canonical LBL version pair is now v1.35 (TS) / v8.26 (JSON-JS) — bumped from v1.34 / v8.25 in the v1.35 / v8.26 PART 190-199 release (see CHANGES_v135.md).
+  - The canonical LBL version pair is now v1.36 (TS) / v8.27 (JSON-JS) — bumped from v1.35 / v8.26 in the v1.36 / v8.27 PART 250-254 release (see CHANGES_v136.md).
     The renderer's #lbl-spec-chip and meta description are aligned with
     this pair; the v1.29/v8.21 known issues from the audit remain
     valid historical context but are NOT re-fixed in v1.30.
@@ -21632,4 +21642,255 @@ CHANGES_v133.md for the full v1.33 / v8.24 release notes.
 
 ================================================================================
 END OF PART 153-166
+================================================================================
+
+
+================================================================================
+PART 250-254 — v1.36 / v8.27 ADDITIONS: FLOATING-PARTS & PRIMITIVE-ASSEMBLY FIX PATCH
+================================================================================
+
+PART 250-254 is the 5-rule mandatory validation-gate layer that closes
+the "floating parts / stacked-cylinder / smooth-plastic / blind-
+delivery" regression class observed in the chunky robot build
+(2026-10-04 post-mortem; see `Image_To_Ts_and_Prompt_To_Ts_v1.36_Upgrade_Patch.txt`).
+
+This is the FIRST release in the LBL spec system that ships a layer
+canonical in BOTH Image_To_Ts.txt AND Prompt_To_Ts.txt with equal
+priority. The 5 PARTs amend PART 146.5 / 148.1 / 150 / 153 / 156 /
+158 / 159 / 161 — they do NOT replace them. The amendment is
+binding: if PART 146.5 said "use SDF for organic merging" and PART
+200 now says "use SDF whenever >2 body parts touch", both rules
+apply, and the stricter rule wins when two rules conflict.
+
+Image-driven factories (this file) get the strictest reading of all
+5 rules: the reference image is ALWAYS available, so PART 254's IoU
+check is mandatory (not gracefully skipped). Prompt-driven factories
+(Prompt_To_Ts.txt) get the same 5 rules but PART 254's IoU check is
+gracefully skipped when no reference silhouette or style image is
+provided.
+
+────────────────────────────────────────────────────────────────────────
+PART 250 — ENFORCE SDF + MARCHING CUBES FOR CONTIGUOUS PARTS
+(amends PART 146.5 / PART 159)
+────────────────────────────────────────────────────────────────────────
+
+  [THE BUG]
+  The AI used BoxGeometry and SphereGeometry placed side-by-side,
+  resulting in visible gaps and intersecting geometry at the
+  shoulders and hips.
+
+  [THE FIX]
+  Force the AI to use Signed Distance Fields (SDF) for any model
+  where body parts touch. The result is a single watertight mesh
+  rather than a stack of intersecting primitives.
+
+  [THE UPGRADE RULE]
+  If a model has more than 2 contiguous body parts (head, torso,
+  limbs, tail, etc.), the AI MUST use `MT.core.sdfUnion` and
+  `MT.core.sdfMarch` to generate a single, watertight mesh.
+
+  [IMPLEMENTATION CODE SNIPPET FOR THE AI]
+  ```typescript
+  // BAD: Separate primitives (causes floating parts)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2), mat);
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5), mat);
+  root.add(head, torso);
+
+  // GOOD: SDF Union (creates a unified, organic shape)
+  const sdf = MT.core.sdfUnion(
+    MT.core.sdfSphere([0, 0.7, 0], 0.2),  // Head
+    MT.core.sdfCapsule([0, 0.2, 0], [0, 0.6, 0], 0.2)  // Torso
+  );
+  const bodyGeo = MT.core.sdfMarch(sdf, { resolution: 64, bound: 2 });
+  const bodyMesh = new THREE.Mesh(bodyGeo, mat);
+  root.add(bodyMesh);
+  ```
+
+  [APPLY TO]
+  - Image_To_Ts.txt  →  YES (mandatory — visible gaps are a
+                           BLOCKING visual regression in
+                           image-driven output)
+  - Prompt_To_Ts.txt →  YES (mandatory — same rule, same priority)
+
+────────────────────────────────────────────────────────────────────────
+PART 251 — AUTOMATED PIVOT OFFSET CALCULATION (amends PART 148.1)
+────────────────────────────────────────────────────────────────────────
+
+  [THE BUG]
+  The arms and legs are floating in space because the pivot offsets
+  were eyeballed (e.g., `arm.position.set(sign * 0.28, 0.1, 0)`).
+
+  [THE FIX]
+  The AI cannot use magic numbers for pivot positions. It must
+  calculate the offset dynamically based on the parent mesh's
+  bounding box.
+
+  [THE UPGRADE RULE]
+  Pivot Offset MUST equal the distance from the parent's origin to
+  its surface.
+
+  [IMPLEMENTATION CODE SNIPPET FOR THE AI]
+  ```typescript
+  // BAD: Eyeballed magic number
+  shoulderL.position.set(-0.28, 0.1, 0);
+
+  // GOOD: Calculated from Bounding Box
+  const torsoWidth = torsoMesh.geometry.boundingBox?.max.x || 0.25;
+  shoulderL.position.set(-(torsoWidth * 0.9), 0.1, 0);
+  ```
+
+  [APPLY TO]
+  - Image_To_Ts.txt  →  YES (mandatory)
+  - Prompt_To_Ts.txt →  YES (mandatory)
+
+────────────────────────────────────────────────────────────────────────
+PART 252 — STRICT STYLE LOCK ENFORCEMENT (amends PART 156)
+────────────────────────────────────────────────────────────────────────
+
+  [THE BUG]
+  The model looks like smooth plastic, not chunky low-poly. The AI
+  defaulted to smooth shading and standard tone mapping.
+
+  [THE FIX]
+  The system prompt must enforce `flatShading: true` and
+  `NoToneMapping` for all "chunky-mascot" style requests.
+
+  [THE UPGRADE RULE]
+  If the style lock is `chunky-mascot`, `flat-low-poly`, or `voxel`,
+  the AI MUST set `flatShading: true` on every material. It MUST
+  also generate an OutlinePass or enable the screenspace outline. It
+  MUST set `renderer.toneMapping = THREE.NoToneMapping` for the
+  look-dev pass.
+
+  [IMPLEMENTATION CODE SNIPPET FOR THE AI]
+  ```typescript
+  // BAD: Smooth plastic look
+  const mat = new THREE.MeshPhysicalMaterial({ color: 0xcc2222 });
+
+  // GOOD: Chunky low-poly look
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xcc2222,
+    flatShading: true,
+    roughness: 0.7,
+    metalness: 0.1
+  });
+  ```
+
+  [APPLY TO]
+  - Image_To_Ts.txt  →  YES (mandatory)
+  - Prompt_To_Ts.txt →  YES (mandatory)
+
+────────────────────────────────────────────────────────────────────────
+PART 253 — MANDATORY USE OF MT.core.loft FOR LIMBS
+(amends PART 153 / PART 161)
+────────────────────────────────────────────────────────────────────────
+
+  [THE BUG]
+  The limbs are segmented cylinders (which looks like a stack of
+  coins).
+
+  [THE FIX]
+  Force the AI to use `MT.core.loft` (PART 146.1) for all limbs. It
+  cannot stack primitive cylinders.
+
+  [THE UPGRADE RULE]
+  The AI must define a cross-section profile and pass it to
+  `MT.core.loft()`. This creates a single, continuous mesh for a
+  limb that tapers naturally, eliminating the segmented "stacked"
+  look.
+
+  [IMPLEMENTATION CODE SNIPPET FOR THE AI]
+  ```typescript
+  // BAD: Stacked cylinders (segmented look)
+  for (let i = 0; i < 3; i++) {
+    const seg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.08), mat
+    );
+    seg.position.y = -0.1 - i * 0.1;
+    arm.add(seg);
+  }
+
+  // GOOD: Single lofted mesh
+  const sections = [
+    { t: 0.0, radius: 0.10 },  // Shoulder
+    { t: 0.5, radius: 0.08 },  // Elbow
+    { t: 1.0, radius: 0.06 }   // Wrist
+  ];
+  const armGeo = MT.core.loft(sections, { radial: 8, length: 8 });
+  const armMesh = new THREE.Mesh(armGeo, mat);
+  ```
+
+  [APPLY TO]
+  - Image_To_Ts.txt  →  YES (mandatory)
+  - Prompt_To_Ts.txt →  YES (mandatory)
+
+────────────────────────────────────────────────────────────────────────
+PART 254 — ENFORCE SILHOUETTE IoU & VISUAL REGRESSION LOOP
+(amends PART 150 / PART 158)
+────────────────────────────────────────────────────────────────────────
+
+  [THE BUG]
+  The AI didn't check its work against the reference image. It
+  generated the model blindly and returned it.
+
+  [THE FIX]
+  The system must run the IoU check and halt if it fails.
+
+  [THE UPGRADE RULE]
+  After construction, the AI must call
+  `window.lblSpec.helpers.compareToReference(root, refImg)`. If the
+  IoU is < 0.80, the system should trigger a retry loop (up to 3
+  times) with adjusted proportions.
+
+  [IMPLEMENTATION CODE SNIPPET FOR THE AI]
+  ```typescript
+  // BAD: Blind generation
+  return root;
+
+  // GOOD: Validation loop
+  const iou = window.lblSpec.helpers.compareToReference(root, refImg);
+  if (iou < 0.80) {
+    console.warn(`IoU too low (${iou}). Adjusting proportions...`);
+    // Logic to scale/adjust limbs based on reference
+    root.scale.set(1.1, 1.1, 1.1);
+  }
+  return root;
+  ```
+
+  [APPLY TO]
+  - Image_To_Ts.txt  →  YES (mandatory — the reference image is
+                           always available in image-driven mode)
+  - Prompt_To_Ts.txt →  YES (mandatory — when a reference
+                           silhouette or style image is provided;
+                           otherwise skip the IoU check
+                           gracefully)
+
+================================================================================
+PART 250-254 SUMMARY (THE ONE-PARAGRAPH VERSION)
+================================================================================
+
+PART 250-254 is the floating-parts & primitive-assembly fix patch
+added on top of PART 145-152 (perfect-shape pipeline) AND PART
+153-166 (image-driven factory defaults) AND PART 167-178 (hard-
+surface / vehicle modeling pipeline) AND PART 179 (artist-first
+form preservation) AND PART 180-189 (chunky 3D sport motorcycle
+reference specification) AND PART 190-199 (architectural modeling
+pipeline). PART 250 forces SDF + Marching Cubes for any model with
+>2 contiguous body parts (amends PART 146.5 / PART 159). PART 251
+forbids magic-number pivot offsets and requires bounding-box-
+derived offsets (amends PART 148.1). PART 252 enforces flatShading
++ OutlinePass + NoToneMapping for chunky-mascot / flat-low-poly /
+voxel style locks (amends PART 156). PART 253 forbids stacked
+CylinderGeometry rings for limbs and requires `MT.core.loft()`
+with a cross-section profile (amends PART 153 / PART 161). PART 254
+requires the silhouette IoU check + retry loop on every build, with
+the IoU check gracefully skipped in pure Prompt_To_Ts mode when no
+reference image is provided (amends PART 150 / PART 158). PART 250-
+254 is purely additive enforcement — PART 1-199 and the 44 PART
+100-143 helpers all still work exactly as before; the amendment is
+binding and the stricter rule wins when two rules conflict. See
+CHANGES_v136.md for the full v1.36 / v8.27 release notes.
+
+================================================================================
+END OF PART 250-254
 ================================================================================
