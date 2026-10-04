@@ -3324,6 +3324,25 @@ def _install_runtime(group, opts=None):
         detailInventory — list of inventory items
         tick — placeholder (caller should replace)
         actions — empty dict (caller should populate)
+        animations — { clips: [], mixer: None, actions: {} }
+                     ← PLURAL key, the shape the renderer's
+                     lblCollectAnimations() reads (index.html line
+                     ~31452). Using singular \`animation\` here was the
+                     root cause of the "play/next animation button
+                     doesn't appear for Python factories" bug (this
+                     helper was the source — the renderer never saw a
+                     plural key on userData.sculptRuntime.animations
+                     so lblFindAnimationMixer() and lblFindAnimationClips()
+                     walked the tree, found nothing, and the toggle UI
+                     stayed empty).
+
+    The pre-installed tick ALSO calls \`mixer.update(dt)\` if a mixer is
+    published on \`rt["animations"]["mixer"]\`, so a factory can write
+        mixer = lbl.make_mixer(g)
+        clip = lbl.make_clip("idle", 1.0, tracks)
+        lbl.publish_animation(g, mixer=mixer, clips=[clip])
+    and the in-app player will pick the clips up automatically (toggle
+    button enabled) AND the per-frame mixer will be ticked.
     """
     if opts is None:
         opts = {}
@@ -3344,7 +3363,16 @@ def _install_runtime(group, opts=None):
         "colliders": {},
         "destructionGroups": {},
         "actions": {},
-        "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+        # PLURAL key — the renderer's lblCollectAnimations() reads
+        # \`rt.animations.clips\` / \`rt.animations.mixer.getActions()\`.
+        # The previous singular \`animation\` field was inert from the
+        # renderer's point of view.
+        "animations": {"clips": [], "mixer": None, "actions": {}},
+        # Backwards-compat: keep \`animation\` as an empty dict too so
+        # factories / inspector code that read \`rt.animation.current\`
+        # before this fix don't crash. The renderer never reads this;
+        # user code that depended on the old fields is unaffected.
+        "animation": {},
         "vfx": {},
         "passes": {},
         "passesReviewed": {},
@@ -3354,10 +3382,21 @@ def _install_runtime(group, opts=None):
         "detailInventory": opts.get("detailInventory", []),
     }
     group.userData.sculptRuntime = rt
-    # Tick placeholder
+    # Tick placeholder — drives the published mixer if one is set so
+    # the factory only has to call \`lbl.publish_animation(g, mixer=m,
+    # clips=[...])\` to get both the in-app toggle button AND running
+    # animation. If a custom userData.tick was already installed,
+    # leave it alone (the factory is taking responsibility for ticking).
     if not getattr(group.userData, "tick", None):
         def _tick(dt, elapsed):
-            rt["animation"]["elapsed"] = elapsed
+            try:
+                _anims = rt.get("animations") or {}
+                _mixer = _anims.get("mixer")
+                if _mixer and hasattr(_mixer, "update"):
+                    _mixer.update(dt)
+            except Exception:
+                # Don't crash the render loop on a misbehaving mixer.
+                pass
         group.userData.tick = _tick
     # setPalette hot-swap
     def set_palette(name_or_dict):
@@ -3367,6 +3406,89 @@ def _install_runtime(group, opts=None):
         return _PALETTE_REGISTRY.names()
     group.userData.availablePalettes = available_palettes
     return rt
+
+
+def _publish_animation(group_or_rt, mixer=None, clips=None, actions=None):
+    """Publish the modern animations shape on a sculptRuntime.
+
+    Writes \`sculptRuntime.animations = { clips: [...], mixer: <mixer>,
+    actions: { name: AnimationAction, ... } }\` (the PLURAL key the
+    renderer reads in \`lblCollectAnimations()\` — index.html ~31452).
+
+    Arguments:
+        group_or_rt — either a THREE.Object3D whose userData.sculptRuntime
+                      is the target, or the sculptRuntime dict itself.
+        mixer       — THREE.AnimationMixer (optional; if omitted, kept as
+                      whatever was previously published, default None).
+        clips       — list of THREE.AnimationClip (optional).
+        actions     — dict name → THREE.AnimationAction (optional) OR a
+                      list of AnimationActions whose \`.clip.name\` is the
+                      key (matching what \`mixer.getActions()\` produces).
+
+    Side effect:
+        Replaces (or fills in) \`sculptRuntime.animations\` with the modern
+        shape. Keeps the old singular \`sculptRuntime.animation\` field
+        populated too as \`{"clips": N, "mixer": mixer} so any user code
+        reading \`rt.animation.mixer\` for diagnostic purposes still
+        finds something.
+
+    The renderer's auto-flatten pass (lblFlattenRuntimeAliases) already
+    walks userData looking for \`rt.animations\` — once this helper runs,
+    \`lblCollectAnimations()\` will see the clips + mixer, populate its
+    own in-app mixer + actions, and the Animation Controls toggle button
+    will appear in the bottom panel.
+    """
+    if group_or_rt is None:
+        return None
+    rt = group_or_rt
+    # If we got a Group-like object, pull the sculptRuntime dict off it.
+    ud = getattr(group_or_rt, "userData", None)
+    if ud is not None:
+        rt = getattr(ud, "sculptRuntime", None) or rt
+    if not isinstance(rt, dict):
+        return None
+    prev = rt.get("animations") or {}
+    if not isinstance(prev, dict):
+        prev = {}
+    out_clips = list(clips) if clips is not None else list(prev.get("clips") or [])
+    # Auto-build actions dict from a list of AnimationActions if we got
+    # one — matches what mixer.getActions() yields (each action has a
+    # \`.clip.name\`).
+    out_actions = prev.get("actions") or {}
+    if isinstance(out_actions, list):
+        # Convert list to dict keyed by clip.name
+        _conv = {}
+        for a in out_actions:
+            try:
+                _conv[getattr(getattr(a, "clip", None), "name", "") or f"anim_{len(_conv)}"] = a
+            except Exception:
+                pass
+        out_actions = _conv
+    elif not isinstance(out_actions, dict):
+        out_actions = {}
+    if isinstance(actions, dict):
+        out_actions.update(actions)
+    elif isinstance(actions, list):
+        for a in actions:
+            try:
+                _n = getattr(getattr(a, "clip", None), "name", "") or f"anim_{len(out_actions)}"
+                out_actions[_n] = a
+            except Exception:
+                pass
+    out_mixer = mixer if mixer is not None else prev.get("mixer")
+    rt["animations"] = {"clips": out_clips, "mixer": out_mixer, "actions": out_actions}
+    # Backwards-compat mirror on the singular key — old factories read
+    # \`rt.animation.mixer\` for their own tick driver; keep it populated
+    # so they keep working without crashing.
+    try:
+        rt["animation"] = {
+            "current": (out_clips[0].name if out_clips and getattr(out_clips[0], "name", None) else None),
+            "count": len(out_clips),
+            "mixer": out_mixer,
+        }
+    except Exception:
+        rt["animation"] = {"count": len(out_clips), "mixer": out_mixer}
+    return rt["animations"]
 
 
 def _install_tick(group, fn):
@@ -4446,6 +4568,13 @@ class _LBLFacade:
     def play_animation(self, *a, **k): return _play_animation(*a, **k)
     def stop_animations(self, *a, **k): return _stop_animations(*a, **k)
     def build_walk_clip(self, *a, **k): return _build_walk_clip(*a, **k)
+    # PART 213.15 — publish the modern {clips, mixer, actions} shape
+    # on sculptRuntime so the renderer's lblCollectAnimations() picks
+    # it up and the play/next toggle button is enabled. Without this,
+    # even a perfectly-built mixer stays invisible to the in-app
+    # player because the renderer only walks userData looking for the
+    # PLURAL key \`sculptRuntime.animations\`, not \`sculptRuntime.animation\`.
+    def publish_animation(self, *a, **k): return _publish_animation(*a, **k)
 
     # ── Look-dev lighting (PART 187 / 199.3 / 273) ────────────────────
     def lookdev_lights(self, *a, **k): return _lookdev_lights(*a, **k)
@@ -5349,7 +5478,7 @@ def _collect_animation_clips(rt, root=None):
     out = []
     if not isinstance(rt, dict):
         return out
-    # 1) rt.animations.clips (modern)
+    # 1) rt.animations.clips (modern, plural — what TS Model_3/4 use)
     anims = rt.get("animations")
     clips = []
     if isinstance(anims, dict):
@@ -5359,6 +5488,22 @@ def _collect_animation_clips(rt, root=None):
         clips = list(anims)
     if clips:
         return [c for c in clips if c is not None]
+    # 1b) Backwards-compat: rt.animation (singular) — older Python
+    # factories (pre-fix) wrote a custom dict on the singular key.
+    # Look for either a "clips" sub-list or a "mixer" with getActions().
+    anim1 = rt.get("animation")
+    if isinstance(anim1, dict):
+        if "clips" in anim1 and anim1["clips"]:
+            try:
+                return [c for c in anim1["clips"] if c is not None]
+            except Exception:
+                pass
+        _m = anim1.get("mixer")
+        if _m and hasattr(_m, "getActions"):
+            try:
+                return [a.clip for a in _m.getActions() if a and a.clip]
+            except Exception:
+                pass
     # 2) root.animations (legacy loader-set)
     if root is not None:
         ra = getattr(root, "animations", None)
@@ -5690,8 +5835,40 @@ def _add_default_export(model_func, module=None):
 # ─────────────────────────────────────────────────────────────────────
 
 def _make_sculpt_runtime(spec):
-    """Build a canonical sculptRuntime dict (PART 207)."""
+    """Build a canonical sculptRuntime dict (PART 207).
+
+    Reads \`spec["animations"]\` (plural) — the modern shape the
+    renderer actually reads in lblCollectAnimations() — and falls back
+    to \`spec["animation"]\` (singular) for backwards-compat with
+    factories authored before this fix.
+
+    See PART 207 in Prompt_To_Py.txt for the full contract, and
+    PART 213.15 for the singular/plural trap.
+    """
     spec = spec or {}
+    # Build the plural animations shape — the renderer's source of
+    # truth for the play/next-button visibility.
+    src_animations = spec.get("animations")
+    if isinstance(src_animations, dict):
+        animations = {
+            "clips": list(src_animations.get("clips") or []),
+            "mixer": src_animations.get("mixer"),
+            "actions": src_animations.get("actions") or {},
+        }
+    elif isinstance(src_animations, list):
+        # Old shape — bare array of clip hints
+        animations = {"clips": list(src_animations), "mixer": None, "actions": {}}
+    else:
+        # Fallback: legacy \`animation\` singular key (pre-fix factories)
+        legacy = spec.get("animation") or {}
+        if isinstance(legacy, dict):
+            animations = {
+                "clips": list(legacy.get("clips") or []),
+                "mixer": legacy.get("mixer"),
+                "actions": legacy.get("actions") or {},
+            }
+        else:
+            animations = {"clips": [], "mixer": None, "actions": {}}
     return {
         "nodes": spec.get("nodes", {}),
         "meshes": spec.get("meshes", {}),
@@ -5700,7 +5877,12 @@ def _make_sculpt_runtime(spec):
         "destructionGroups": spec.get("destructionGroups", []),
         "materials": spec.get("materials", {}),
         "actions": spec.get("actions", []),
-        "animation": spec.get("animation", {}),
+        # PLURAL — primary key the renderer reads.
+        "animations": animations,
+        # SINGULAR — kept populated for diagnostic / legacy code paths.
+        # The renderer never reads this; user code that depends on the
+        # old field still works.
+        "animation": spec.get("animation") or {},
         "vfx": spec.get("vfx", []),
         "passes": spec.get("passes", []),
         "detailInventory": spec.get("detailInventory", []),

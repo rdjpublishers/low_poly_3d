@@ -433,6 +433,33 @@ def test_animation_track_detection(mod):
     assert mod.lbl.collect_animation_clips(rt) == ["c1", "c2"]
     rt_empty = {"animations": {"clips": []}}
     assert mod.lbl.collect_animation_clips(rt_empty) == []
+    # PART 213.15 — backwards-compat: rt.animation (singular) still
+    # yields clips when the plural key is missing.
+    rt_legacy = {"animation": {"clips": ["c3"], "mixer": None}}
+    assert mod.lbl.collect_animation_clips(rt_legacy) == ["c3"]
+    print("  PASS")
+
+
+def test_publish_animation_and_install_runtime(mod):
+    print("test_publish_animation_and_install_runtime")
+    # PART 213.15 — lbl.publish_animation writes the modern
+    # {clips, mixer, actions} shape that lblCollectAnimations reads.
+    rt = {"animations": {"clips": [], "mixer": None, "actions": {}}}
+    out = mod.lbl.publish_animation(rt, mixer="M", clips=["c1", "c2"])
+    assert out["mixer"] == "M", "publish_animation did not set mixer"
+    assert out["clips"] == ["c1", "c2"], "publish_animation did not set clips"
+    assert isinstance(out["actions"], dict)
+    # Actions can be passed as a dict (name → action).
+    a1 = type("A", (), {"clip": type("C", (), {"name": "wave"})()})()
+    out2 = mod.lbl.publish_animation(rt, actions={"wave": a1})
+    assert out2["actions"]["wave"] is a1
+    # Actions can be passed as a list (keyed by clip.name).
+    out3 = mod.lbl.publish_animation(rt, actions=[a1])
+    assert out3["actions"]["wave"] is a1
+    # singular `animation` key still populated for backwards compat.
+    assert "animation" in rt and "mixer" in rt["animation"]
+    # install_runtime is wired on the facade.
+    assert hasattr(mod.lbl, "publish_animation"), "publish_animation missing from lbl facade"
     print("  PASS")
 
 
@@ -658,6 +685,7 @@ def main():
         test_aces_bridge(mod)
         test_mt_fallbacks(mod)
         test_animation_track_detection(mod)
+        test_publish_animation_and_install_runtime(mod)
         test_schema_linter_and_shells(mod)
         test_validation_helpers(mod)
         test_lookdev_and_bezier(mod)
