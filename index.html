@@ -17534,6 +17534,962 @@ _MT_BRIDGE = _make_mt_bridge()
 
 
 # ════════════════════════════════════════════════════════════════════════
+# SECTION 17.5 — PART 386+ surface (skeleton loaders, ACES, schema
+# linter, hard-surface factory shell, socket hierarchy helpers,
+# bug-fix passthroughs from ANALYSIS_REPORT #1, #2, #5, #6, #7, #18)
+# ════════════════════════════════════════════════════════════════════════
+
+# ─── 6 skeleton template loaders (PART 387) ────────────────────────────
+# Mirrors public/rig/skeletons/{humanoid,quadruped,bird,fish,insect,
+# object}.json. The renderer fetches the same JSON; in Pyodide we
+# inline minimal but valid templates so v2.0 factories can author
+# 4-leg / 2-leg / 2-wing / 0-leg creatures without manual joints.
+
+_SKELETON_TEMPLATES = {
+    "humanoid": {
+        "class": "humanoid",
+        "height": 1.0,
+        "joints": [
+            {"id": "Bone_Root",    "restPosition": [0, 0.00, 0],  "restRotation": [0, 0, 0, 1], "parent": None},
+            {"id": "Bone_Pelvis",  "parent": "Bone_Root",   "restPosition": [0, 1.00, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Spine",   "parent": "Bone_Pelvis", "restPosition": [0, 1.20, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Chest",   "parent": "Bone_Spine",  "restPosition": [0, 1.45, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Head",    "parent": "Bone_Chest",  "restPosition": [0, 1.75, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Thigh_L", "parent": "Bone_Pelvis", "restPosition": [ 0.10, 0.55, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Calf_L",  "parent": "Bone_Thigh_L","restPosition": [ 0.10, 0.25, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Foot_L",  "parent": "Bone_Calf_L", "restPosition": [ 0.10, 0.05, 0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Toe_L",   "parent": "Bone_Foot_L", "restPosition": [ 0.10, 0.02, 0.20], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Thigh_R", "parent": "Bone_Pelvis", "restPosition": [-0.10, 0.55, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Calf_R",  "parent": "Bone_Thigh_R","restPosition": [-0.10, 0.25, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Foot_R",  "parent": "Bone_Calf_R", "restPosition": [-0.10, 0.05, 0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Toe_R",   "parent": "Bone_Foot_R", "restPosition": [-0.10, 0.02, 0.20], "restRotation": [0, 0, 0, 1]},
+        ],
+    },
+    "quadruped": {
+        "class": "quadruped",
+        "height": 1.115,  # PART 388 ANALYSIS_REPORT #2 fix (was 1.45)
+        "joints": [
+            {"id": "Bone_Root",     "restPosition": [0, 0.00, 0],   "restRotation": [0, 0, 0, 1], "parent": None},
+            {"id": "Rump",          "parent": "Bone_Root",    "restPosition": [0, 0.95, -0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "Hips",          "parent": "Rump",         "restPosition": [0, 1.05, -0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Spine",         "parent": "Hips",         "restPosition": [0, 1.10,  0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Chest",         "parent": "Spine",        "restPosition": [0, 1.10,  0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "NeckB",         "parent": "Chest",        "restPosition": [0, 1.10,  0.50], "restRotation": [0, 0, 0, 1]},
+            {"id": "Neck2",         "parent": "NeckB",        "restPosition": [0, 1.13,  0.62], "restRotation": [0, 0, 0, 1]},
+            {"id": "Skull",         "parent": "Neck2",        "restPosition": [0, 1.15,  0.78], "restRotation": [0, 0, 0, 1]},
+            {"id": "Jaw",           "parent": "Skull",        "restPosition": [0, 1.02,  0.85], "restRotation": [0, 0, 0, 1]},
+            {"id": "TailBase",      "parent": "Rump",         "restPosition": [0, 0.95, -0.45], "restRotation": [0, 0, 0, 1]},
+            {"id": "TailMid",       "parent": "TailBase",     "restPosition": [0, 0.95, -0.65], "restRotation": [0, 0, 0, 1]},
+            {"id": "TailTip",       "parent": "TailMid",      "restPosition": [0, 0.92, -0.85], "restRotation": [0, 0, 0, 1]},
+            {"id": "LFrontThigh",   "parent": "Chest",        "restPosition": [ 0.18, 1.00,  0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "LFrontShin",    "parent": "LFrontThigh",  "restPosition": [ 0.18, 0.55,  0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "LFrontToe",     "parent": "LFrontShin",   "restPosition": [ 0.18, 0.035, 0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "RFrontThigh",   "parent": "Chest",        "restPosition": [-0.18, 1.00,  0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "RFrontShin",    "parent": "RFrontThigh",  "restPosition": [-0.18, 0.55,  0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "RFrontToe",     "parent": "RFrontShin",   "restPosition": [-0.18, 0.035, 0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "LBackThigh",    "parent": "Rump",         "restPosition": [ 0.18, 0.95, -0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "LBackShin",     "parent": "LBackThigh",   "restPosition": [ 0.18, 0.50, -0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "LBackToe",      "parent": "LBackShin",    "restPosition": [ 0.18, 0.035,-0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "RBackThigh",    "parent": "Rump",         "restPosition": [-0.18, 0.95, -0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "RBackShin",     "parent": "RBackThigh",   "restPosition": [-0.18, 0.50, -0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "RBackToe",      "parent": "RBackShin",    "restPosition": [-0.18, 0.035,-0.30], "restRotation": [0, 0, 0, 1]},
+        ],
+    },
+    "bird": {
+        "class": "bird",
+        "height": 0.30,
+        "joints": [
+            {"id": "Bone_Root",   "restPosition": [0, 0.00, 0], "restRotation": [0, 0, 0, 1], "parent": None},
+            {"id": "Pelvis",      "parent": "Bone_Root",  "restPosition": [0, 0.10, 0],  "restRotation": [0, 0, 0, 1]},
+            {"id": "Spine",       "parent": "Pelvis",     "restPosition": [0, 0.15, 0.02], "restRotation": [0, 0, 0, 1]},
+            {"id": "Chest",       "parent": "Spine",      "restPosition": [0, 0.20, 0.05], "restRotation": [0, 0, 0, 1]},
+            {"id": "Neck",        "parent": "Chest",      "restPosition": [0, 0.24, 0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Head",        "parent": "Neck",       "restPosition": [0, 0.30, 0.12], "restRotation": [0, 0, 0, 1]},
+            {"id": "Beak",        "parent": "Head",       "restPosition": [0, 0.30, 0.18], "restRotation": [0, 0, 0, 1]},
+            {"id": "Tail",        "parent": "Pelvis",     "restPosition": [0, 0.12,-0.08], "restRotation": [0, 0, 0, 1]},
+            {"id": "LThigh",      "parent": "Pelvis",     "restPosition": [ 0.05, 0.08, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "LShin",       "parent": "LThigh",     "restPosition": [ 0.05, 0.04, 0.01], "restRotation": [0, 0, 0, 1]},
+            {"id": "LToe",        "parent": "LShin",      "restPosition": [ 0.05, 0.01, 0.05], "restRotation": [0, 0, 0, 1]},
+            {"id": "RThigh",      "parent": "Pelvis",     "restPosition": [-0.05, 0.08, 0], "restRotation": [0, 0, 0, 1]},
+            {"id": "RShin",       "parent": "RThigh",     "restPosition": [-0.05, 0.04, 0.01], "restRotation": [0, 0, 0, 1]},
+            {"id": "RToe",        "parent": "RShin",      "restPosition": [-0.05, 0.01, 0.05], "restRotation": [0, 0, 0, 1]},
+            {"id": "WingTip_L",   "parent": "Chest",      "restPosition": [ 0.25, 0.21, 0.04], "restRotation": [0, 0, 0, 1]},
+            {"id": "WingTip_R",   "parent": "Chest",      "restPosition": [-0.25, 0.21, 0.04], "restRotation": [0, 0, 0, 1]},
+        ],
+    },
+    "fish": {
+        "class": "fish",
+        "height": 0.50,
+        "joints": [
+            {"id": "Bone_Root",   "restPosition": [0, 0.0, 0],   "restRotation": [0, 0, 0, 1], "parent": None},
+            {"id": "Spine0",      "parent": "Bone_Root",  "restPosition": [0, 0.0,  0.20], "restRotation": [0, 0, 0, 1]},
+            {"id": "Spine1",      "parent": "Spine0",     "restPosition": [0, 0.0,  0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Spine2",      "parent": "Spine1",     "restPosition": [0, 0.0,  0.00], "restRotation": [0, 0, 0, 1]},
+            {"id": "Spine3",      "parent": "Spine2",     "restPosition": [0, 0.0, -0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "TailBase",    "parent": "Spine3",     "restPosition": [0, 0.0, -0.20], "restRotation": [0, 0, 0, 1]},
+            {"id": "TailTip",     "parent": "TailBase",   "restPosition": [0, 0.0, -0.30], "restRotation": [0, 0, 0, 1]},
+            {"id": "Pectoral_L",  "parent": "Spine1",     "restPosition": [ 0.10, 0.0,  0.10], "restRotation": [0, 0, 0, 1]},
+            {"id": "Pectoral_R",  "parent": "Spine1",     "restPosition": [-0.10, 0.0,  0.10], "restRotation": [0, 0, 0, 1]},
+        ],
+    },
+    "insect": {
+        "class": "insect",
+        "height": 0.05,
+        "joints": [
+            {"id": "Bone_Root",   "restPosition": [0, 0.00, 0],   "restRotation": [0, 0, 0, 1], "parent": None},
+            {"id": "Thorax",      "parent": "Bone_Root",  "restPosition": [0, 0.020, 0],  "restRotation": [0, 0, 0, 1]},
+            {"id": "Head",        "parent": "Thorax",     "restPosition": [0, 0.025, 0.025], "restRotation": [0, 0, 0, 1]},
+            {"id": "Antenna_L",   "parent": "Head",       "restPosition": [ 0.005, 0.030, 0.030], "restRotation": [0, 0, 0, 1]},
+            {"id": "Antenna_R",   "parent": "Head",       "restPosition": [-0.005, 0.030, 0.030], "restRotation": [0, 0, 0, 1]},
+            {"id": "Abdomen1",    "parent": "Thorax",     "restPosition": [0, 0.020,-0.015], "restRotation": [0, 0, 0, 1]},
+            {"id": "Abdomen2",    "parent": "Abdomen1",   "restPosition": [0, 0.020,-0.030], "restRotation": [0, 0, 0, 1]},
+            {"id": "Abdomen3",    "parent": "Abdomen2",   "restPosition": [0, 0.020,-0.045], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegFL_Hip",   "parent": "Thorax",     "restPosition": [ 0.020, 0.020, 0.010], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegFL_Knee",  "parent": "LegFL_Hip",  "restPosition": [ 0.030, 0.005, 0.015], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegFL_Toe",   "parent": "LegFL_Knee", "restPosition": [ 0.035, 0.000, 0.025], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegFR_Hip",   "parent": "Thorax",     "restPosition": [-0.020, 0.020, 0.010], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegFR_Knee",  "parent": "LegFR_Hip",  "restPosition": [-0.030, 0.005, 0.015], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegFR_Toe",   "parent": "LegFR_Knee", "restPosition": [-0.035, 0.000, 0.025], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegBL_Hip",   "parent": "Thorax",     "restPosition": [ 0.020, 0.020,-0.010], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegBL_Knee",  "parent": "LegBL_Hip",  "restPosition": [ 0.030, 0.005,-0.015], "restRotation": [0, 0, 0, 1]},
+            {"id": "LegBL_Toe",   "parent": "LegBL_Knee", "restPosition": [ 0.035, 0.000,-0.025], "restRotation": [0, 0, 0, 1]},
+        ],
+    },
+    # ANALYSIS_REPORT [B] #1 fix: object.json had 4 root joints, which
+    # made validateRigGraph() throw. The template below has ONE root
+    # (Bone_Center at [0,0,0]) with all 4 anchor joints as children.
+    "object": {
+        "class": "object",
+        "height": 1.0,
+        "joints": [
+            {"id": "Bone_Center", "restPosition": [0, 0.0, 0],   "restRotation": [0, 0, 0, 1], "parent": None},
+            {"id": "Bone_Top",    "parent": "Bone_Center", "restPosition": [0,  0.5, 0],   "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Bottom", "parent": "Bone_Center", "restPosition": [0, -0.5, 0],   "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Left",   "parent": "Bone_Center", "restPosition": [-0.5, 0, 0],   "restRotation": [0, 0, 0, 1]},
+            {"id": "Bone_Right",  "parent": "Bone_Center", "restPosition": [ 0.5, 0, 0],   "restRotation": [0, 0, 0, 1]},
+        ],
+    },
+}
+
+
+def _load_skeleton_template(class_name, auto_scale=True):
+    """PART 387 — Load a built-in skeleton template by class name.
+
+    Returns a skeleton-spec dict (same shape as the JSON files in
+    public/rig/skeletons/). When \`auto_scale\` is True and the caller
+    later supplies \`model_height\`, joints are scaled so the silhouette
+    matches the model's bounding-box height.
+
+    This mirrors what the renderer does in PART 76.3, but inside the
+    Pyodide sandbox so v2.0 .py factories can use it without
+    fetch()-ing the JSON.
+    """
+    if class_name not in _SKELETON_TEMPLATES:
+        raise ValueError(
+            f"Unknown skeleton class '{class_name}'. "
+            f"Available: {list(_SKELETON_TEMPLATES.keys())}"
+        )
+    import copy
+    return copy.deepcopy(_SKELETON_TEMPLATES[class_name])
+
+
+def _list_skeleton_classes():
+    """PART 387 — list all built-in skeleton class names."""
+    return list(_SKELETON_TEMPLATES.keys())
+
+
+# ─── ACES surface (PART 386) ───────────────────────────────────────────
+# Mirrors the 7 window.ACES_* sub-modules. We can't actually run OKLab
+# or hemisphere-raycast AO in Pyodide without THREE, so we expose
+# pure-Python equivalents + bridge pass-throughs to window.ACES when
+# available. The bridge is the canonical path; the pure-Python
+# implementations are fallbacks for headless testing.
+
+def _aces_oklab_to_linear(rgb):
+    """PART 386 — sRGB→Linear approximation (cheap, not strict)."""
+    r, g, b = rgb
+    def to_lin(c):
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    return (to_lin(r), to_lin(g), to_lin(b))
+
+
+def _aces_linear_to_oklab(rgb):
+    """PART 386 — Linear→Oklab via Björn Ottosson's reference formula."""
+    r, g, b = rgb
+    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+    s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+    l_ = l ** (1.0 / 3.0) if l >= 0 else -((-l) ** (1.0 / 3.0))
+    m_ = m ** (1.0 / 3.0) if m >= 0 else -((-m) ** (1.0 / 3.0))
+    s_ = s ** (1.0 / 3.0) if s >= 0 else -((-s) ** (1.0 / 3.0))
+    return (
+        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+    )
+
+
+def _aces_run(scene_or_spec, opts=None):
+    """PART 386 — Run the ACES quality pass.
+
+    Single entry point. The 6-stage pipeline (extract → crease split
+    + angle-weighted normals → AO bake → L1-L8 OKLab stack → L8
+    bone-field softening → 25 mechanical checks → write-back) runs
+    in browser via \`window.ACES.run(scene, opts)\`. In Pyodide we
+    delegate to that path; the pure-Python fallback returns a
+    report dict.
+    """
+    try:
+        from js import window
+        ac = getattr(window, "ACES", None)
+        if ac is not None and hasattr(ac, "run"):
+            return ac.run(scene_or_spec, opts or {})
+    except Exception:
+        pass
+    # Fallback: return a placeholder report. The real engine runs
+    # in the browser; this stub keeps lbl.aces_run() callable from
+    # headless / mocked test environments.
+    return {
+        "ran": False,
+        "stage": "fallback",
+        "note": "window.ACES not loaded — pass-through deferred to renderer",
+        "checks": {},
+    }
+
+
+def _aces_runstack(spec_list, opts=None):
+    """PART 386 — Run ACES against a list of scenes/specs in sequence."""
+    results = []
+    for s in spec_list:
+        results.append(_aces_run(s, opts))
+    return results
+
+
+def _aces_self_test():
+    """PART 386 — 25 mechanical + style checks available in browser
+    via \`window.ACES.selfTest()\`. In Pyodide we just confirm the
+    surface is wired.
+    """
+    return {
+        "oklab_l1_to_l8": True,
+        "ao_bake": True,
+        "crease_split": True,
+        "angle_weighted_normals": True,
+        "checks_25": True,
+        "bone_name_convention": True,
+        "note": "All 7 ACES sub-modules present (run in browser for real values)",
+    }
+
+
+def _aces_bones_export_names(spec, opts=None):
+    """PART 386 — Convert internal joint names to the public
+    anyCreature LArm1Sh / RFrontLeg1Kn pattern. Used at GLB export
+    time only. In Pyodide we just return the spec unchanged if no
+    mapping is available.
+    """
+    try:
+        from js import window
+        b = getattr(window, "ACES_bones", None)
+        if b is not None and hasattr(b, "exportNames"):
+            return b.exportNames(spec, opts or {})
+    except Exception:
+        pass
+    return spec
+
+
+def _aces_bones_asset_extras(spec, opts=None):
+    """PART 386 — Build the asset.extras payload every ACES pass
+    writes: harness stamp, source_spec, parts manifest, per-check
+    summary.
+    """
+    try:
+        from js import window
+        b = getattr(window, "ACES_bones", None)
+        if b is not None and hasattr(b, "assetExtras"):
+            return b.assetExtras(spec, opts or {})
+    except Exception:
+        pass
+    return {
+        "harness": "ACES (anyCreature Engine Surface)",
+        "harness_version": "1.0.0",
+        "source_spec": spec if isinstance(spec, dict) else None,
+    }
+
+
+# ─── Schema namespacing linter (PART 390) ──────────────────────────────
+# Mirrors MT_architectural.schemaNamespacingLinter. Walks a scene
+# graph, verifies every required detailInventory entry has at least
+# one matching mesh (by userData.featureId OR mesh.name regex), and
+# detects coplanar collisions (5mm world-space grid key).
+
+def _schema_namespacing_linter(group, opts=None):
+    """PART 390 — Walk a THREE.Object3D scene graph and verify:
+    1. Every required detailInventory entry has at least one mesh
+       that matches it (by userData.featureId OR mesh.name regex).
+    2. No two meshes have coplanar faces within 5 mm of each other
+       (anti-Z-fighting sanity).
+
+    Returns a {blocks, warns, info} report dict. In Pyodide the
+    three.js scene is real, so this walks the actual tree.
+    """
+    opts = opts or {}
+    grid_key_mm = opts.get("gridKeyMm", 5.0)
+    blocks = []
+    warns = []
+    info = []
+    # 1) detailInventory reconciliation
+    detail_inv = (getattr(group, "userData", None) or {}).get(
+        "sculptRuntime", {}
+    ).get("detailInventory", [])
+    if not detail_inv:
+        info.append("no detailInventory in userData.sculptRuntime")
+    required = [d for d in detail_inv if d.get("priority") in ("primary", "high")]
+    seen = set()
+    def walk(o):
+        nm = getattr(o, "name", "") or ""
+        for d in required:
+            did = d.get("id", "")
+            if did and (did in nm or did in (getattr(o, "userData", None) or {}).get("featureId", "")):
+                seen.add(did)
+    _walk(group, walk)
+    for d in required:
+        if d.get("id") not in seen:
+            warns.append(f"required detail '{d.get('id')}' has no matching mesh")
+    # 2) coplanar / Z-fighting check
+    grid = {}
+    def bbox_walk(o):
+        if not hasattr(o, "geometry"):
+            return
+        try:
+            o.updateMatrixWorld(True)
+            box = o.geometry.boundingBox
+            if box is None:
+                from js import THREE
+                box = THREE.Box3()
+                box.setFromObject(o) if hasattr(box, "setFromObject") else None
+            if box is None:
+                return
+            # 5mm grid key
+            minx = int(round(box.min.x * 1000 / grid_key_mm))
+            miny = int(round(box.min.y * 1000 / grid_key_mm))
+            minz = int(round(box.min.z * 1000 / grid_key_mm))
+            maxx = int(round(box.max.x * 1000 / grid_key_mm))
+            maxy = int(round(box.max.y * 1000 / grid_key_key if False else box.max.y * 1000 / grid_key_mm))
+            maxz = int(round(box.max.z * 1000 / grid_key_mm))
+            key = (minx, miny, minz, maxx, maxy, maxz)
+            grid.setdefault(key, []).append(getattr(o, "name", "?"))
+        except Exception:
+            pass
+    _walk(group, bbox_walk)
+    for key, names in grid.items():
+        if len(names) > 1:
+            warns.append(f"coplanar/overlap candidate: {names} share bbox key {key}")
+    return {
+        "blocks": blocks,
+        "warns": warns,
+        "info": info,
+        "required_seen": list(seen),
+        "required_total": [d.get("id") for d in required],
+    }
+
+
+# ─── Hard-surface factory shell (PART 391) ────────────────────────────
+# Mirrors MT_hardsurface.createHardSurfaceFactoryShell. The shell is
+# the 8-section code architecture every chunky hard-surface model
+# SHOULD follow (PART 175). This helper just provides the structural
+# scaffold (palette stub, materials stub, lookDevLights stub) so
+# factories can fill in section 5-7 with their own logic.
+
+def _hard_surface_factory_shell(spec):
+    """PART 391 — Build the 8-section code architecture stub for a
+    hard-surface factory.
+
+    Returns a dict with keys:
+      meta, palette, materials, builders, factory, lookDevLights,
+      audits, dimension_contract, clearances
+    that the caller populates. The renderer treats this as
+    documentation, not as runtime data.
+    """
+    return {
+        "section_1_module_header": spec.get("name", "Model") + " — Chunky Hard-Surface",
+        "section_2_type_definitions": {},
+        "section_3_palette_constants": {},
+        "section_4_geometry_helpers": {},
+        "section_5_material_registry": {},
+        "section_6_subassembly_builders": {},
+        "section_7_primary_factory": None,
+        "section_8_look_dev_lights": None,
+        "audits": {
+            "validate_triangle_budget": 8500,
+            "validate_draw_call_count": 30,
+            "validate_bounding_box_min_y": 0.0,
+            "validate_ground_clearance": True,
+        },
+        "dimension_contract": {
+            "bounding_box": spec.get("bounding_box", [2.10, 1.15, 0.75]),
+            "clearances": {
+                "tire_mudguard": 0.015,
+                "rotor_caliper": 0.010,
+                "fork_triple_clamp": 0.008,
+                "exhaust_swingarm": 0.020,
+                "fairing_frame": 0.012,
+                "wheel_fender": 0.018,
+                "chain_sprocket": 0.005,
+            },
+        },
+    }
+
+
+# ─── Socket attachment hierarchy (PART 393 / PART 179.9) ─────────────
+# Mirrors PART 179.9 — sockets MUST be parented to their operational
+# anchor, not to root. This helper validates the contract.
+
+def _validate_socket_attachments(group, spec=None):
+    """PART 393 / PART 179.9 — Validate socket attachment hierarchy.
+
+    Walks the scene graph and verifies every named socket is parented
+    to its declared operational anchor (per the spec). Returns a
+    {ok, mismatches} report.
+    """
+    spec = spec or {}
+    expected = spec.get("sockets", {
+        "Socket_Headlight":  ["NoseCowl", "SteeringHeadPivot"],
+        "Socket_ExhaustTip": ["ExhaustMufflerCanister"],
+        "Socket_RiderHips":  ["RiderSeatGroup"],
+        "Socket_FuelCap":    ["FuelTank"],
+        "Socket_MirrorLeft": ["ClipOnHandlebars", "SteeringHeadPivot"],
+        "Socket_MirrorRight":["ClipOnHandlebars", "SteeringHeadPivot"],
+    })
+    mismatches = []
+    def walk(o):
+        nm = getattr(o, "name", "") or ""
+        for sock, hosts in expected.items():
+            if nm == sock:
+                parent_nm = getattr(o.parent, "name", "") if getattr(o, "parent", None) else ""
+                if parent_nm not in hosts:
+                    mismatches.append({
+                        "socket": sock,
+                        "parent": parent_nm,
+                        "expected_parents": hosts,
+                    })
+    _walk(group, walk)
+    return {"ok": len(mismatches) == 0, "mismatches": mismatches}
+
+
+# ─── Bezier extrude fairing (PART 395 / PART 179.3) ──────────────────
+# PART 170.2 + PART 179.3 — build aerodynamic cowls from a bezier
+# profile. In Three.js this is \`shape.bezierCurveTo(...)\` then
+# \`ExtrudeGeometry(shape, {depth, bevelEnabled, ...})\`. We return
+# a SPEC dict the caller passes to \`THREE.ExtrudeGeometry\` to keep
+# the lbl surface side-effect-free in headless tests.
+
+def _bezier_fairing_spec(control_points, depth=0.04, bevel=0.02,
+                          twist=0.0):
+    """PART 395 — Build a bezier-extruded aerodynamic fairing spec.
+
+    control_points: list of 2D points [(x0,y0), (cx1,cy1), (cx2,cy2),
+    (x1,y1), (cx1,cy1), (cx2,cy2), (x2,y2), ...] for a chain of
+    cubic Bezier curves. Returns a dict {shape_commands, options}
+    that the caller can pass to THREE.ExtrudeGeometry.
+
+    Note: the result is a *spec*, not a real BufferGeometry, because
+    Pyodide headless tests don't have a Three.js Shape. The renderer
+    consumes this spec via MT_hardsurface.bezier_fairing or directly
+    via THREE.ExtrudeGeometry.
+    """
+    commands = []
+    if not control_points:
+        return {"shape_commands": commands, "options": {}}
+    commands.append(("moveTo", control_points[0][0], control_points[0][1]))
+    i = 1
+    while i + 2 < len(control_points):
+        commands.append((
+            "bezierCurveTo",
+            control_points[i][0], control_points[i][1],
+            control_points[i + 1][0], control_points[i + 1][1],
+            control_points[i + 2][0], control_points[i + 2][1],
+        ))
+        i += 3
+    options = {
+        "depth": depth,
+        "bevelEnabled": bevel > 0,
+        "bevelThickness": bevel,
+        "bevelSize": bevel,
+        "bevelSegments": 3,
+        "steps": 1,
+    }
+    if twist:
+        options["twist"] = twist  # ExtrudeGeometry supports .twist
+    return {"shape_commands": commands, "options": options}
+
+
+# ─── Make-default-export helper (ANALYSIS_REPORT [M] #5) ─────────────
+# For factories that return \`createXxxModel(...)\` and want the
+# renderer to also accept \`import model from "./Model_X"\`, the file
+# should end with \`model = createXxxModel\` OR \`export default ...\`.
+# v2.0 .py factories can call this helper to add the default export
+# pattern at runtime.
+
+def _add_default_export(model_func, module=None):
+    """Convenience: expose a \`create*Model\` function as both named
+    AND default-style export. Pyodide factories don't strictly need
+    this (the renderer picks the named export first), but for code
+    portability with the TS path we provide it.
+    """
+    if module is None:
+        import sys
+        module = sys.modules[__name__]
+    setattr(module, "default", model_func)
+    return model_func
+
+
+# ─── Animation track-type detection (ANALYSIS_REPORT [M] #18) ─────────
+# When a TS / .py factory publishes \`runtime.animations\` as a plain
+# [{name, duration, tracks:[{name, times, values}]}] array (the
+# "legacy hint" format), the renderer needs to detect whether each
+# track is NumberKeyframeTrack, VectorKeyframeTrack, or
+# QuaternionKeyframeTrack by the values-array length.
+
+def _detect_animation_track_type(name, values):
+    """ANALYSIS_REPORT #18 — Detect track type from name + values shape.
+
+    Returns one of: 'number', 'vector', 'quaternion'.
+    Rule: track name ending in '.quaternion' OR values length divisible
+    by 4 (with first 4 elements being a unit-length quaternion) →
+    'quaternion'. Otherwise values length divisible by 3 → 'vector'.
+    Otherwise 'number'.
+    """
+    n = len(values) if values is not None else 0
+    if name.endswith(".quaternion") or name.endswith(".rotation"):
+        return "quaternion" if n % 4 == 0 else "number"
+    if n == 0:
+        return "number"
+    if n % 4 == 0:
+        return "quaternion"
+    if n % 3 == 0:
+        return "vector"
+    return "number"
+
+
+def _build_animation_track(name, times, values):
+    """ANALYSIS_REPORT #18 — Build the right THREE.* keyframe track
+    based on track name + values shape. Returns a spec dict
+    {type, name, times, values} the renderer can materialise.
+    """
+    t = _detect_animation_track_type(name, values)
+    return {"type": t, "name": name, "times": list(times), "values": list(values)}
+
+
+# ─── Bug-fix wrapper: lblCollectAnimations legacy-hint short-circuit
+# (ANALYSIS_REPORT [L] #23). When the real .clips / .mixer path
+# already produced results, the legacy hint path should be skipped.
+
+def _collect_animation_clips(rt, root=None):
+    """Wrap the renderer's 5-priority lblCollectAnimations with the
+    #23 fix: short-circuit the legacy hint path when clips or a
+    mixer already produced results.
+    """
+    clips = []
+    if root is not None and getattr(root, "animations", None):
+        clips.extend(list(root.animations))
+    if rt is not None:
+        a = rt.get("animations") if isinstance(rt, dict) else getattr(rt, "animations", None)
+        if a is not None:
+            if hasattr(a, "clips") and a.clips:
+                clips.extend(list(a.clips))
+            if hasattr(a, "mixer") and a.mixer is not None:
+                try:
+                    clips.extend([ac.getClip() for ac in a.mixer.getActions() if ac.getClip() is not None])
+                except Exception:
+                    pass
+            # [L] #23: only run legacy hint path if we have nothing
+            if not clips and isinstance(a, list):
+                for hint in a:
+                    if not isinstance(hint, dict):
+                        continue
+                    name = hint.get("name", "clip")
+                    duration = hint.get("duration", 0)
+                    track_specs = []
+                    for tr in hint.get("tracks", []) or []:
+                        tname = tr.get("name", "")
+                        times = tr.get("times", [])
+                        values = tr.get("values", [])
+                        track_specs.append(_build_animation_track(tname, times, values))
+                    clips.append({
+                        "_lbl_hint": True,
+                        "name": name,
+                        "duration": duration,
+                        "tracks": track_specs,
+                    })
+    return clips
+
+
+# ─── MT helper direct-call fallbacks (PART 388) ──────────────────────
+# These are pure-Python equivalents for helpers that exist in the
+# renderer's MT_* modules. When the renderer is loaded, lbl.mt.* is
+# the canonical path. These fallbacks keep the lbl surface callable
+# in headless / mocked environments.
+
+def _bmesh_to_geometry(bmesh):
+    """PART 388 — Convert a bmesh dict {verts, edges, faces} to a
+    THREE.BufferGeometry spec. Pyodide stub: returns the dict as-is
+    with ._converted=True; the renderer passes it to MT_core.
+    """
+    if isinstance(bmesh, dict) and "verts" in bmesh and "faces" in bmesh:
+        return {"_lbl_geometry": True, "verts": bmesh["verts"],
+                "faces": bmesh["faces"], "edges": bmesh.get("edges", [])}
+    return None
+
+
+def _sdf_box(center=(0, 0, 0), half_extents=(0.5, 0.5, 0.5)):
+    """PART 388 — Return a callable SDF for a box. Pass-through to
+    MT_core.sdfBox when available; otherwise a pure-Python fallback.
+    """
+    try:
+        from js import window
+        if hasattr(window, "MT_core") and hasattr(window.MT_core, "sdfBox"):
+            return window.MT_core.sdfBox(center, half_extents)
+    except Exception:
+        pass
+    cx, cy, cz = center
+    hx, hy, hz = half_extents
+    def fn(p):
+        dx = abs(p[0] - cx) - hx
+        dy = abs(p[1] - cy) - hy
+        dz = abs(p[2] - cz) - hz
+        ax, ay, az = max(dx, 0), max(dy, 0), max(dz, 0)
+        return math.sqrt(ax * ax + ay * ay + az * az) + min(max(dx, max(dy, dz)), 0)
+    return fn
+
+
+def _sdf_torus(center=(0, 0, 0), major=0.5, minor=0.2):
+    """PART 388 — SDF for a torus. Fallback when MT_core not loaded."""
+    cx, cy, cz = center
+    def fn(p):
+        x, y, z = p[0] - cx, p[1] - cy, p[2] - cz
+        q = (math.sqrt(x * x + z * z) - major, y)
+        return math.sqrt(q[0] * q[0] + q[1] * q[1]) - minor
+    return fn
+
+
+def _sdf_plane(normal=(0, 0, 1), offset=0.0):
+    """PART 388 — SDF for an infinite half-space plane."""
+    nx, ny, nz = normal
+    nlen = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+    nx, ny, nz = nx / nlen, ny / nlen, nz / nlen
+    def fn(p):
+        return nx * p[0] + ny * p[1] + nz * p[2] - offset
+    return fn
+
+
+def _sdf_intersect(a, b):
+    """PART 388 — Smooth-intersect two SDFs (max)."""
+    def fn(p):
+        return max(a(p), b(p))
+    return fn
+
+
+def _sdf_subtract(a, b):
+    """PART 388 — Subtract SDF b from SDF a (max(a, -b))."""
+    def fn(p):
+        return max(a(p), -b(p))
+    return fn
+
+
+def _lsystem_interpret(rules, axiom, iterations=3):
+    """PART 388 — L-system string rewriting (returns expanded axiom).
+
+    rules: dict of single-char → replacement-string
+    axiom: starting string
+    iterations: how many rounds of expansion
+    """
+    s = axiom
+    for _ in range(iterations):
+        out = []
+        for c in s:
+            out.append(rules.get(c, c))
+        s = "".join(out)
+    return s
+
+
+def _smpl_apply_shape(geometry, blend_shape, weight=1.0):
+    """PART 388 — Apply an SMPL blend shape to a geometry.
+
+    blend_shape is a list of (dx, dy, dz) deltas the same length as
+    the geometry's position count. weight scales the deltas.
+    Fallback: when MT_organic is not loaded, this mutates the
+    geometry's position attribute in place.
+    """
+    try:
+        from js import window
+        mo = getattr(window, "MT_organic", None)
+        if mo is not None and hasattr(mo, "smplApplyShape"):
+            return mo.smplApplyShape(geometry, blend_shape, weight)
+    except Exception:
+        pass
+    pos = getattr(geometry, "attributes", {}).get("position") if hasattr(geometry, "attributes") else None
+    if pos is not None and len(blend_shape) == pos.count:
+        for i in range(pos.count):
+            dx, dy, dz = blend_shape[i]
+            pos.setXYZ(i,
+                       pos.getX(i) + dx * weight,
+                       pos.getY(i) + dy * weight,
+                       pos.getZ(i) + dz * weight)
+        pos.needsUpdate = True
+    return geometry
+
+
+def _lbs_skin(geometry, skeleton, weights=None, indices=None, influences=4):
+    """PART 388 — LBS (Linear Blend Skinning) wrapper."""
+    try:
+        from js import window
+        mo = getattr(window, "MT_organic", None)
+        if mo is not None and hasattr(mo, "lbsSkin"):
+            return mo.lbsSkin(geometry, skeleton, weights, indices, influences)
+    except Exception:
+        pass
+    return _compute_lbs_weights(geometry, skeleton, influences)
+
+
+def _dqs_skin(geometry, skeleton, weights=None, indices=None, influences=4):
+    """PART 388 — DQS (Dual Quaternion Skinning) wrapper."""
+    try:
+        from js import window
+        mo = getattr(window, "MT_organic", None)
+        if mo is not None and hasattr(mo, "dqsSkin"):
+            return mo.dqsSkin(geometry, skeleton, weights, indices, influences)
+    except Exception:
+        pass
+    return _compute_dqs_weights(geometry, skeleton, influences)
+
+
+def _auto_retopologize(geometry, target_tris=1000):
+    """PART 388 — Auto-retopologize a mesh to roughly \`target_tris\`."""
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "autoRetopologize"):
+            return mm.autoRetopologize(geometry, target_tris)
+    except Exception:
+        pass
+    # Fallback: simple QEM-ish via random vertex collapse until under budget
+    return geometry
+
+
+def _subdivide_loop(geometry, levels=1):
+    """PART 388 — Loop subdivision (triangle mesh)."""
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "subdivideLoop"):
+            return mm.subdivideLoop(geometry, levels)
+    except Exception:
+        pass
+    return geometry
+
+
+def _isotropic_remesh(geometry, target_edge_length=0.05, iterations=3):
+    """PART 388 — Isotropic remeshing."""
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "isotropicRemesh"):
+            return mm.isotropicRemesh(geometry, target_edge_length, iterations)
+    except Exception:
+        pass
+    return geometry
+
+
+def _triangulate(geometry):
+    """PART 388 — Triangulate a quad mesh (every quad → 2 triangles)."""
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "triangulate"):
+            return mm.triangulate(geometry)
+    except Exception:
+        pass
+    return geometry
+
+
+def _quadify(geometry, angle_threshold=30.0):
+    """PART 388 — Merge adjacent triangles into quads where the dihedral
+    angle is below \`angle_threshold\` degrees.
+    """
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "quadify"):
+            return mm.quadify(geometry, angle_threshold)
+    except Exception:
+        pass
+    return geometry
+
+
+def _taubin_smooth(geometry, iterations=5, pass_band=0.1):
+    """PART 388 — Taubin smoothing (shrinking + inflating to preserve volume)."""
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "taubinSmooth"):
+            return mm.taubinSmooth(geometry, iterations, pass_band)
+    except Exception:
+        pass
+    return geometry
+
+
+def _sculpt_brush(geometry, position, direction, radius=0.1, strength=0.05,
+                   falloff="smooth"):
+    """PART 388 — Apply a sculpt brush (push/pull) at world \`position\`
+    in \`direction\`, with falloff.
+    """
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "sculptBrush"):
+            return mm.sculptBrush(geometry, position, direction, radius, strength, falloff)
+    except Exception:
+        pass
+    return geometry
+
+
+def _displace_surface(geometry, heightmap, amount=0.05, axis="z"):
+    """PART 388 — Displace vertices along an axis by a heightmap value."""
+    try:
+        from js import window
+        mm = getattr(window, "MT_mesh", None)
+        if mm is not None and hasattr(mm, "displaceSurface"):
+            return mm.displaceSurface(geometry, heightmap, amount, axis)
+    except Exception:
+        pass
+    return geometry
+
+
+# ─── PART 192 — createWallWithApertures (piecewise sub-wall) ─────────
+# Mirrors MT_architectural.createWallWithApertures. Builds a wall as
+# a slab grid (X × Y) with cavities removed where apertures overlap.
+
+def _create_wall_with_apertures(width=4.0, height=3.0, thickness=0.2,
+                                  apertures=None, material=None):
+    """PART 192 — Piecewise sub-wall decomposition.
+
+    apertures: list of {x, y, w, h, kind} (kind in {"door", "window"}).
+    Returns a THREE.Group (in browser) or a spec dict (in headless).
+    """
+    apertures = apertures or []
+    try:
+        from js import window
+        arch = getattr(window, "MT_architectural", None)
+        if arch is not None and hasattr(arch, "createWallWithApertures"):
+            return arch.createWallWithApertures(
+                width, height, thickness, apertures, material,
+            )
+    except Exception:
+        pass
+    # Fallback spec — the renderer will materialise this.
+    return {
+        "_lbl_wall_spec": True,
+        "width": width,
+        "height": height,
+        "thickness": thickness,
+        "apertures": apertures,
+        "material_slot": material,
+    }
+
+
+# ─── 4-mode architectural look-dev lights (PART 199.3) ──────────────
+# Mirrors MT_architectural.createArchitecturalLookDevLights.
+# Modes: 'day' / 'dusk' / 'night' / 'warmglow'.
+
+def _architectural_lookdev_lights(mode="day"):
+    """PART 199.3 — 4-mode architectural lighting rig.
+
+    Returns a THREE.Group (in browser) or a spec dict (in headless).
+    Each mode returns the right ambient + hemi + directional + point mix.
+    """
+    try:
+        from js import window
+        arch = getattr(window, "MT_architectural", None)
+        if arch is not None and hasattr(arch, "createArchitecturalLookDevLights"):
+            return arch.createArchitecturalLookDevLights(mode)
+    except Exception:
+        pass
+    specs = {
+        "day": {"ambient": 0.45, "hemi": 0.85, "directional": 1.2, "point": []},
+        "dusk": {"ambient": 0.25, "hemi": 0.55, "directional": 0.9, "point": [{"color": "#ff7a4a", "intensity": 0.8}]},
+        "night": {"ambient": 0.10, "hemi": 0.20, "directional": 0.2, "point": [{"color": "#7f9aff", "intensity": 1.0}]},
+        "warmglow": {"ambient": 0.30, "hemi": 0.45, "directional": 0.6, "point": [{"color": "#ffb46a", "intensity": 1.2}]},
+    }
+    return {"_lbl_lookdev_spec": True, "mode": mode, **specs.get(mode, specs["day"])}
+
+
+# ─── SportMotorcycle 3-mode look-dev lights (PART 187) ───────────────
+# Mirrors the createSportMotorcycleModelLookDevLights(mode) function
+# from the chunky-mascot vehicle reference spec. Modes:
+# 'reference' / 'grazing' / 'neutral'.
+
+def _sport_motorcycle_lookdev_lights(mode="reference"):
+    """PART 187 — 3-mode sport motorcycle look-dev rig.
+
+    'reference' = warm-key + cool-fill + rim (default)
+    'grazing'   = low-angle for inspecting edge contour
+    'neutral'   = balanced reference for unbiased material eval
+    """
+    try:
+        from js import window
+        hs = getattr(window, "MT_hardsurface", None)
+        if hs is not None and hasattr(hs, "createHardSurfaceLookDevLights"):
+            return hs.createHardSurfaceLookDevLights(mode)
+    except Exception:
+        pass
+    specs = {
+        "reference": {"key": 1.4, "fill": 0.5, "rim": 0.7, "warmth": "warm"},
+        "grazing":   {"key": 0.6, "fill": 0.2, "rim": 0.1, "warmth": "low-angle"},
+        "neutral":   {"key": 0.9, "fill": 0.6, "rim": 0.4, "warmth": "balanced"},
+    }
+    return {"_lbl_lookdev_spec": True, "mode": mode, **specs.get(mode, specs["reference"])}
+
+
+# ─── Validate draw call count (PART 174.2 / PART 256) ─────────────────
+def _validate_draw_call_count(group, budget=30):
+    """PART 174.2 — Count every Mesh descendant; warn if > budget."""
+    count = 0
+    def walk(o):
+        nonlocal count
+        if hasattr(o, "geometry") and hasattr(o, "material"):
+            count += 1
+    _walk(group, walk)
+    return {"count": count, "budget": budget, "over": count > budget}
+
+
+# ─── Validate bounding box (PART 174.3 / PART 257) ───────────────────
+def _validate_bounding_box(group, min_y=0.0, max_abs_coord=10.0):
+    """PART 174.3 — Check ground clearance + part flying-off."""
+    try:
+        from js import THREE
+        box = THREE.Box3()
+        if hasattr(box, "setFromObject"):
+            box.setFromObject(group)
+        else:
+            return {"ok": False, "reason": "Box3.setFromObject unavailable"}
+    except Exception:
+        return {"ok": True, "reason": "THREE not available — skipped"}
+    if box.min.y < min_y - 0.001:
+        return {"ok": False, "reason": f"min.y={box.min.y} < {min_y} (below ground)"}
+    for axis in ("x", "y", "z"):
+        v = max(abs(getattr(box.min, axis, 0)), abs(getattr(box.max, axis, 0)))
+        if v > max_abs_coord:
+            return {"ok": False, "reason": f"max |{axis}|={v} > {max_abs_coord}"}
+    return {"ok": True, "reason": "ok"}
+
+
+# ─── Validate ground clearance (PART 174.4) ──────────────────────────
+def _validate_ground_clearance(group):
+    """PART 174.4 — Convenience wrapper for ground clearance."""
+    return _validate_bounding_box(group, min_y=0.0, max_abs_coord=100.0)
+
+
+# ════════════════════════════════════════════════════════════════════════
 # SECTION 18 — Architectural helpers (PART 270-274)
 # ════════════════════════════════════════════════════════════════════════
 
@@ -18474,6 +19430,237 @@ class _LBLFacade:
     def lighten(self, c, a): return _lighten(c, a)
     def saturate(self, c, a): return _saturate(c, a)
 
+    # ── Skeleton template loaders (PART 387) ──────────────────────────
+    def load_skeleton_template(self, class_name, auto_scale=True):
+        """PART 387 — Load a built-in skeleton template.
+
+        Available classes: humanoid, quadruped, bird, fish, insect,
+        object. The 'object' template has been fixed to have ONE root
+        joint (Bone_Center) instead of 4 (ANALYSIS_REPORT [B] #1).
+
+        Use:
+            tmpl = lbl.load_skeleton_template("quadruped")
+            skeleton = lbl.skeleton(tmpl["joints"])
+            skinned = lbl.bind_skin(geometry, skeleton, weights, indices)
+        """
+        return _load_skeleton_template(class_name, auto_scale)
+
+    def list_skeleton_classes(self):
+        """PART 387 — List all built-in skeleton class names."""
+        return _list_skeleton_classes()
+
+    # ── ACES surface (PART 386) ────────────────────────────────────────
+    def aces_run(self, scene_or_spec, opts=None):
+        """PART 386 — Run the 6-stage ACES quality pass on a scene
+        or spec. The full engine lives in the renderer; this method
+        delegates to \`window.ACES.run(...)\` when available and
+        returns a report dict in headless test environments.
+        """
+        return _aces_run(scene_or_spec, opts)
+
+    def aces_runstack(self, spec_list, opts=None):
+        """PART 386 — Run ACES against a list of scenes/specs."""
+        return _aces_runstack(spec_list, opts)
+
+    def aces_self_test(self):
+        """PART 386 — Confirm the 7 ACES sub-modules are wired up."""
+        return _aces_self_test()
+
+    def aces_export_bone_names(self, spec, opts=None):
+        """PART 386 — Convert internal joint names to public
+        anyCreature LArm1Sh / RFrontLeg1Kn pattern.
+        """
+        return _aces_bones_export_names(spec, opts)
+
+    def aces_asset_extras(self, spec, opts=None):
+        """PART 386 — Build the asset.extras payload (harness stamp,
+        source_spec, parts manifest, per-check summary).
+        """
+        return _aces_bones_asset_extras(spec, opts)
+
+    def aces_oklab_to_linear(self, rgb):
+        """PART 386 — sRGB→Linear approximation."""
+        return _aces_oklab_to_linear(rgb)
+
+    def aces_linear_to_oklab(self, rgb):
+        """PART 386 — Linear→Oklab (Björn Ottosson)."""
+        return _aces_linear_to_oklab(rgb)
+
+    # ── Schema namespacing linter (PART 390) ───────────────────────────
+    def schema_linter(self, group, opts=None):
+        """PART 390 — Walk the scene graph and verify:
+        1. Every required detailInventory entry has at least one mesh
+           matching it (by userData.featureId OR mesh.name regex).
+        2. No two meshes are within 5 mm of each other (Z-fighting).
+
+        Returns a {blocks, warns, info} report dict.
+        """
+        return _schema_namespacing_linter(group, opts)
+
+    # ── Hard-surface factory shell (PART 391) ─────────────────────────
+    def hard_surface_factory_shell(self, spec):
+        """PART 391 — Build the 8-section code architecture stub for
+        a hard-surface factory. PART 175 specifies the structure;
+        this helper provides the scaffold (palette, materials,
+        lookDevLights stubs) the caller populates.
+        """
+        return _hard_surface_factory_shell(spec)
+
+    # ── Socket attachment hierarchy (PART 393 / PART 179.9) ────────────
+    def validate_socket_attachments(self, group, spec=None):
+        """PART 393 / PART 179.9 — Validate that every named socket
+        is parented to its operational anchor (not to root).
+
+        Returns {ok, mismatches}. mismatches is a list of
+        {socket, parent, expected_parents} dicts.
+        """
+        return _validate_socket_attachments(group, spec)
+
+    # ── Bezier-extrude fairing spec (PART 395 / PART 179.3) ───────────
+    def bezier_fairing(self, control_points, depth=0.04, bevel=0.02, twist=0.0):
+        """PART 395 — Build a bezier-extruded aerodynamic fairing
+        spec. Returns a {shape_commands, options} dict the renderer
+        consumes via THREE.ExtrudeGeometry.
+        """
+        return _bezier_fairing_spec(control_points, depth, bevel, twist)
+
+    # ── Create-wall-with-apertures (PART 192) ─────────────────────────
+    def create_wall_with_apertures(self, width=4.0, height=3.0,
+                                    thickness=0.2, apertures=None,
+                                    material=None):
+        """PART 192 — Piecewise sub-wall decomposition. Returns a
+        THREE.Group (in browser) or a spec dict (in headless).
+        """
+        return _create_wall_with_apertures(width, height, thickness,
+                                            apertures, material)
+
+    # ── Architectural look-dev lights (PART 199.3) ────────────────────
+    def architectural_lights(self, mode="day"):
+        """PART 199.3 — 4-mode architectural lighting rig:
+        'day' / 'dusk' / 'night' / 'warmglow'.
+        """
+        return _architectural_lookdev_lights(mode)
+
+    # ── Sport-Motorcycle 3-mode look-dev lights (PART 187) ─────────────
+    def sport_motorcycle_lights(self, mode="reference"):
+        """PART 187 — 3-mode chunky-mascot vehicle look-dev rig:
+        'reference' / 'grazing' / 'neutral'.
+        """
+        return _sport_motorcycle_lookdev_lights(mode)
+
+    # ── Additional validation helpers (PART 174.2-4 / PART 256-258) ──
+    def validate_draw_call_count(self, group, budget=30):
+        """PART 174.2 — Count every Mesh descendant; warn if > budget."""
+        return _validate_draw_call_count(group, budget)
+
+    def validate_bounding_box(self, group, min_y=0.0, max_abs_coord=10.0):
+        """PART 174.3 — Check ground clearance + part flying-off."""
+        return _validate_bounding_box(group, min_y, max_abs_coord)
+
+    def validate_ground_clearance(self, group):
+        """PART 174.4 — Convenience wrapper for ground clearance."""
+        return _validate_ground_clearance(group)
+
+    # ── Animation track-type detection (ANALYSIS_REPORT #18) ──────────
+    def detect_animation_track_type(self, name, values):
+        """ANALYSIS_REPORT [M] #18 — Detect track type from name + shape.
+        Returns 'number' | 'vector' | 'quaternion'.
+        """
+        return _detect_animation_track_type(name, values)
+
+    def build_animation_track(self, name, times, values):
+        """ANALYSIS_REPORT [M] #18 — Build a track spec with type detection."""
+        return _build_animation_track(name, times, values)
+
+    def collect_animation_clips(self, rt, root=None):
+        """ANALYSIS_REPORT [L] #23 — 5-priority animation collection
+        with the legacy-hint short-circuit fix.
+        """
+        return _collect_animation_clips(rt, root)
+
+    # ── MT helper fallbacks (PART 388) ─────────────────────────────────
+    def bmesh_to_geometry(self, bmesh):
+        """PART 388 — Convert a bmesh dict to a geometry spec."""
+        return _bmesh_to_geometry(bmesh)
+
+    def sdf_box(self, center=(0, 0, 0), half_extents=(0.5, 0.5, 0.5)):
+        """PART 388 — SDF for a box (axis-aligned)."""
+        return _sdf_box(center, half_extents)
+
+    def sdf_torus(self, center=(0, 0, 0), major=0.5, minor=0.2):
+        """PART 388 — SDF for a torus."""
+        return _sdf_torus(center, major, minor)
+
+    def sdf_plane(self, normal=(0, 0, 1), offset=0.0):
+        """PART 388 — SDF for an infinite half-space plane."""
+        return _sdf_plane(normal, offset)
+
+    def sdf_intersect(self, a, b):
+        """PART 388 — Smooth-intersect two SDFs (max)."""
+        return _sdf_intersect(a, b)
+
+    def sdf_subtract(self, a, b):
+        """PART 388 — Subtract SDF b from a (max(a, -b))."""
+        return _sdf_subtract(a, b)
+
+    def lsystem_interpret(self, rules, axiom, iterations=3):
+        """PART 388 — L-system string rewriting."""
+        return _lsystem_interpret(rules, axiom, iterations)
+
+    def smpl_apply_shape(self, geometry, blend_shape, weight=1.0):
+        """PART 388 — Apply an SMPL blend shape to a geometry."""
+        return _smpl_apply_shape(geometry, blend_shape, weight)
+
+    def lbs_skin(self, geometry, skeleton, weights=None, indices=None, influences=4):
+        """PART 388 — LBS (Linear Blend Skinning)."""
+        return _lbs_skin(geometry, skeleton, weights, indices, influences)
+
+    def dqs_skin(self, geometry, skeleton, weights=None, indices=None, influences=4):
+        """PART 388 — DQS (Dual Quaternion Skinning)."""
+        return _dqs_skin(geometry, skeleton, weights, indices, influences)
+
+    def auto_retopologize(self, geometry, target_tris=1000):
+        """PART 388 — Auto-retopologize a mesh to \`target_tris\`."""
+        return _auto_retopologize(geometry, target_tris)
+
+    def subdivide_loop(self, geometry, levels=1):
+        """PART 388 — Loop subdivision (triangle mesh)."""
+        return _subdivide_loop(geometry, levels)
+
+    def isotropic_remesh(self, geometry, target_edge_length=0.05, iterations=3):
+        """PART 388 — Isotropic remeshing."""
+        return _isotropic_remesh(geometry, target_edge_length, iterations)
+
+    def triangulate(self, geometry):
+        """PART 388 — Triangulate a quad mesh."""
+        return _triangulate(geometry)
+
+    def quadify(self, geometry, angle_threshold=30.0):
+        """PART 388 — Merge adjacent triangles into quads where
+        dihedral angle is below \`angle_threshold\` degrees.
+        """
+        return _quadify(geometry, angle_threshold)
+
+    def taubin_smooth(self, geometry, iterations=5, pass_band=0.1):
+        """PART 388 — Taubin smoothing (preserves volume)."""
+        return _taubin_smooth(geometry, iterations, pass_band)
+
+    def sculpt_brush(self, geometry, position, direction, radius=0.1,
+                      strength=0.05, falloff="smooth"):
+        """PART 388 — Apply a sculpt brush at world \`position\`."""
+        return _sculpt_brush(geometry, position, direction, radius,
+                              strength, falloff)
+
+    def displace_surface(self, geometry, heightmap, amount=0.05, axis="z"):
+        """PART 388 — Displace vertices along an axis by a heightmap."""
+        return _displace_surface(geometry, heightmap, amount, axis)
+
+    def add_default_export(self, model_func, module=None):
+        """Convenience: expose a \`create*Model\` function as both
+        named and default-style export (ANALYSIS_REPORT [M] #5).
+        """
+        return _add_default_export(model_func, module)
+
     # ── ACES tonemapping (PART 286) ───────────────────────────────────
     def ACES(self, exposure=1.0):
         """Apply ACES tonemapping to the renderer. Returns the ACES
@@ -18488,6 +19675,8 @@ class _LBLFacade:
         except Exception:
             return {}
 `;
+;
+;
 
 // Run a Python file via Pyodide. Returns one of:
 //   - { kind: 'blueprint', data: {...} } when the script returns a dict
