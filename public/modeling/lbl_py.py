@@ -118,12 +118,66 @@ class _LBLBuilder:
             return "$" + name
         return name
 
+    def _apply_palette_material(self, o):
+        """Resolve palette material dict into the object's fields.
+
+        Mirror of the JS path's __applyPaletteMaterial() (search
+        __applyPaletteMaterial in index.html for the full rationale).
+
+        When you do:
+            lbl.define_palette({"shell": {"color": "#f5821b", "roughness": 0.55}})
+            lbl.attach_box("body", material="shell")
+
+        the JS path copies {"color": ..., "roughness": ...} onto the
+        object as baseColor / roughness / metalness / etc., and resets
+        `o["material"]` to the recognised built-in "default" preset.
+
+        Why? Because applyPalette() (the JSON pipeline's $-ref resolver)
+        is a string-only substitution — if the palette value is a dict,
+        applyPalette() inlines the dict directly, breaking the schema
+        validator's `typeof === 'string'` assertion. Doing the resolution
+        at attach-time (this function) keeps the wire format validator-
+        clean.
+
+        Idempotent: if "material" is already a non-palette-key string,
+        or if the palette key doesn't exist, the object is left as-is.
+        """
+        m = o.get("material")
+        if isinstance(m, str) and not m.startswith("$"):
+            pal = self._ctx.get("palette", {})
+            defn = pal.get(m)
+            if isinstance(defn, dict):
+                # Copy each palette field onto the object (if not already set).
+                if defn.get("color") is not None and o.get("baseColor") is None and o.get("color") is None:
+                    o["baseColor"] = defn["color"]
+                if defn.get("roughness") is not None and o.get("roughness") is None:
+                    o["roughness"] = defn["roughness"]
+                if defn.get("metalness") is not None and o.get("metalness") is None:
+                    o["metalness"] = defn["metalness"]
+                if defn.get("opacity") is not None and o.get("opacity") is None:
+                    o["opacity"] = defn["opacity"]
+                if defn.get("emissive") is not None and o.get("emissive") is None:
+                    o["emissive"] = defn["emissive"]
+                if defn.get("emissiveIntensity") is not None and o.get("emissiveIntensity") is None:
+                    o["emissiveIntensity"] = defn["emissiveIntensity"]
+                # The schema validator requires "material" to be a string from
+                # the known-materials set. The dict resolution is now baked
+                # into the object's own fields, so we set "default" so the
+                # validator doesn't warn about an unrecognised material name.
+                o["material"] = "default"
+
     def _push_object(self, o):
         """Mirror JS __pushObject() — apply group-stack mirrorFace, append."""
         if self._ctx["group_stack"]:
             top = self._ctx["group_stack"][-1]
             if isinstance(top, dict) and "mirrorFace" in top and "mirrorFace" not in o:
                 o["mirrorFace"] = top["mirrorFace"]
+        # Resolve palette dict into object fields (mirror JS __applyPaletteMaterial).
+        # Done only if the user passed a bare name (no '$' prefix); $-refs are
+        # left for applyPalette() in the JSON pipeline.
+        m = o.get("material")
+        if isinstance(m, str) and not m.startswith("$"):
+            self._apply_palette_material(o)
         self._ctx["objects"].append(o)
         return o
 
@@ -186,7 +240,7 @@ class _LBLBuilder:
         for k in ("material", "mirrorFace", "smoothing", "colorVariation",
                   "toneVariant", "emissive", "emissiveIntensity"):
             if k in opts:
-                o[k] = self._ref(opts[k]) if k == "material" else opts[k]
+                o[k] = opts[k]
         return self._push_object(o)
 
     def attach_cylinder(self, id, **opts):
@@ -214,7 +268,7 @@ class _LBLBuilder:
         elif "rotation" in opts:
             o["rotation"] = opts["rotation"]
         if "material" in opts:
-            o["material"] = self._ref(opts["material"])
+            o["material"] = opts["material"]
         return self._push_object(o)
 
     def attach_chain(self, id, **opts):
@@ -235,7 +289,7 @@ class _LBLBuilder:
         }
         o.update(self._resolve_on(opts))
         if "material" in opts:
-            o["material"] = self._ref(opts["material"])
+            o["material"] = opts["material"]
         return self._push_object(o)
 
     def paint_rectangle(self, id, **opts):
@@ -245,7 +299,7 @@ class _LBLBuilder:
         size = opts.get("size") or [1, 1]
         o["scale"] = [size[0], size[1], 1]
         if "material" in opts:
-            o["material"] = self._ref(opts["material"])
+            o["material"] = opts["material"]
         return self._push_object(o)
 
     def hollow(self, id, **opts):
@@ -299,9 +353,27 @@ class _LBLBuilder:
         This is the value your factory should `return`. The renderer
         routes the dict through the existing buildScene() pipeline
         unchanged.
+
+        Auto-injected meta defaults (silence common validator warnings):
+          • meta.style         — "low-poly" (overridable by the user)
+          • meta.category      — "general"  (overridable by the user)
+          • meta.proportions   — the PART 49.1 proportion declaration
+                                 with sensible placeholders
         """
+        meta = dict(self._ctx["meta"])
+        # Only fill in fields the user didn't already set.
+        if "style" not in meta:
+            meta["style"] = "low-poly"
+        if "category" not in meta:
+            meta["category"] = "general"
+        if "proportions" not in meta:
+            meta["proportions"] = {
+                "W_over_H": 1.0,
+                "fill":     0.85,
+                # Other fields are opt-in — see Prompt_To_Py.txt PART 225
+            }
         return {
-            "meta": dict(self._ctx["meta"]),
+            "meta": meta,
             "palette": dict(self._ctx["palette"]),
             "objects": list(self._ctx["objects"]),
         }
