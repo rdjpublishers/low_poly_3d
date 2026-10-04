@@ -13544,6 +13544,143 @@ function __resetBuilderCtx(){
   __builderCtx = { meta:{}, materials:{}, objects:[], groupStack:[] };
 }
 
+// v2.0.3 (PROBLEM 3 + 5 fix) — JS shim for the Python `lbl` helper.
+// When a .js blueprint references `lbl`, this object is injected as a
+// parameter to the eval scope. It mirrors the most common Python
+// facade methods (builder + VFX + animation + rigging) so non-Python
+// authors have the same authoring surface.
+//
+// This is a STATIC shim — methods that need the Python runtime (e.g.
+// ACES.run, MT.run) return a "use Python" stub or no-op gracefully.
+function __buildLblJsShim(){
+  const shim = {
+    // Builder API — delegates to the existing renderer functions.
+    name: (s) => name(s),
+    definePalette: (defs) => definePalette(defs),
+    createAnchor: (id, opts) => createAnchor(id, opts),
+    attachBox: (id, opts) => attachBox(id, opts),
+    attachCylinder: (id, opts) => attachCylinder(id, opts),
+    attachChain: (id, opts) => attachChain(id, opts),
+    paintRectangle: (id, opts) => paintRectangle(id, opts),
+    hollow: (id, opts) => hollow(id, opts),
+    group: (name_, opts, fn) => group(name_, opts, fn),
+    blueprint: () => blueprint(),
+    reset: () => { __resetBuilderCtx(); },
+    // ACES / VFX — soft stubs. The real implementation requires the
+    // ACES / MT / EffectComposer bundles which are bound to Pyodide. The
+    // JS shim returns a transparent no-op for the most common cases
+    // (outline, post-fx, decal) so JS blueprints can call them without
+    // crashing. The full surface is available via the .py path.
+    acesRun: (group, opts) => {
+      console.warn('[lbl-shim] acesRun() is a no-op in JS blueprints; use a .py factory for the full ACES pipeline.');
+      return { ok: false, error: 'Use a .py factory for ACES pipeline.' };
+    },
+    acesSelfTest: () => ({
+      ok: false,
+      modules: { oklab: false, normals: false, ao: false, shade: false,
+                checks: false, bones: false, engine: false },
+      error: 'ACES requires the Python / Pyodide path.',
+    }),
+    // VFX stubs (PART 420-430). Real implementations live in Pyodide.
+    outlinePass: (group, mode, thickness, color) => {
+      console.warn('[lbl-shim] outlinePass() is a no-op in JS blueprints; use a .py factory.');
+      return null;
+    },
+    postFx: (renderer, chain) => {
+      console.warn('[lbl-shim] postFx() is a no-op in JS blueprints; use a .py factory.');
+      return { type: 'post_fx', chain, passes: [] };
+    },
+    iblHelmet: (scene, mode, intensity) => {
+      console.warn('[lbl-shim] iblHelmet() is a no-op in JS blueprints; use a .py factory.');
+      return { type: 'ibl_helmet', mode, intensity };
+    },
+    decal: () => {
+      console.warn('[lbl-shim] decal() is a no-op in JS blueprints; use a .py factory.');
+      return { type: 'decal' };
+    },
+    shaderMaterial: () => {
+      console.warn('[lbl-shim] shaderMaterial() is a no-op in JS blueprints; use a .py factory.');
+      return { type: 'shader_material' };
+    },
+    particleSystem: (spec) => {
+      console.warn('[lbl-shim] particleSystem() is a no-op in JS blueprints; use a .py factory.');
+      return Object.assign({ type: 'particle_system' }, spec || {});
+    },
+    trail: () => {
+      console.warn('[lbl-shim] trail() is a no-op in JS blueprints; use a .py factory.');
+      return { type: 'trail' };
+    },
+    instancedGrass: (field, count) => {
+      console.warn('[lbl-shim] instancedGrass() is a no-op in JS blueprints; use a .py factory.');
+      return { type: 'instanced_grass', blade_count: count };
+    },
+    bvhRaycast: (meshes, raycaster) => {
+      // Use THREE native raycast as a JS-side fallback.
+      try{
+        const hits = [];
+        for(const m of meshes || []){
+          const r = m.raycast(raycaster);
+          if(r && r.length) hits.push(...r);
+        }
+        hits.sort((a, b) => a.distance - b.distance);
+        return hits;
+      }catch(_){ return []; }
+    },
+    spriteSheet: () => ({ type: 'sprite_sheet', tick: () => {} }),
+    lensFlare: () => ({ type: 'lens_flare' }),
+    // Rigging / animation stubs (PART 246, 247) — the JS path can build
+    // static geometry + materials but cannot author SkinnedMesh / clips
+    // without the Pyodide bridge. Author those in .py.
+    skeleton: (joints) => {
+      console.warn('[lbl-shim] skeleton() is a stub in JS blueprints; use a .py factory.');
+      return null;
+    },
+    bindSkin: () => {
+      console.warn('[lbl-shim] bindSkin() is a stub in JS blueprints; use a .py factory.');
+      return null;
+    },
+    skinnedMesh: () => {
+      console.warn('[lbl-shim] skinnedMesh() is a stub in JS blueprints; use a .py factory.');
+      return null;
+    },
+    // Geometry / material convenience
+    Box: (w, h, d, mat) => {
+      const g = new THREE.BoxGeometry(w, h, d);
+      return new THREE.Mesh(g, mat || new THREE.MeshStandardMaterial());
+    },
+    Sphere: (r, mat) => new THREE.Mesh(new THREE.SphereGeometry(r, 32, 16),
+                                       mat || new THREE.MeshStandardMaterial()),
+    Cylinder: (rt, rb, h, mat) => new THREE.Mesh(
+      new THREE.CylinderGeometry(rt, rb, h, 24),
+      mat || new THREE.MeshStandardMaterial()
+    ),
+    Cone: (r, h, mat) => new THREE.Mesh(
+      new THREE.ConeGeometry(r, h, 24),
+      mat || new THREE.MeshStandardMaterial()
+    ),
+    Torus: (r, t, mat) => new THREE.Mesh(
+      new THREE.TorusGeometry(r, t, 16, 48),
+      mat || new THREE.MeshStandardMaterial()
+    ),
+    Capsule: (r, h, mat) => new THREE.Mesh(
+      new THREE.CapsuleGeometry(r, h, 4, 16),
+      mat || new THREE.MeshStandardMaterial()
+    ),
+    Plane: (w, h, mat) => new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      mat || new THREE.MeshStandardMaterial()
+    ),
+    material: (opts) => new THREE.MeshStandardMaterial(opts || {}),
+    physical: (opts) => new THREE.MeshPhysicalMaterial(opts || {}),
+    Group: (n) => { const g = new THREE.Group(); if(n) g.name = n; return g; },
+  };
+  return shim;
+}
+// Build the shim once at module load.
+const __lblJsShim = (typeof __buildLblJsShim === 'function') ? __buildLblJsShim() : {};
+// Also expose on window for any code that wants to use it directly.
+try{ window.__lblJsShim = __lblJsShim; }catch(_){}
+
 function __splitIdAnchor(str){
   const dot = str.indexOf('.');
   if(dot===-1) return { id: str, anchor: null };
@@ -13752,8 +13889,17 @@ function runJsBlueprint(code){
   // Passing "name" as a plain parameter avoids that collision entirely —
   // a function parameter shadows the outer scope for reads inside that
   // function body regardless of what window.name happens to be.
+  //
+  // v2.0.3 (PROBLEM 3 fix) — also pass `lbl` so JS blueprints can use
+  // the same helper surface as .py factories. The `lbl` symbol is a
+  // JS shim (window.__lblJsShim) that mirrors the most common Python
+  // facade methods (lbl.attachBox, lbl.definePalette, lbl.outlinePass,
+  // lbl.particles, etc.) so non-Python users have the same authoring
+  // surface. If the shim hasn't been built yet (older renderer init),
+  // we fall back to a no-op object — `lbl is not defined` will still be
+  // thrown, but the error message is now clear about how to fix it.
   const builderParamNames=['name','definePalette','createAnchor','attachBox',
-    'attachCylinder','attachChain','paintRectangle','hollow','group'];
+    'attachCylinder','attachChain','paintRectangle','hollow','group','lbl'];
   let fn;
   try{
     fn = new Function(...builderParamNames, wrapped);
@@ -13765,9 +13911,16 @@ function runJsBlueprint(code){
   __resetBuilderCtx();
   let result;
   try{
+    const lblShim = (typeof window !== 'undefined' && window.__lblJsShim)
+      ? window.__lblJsShim
+      : (typeof __lblJsShim !== 'undefined' ? __lblJsShim : {});
     result = fn(name, definePalette, createAnchor, attachBox,
-      attachCylinder, attachChain, paintRectangle, hollow, group);
+      attachCylinder, attachChain, paintRectangle, hollow, group, lblShim);
   }catch(e){
+    // v2.0.3 — if the error is "lbl is not defined", give a clearer hint
+    if(/\blbl\s+is\s+not\s+defined\b/i.test(String(e && e.message || e))){
+      throw new Error('JS runtime error: `lbl` is referenced but the helper shim is not available. Restart the renderer or use the .py factory pipeline for full lbl.* surface. Underlying: ' + (e.message || e));
+    }
     throw new Error(`JS runtime error: ${e.message}`);
   }
   // v7.4 — builder-style scripts (attachBox/attachChain/createAnchor/...)
@@ -20730,6 +20883,21 @@ async function runPyBlueprint(text, filename){
   // Rebind THREE every call so a hot-reloaded import map or a different
   // three build is reflected without restarting Pyodide.
   py.globals.set('THREE', THREE);
+  // v2.0.3 (PROBLEM 1+2+4 fix) — also rebind `lbl` into the Python
+  // globals every call. `py.runPython(text)` runs in a *fresh* module
+  // namespace by default, so the `lbl` we registered via
+  // `sys.modules['lbl'] = lbl` and `builtins.lbl = ...` is not visible
+  // to user code. Setting it on py.globals makes it visible in every
+  // script we run from that namespace, regardless of how Pyodide
+  // resolves the filename. This also fixes the misleading "Could not
+  // load Pyodide from jsDelivr" error which was actually a KeyError
+  // on `lbl` in user code (not a network failure).
+  try{
+    const lblMod = py.runPython('sys.modules["lbl"]');
+    if(lblMod){
+      py.globals.set('lbl', lblMod);
+    }
+  }catch(_){}
   // Also re-mirror THREE's classes to window so user `from js import X`
   // statements pick up any addons that were loaded after the first
   // .py file (or a hot-reloaded import map). getPyodide() does the
@@ -20752,11 +20920,29 @@ async function runPyBlueprint(text, filename){
   // Wrap the user's source in a controlled namespace. We run it once
   // at module scope so `def create_model(...)` becomes importable.
   // Then we call it with `options or None` and look at what came back.
+  // v2.0.3 (PROBLEM 1 fix) — pass `globals: py.globals` so the user
+  // script runs in the SAME namespace where `lbl` is registered.
+  // Without this, `py.runPython(text)` would create a fresh module
+  // scope and `lbl` (registered as `sys.modules['lbl']` and as a
+  // builtins attribute) would not be visible. The default empty
+  // filename is also fixed here to avoid the `File "", line 3` traceback
+  // fragment that made the error hard to read.
   let resultProxy;
   try {
-    py.runPython(text, { filename: filename || '<python blueprint>' });
+    py.runPython(text, {
+      filename: filename || '<python blueprint>',
+      globals: py.globals,
+    });
   }catch(e){
-    throw new Error(`Python syntax/runtime error: ${e.message || e}`);
+    // v2.0.3 (PROBLEM 4 fix) — distinguish "Pyodide failed to load"
+    // (network) from "user code raised KeyError: 'lbl'" (which used
+    // to be mis-attributed as a Pyodide loader failure). The check
+    // looks at the error type / message and wraps it accordingly.
+    const msg = (e && e.message) || String(e);
+    if(/loadPyodide|Could not load Pyodide|NetworkError|Failed to fetch/i.test(msg)){
+      throw new Error(`Pyodide network load failed: ${msg}. Check your internet / CDN access.`);
+    }
+    throw new Error(`Python syntax/runtime error: ${msg}`);
   }
 
   // Find the factory: any callable whose name matches /^create\\w+(Model)?$/
