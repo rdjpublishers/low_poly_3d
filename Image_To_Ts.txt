@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.36 / v8.27 — IMAGE-TO-TS AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.38 / v8.29 — IMAGE-TO-TS AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 100-143 (v1.29) -- 44-TECHNIQUE MODELING BUNDLE (RENDERER CAPABILITY, OPT-IN) added to public/modeling/ with 7 modules and 44 helpers on window.MT; spec annex at public/modeling/MODELING_TECHNIQUES_v143.md and worked examples at public/modeling/EXAMPLES_MT_v143.md; verified against the renderer source on the same file again on the v1.29 pass (2026-09-14).
   PART 145-152 (v1.30) -- PERFECT-SHAPE MODELING PIPELINE (additive AI-factory guidance) added to all 6 spec docs; layers on top of PART 100-143 + PART 74 + PART 34 to turn "place a bunch of primitives" into "build a real shape" via the 8-step pipeline (analyze / skeleton-first / cross-section profiles / loft / position accessories / uniform bevel / rig+validate / animate); see the PART 145-152 sections at the END of each spec doc and CHANGES_v130.md.
@@ -8,6 +8,8 @@ For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   PART 179 (v1.33 / v8.24) -- ARTIST-FIRST GEOMETRY FLOW & FORM-PRESERVATION PATCH layered additively on top of PART 167-178 in Prompt_To_Ts.txt; fixes the "Before vs. After" visual regression documented in SYSTEM_UPGRADE_SPECIFICATION.txt. The Hierarchy of Fidelity (visual silhouette > compound contour > PBR tactile material > mechanical skeleton > code minification) is the OVERRIDING directive of PART 179. Image_To_Ts.txt REFERENCES PART 179 from Prompt_To_Ts.txt the same way it references PART 167-178 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v133.md.
   PART 180-189 (v1.34 / v8.25) -- CHUNKY 3D SPORT MOTORCYCLE REFERENCE SPECIFICATION added canonically to Prompt_To_Ts.txt (the missing reference-specification layer for the PART 177 worked example); codifies the user-supplied `SportMotorcycle_3D_Techniques_Specification.txt` (10-section authoritative spec at repo root) as 10 numbered PARTs (PART 180 spec layout / PART 181 core technologies stack / PART 182 authoritative geometry catalog / PART 183 reference materials + 6-band palette / PART 184 the 8 builder functions / PART 185 bike-forward coordinate system / PART 186 the 9-key sculptRuntime contract + 5 Actions API + tick + 9 options / PART 187 look-dev lighting factory with 3 modes / PART 188 ~8 500 tris + 8 architectural patterns / PART 189 style + LBL version stamp pair). Image_To_Ts.txt REFERENCES PART 180-189 from Prompt_To_Ts.txt the same way it references PART 167-178 / PART 179 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v134.md.
   PART 190-199 (v1.35 / v8.26) -- ARCHITECTURAL MODELING PIPELINE added canonically to Prompt_To_Ts.txt (the missing methodology layer for buildings / interiors / procedural architecture / landscape). Distilled from `SYSTEM_RECOMMENDATIONS_AND_MODEL_ANALYSIS.txt` (post-mortem on the Modern Dual-Volume Villa build, 2026-09-16). Adds `public/modeling/mt-architectural.js` (1095 lines, 8 helpers + schema linter + look-dev lights + 9-key palette on `window.MT_architectural`) + `EXAMPLES_MT_ARCHITECTURAL.md` worked examples annex. Image_To_Ts.txt REFERENCES PART 190-199 from Prompt_To_Ts.txt the same way it references PART 167-178 / PART 179 / PART 180-189 — the canonical content stays in Prompt_To_Ts.txt. See CHANGES_v135.md.
+  PART 220-229 + 416 (v1.37 / v8.28) -- IMAGE-TO-PYTHON CROSS-REFERENCE + v2.0.2 PATCH SYNC. The image-to-Python factory pipeline (PART 220-229, defined in Image_To_Py.txt) is now reflected in this TS spec. Image_To_Py.txt is the canonical source for image-driven Python factories. The 4 sibling spec files REFERENCE PART 220-229 + PART 416 from Image_To_Py.txt rather than duplicating them. See CHANGES_v137.md.
+  PART 420-450 (v8.29 / v1.38) -- VFX / POST-FX / SHADER / PARTICLE / TRAIL SURFACE (v2.0.3). The Python factory pipeline now exposes 11 VFX / post-processing methods on lbl.* (lbl.outline_pass, lbl.post_fx, lbl.ibl_helmet, lbl.decal, lbl.shader_material, lbl.particle_system, lbl.trail, lbl.instanced_grass, lbl.bvh_raycast, lbl.sprite_sheet, lbl.lens_flare). See Prompt_To_Py.txt PART 420-450 for canonical documentation. JS/TS/JSON factories can opt in to the same capabilities by calling window.ACES_postFx / window.EffectComposer / THREE.Points / THREE.InstancedMesh directly -- the surface is the same. See CHANGES_v202.md.
   PART 250-254 (v1.36 / v8.27) -- FLOATING-PARTS & PRIMITIVE-ASSEMBLY FIX PATCH (canonical in BOTH Image_To_Ts.txt AND Prompt_To_Ts.txt with equal priority): 5 mandatory validation gates that close the "floating parts / stacked-cylinder / smooth-plastic / blind-delivery" regression class observed in the chunky robot build (2026-10-04). PART 250 forces `MT.core.sdfUnion` + `MT.core.sdfMarch` whenever >2 contiguous body parts touch (amends PART 146.5 / PART 159). PART 251 forbids magic-number pivot offsets and requires bounding-box-derived offsets (amends PART 148.1). PART 252 enforces `flatShading: true` + OutlinePass + `THREE.NoToneMapping` for `chunky-mascot` / `flat-low-poly` / `voxel` style locks (amends PART 156). PART 253 forbids stacked CylinderGeometry rings for limbs and requires `MT.core.loft()` with a cross-section profile (amends PART 153 / PART 161). PART 254 requires `window.lblSpec.helpers.compareToReference()` after construction with a retry loop if IoU < 0.80, gracefully skipped in pure Prompt_To_Ts mode when no reference image is provided (amends PART 150 / PART 158). See CHANGES_v136.md.
 ================================================================================
 >>> v1.34 / v8.25 DE-DUP NOTE — PART 100-152 (44-Technique Modeling
@@ -21894,3 +21896,147 @@ CHANGES_v136.md for the full v1.36 / v8.27 release notes.
 ================================================================================
 END OF PART 250-254
 ================================================================================
+
+================================================================================
+IMPORTANT — THINGS IN THE SYSTEM NOT IN PRIOR SPEC FILES
+================================================================================
+
+This section catalogs 25 capabilities the repo has but the spec docs
+don't (yet) document. Added in the v2.0.2 / v1.37 / v8.28 sync pass.
+
+These are real renderer capabilities (verified against index.html,
+public/aces/, public/modeling/, public/rig/, public/models/) that the
+AI factory author should know about but couldn't find in the spec.
+
+────────────────────────────────────────────────────────────────────────
+1.  Mockup Generator sibling (mockup-generator.html, 84 KB) — the
+    renderer has a sibling HTML file that pre-loads the model store.
+    Python factories don't depend on it but the renderer does.
+    Spec gap: NONE of the 8 spec files document it.
+
+2.  ACES load order is strict — aces-oklab → aces-normals → aces-ao →
+    aces-shade → aces-checks → aces-bones → aces-engine. Reordering
+    crashes the app because of top-level destructure. Spec gap: only
+    PART 386 names the modules; load order is in a source comment only.
+
+3.  Eager MT/ACES import (430 KB) — index.html eagerly imports all
+    7 ACES + 7 MT modules at startup. The modules are only used when
+    the user clicks ACES/MT toolbar buttons. Lazy-import would shave
+    ~430 KB off first-page (ANALYSIS_REPORT #24). Spec gap: PART 386 /
+    405 don't mention the trade-off.
+
+4.  Three.js addon classes — the renderer mirrors addon classes
+    (RoundedBoxGeometry, TransformControls, GLTFExporter, etc.) into
+    the `window` namespace so user code can do
+    `from js import RoundedBoxGeometry` in Pyodide. Spec gap: PART
+    203 mentions `from js import THREE` but doesn't enumerate the
+    addon classes.
+
+6.  _stripEmptyBufferViewsFromGLB is a 170-line scrubber fixing a
+    GLTFExporter bug (empty bufferViews). Spec gap: never mentioned
+    in the 8 spec files.
+
+7.  Animation track-type loss (ANALYSIS_REPORT #18) — the legacy
+    hint path loses the original VectorKeyframeTrack /
+    QuaternionKeyframeTrack type. v2.0.2 lbl.detect_animation_track_type
+    / build_animation_track / collect_animation_clips fix it on the
+    Python side; the renderer itself still doesn't call them yet.
+    Spec gap: PART 389 documents detection but the renderer wiring
+    is still TODO.
+
+8.  Skeleton JSON files still buggy — public/rig/skeletons/object.json
+    still has 4 root joints and public/rig/specs/quadruped_light.json
+    still declares height 1.45 m (actual 1.115 m). The in-Python
+    lbl.load_skeleton_template returns FIXED templates; the
+    renderer's disk-loaded templates are still buggy. Spec gap:
+    PART 387 documents the fix in the inlined helper but doesn't
+    say "the JSON files in public/rig/skeletons/ are still buggy;
+    use lbl.load_skeleton_template instead".
+
+9.  Pyodide version pinning (Pyodide 0.26.2 is pinned in index.html
+    line 13842). Newer Pyodide versions may break the `from js
+    import THREE` bridge or the import map. Spec gap: not mentioned.
+
+10. Undo/redo (60-step via buildScene wrapper). Spec gap: not
+    mentioned in any of the 8 files.
+
+11. 36 anti-pattern validators (E1..E36) + 9 fidelity-gate checks
+    (STYLE / CATEGORY / COLOR-SILHOUETTE / DETAIL COUNT / METALLIC-
+    PRESENCE / EMISSIVE-PRESENCE / STYLE-COHERENT-MATERIALS).
+    Spec gap: only PART 174 (Python form) names a few — the full
+    list is never documented.
+
+12. 4 lighting presets (Studio / Outdoor / Night / Flat) — toolbar
+    cycle button. Spec gap: not mentioned.
+
+13. 2 outline modes ('backface' default + 'screenspace' depth+
+    normal edge detect, ~50 lines of GLSL). Spec gap: not mentioned.
+
+14. Per-style tone-mapping (NoToneMapping for voxel/toon/flat,
+    ACESFilmic for realistic, Cineon for stylized/chibi, Linear for
+    painterly). Spec gap: not mentioned.
+
+15. Modular socket kitbash (PART 33.1[7]). Spec gap: not mentioned.
+
+16. FSM (animation state machine) inspector. Spec gap: not mentioned.
+
+17. 18-render multi-view validation grid (PART 44.7). Spec gap: not
+    mentioned.
+
+18. LOD chain generation (5-LOD chain, displayed in inspector).
+    Spec gap: not mentioned.
+
+19. T-pose, mesh cleanup, eye-tracking helpers. Spec gap: not
+    mentioned.
+
+20. 3 export formats (GLB, OBJ, STL). Spec gap: not mentioned.
+
+21. GLB-with-rigged-skeleton path (exportRiggedModelToGlb in
+    Model_7). Spec gap: not mentioned.
+
+22. Group / ungroup / combine operations (group-pivot wrap). Spec
+    gap: not mentioned.
+
+23. Face-texture editor (per-face UV/transform). Spec gap: not
+    mentioned.
+
+24. Texture-positioning tool (drag/scale on viewport). Spec gap: not
+    mentioned.
+
+25. Runtime hook contract — userData.sculptRuntime (PART 207) +
+    userData.tick (per-frame lambda) + userData.isPickable = true +
+    userData.partName on every mesh. Spec gap: PART 207 documents
+    sculptRuntime + tick but doesn't enumerate isPickable / partName.
+
+26. TypeScript transpilation via ts.transpileModule() in-browser —
+    no external TS server. Spec gap: not mentioned in
+    Prompt_To_Ts.txt.
+
+27. MODELING_TECHNIQUES_v143.md is the canonical 44-technique annex
+    for PART 100-143. Spec gap: PART 405 mentions it but never
+    publishes its 44 helper names.
+
+28. EXAMPLES_v8_17.md (filename stale — see #29) has worked
+    examples. Spec gap: filename out of sync with the spec version.
+
+29. EXAMPLES_v8_17.md is named after v8.17 but the spec is now at
+    v8.28 — the file should be renamed EXAMPLES_v8_28.md. Spec gap:
+    filename drift.
+
+30. ANALYSIS_REPORT.txt (71 KB, 2026-09-14) is the canonical
+    renderer+ACES+MT audit. Lists 30 issues with severity, solution,
+    and recommended fix. Spec gap: PART 200-302 references the
+    [B] / [H] / [M] / [L] tags but never publishes the full list.
+
+31. SYSTEM_UPGRADE_SPECIFICATION.txt — referenced from PART 179 but
+    not in the repo (was the diagnostic that drove the v1.33 fix).
+
+32. CHANGES_v130.md / v132 / v133 / v134 / v135 — the version
+    changelogs. Spec gap: only referenced from the version header.
+
+33. SPEC target advertised 4 different version numbers across the
+    repo (ANALYSIS_REPORT #4). The v2.0.2 / v1.37 / v8.28 sync
+    pass brings all 8 spec files to ONE consistent canonical version
+    per pair (v8.28 / v1.37 for JS+TS+JSON; v2.0.2 for Python).
+
+────────────────────────────────────────────────────────────────────────

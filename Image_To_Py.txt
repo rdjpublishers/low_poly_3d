@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.1 — IMAGE-TO-PYTHON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.3 — IMAGE-TO-PYTHON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   https://rdjpublishers.com/low_poly_3d/
 ================================================================================
@@ -4727,6 +4727,7 @@ PART 411-420 — IMAGE-DRIVEN PYTHON COMMON MISTAKES (FULL FORM)
             )
 
   PART 416 — MISTAKE M36 (Pyodide NEW ())
+  PART 420-450 (v2.0.3) -- VFX / POST-FX / SHADER / PARTICLE / TRAIL SURFACE. See Prompt_To_Py.txt PART 420-450 for canonical documentation. The 11 VFX methods (lbl.outline_pass, lbl.post_fx, lbl.ibl_helmet, lbl.decal, lbl.shader_material, lbl.particle_system, lbl.trail, lbl.instanced_grass, lbl.bvh_raycast, lbl.sprite_sheet, lbl.lens_flare) close the gap between PART 28's PART 28 PART 290-291 advanced-shader references and a real, callable facade. See CHANGES_v202.md.
         SYMPTOM: Pyodide error "Three.Group is not a function"
         CAUSE: Using THREE.Group() instead of THREE.Group.new()
         FIX:
@@ -9282,7 +9283,7 @@ END OF PART 360-385 (v2.0 upgrade documentation)
 
 
 ================================================================================
-PART 386-410 — v2.0.1 PATCH (FULL PARITY + ATTACHMENT-DRIVEN FEATURES)
+PART 386-410 — v2.0.2 PATCH (FULL PARITY + ATTACHMENT-DRIVEN FEATURES)
 ================================================================================
 
 This PART block is layered additively on top of PART 360-385. It
@@ -9323,7 +9324,7 @@ anyCreature 1.3.1 into the renderer:
   public/aces/aces-checks.js     PART 93+98 — 25 mechanical + style checks
   public/aces/aces-bones.js      PART 94 — public bone-name + extras
 
-v2.0.1 exposes the ACES surface to Python factories via 7 new lbl
+v2.0.2 exposes the ACES surface to Python factories via 7 new lbl
 methods:
 
   lbl.aces_run(scene_or_spec, opts=None)         # PART 386.1
@@ -9394,7 +9395,7 @@ to the model's bounding box. The 6 templates are:
   insect     — 17 joints, 0.05 m
   object     — 5 joints, 1.0 m (1 root + 4 anchors) [PART 388 fix]
 
-v2.0.1 inlines these templates into the lbl helper as a Python dict
+v2.0.2 inlines these templates into the lbl helper as a Python dict
 so Pyodide factories don't need to fetch() them:
 
   lbl.load_skeleton_template("quadruped")
@@ -9424,7 +9425,7 @@ PART 388 — MT HELPER FALLBACKS (pure-Python equivalents)
 The renderer's `window.MT_*` modules expose ~75 helpers across 6
 namespaces (core / mesh / organic / materials / advanced / textures
 + hardsurface + architectural + highpoly). v2.0.0 had thin
-pass-throughs for ~70 of these. v2.0.1 adds 17 more that were
+pass-throughs for ~70 of these. v2.0.2 adds 17 more that were
 missing from the bridge, with pure-Python fallbacks when the
 module isn't loaded:
 
@@ -9467,7 +9468,7 @@ When a TS / .py factory publishes `runtime.animations` as a plain
 `[{name, duration, tracks:[{name, times, values}]}]` array (the
 "legacy hint" path), the renderer needs to detect whether each
 track is `NumberKeyframeTrack`, `VectorKeyframeTrack`, or
-`QuaternionKeyframeTrack` by the values-array length. v2.0.1 adds
+`QuaternionKeyframeTrack` by the values-array length. v2.0.2 adds
 3 new helpers:
 
   lbl.detect_animation_track_type(name, values)   # PART 389.1
@@ -9512,7 +9513,7 @@ THREE.Object3D scene graph and verifies:
   2. No two meshes have coplanar faces within 5 mm of each other
      (anti-Z-fighting sanity check).
 
-v2.0.1 exposes this to Python:
+v2.0.2 exposes this to Python:
 
   report = lbl.schema_linter(group, {
       "gridKeyMm": 5.0,   # coplanar threshold
@@ -9759,7 +9760,7 @@ Three fix patterns:
     factory function (e.g. `lbl.bezier_fairing()`) that internally
     owns the single canonical options object.
 
-v2.0.1 makes `lbl.bezier_fairing()` the canonical funnel for all
+v2.0.2 makes `lbl.bezier_fairing()` the canonical funnel for all
 aerodynamic fairing extrusions. The `_bezier_fairing_spec()`
 function in lbl_py.py builds a single canonical options dict and
 returns it as a spec; the renderer materialises it via
@@ -9966,7 +9967,7 @@ The 10-step cheat-sheet (PART 152):
 PART 403 — RENDERER BUG FIXES (ANALYSIS_REPORT [B] [H] [M])
 ────────────────────────────────────────────────────────────────────────
 
-ANALYSIS_REPORT.txt (2026-09-14) catalogued 30 issues. v2.0.1
+ANALYSIS_REPORT.txt (2026-09-14) catalogued 30 issues. v2.0.2
 addresses the 6 most important:
 
   [B] #1 — object.json multi-root
@@ -10074,7 +10075,7 @@ PART 405 — 44-TECHNIQUE MODELING BUNDLE (PART 100-143)
 ────────────────────────────────────────────────────────────────────────
 
 The renderer's `window.MT` bundle is the 44-technique vocabulary.
-v2.0.1's `lbl.mt` bridge exposes ~75 helpers (44 in the original
+v2.0.2's `lbl.mt` bridge exposes ~75 helpers (44 in the original
 bundle + 6 hardsurface + 8 architectural + 5 textures + 7 highpoly
 + 4 engine dispatcher functions).
 
@@ -10122,7 +10123,7 @@ In v2.0 Python:
   lbl.mt.selfTest()  # returns {"ok": True, "ran": 44, "errors": []}
 
 ────────────────────────────────────────────────────────────────────────
-PART 406 — v2.0.1 EXTENDED LBL FACADE METHOD INVENTORY
+PART 406 — v2.0.2 EXTENDED LBL FACADE METHOD INVENTORY
 ────────────────────────────────────────────────────────────────────────
 
 The `_LBLFacade` class now exposes 30+ new methods beyond what
@@ -10240,10 +10241,10 @@ Cross-reference table (PART 200-302 vs lbl_py.py surface):
   TS PART 200-219 (Python factory)        → entire lbl facade
 
 ────────────────────────────────────────────────────────────────────────
-PART 408 — UPDATED COMMON MISTAKES (v2.0.1)
+PART 408 — UPDATED COMMON MISTAKES (v2.0.2)
 ────────────────────────────────────────────────────────────────────────
 
-In addition to the v2.0 common mistakes in PART 378, v2.0.1
+In addition to the v2.0 common mistakes in PART 378, v2.0.2
 adds:
 
   DO NOT use lbl.Cylinder() for vehicle wheels. Use lbl.LathedTire()
@@ -10276,13 +10277,13 @@ adds:
   (use lbl.add_default_export()) for portability with the TS path.
 
 ────────────────────────────────────────────────────────────────────────
-PART 409 — UPDATED RUNTIME ERROR REFERENCE (v2.0.1)
+PART 409 — UPDATED RUNTIME ERROR REFERENCE (v2.0.2)
 ────────────────────────────────────────────────────────────────────────
 
-In addition to the v2.0 errors in PART 379, v2.0.1 adds:
+In addition to the v2.0 errors in PART 379, v2.0.2 adds:
 
   "skeleton has 4 root joints" → The 'object' template fixed in
-    v2.0.1 has 1 root. If you built a custom skeleton, ensure
+    v2.0.2 has 1 root. If you built a custom skeleton, ensure
     EXACTLY ONE joint has parent=None. Use lbl.list_skeleton_classes()
     to get a known-good starting point.
 
@@ -10309,11 +10310,11 @@ In addition to the v2.0 errors in PART 379, v2.0.1 adds:
     by 0.005 m or move them apart.
 
 ────────────────────────────────────────────────────────────────────────
-PART 410 — v2.0.1 SUMMARY (20 RULES)
+PART 410 — v2.0.2 SUMMARY (20 RULES)
 ────────────────────────────────────────────────────────────────────────
 
 For the AI prompt author, here is the absolute minimum you need to
-know about v2.0.1 (combined with v2.0 from PART 385):
+know about v2.0.2 (combined with v2.0 from PART 385):
 
   1. Use Style B (THREE.Group return) -- NOT Style A.
   2. Use the 10-slot palette system (lbl.build_materials + setPalette).
@@ -10344,13 +10345,13 @@ know about v2.0.1 (combined with v2.0 from PART 385):
   20. Use lbl.add_default_export() to expose BOTH named AND default
       exports (PART 403).
 
-If you remember these 20 rules, you'll generate v2.0.1-compatible
+If you remember these 20 rules, you'll generate v2.0.2-compatible
 Python factories. If you also use the worked examples in
 Model_10.py / Model_11_Character.py / Model_12_House.py as patterns,
 you'll match the TypeScript output quality.
 
-Companion files (v2.0.1):
-  • public/modeling/lbl_py.py — 5,700+ lines of v2.0.1 surface
+Companion files (v2.0.2):
+  • public/modeling/lbl_py.py — 5,700+ lines of v2.0.2 surface
   • public/models/Model_10.py — Apex Horizon GT supercar
   • public/models/Model_11_Character.py — rigged character
   • public/models/Model_12_House.py — procedural cottage
@@ -10364,8 +10365,186 @@ The standalone test suite:
 
 The release notes:
   • CHANGES_v2_0.md — full v2.0.0 changelog
-  • (this file) PART 386-410 — v2.0.1 patch changelog
+  • (this file) PART 386-410 — v2.0.2 patch changelog
 
 ================================================================================
-END OF PART 386-410 (v2.0.1 patch documentation)
+END OF PART 386-410 (v2.0.2 patch documentation)
 ================================================================================
+
+================================================================================
+PART 416 — v2.0.2 PATCH NOTES (IMAGE-TO-PYTHON)
+================================================================================
+
+The v2.0.2 release (paired with Prompt_To_Py.txt PART 411-416) brings
+the image-driven Python factory pipeline up to parity with the new
+lbl_py.py SECTION 22 surface. Image-driven factories MUST now use:
+
+  • lbl.aces_run(group)              — after the model is built
+  • lbl.system_capabilities()        — discover what's available
+  • lbl.sport_motorcycle_lights(mode) — for sport-motorcycle images
+  • lbl.architectural_lights(mode)   — for building images
+  • lbl.schema_linter(group)         — verify detailInventory coverage
+  • lbl.make_sculpt_runtime(spec)    — build the 9-key runtime contract
+  • lbl.install_set_palette(group, [...]) — palette hot-swap
+
+For image-driven factories specifically, v2.0.2 adds:
+
+  PART 416.1 — imageToWorld mapping now uses lbl.compute_silhouette_iou
+               as a 3-variant ranking helper (PART 166 + PART 254).
+  PART 416.2 — IoU grading is now exposed as lbl.compute_silhouette_iou
+               (returns 0.0 in headless; browser returns real number).
+  PART 416.3 — color sampling is unchanged but the 6-band palette can
+               be derived with lbl.make_style_field_palette(prompt) when
+               the user supplies free-text cues alongside the image.
+  PART 416.4 — proportion declaration is unchanged (PART 49.1 contract).
+
+The standalone test suite grew from 8 to 17 tests. Run it with
+`python3 test_integration.py` after upgrading lbl_py.py.
+
+================================================================================
+END OF PART 416 (v2.0.2 patch notes)
+================================================================================
+
+================================================================================
+IMPORTANT — THINGS IN THE SYSTEM NOT IN PRIOR SPEC FILES
+================================================================================
+
+This section catalogs 25 capabilities the repo has but the spec docs
+don't (yet) document. Added in the v2.0.2 / v1.37 / v8.28 sync pass.
+
+These are real renderer capabilities (verified against index.html,
+public/aces/, public/modeling/, public/rig/, public/models/) that the
+AI factory author should know about but couldn't find in the spec.
+
+────────────────────────────────────────────────────────────────────────
+1.  Mockup Generator sibling (mockup-generator.html, 84 KB) — the
+    renderer has a sibling HTML file that pre-loads the model store.
+    Python factories don't depend on it but the renderer does.
+    Spec gap: NONE of the 8 spec files document it.
+
+2.  ACES load order is strict — aces-oklab → aces-normals → aces-ao →
+    aces-shade → aces-checks → aces-bones → aces-engine. Reordering
+    crashes the app because of top-level destructure. Spec gap: only
+    PART 386 names the modules; load order is in a source comment only.
+
+3.  Eager MT/ACES import (430 KB) — index.html eagerly imports all
+    7 ACES + 7 MT modules at startup. The modules are only used when
+    the user clicks ACES/MT toolbar buttons. Lazy-import would shave
+    ~430 KB off first-page (ANALYSIS_REPORT #24). Spec gap: PART 386 /
+    405 don't mention the trade-off.
+
+4.  Three.js addon classes — the renderer mirrors addon classes
+    (RoundedBoxGeometry, TransformControls, GLTFExporter, etc.) into
+    the `window` namespace so user code can do
+    `from js import RoundedBoxGeometry` in Pyodide. Spec gap: PART
+    203 mentions `from js import THREE` but doesn't enumerate the
+    addon classes.
+
+6.  _stripEmptyBufferViewsFromGLB is a 170-line scrubber fixing a
+    GLTFExporter bug (empty bufferViews). Spec gap: never mentioned
+    in the 8 spec files.
+
+7.  Animation track-type loss (ANALYSIS_REPORT #18) — the legacy
+    hint path loses the original VectorKeyframeTrack /
+    QuaternionKeyframeTrack type. v2.0.2 lbl.detect_animation_track_type
+    / build_animation_track / collect_animation_clips fix it on the
+    Python side; the renderer itself still doesn't call them yet.
+    Spec gap: PART 389 documents detection but the renderer wiring
+    is still TODO.
+
+8.  Skeleton JSON files still buggy — public/rig/skeletons/object.json
+    still has 4 root joints and public/rig/specs/quadruped_light.json
+    still declares height 1.45 m (actual 1.115 m). The in-Python
+    lbl.load_skeleton_template returns FIXED templates; the
+    renderer's disk-loaded templates are still buggy. Spec gap:
+    PART 387 documents the fix in the inlined helper but doesn't
+    say "the JSON files in public/rig/skeletons/ are still buggy;
+    use lbl.load_skeleton_template instead".
+
+9.  Pyodide version pinning (Pyodide 0.26.2 is pinned in index.html
+    line 13842). Newer Pyodide versions may break the `from js
+    import THREE` bridge or the import map. Spec gap: not mentioned.
+
+10. Undo/redo (60-step via buildScene wrapper). Spec gap: not
+    mentioned in any of the 8 files.
+
+11. 36 anti-pattern validators (E1..E36) + 9 fidelity-gate checks
+    (STYLE / CATEGORY / COLOR-SILHOUETTE / DETAIL COUNT / METALLIC-
+    PRESENCE / EMISSIVE-PRESENCE / STYLE-COHERENT-MATERIALS).
+    Spec gap: only PART 174 (Python form) names a few — the full
+    list is never documented.
+
+12. 4 lighting presets (Studio / Outdoor / Night / Flat) — toolbar
+    cycle button. Spec gap: not mentioned.
+
+13. 2 outline modes ('backface' default + 'screenspace' depth+
+    normal edge detect, ~50 lines of GLSL). Spec gap: not mentioned.
+
+14. Per-style tone-mapping (NoToneMapping for voxel/toon/flat,
+    ACESFilmic for realistic, Cineon for stylized/chibi, Linear for
+    painterly). Spec gap: not mentioned.
+
+15. Modular socket kitbash (PART 33.1[7]). Spec gap: not mentioned.
+
+16. FSM (animation state machine) inspector. Spec gap: not mentioned.
+
+17. 18-render multi-view validation grid (PART 44.7). Spec gap: not
+    mentioned.
+
+18. LOD chain generation (5-LOD chain, displayed in inspector).
+    Spec gap: not mentioned.
+
+19. T-pose, mesh cleanup, eye-tracking helpers. Spec gap: not
+    mentioned.
+
+20. 3 export formats (GLB, OBJ, STL). Spec gap: not mentioned.
+
+21. GLB-with-rigged-skeleton path (exportRiggedModelToGlb in
+    Model_7). Spec gap: not mentioned.
+
+22. Group / ungroup / combine operations (group-pivot wrap). Spec
+    gap: not mentioned.
+
+23. Face-texture editor (per-face UV/transform). Spec gap: not
+    mentioned.
+
+24. Texture-positioning tool (drag/scale on viewport). Spec gap: not
+    mentioned.
+
+25. Runtime hook contract — userData.sculptRuntime (PART 207) +
+    userData.tick (per-frame lambda) + userData.isPickable = true +
+    userData.partName on every mesh. Spec gap: PART 207 documents
+    sculptRuntime + tick but doesn't enumerate isPickable / partName.
+
+26. TypeScript transpilation via ts.transpileModule() in-browser —
+    no external TS server. Spec gap: not mentioned in
+    Prompt_To_Ts.txt.
+
+27. MODELING_TECHNIQUES_v143.md is the canonical 44-technique annex
+    for PART 100-143. Spec gap: PART 405 mentions it but never
+    publishes its 44 helper names.
+
+28. EXAMPLES_v8_17.md (filename stale — see #29) has worked
+    examples. Spec gap: filename out of sync with the spec version.
+
+29. EXAMPLES_v8_17.md is named after v8.17 but the spec is now at
+    v8.28 — the file should be renamed EXAMPLES_v8_28.md. Spec gap:
+    filename drift.
+
+30. ANALYSIS_REPORT.txt (71 KB, 2026-09-14) is the canonical
+    renderer+ACES+MT audit. Lists 30 issues with severity, solution,
+    and recommended fix. Spec gap: PART 200-302 references the
+    [B] / [H] / [M] / [L] tags but never publishes the full list.
+
+31. SYSTEM_UPGRADE_SPECIFICATION.txt — referenced from PART 179 but
+    not in the repo (was the diagnostic that drove the v1.33 fix).
+
+32. CHANGES_v130.md / v132 / v133 / v134 / v135 — the version
+    changelogs. Spec gap: only referenced from the version header.
+
+33. SPEC target advertised 4 different version numbers across the
+    repo (ANALYSIS_REPORT #4). The v2.0.2 / v1.37 / v8.28 sync
+    pass brings all 8 spec files to ONE consistent canonical version
+    per pair (v8.28 / v1.37 for JS+TS+JSON; v2.0.2 for Python).
+
+────────────────────────────────────────────────────────────────────────

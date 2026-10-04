@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.1 — PROMPT-TO-PYTHON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.3 — PROMPT-TO-PYTHON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   https://rdjpublishers.com/low_poly_3d/
 ================================================================================
@@ -9340,7 +9340,7 @@ END OF PART 360-385 (v2.0 upgrade documentation)
 
 
 ================================================================================
-PART 386-410 — v2.0.1 PATCH (FULL PARITY + ATTACHMENT-DRIVEN FEATURES)
+PART 386-410 — v2.0.2 PATCH (FULL PARITY + ATTACHMENT-DRIVEN FEATURES)
 ================================================================================
 
 This PART block is layered additively on top of PART 360-385. It
@@ -9381,7 +9381,7 @@ anyCreature 1.3.1 into the renderer:
   public/aces/aces-checks.js     PART 93+98 — 25 mechanical + style checks
   public/aces/aces-bones.js      PART 94 — public bone-name + extras
 
-v2.0.1 exposes the ACES surface to Python factories via 7 new lbl
+v2.0.2 exposes the ACES surface to Python factories via 7 new lbl
 methods:
 
   lbl.aces_run(scene_or_spec, opts=None)         # PART 386.1
@@ -9452,7 +9452,7 @@ to the model's bounding box. The 6 templates are:
   insect     — 17 joints, 0.05 m
   object     — 5 joints, 1.0 m (1 root + 4 anchors) [PART 388 fix]
 
-v2.0.1 inlines these templates into the lbl helper as a Python dict
+v2.0.2 inlines these templates into the lbl helper as a Python dict
 so Pyodide factories don't need to fetch() them:
 
   lbl.load_skeleton_template("quadruped")
@@ -9482,7 +9482,7 @@ PART 388 — MT HELPER FALLBACKS (pure-Python equivalents)
 The renderer's `window.MT_*` modules expose ~75 helpers across 6
 namespaces (core / mesh / organic / materials / advanced / textures
 + hardsurface + architectural + highpoly). v2.0.0 had thin
-pass-throughs for ~70 of these. v2.0.1 adds 17 more that were
+pass-throughs for ~70 of these. v2.0.2 adds 17 more that were
 missing from the bridge, with pure-Python fallbacks when the
 module isn't loaded:
 
@@ -9525,7 +9525,7 @@ When a TS / .py factory publishes `runtime.animations` as a plain
 `[{name, duration, tracks:[{name, times, values}]}]` array (the
 "legacy hint" path), the renderer needs to detect whether each
 track is `NumberKeyframeTrack`, `VectorKeyframeTrack`, or
-`QuaternionKeyframeTrack` by the values-array length. v2.0.1 adds
+`QuaternionKeyframeTrack` by the values-array length. v2.0.2 adds
 3 new helpers:
 
   lbl.detect_animation_track_type(name, values)   # PART 389.1
@@ -9570,7 +9570,7 @@ THREE.Object3D scene graph and verifies:
   2. No two meshes have coplanar faces within 5 mm of each other
      (anti-Z-fighting sanity check).
 
-v2.0.1 exposes this to Python:
+v2.0.2 exposes this to Python:
 
   report = lbl.schema_linter(group, {
       "gridKeyMm": 5.0,   # coplanar threshold
@@ -9817,7 +9817,7 @@ Three fix patterns:
     factory function (e.g. `lbl.bezier_fairing()`) that internally
     owns the single canonical options object.
 
-v2.0.1 makes `lbl.bezier_fairing()` the canonical funnel for all
+v2.0.2 makes `lbl.bezier_fairing()` the canonical funnel for all
 aerodynamic fairing extrusions. The `_bezier_fairing_spec()`
 function in lbl_py.py builds a single canonical options dict and
 returns it as a spec; the renderer materialises it via
@@ -10024,7 +10024,7 @@ The 10-step cheat-sheet (PART 152):
 PART 403 — RENDERER BUG FIXES (ANALYSIS_REPORT [B] [H] [M])
 ────────────────────────────────────────────────────────────────────────
 
-ANALYSIS_REPORT.txt (2026-09-14) catalogued 30 issues. v2.0.1
+ANALYSIS_REPORT.txt (2026-09-14) catalogued 30 issues. v2.0.2
 addresses the 6 most important:
 
   [B] #1 — object.json multi-root
@@ -10132,7 +10132,7 @@ PART 405 — 44-TECHNIQUE MODELING BUNDLE (PART 100-143)
 ────────────────────────────────────────────────────────────────────────
 
 The renderer's `window.MT` bundle is the 44-technique vocabulary.
-v2.0.1's `lbl.mt` bridge exposes ~75 helpers (44 in the original
+v2.0.2's `lbl.mt` bridge exposes ~75 helpers (44 in the original
 bundle + 6 hardsurface + 8 architectural + 5 textures + 7 highpoly
 + 4 engine dispatcher functions).
 
@@ -10180,7 +10180,7 @@ In v2.0 Python:
   lbl.mt.selfTest()  # returns {"ok": True, "ran": 44, "errors": []}
 
 ────────────────────────────────────────────────────────────────────────
-PART 406 — v2.0.1 EXTENDED LBL FACADE METHOD INVENTORY
+PART 406 — v2.0.2 EXTENDED LBL FACADE METHOD INVENTORY
 ────────────────────────────────────────────────────────────────────────
 
 The `_LBLFacade` class now exposes 30+ new methods beyond what
@@ -10298,10 +10298,10 @@ Cross-reference table (PART 200-302 vs lbl_py.py surface):
   TS PART 200-219 (Python factory)        → entire lbl facade
 
 ────────────────────────────────────────────────────────────────────────
-PART 408 — UPDATED COMMON MISTAKES (v2.0.1)
+PART 408 — UPDATED COMMON MISTAKES (v2.0.2)
 ────────────────────────────────────────────────────────────────────────
 
-In addition to the v2.0 common mistakes in PART 378, v2.0.1
+In addition to the v2.0 common mistakes in PART 378, v2.0.2
 adds:
 
   DO NOT use lbl.Cylinder() for vehicle wheels. Use lbl.LathedTire()
@@ -10334,13 +10334,13 @@ adds:
   (use lbl.add_default_export()) for portability with the TS path.
 
 ────────────────────────────────────────────────────────────────────────
-PART 409 — UPDATED RUNTIME ERROR REFERENCE (v2.0.1)
+PART 409 — UPDATED RUNTIME ERROR REFERENCE (v2.0.2)
 ────────────────────────────────────────────────────────────────────────
 
-In addition to the v2.0 errors in PART 379, v2.0.1 adds:
+In addition to the v2.0 errors in PART 379, v2.0.2 adds:
 
   "skeleton has 4 root joints" → The 'object' template fixed in
-    v2.0.1 has 1 root. If you built a custom skeleton, ensure
+    v2.0.2 has 1 root. If you built a custom skeleton, ensure
     EXACTLY ONE joint has parent=None. Use lbl.list_skeleton_classes()
     to get a known-good starting point.
 
@@ -10367,11 +10367,11 @@ In addition to the v2.0 errors in PART 379, v2.0.1 adds:
     by 0.005 m or move them apart.
 
 ────────────────────────────────────────────────────────────────────────
-PART 410 — v2.0.1 SUMMARY (20 RULES)
+PART 410 — v2.0.2 SUMMARY (20 RULES)
 ────────────────────────────────────────────────────────────────────────
 
 For the AI prompt author, here is the absolute minimum you need to
-know about v2.0.1 (combined with v2.0 from PART 385):
+know about v2.0.2 (combined with v2.0 from PART 385):
 
   1. Use Style B (THREE.Group return) -- NOT Style A.
   2. Use the 10-slot palette system (lbl.build_materials + setPalette).
@@ -10402,13 +10402,13 @@ know about v2.0.1 (combined with v2.0 from PART 385):
   20. Use lbl.add_default_export() to expose BOTH named AND default
       exports (PART 403).
 
-If you remember these 20 rules, you'll generate v2.0.1-compatible
+If you remember these 20 rules, you'll generate v2.0.2-compatible
 Python factories. If you also use the worked examples in
 Model_10.py / Model_11_Character.py / Model_12_House.py as patterns,
 you'll match the TypeScript output quality.
 
-Companion files (v2.0.1):
-  • public/modeling/lbl_py.py — 5,700+ lines of v2.0.1 surface
+Companion files (v2.0.2):
+  • public/modeling/lbl_py.py — 5,700+ lines of v2.0.2 surface
   • public/models/Model_10.py — Apex Horizon GT supercar
   • public/models/Model_11_Character.py — rigged character
   • public/models/Model_12_House.py — procedural cottage
@@ -10422,8 +10422,870 @@ The standalone test suite:
 
 The release notes:
   • CHANGES_v2_0.md — full v2.0.0 changelog
-  • (this file) PART 386-410 — v2.0.1 patch changelog
+  • (this file) PART 386-410 — v2.0.2 patch changelog
 
 ================================================================================
-END OF PART 386-410 (v2.0.1 patch documentation)
+END OF PART 386-410 (v2.0.2 patch documentation)
+================================================================================
+
+================================================================================
+PART 411 — v2.0.2 PATCH: RENDERER CAPABILITY SYNC
+================================================================================
+
+The v2.0.2 release closes the gap between what the spec claimed existed
+on the `lbl.*` facade (PART 386-410) and what the lbl_py.py source file
+actually exposed. Every method in PART 406's "v2.0.1 EXTENDED LBL FACADE
+METHOD INVENTORY" is now genuinely callable from a .py factory — no more
+silent AttributeError on `lbl.aces_run(...)`, `lbl.schema_linter(...)`,
+`lbl.bezier_fairing(...)`, etc.
+
+This patch is additive and backward-compatible. v2.0.1 .py files keep
+working unchanged.
+
+────────────────────────────────────────────────────────────────────────
+PART 411.1 — What changed in lbl_py.py (SECTION 22)
+────────────────────────────────────────────────────────────────────────
+
+A new SECTION 22 was added to lbl_py.py (~1000 lines) implementing every
+method the spec advertised. The pattern for each method:
+
+  def _method_name(...):
+      try:
+          from js import window
+          mod = getattr(window, "MT_<namespace>", None)
+          if mod is not None and not _is_stub(mod):
+              # ... delegate to JS bridge
+      except Exception:
+          pass
+      # pure-Python fallback
+      return ...
+
+This means: in Pyodide the methods participate in the actual ACES / MT /
+three-rig-helpers / skeletal bundles; in headless test environments they
+return placeholder dicts so unit tests and the offline Python pipeline
+keep working.
+
+────────────────────────────────────────────────────────────────────────
+PART 411.2 — New lbl.* methods (canonical inventory)
+────────────────────────────────────────────────────────────────────────
+
+Skeleton templates (PART 387 — ANALYSIS_REPORT [B] #1, #2 fixes):
+  lbl.load_skeleton_template(class_name)
+      Return a deep-copied template dict for one of:
+        humanoid (1.70 m), quadruped (1.115 m, FIXED), bird (0.30 m),
+        fish (0.50 m), insect (0.05 m), object (1.0 m, single-root FIXED).
+      Raises KeyError for unknown classes.
+
+  lbl.list_skeleton_classes()
+      Return the sorted list of available class names.
+
+ACES (anyCreature Engine Surface) bridge (PART 386):
+  lbl.aces_run(scene_or_spec, opts=None)
+      Run the 6-stage pipeline. In Pyodide, delegates to window.ACES.run().
+      Headless: returns a placeholder report.
+
+  lbl.aces_runstack(spec_list, opts=None)
+      Run multiple specs sequentially. Returns {"ok", "reports": [...]}.
+
+  lbl.aces_self_test()
+      Confirm the 7 ACES sub-modules are wired. Returns
+      {"ok", "modules": {oklab, normals, ao, shade, checks, bones, engine},
+       "errors": [str]}.
+
+  lbl.aces_export_bone_names(spec, opts=None)
+      Return the canonical bone-name list. Fallback: walks spec.joints.
+
+  lbl.aces_asset_extras(spec, opts=None)
+      Return {"harness": "ACES (anyCreature Engine Surface)", "version": "1.0.0"}.
+
+  lbl.aces_oklab_to_linear(rgb)
+      Convert sRGB → linear via gamma 2.2 approximation.
+
+  lbl.aces_linear_to_oklab(rgb)
+      Convert linear → sRGB.
+
+Schema + factory (PART 390, 391):
+  lbl.schema_linter(group, opts=None)
+      Walk a scene graph and report coplanar-pair candidates.
+
+  lbl.hard_surface_factory_shell(spec)
+      Return the 8-section code-architecture scaffold:
+      {name, bounding_box, audits, dimension_contract, sections}.
+
+  lbl.validate_socket_attachments(group, spec=None)
+      Verify every socket is parented to one of its allowed parents.
+
+Look-dev lighting (PART 187):
+  lbl.sport_motorcycle_lights(mode)
+      mode ∈ "reference", "grazing", "neutral". Returns the lighting spec.
+
+Architectural (PART 192):
+  lbl.create_wall_with_apertures(width, height, thickness, apertures, material)
+      Return a piecewise sub-wall spec for the renderer to materialise.
+
+Validation (PART 174.2-4):
+  lbl.validate_draw_call_count(group, budget=30)
+  lbl.validate_bounding_box(group, min_y=0.0, max_abs_coord=10.0)
+  lbl.validate_ground_clearance(group, clearance=0.0)
+
+Animation track-type detection (PART 389 — ANALYSIS_REPORT [B] #18 fix):
+  lbl.detect_animation_track_type(name, values)
+      Returns "quaternion" | "vector" | "number".
+
+  lbl.build_animation_track(name, times, values)
+      Returns {"name", "type", "times", "values"}.
+
+  lbl.collect_animation_clips(rt, root=None)
+      Short-circuits the legacy-hint path when real .clips exist.
+
+MT fallbacks (PART 388):
+  lbl.bmesh_to_geometry(bmesh)
+  lbl.sdf_box(center, half_extents)            # returns a callable
+  lbl.sdf_torus(center, major, minor)
+  lbl.sdf_plane(normal, offset)
+  lbl.sdf_intersect(a, b)                      # boolean SDF op
+  lbl.sdf_subtract(a, b)
+  lbl.lsystem_interpret(rules, axiom, iterations)
+  lbl.smpl_apply_shape(geometry, blend_shape, weight=1.0)
+  lbl.lbs_skin(geometry, skeleton, weights, indices, influences=4)
+  lbl.dqs_skin(geometry, skeleton, weights, indices, influences=4)
+  lbl.auto_retopologize(geometry, target_tris=5000)
+  lbl.subdivide_loop(geometry, levels=1)
+  lbl.isotropic_remesh(geometry, target_edge_length=0.05, iterations=2)
+  lbl.triangulate(geometry)
+  lbl.quadify(geometry, angle_threshold=30.0)
+  lbl.taubin_smooth(geometry, iterations=5, pass_band=0.5)
+  lbl.sculpt_brush(geometry, position, direction, radius, strength)
+  lbl.displace_surface(geometry, heightmap, amount, axis)
+
+Bezier fairing (PART 395):
+  lbl.bezier_fairing(control_points, depth=0.04, bevel=0.005, twist=0.0)
+      Returns a TS1117-safe single canonical options dict.
+
+Default-export helper (PART 403 — ANALYSIS_REPORT [M] #5 fix):
+  lbl.add_default_export(model_func, module=None)
+      Bind model_func as BOTH a named attribute and `default` on the
+      module. Fixes Models 7, 8, 9's missing-default-export deviation.
+
+────────────────────────────────────────────────────────────────────────
+PART 412 — NEW v2.0.2 HELPERS (PART 411-450)
+────────────────────────────────────────────────────────────────────────
+
+The methods below are new in v2.0.2 — they don't appear in v2.0.1 and
+they close gaps the AI factory authors flagged:
+
+Sculpt-runtime introspection (PART 207 / 411.2):
+  lbl.make_sculpt_runtime(spec)
+      Built a sculptRuntime dict with all 9 PART 207 keys filled in.
+
+  lbl.validate_sculpt_runtime_dict(runtime)
+      Verify the 9 required keys are present.
+
+  lbl.extract_animation_clips(group)
+      Walk a group and return all AnimationClips, deduped.
+
+  lbl.collect_meshes_by_name(group)
+      Return {name: mesh} for every Mesh under the group.
+
+  lbl.compute_silhouette_iou(group_a, group_b, samples=64)
+      Coarse silhouette-IoU helper (browser-only; headless returns 0.0).
+
+  lbl.make_style_field_palette(prompt)
+      Map a free-text prompt to a 5-color palette (fire/water/earth/etc).
+
+  lbl.install_set_palette(group, available_palettes)
+      Bind group.userData.setPalette + .availablePalettes for hot-swap.
+
+  lbl.list_palettes()            # alias for the facade
+  lbl.get_palette_names()        # alias for the facade
+
+  lbl.make_pbr_recipe(recipe, **opts)
+      Return a PBR material spec for a named recipe (chitin / elytra /
+      membrane / velvet / skin / cloth / leather / stone / wood / metal).
+
+  lbl.apply_pbr_recipe(mesh, recipe, **opts)
+      Apply a named PBR recipe to a mesh's material.
+
+  lbl.attach_label(group, text, position, color, size)
+      Debug-only — attach a flat marker plane as a label.
+
+  lbl.setup_environment(group, mode, intensity)
+      Add a procedural PMREM/RoomEnvironment to a scene.
+
+  lbl.export_glb(group, **opts)
+      Trigger a GLB export (browser-only).
+
+  lbl.serialize_blueprint(group, meta=None)
+      Walk a group and produce a serialisable JSON blueprint dict.
+
+  lbl.material_from_palette_slot(slot_name, palette_name)
+      Return a material for a named palette slot.
+
+  lbl.install_tick_default(group, fn=None)
+      Install a per-frame tick on a group (no-op when no `fn` provided).
+
+  lbl.is_in_pyodide()
+      Return True if the current runtime is Pyodide.
+
+  lbl.system_capabilities()
+      Return a dict describing what the runtime supports (Pyodide, ACES
+      modules loaded, MT namespaces loaded, etc). Useful for the AI to
+      know what helpers are usable.
+
+  lbl.pbr_recipe_names()
+  lbl.finish_names()              # CS2 finishes
+  lbl.wear_tier_names()           # CS2 wear tiers
+
+────────────────────────────────────────────────────────────────────────
+PART 413 — DEFENSIVE STUB DETECTION (_is_stub)
+────────────────────────────────────────────────────────────────────────
+
+Several SECTION 22 helpers do:
+
+  from js import window
+  mod = getattr(window, "ACES_oklab", None)
+  if mod is not None and not _is_stub(mod):
+      ...
+
+The `_is_stub(value)` helper recognises the test-only stub class
+(`_Stub`) that returns itself for every property access. Without this
+guard, the test stub's `getattr(window, "ACES_oklab", None)` returns
+the stub itself (not None), `hasattr(stub, "s2l")` returns True, and
+calling `stub.s2l(...)` returns ANOTHER stub which then can't be
+serialised — causing a hang in unit tests.
+
+In production (real Pyodide), `_is_stub()` returns False and the
+behaviour is identical to a direct attribute call.
+
+────────────────────────────────────────────────────────────────────────
+PART 414 — TEST SUITE EXPANDED (test_integration.py)
+────────────────────────────────────────────────────────────────────────
+
+The standalone integration test suite grew from 8 tests to 17 tests.
+Every new method on `lbl.*` has at least one test:
+
+  test_color_helpers               v2.0
+  test_palette_system              v2.0
+  test_prng                        v2.0
+  test_textures                    v2.0
+  test_pbr_recipes                 v2.0
+  test_animation_helpers           v2.0
+  test_style_a_backward_compat     v2.0
+  test_lbl_facade                  v2.0.2 — now asserts every method exists
+  test_skeleton_templates          v2.0.2 — 6 templates + ANALYSIS_REPORT fixes
+  test_aces_bridge                 v2.0.2 — 7 ACES methods
+  test_mt_fallbacks                v2.0.2 — 18 MT fallback methods
+  test_animation_track_detection   v2.0.2 — quaternion/vector/num rules
+  test_schema_linter_and_shells    v2.0.2 — schema, shell, sockets, wall
+  test_validation_helpers          v2.0.2 — draw-call/bbox/ground-clearance
+  test_lookdev_and_bezier          v2.0.2 — sport-mc lights, bezier_fairing
+  test_default_export_helper       v2.0.2 — PART 403 add_default_export
+  test_sculpt_runtime_and_pbr      v2.0.2 — sculptRuntime + pbr recipes
+
+Run with: `python3 test_integration.py`. Expected: "All tests PASSED ✓".
+
+────────────────────────────────────────────────────────────────────────
+PART 415 — IMPORTANT THINGS IN THE SYSTEM NOT IN PRIOR SPECS
+────────────────────────────────────────────────────────────────────────
+
+The v2.0.1 spec was comprehensive but missed several renderer
+capabilities that v2.0.2 now documents:
+
+  1. The renderer's index.html has a Mockup Generator sibling
+     (mockup-generator.html, 84 KB) that pre-loads the model store.
+     The Python factory pipeline doesn't use it but the renderer
+     depends on it for the "preload" tab. Spec gap: none of the
+     8 spec files document this.
+
+  2. The 7 ACES sub-modules have a strict load order
+     (aces-oklab → aces-normals → aces-ao → aces-shade →
+      aces-checks → aces-bones → aces-engine). Reordering crashes
+     the app (destructure at module top). Spec gap: only PART 386
+     names the modules; load order is in the source comment only.
+
+  3. The renderer eagerly imports all 7 ACES + 7 MT modules at
+     startup (~430 KB transferred on first load). The modules are
+     only used when the user clicks the ACES / MT toolbar buttons.
+     Lazy-loading would shave ~430 KB off the first-page load.
+     (ANALYSIS_REPORT #24.) Spec gap: PART 386 / 405 don't mention
+     lazy-loading trade-off.
+
+  4. Three.js addon classes used by .py factories need to be
+     imported into the `window` namespace before user code can do
+     `from js import RoundedBoxGeometry`. The renderer does this
+     at startup (lines 13880-13937 of index.html). Spec gap: PART
+     203 mentions `from js import THREE` but doesn't enumerate
+     the addon classes.
+
+  5. The renderer's `_stripEmptyBufferViewsFromGLB` is a 170-line
+     scrubber that fixes a GLTFExporter bug (empty bufferViews).
+     Spec gap: never mentioned in the 8 spec files.
+
+  6. The `lblCollectAnimations()` legacy hint path used by Model_2
+     loses the original track type (ANALYSIS_REPORT #18). v2.0.2
+     adds `lbl.detect_animation_track_type` / `build_animation_track`
+     but the renderer itself still doesn't call them yet. Spec gap:
+     PART 389 documents the detection but the renderer wiring is
+     still TODO.
+
+  7. The 6 demo skeletons include a buggy `object` template (4 root
+     joints) and a height-incorrect `quadruped` template. The
+     in-Python lbl.load_skeleton_template returns the FIXED version
+     but the renderer still loads the buggy files from disk.
+     Spec gap: PART 387 documents the fix in the inlined helper but
+     doesn't say "the JSON files in public/rig/skeletons/ are still
+     buggy; use lbl.load_skeleton_template instead".
+
+  8. Pyodide 0.26.2 is pinned in index.html (line 13842). Newer
+     Pyodide versions may break the `from js import THREE` bridge
+     or the import map. Spec gap: not mentioned.
+
+  9. The renderer has a 60-step undo/redo via buildScene wrapper.
+     Spec gap: not mentioned in any of the 8 files.
+
+  10. The validator has 36 anti-pattern validators (E1..E36) and
+      9 fidelity-gate checks (STYLE MATCH, CATEGORY MATCH,
+      COLOR/SILHOUETTE MATCH, DETAIL COUNT, METALLIC-PRESENCE,
+      EMISSIVE-PRESENCE, STYLE-COHERENT-MATERIALS). Spec gap: only
+      PART 174 (Python form) names a few — the full list of 36 + 9
+      is never documented in any spec.
+
+  11. The renderer has 4 lighting presets (Studio / Outdoor / Night
+      / Flat) accessible via toolbar cycle button. Spec gap: not
+      mentioned.
+
+  12. The renderer has 2 outline modes: 'backface' (default) and
+      'screenspace' (depth+normal edge detect). Spec gap: not
+      mentioned.
+
+  13. The renderer has per-style tone-mapping table (NoToneMapping
+      for voxel/toon/flat, ACESFilmic for realistic, Cineon for
+      stylized/chibi, Linear for painterly). Spec gap: not
+      mentioned.
+
+  14. The renderer has a Modular socket kitbash (PART 33.1[7]) for
+      placeholder socket primitives. Spec gap: not mentioned.
+
+  15. The renderer has an FSM (animation state machine) inspector.
+      Spec gap: not mentioned.
+
+  16. The renderer has an 18-render multi-view validation grid
+      (PART 44.7). Spec gap: not mentioned.
+
+  17. The renderer has LOD chain generation (5-LOD chain, displayed
+      in the inspector). Spec gap: not mentioned.
+
+  18. The renderer has T-pose, mesh cleanup, eye-tracking helpers.
+      Spec gap: not mentioned.
+
+  19. The renderer has 3 lo export formats: GLB, OBJ, STL. Spec gap:
+      not mentioned.
+
+  20. The renderer has a GLB-with-rigged-skeleton path
+      (exportRiggedModelToGlb in Model_7). Spec gap: not mentioned.
+
+  21. The renderer has group / ungroup / combine operations
+      (group-pivot wrap). Spec gap: not mentioned.
+
+  22. The renderer has a face-texture editor (per-face UV/transform).
+      Spec gap: not mentioned.
+
+  23. The renderer has a texture-positioning tool (drag/scale on
+      viewport). Spec gap: not mentioned.
+
+  24. The renderer's runtime hook contract includes:
+        • userData.sculptRuntime (9 keys per PART 207)
+        • userData.tick (per-frame lambda)
+        • userData.isPickable = true
+        • userData.partName on every mesh
+      Spec gap: PART 207 documents sculptRuntime + tick but doesn't
+      enumerate isPickable / partName.
+
+  25. The renderer uses TypeScript transpilation via
+       `ts.transpileModule()` in-browser — no external TS server.
+       Spec gap: not mentioned in Prompt_To_Ts.txt.
+
+────────────────────────────────────────────────────────────────────────
+PART 416 — v2.0.2 SUMMARY (10 NEW RULES)
+────────────────────────────────────────────────────────────────────────
+
+For the AI prompt author, here is what changed from v2.0.1 to v2.0.2:
+
+  1. Every method in PART 406's "v2.0.1 EXTENDED LBL FACADE METHOD
+     INVENTORY" now actually exists on `lbl.*`. Use them without
+     `hasattr` guards.
+
+  2. lbl.load_skeleton_template("object") now returns a
+     single-rooted template (FIX for ANALYSIS_REPORT #1). Same for
+     "quadruped" → height=1.115 (FIX for #2).
+
+  3. lbl.detect_animation_track_type / build_animation_track /
+     collect_animation_clips are the canonical way to publish
+     runtime.animations arrays without losing track type.
+
+  4. lbl.schema_linter / hard_surface_factory_shell /
+     create_wall_with_apertures are the architectural pipeline.
+
+  5. lbl.validate_socket_attachments enforces PART 179.9 socket
+     hierarchy.
+
+  6. lbl.bezier_fairing returns a single canonical options dict
+     (no TS1117 duplicate keys).
+
+  7. lbl.add_default_export(model_func) fixes PART 1 spec
+     deviation for Models 7, 8, 9.
+
+  8. lbl.make_sculpt_runtime + validate_sculpt_runtime_dict are
+     the canonical PART 207 helpers.
+
+  9. lbl.system_capabilities() lets a .py file discover what
+     helpers are usable in the current environment.
+
+  10. test_integration.py grew from 8 to 17 tests; run it after
+      upgrading lbl_py.py to confirm nothing regressed.
+
+If you remember these 10 rules + the 20 rules from v2.0.1, you'll
+generate v2.0.2-compatible Python factories.
+
+Companion files (v2.0.2):
+  • public/modeling/lbl_py.py — 6,500+ lines (added SECTION 22)
+  • public/modeling/test_integration.py — 17 tests (was 8)
+  • public/modeling/build_inlined.py — regenerates lbl_py_inlined.{txt,js}
+  • public/modeling/patch_index.py — patches index.html with new src
+
+The release notes:
+  • CHANGES_v2_0.md — full v2.0.0 changelog
+  • Prompt_To_Py.txt PART 386-410 — v2.0.1 changelog
+  • Prompt_To_Py.txt PART 411-416 — v2.0.2 changelog (NEW)
+
+================================================================================
+END OF PART 411-416 (v2.0.2 patch documentation)
+================================================================================
+
+================================================================================
+IMPORTANT — THINGS IN THE SYSTEM NOT IN PRIOR SPEC FILES
+================================================================================
+
+This section catalogs 25 capabilities the repo has but the spec docs
+don't (yet) document. Added in the v2.0.2 / v1.37 / v8.28 sync pass.
+
+These are real renderer capabilities (verified against index.html,
+public/aces/, public/modeling/, public/rig/, public/models/) that the
+AI factory author should know about but couldn't find in the spec.
+
+────────────────────────────────────────────────────────────────────────
+1.  Mockup Generator sibling (mockup-generator.html, 84 KB) — the
+    renderer has a sibling HTML file that pre-loads the model store.
+    Python factories don't depend on it but the renderer does.
+    Spec gap: NONE of the 8 spec files document it.
+
+2.  ACES load order is strict — aces-oklab → aces-normals → aces-ao →
+    aces-shade → aces-checks → aces-bones → aces-engine. Reordering
+    crashes the app because of top-level destructure. Spec gap: only
+    PART 386 names the modules; load order is in a source comment only.
+
+3.  Eager MT/ACES import (430 KB) — index.html eagerly imports all
+    7 ACES + 7 MT modules at startup. The modules are only used when
+    the user clicks ACES/MT toolbar buttons. Lazy-import would shave
+    ~430 KB off first-page (ANALYSIS_REPORT #24). Spec gap: PART 386 /
+    405 don't mention the trade-off.
+
+4.  Three.js addon classes — the renderer mirrors addon classes
+    (RoundedBoxGeometry, TransformControls, GLTFExporter, etc.) into
+    the `window` namespace so user code can do
+    `from js import RoundedBoxGeometry` in Pyodide. Spec gap: PART
+    203 mentions `from js import THREE` but doesn't enumerate the
+    addon classes.
+
+6.  _stripEmptyBufferViewsFromGLB is a 170-line scrubber fixing a
+    GLTFExporter bug (empty bufferViews). Spec gap: never mentioned
+    in the 8 spec files.
+
+7.  Animation track-type loss (ANALYSIS_REPORT #18) — the legacy
+    hint path loses the original VectorKeyframeTrack /
+    QuaternionKeyframeTrack type. v2.0.2 lbl.detect_animation_track_type
+    / build_animation_track / collect_animation_clips fix it on the
+    Python side; the renderer itself still doesn't call them yet.
+    Spec gap: PART 389 documents detection but the renderer wiring
+    is still TODO.
+
+8.  Skeleton JSON files still buggy — public/rig/skeletons/object.json
+    still has 4 root joints and public/rig/specs/quadruped_light.json
+    still declares height 1.45 m (actual 1.115 m). The in-Python
+    lbl.load_skeleton_template returns FIXED templates; the
+    renderer's disk-loaded templates are still buggy. Spec gap:
+    PART 387 documents the fix in the inlined helper but doesn't
+    say "the JSON files in public/rig/skeletons/ are still buggy;
+    use lbl.load_skeleton_template instead".
+
+9.  Pyodide version pinning (Pyodide 0.26.2 is pinned in index.html
+    line 13842). Newer Pyodide versions may break the `from js
+    import THREE` bridge or the import map. Spec gap: not mentioned.
+
+10. Undo/redo (60-step via buildScene wrapper). Spec gap: not
+    mentioned in any of the 8 files.
+
+11. 36 anti-pattern validators (E1..E36) + 9 fidelity-gate checks
+    (STYLE / CATEGORY / COLOR-SILHOUETTE / DETAIL COUNT / METALLIC-
+    PRESENCE / EMISSIVE-PRESENCE / STYLE-COHERENT-MATERIALS).
+    Spec gap: only PART 174 (Python form) names a few — the full
+    list is never documented.
+
+12. 4 lighting presets (Studio / Outdoor / Night / Flat) — toolbar
+    cycle button. Spec gap: not mentioned.
+
+13. 2 outline modes ('backface' default + 'screenspace' depth+
+    normal edge detect, ~50 lines of GLSL). Spec gap: not mentioned.
+
+14. Per-style tone-mapping (NoToneMapping for voxel/toon/flat,
+    ACESFilmic for realistic, Cineon for stylized/chibi, Linear for
+    painterly). Spec gap: not mentioned.
+
+15. Modular socket kitbash (PART 33.1[7]). Spec gap: not mentioned.
+
+16. FSM (animation state machine) inspector. Spec gap: not mentioned.
+
+17. 18-render multi-view validation grid (PART 44.7). Spec gap: not
+    mentioned.
+
+18. LOD chain generation (5-LOD chain, displayed in inspector).
+    Spec gap: not mentioned.
+
+19. T-pose, mesh cleanup, eye-tracking helpers. Spec gap: not
+    mentioned.
+
+20. 3 export formats (GLB, OBJ, STL). Spec gap: not mentioned.
+
+21. GLB-with-rigged-skeleton path (exportRiggedModelToGlb in
+    Model_7). Spec gap: not mentioned.
+
+22. Group / ungroup / combine operations (group-pivot wrap). Spec
+    gap: not mentioned.
+
+23. Face-texture editor (per-face UV/transform). Spec gap: not
+    mentioned.
+
+24. Texture-positioning tool (drag/scale on viewport). Spec gap: not
+    mentioned.
+
+25. Runtime hook contract — userData.sculptRuntime (PART 207) +
+    userData.tick (per-frame lambda) + userData.isPickable = true +
+    userData.partName on every mesh. Spec gap: PART 207 documents
+    sculptRuntime + tick but doesn't enumerate isPickable / partName.
+
+26. TypeScript transpilation via ts.transpileModule() in-browser —
+    no external TS server. Spec gap: not mentioned in
+    Prompt_To_Ts.txt.
+
+27. MODELING_TECHNIQUES_v143.md is the canonical 44-technique annex
+    for PART 100-143. Spec gap: PART 405 mentions it but never
+    publishes its 44 helper names.
+
+28. EXAMPLES_v8_17.md (filename stale — see #29) has worked
+    examples. Spec gap: filename out of sync with the spec version.
+
+29. EXAMPLES_v8_17.md is named after v8.17 but the spec is now at
+    v8.28 — the file should be renamed EXAMPLES_v8_28.md. Spec gap:
+    filename drift.
+
+30. ANALYSIS_REPORT.txt (71 KB, 2026-09-14) is the canonical
+    renderer+ACES+MT audit. Lists 30 issues with severity, solution,
+    and recommended fix. Spec gap: PART 200-302 references the
+    [B] / [H] / [M] / [L] tags but never publishes the full list.
+
+31. SYSTEM_UPGRADE_SPECIFICATION.txt — referenced from PART 179 but
+    not in the repo (was the diagnostic that drove the v1.33 fix).
+
+32. CHANGES_v130.md / v132 / v133 / v134 / v135 — the version
+    changelogs. Spec gap: only referenced from the version header.
+
+33. SPEC target advertised 4 different version numbers across the
+    repo (ANALYSIS_REPORT #4). The v2.0.2 / v1.37 / v8.28 sync
+    pass brings all 8 spec files to ONE consistent canonical version
+    per pair (v8.28 / v1.37 for JS+TS+JSON; v2.0.2 for Python).
+
+────────────────────────────────────────────────────────────────────────
+
+================================================================================
+PART 420-430 — v2.0.3 PATCH: VFX / POST-FX / SHADER / PARTICLE / TRAIL SURFACE
+================================================================================
+
+The v2.0.3 release (paired with lbl_py.py SECTION 23) closes the VFX
+gap that the v2.0.2 audit identified. Every method follows the
+standard bridge-or-fallback pattern (try the JS module first, fall
+back to a pure-Python spec dict so headless tests still work).
+
+────────────────────────────────────────────────────────────────────────
+PART 420 — OUTLINE PASS
+────────────────────────────────────────────────────────────────────────
+
+`lbl.outline_pass(group, mode="backface", thickness=0.02, color="#000000")`
+
+Two modes:
+  • "backface"  (default) — clone each Mesh, flip culling to
+    THREE.BackSide, scale up by (1 + thickness). Works in every
+    WebGL context, no shader needed. Cheap and reliable.
+  • "screenspace" — a post-process pass that detects depth+normal
+    discontinuities via the OutlinePass. Sharper at corners; requires
+    EffectComposer wired (browser-only).
+
+In headless mode (no THREE) it returns a spec dict the renderer
+materialises; in the browser it returns the outline Group (backface)
+or the live OutlinePass instance (screenspace).
+
+Usage:
+  ol = lbl.outline_pass(car_root, mode="backface", thickness=0.015)
+  # or
+  ol = lbl.outline_pass(creature_root, mode="screenspace",
+                          thickness=0.02, color="#000000")
+
+────────────────────────────────────────────────────────────────────────
+PART 421 — POST-FX CHAIN
+────────────────────────────────────────────────────────────────────────
+
+`lbl.post_fx(renderer_or_scene, chain=None)`
+
+chain is a list of pass names. Supported (canonical 8):
+  • "bloom"      — UnrealBloomPass (strength 0.55, radius 0.4, threshold 0.85)
+  • "ssao"       — SSAOPass (kernel radius 8)
+  • "outline"    — OutlinePass (edgeStrength 3.0)
+  • "fxaa"       — FXAAShader
+  • "halftone"   — HalftonePass (radius 4)
+  • "chromatic"  — ChromaticAberrationShader (amount 0.002)
+  • "vignette"   — VignetteShader (offset 1.0, darkness 0.6)
+  • "filmgrain"  — FilmGrainShader (intensity 0.15)
+
+In headless mode the function returns a spec dict; in the browser
+it tries `window.postFx` / `ACES_postFx` first, then assembles an
+EffectComposer fallback.
+
+Usage:
+  passes = lbl.post_fx(renderer, chain=["bloom", "ssao", "vignette"])
+
+────────────────────────────────────────────────────────────────────────
+PART 422 — IBL HELMET
+────────────────────────────────────────────────────────────────────────
+
+`lbl.ibl_helmet(scene, mode="room", intensity=1.0, path=None)`
+
+PMREM-processed environment. Modes:
+  • "room"    — THREE.RoomEnvironment (no asset required, procedural)
+  • "studio"  — 3-light gradient rig
+  • "outdoor" — sky+ground gradient rig
+  • "hdri"    — load a .hdr file from `path` via RGBELoader
+  • "preset"  — one of a few built-in gradients
+
+Returns the env texture (browser) or a spec dict.
+
+Usage:
+  lbl.ibl_helmet(scene, mode="room", intensity=1.0)
+  lbl.ibl_helmet(scene, mode="hdri",
+                  path="https://example.com/forest.hdr", intensity=1.5)
+
+────────────────────────────────────────────────────────────────────────
+PART 423 — DECAL
+────────────────────────────────────────────────────────────────────────
+
+`lbl.decal(group, texture, position, normal, size, rotation)`
+
+Surface-projected texture (uses THREE.DecalGeometry). The renderer
+searches the first Mesh under `group` and projects onto it.
+
+Usage:
+  spec = lbl.decal(
+      car_root,
+      texture=sticker_texture,   # THREE.DataTexture / Texture / None
+      position=(0, 1.0, 2.0),    # world-space hit point
+      normal=(0, 1, 0),          # surface normal
+      size=(0.5, 0.5, 0.5),     # decal extent in metres
+      rotation=(0, math.pi/2, 0),
+  )
+
+────────────────────────────────────────────────────────────────────────
+PART 424 — SHADER MATERIAL
+────────────────────────────────────────────────────────────────────────
+
+`lbl.shader_material(vertex_shader, fragment_shader, uniforms=None)`
+
+Build a custom THREE.ShaderMaterial. uniforms is a dict of either
+{name: value} or {name: {value: ...}} (the second is the THREE-style).
+
+Usage:
+  mat = lbl.shader_material(
+      vertex_shader='''
+          varying vec3 vNormal;
+          void main() {
+              vNormal = normalMatrix * normal;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+      ''',
+      fragment_shader='''
+          varying vec3 vNormal;
+          void main() {
+              float i = dot(normalize(vNormal), vec3(0.0, 1.0, 0.0));
+              gl_FragColor = vec4(i, i, i, 1.0);
+          }
+      ''',
+      uniforms={"t": {"value": 0.5}},
+  )
+  mesh.material = mat if isinstance(mat, dict) else mat.get("material")
+
+────────────────────────────────────────────────────────────────────────
+PART 425 — PARTICLE SYSTEM
+────────────────────────────────────────────────────────────────────────
+
+`lbl.particle_system(spec)`
+
+GPU-instanced particle system (THREE.Points). spec keys:
+  count          — int (default 1000)
+  position_range — [[xmin,ymin,zmin], [xmax,ymax,zmax]] (default ±5)
+  velocity_range — same shape (default ±1)
+  size           — float (default 0.1)
+  color          — hex string or [r,g,b] 0..1
+  lifetime       — seconds (default 4.0)
+  gravity        — [x,y,z] (default [0,-9.8,0])
+  additive       — bool (default True for sparks / fire / magic)
+  emitter        — 'point' | 'box' | 'sphere' | 'cone' (default 'sphere')
+  texture        — optional DataTexture / Texture
+
+Usage:
+  ps = lbl.particle_system({
+      "count": 500,
+      "color": "#ffaa00",
+      "emitter": "sphere",
+      "additive": True,
+      "lifetime": 2.5,
+      "size": 0.08,
+  })
+  scene.add(ps["points"])  # browser only
+
+────────────────────────────────────────────────────────────────────────
+PART 426 — TRAIL
+────────────────────────────────────────────────────────────────────────
+
+`lbl.trail(emitter, target, color, width, length, fade)`
+
+Motion trail behind a moving target. Returns a spec dict with:
+  • line    — THREE.Line (browser)
+  • tick    — per-frame step function (no-op in headless)
+
+The tick shifts positions each frame to keep the last `length`
+samples. Mount on the scene and call userData.tick to drive it.
+
+Usage:
+  trail = lbl.trail(scene, target_mesh, color="#88aaff",
+                    width=0.05, length=20, fade=0.92)
+  target_mesh.userData.tick = trail["tick"]
+
+────────────────────────────────────────────────────────────────────────
+PART 427 — INSTANCED GRASS
+────────────────────────────────────────────────────────────────────────
+
+`lbl.instanced_grass(field, blade_count, blade_geo, height, width,
+                      wind_amp, color, ground_size)`
+
+Scatter `blade_count` instanced grass blades across a `ground_size` x
+`ground_size` patch, attached to `field`. Deterministic — uses
+mulberry32(42) so the same call produces the same layout.
+
+Usage:
+  grass = lbl.instanced_grass(scene, blade_count=2000, height=0.4,
+                              width=0.05, color="#3a7d2c", ground_size=20.0)
+  scene.add(grass["instanced"])
+
+────────────────────────────────────────────────────────────────────────
+PART 428 — BVH RAYCAST
+────────────────────────────────────────────────────────────────────────
+
+`lbl.bvh_raycast(meshes, raycaster)`
+
+BVH-accelerated raycast (uses three-mesh-bvh under the hood). Tries
+`window.bvhRaycast` / `lblRaycastBVH` / `ACES_bvhRaycast` first, then
+falls back to THREE native `mesh.raycast(raycaster)`.
+
+Usage:
+  intersects = lbl.bvh_raycast(car_meshes, raycaster)
+  for hit in intersects:
+      pt = hit.point
+      face = hit.face
+
+────────────────────────────────────────────────────────────────────────
+PART 429 — SPRITE SHEET ANIMATION
+────────────────────────────────────────────────────────────────────────
+
+`lbl.sprite_sheet(texture, frame_width, frame_height, frame_count, fps, loop)`
+
+Animate a sprite sheet by setting texture.offset / texture.repeat
+per frame. Returns a tick function that the renderer can call
+from userData.tick.
+
+Usage:
+  ss = lbl.sprite_sheet(sprite_texture, frame_width=64,
+                        frame_height=64, frame_count=12, fps=12)
+  mesh.userData.tick = ss["tick"]
+
+────────────────────────────────────────────────────────────────────────
+PART 430 — LENS FLARE
+────────────────────────────────────────────────────────────────────────
+
+`lbl.lens_flare(emitter, light_position, color, size, count)`
+
+Attach a procedural lens-flare group (N plane meshes with additive
+blending) to a light position. Browser-only.
+
+Usage:
+  lf = lbl.lens_flare(scene, light_position=(0, 5, 0),
+                      color="#ffeecc", size=1.0, count=6)
+  scene.add(lf["group"])
+
+────────────────────────────────────────────────────────────────────────
+PART 431-440 — SYSTEM VFX BEST-PRACTICES
+────────────────────────────────────────────────────────────────────────
+
+The 5 iron rules for system-VFX work (PART 28 / 290-291 Python form):
+
+  1. Bloom is for emissive surfaces only — never apply it to the
+     whole scene without a high threshold (≥ 0.85).
+  2. Outline mode "backface" is the default; "screenspace" only when
+     you need sharp inner corners.
+  3. IBL is REQUIRED for any model with metalness ≥ 0.5 or
+     transmission > 0. Without it the PBR materials look flat.
+  4. Particles MUST be additive when they represent fire / sparks /
+     magic; non-additive for dust / smoke.
+  5. Trails MUST be tied to a tick (renderer-side) — never trust
+     user-side per-frame callbacks for production.
+
+────────────────────────────────────────────────────────────────────────
+PART 441-450 — v2.0.3 SUMMARY (10 NEW RULES)
+────────────────────────────────────────────────────────────────────────
+
+For the AI prompt author, here is what changed in v2.0.3:
+
+  1. lbl.outline_pass(group, mode) — 2 outline modes.
+  2. lbl.post_fx(renderer, chain) — 8 named post-FX passes.
+  3. lbl.ibl_helmet(scene, mode, intensity) — PMREM + HDRI.
+  4. lbl.decal(group, texture, position, normal, size) — surface decals.
+  5. lbl.shader_material(vert, frag, uniforms) — custom shaders.
+  6. lbl.particle_system(spec) — GPU-instanced particles.
+  7. lbl.trail(emitter, target, ...) — motion trails.
+  8. lbl.instanced_grass(field, blade_count, ...) — vegetation.
+  9. lbl.bvh_raycast(meshes, raycaster) — BVH-accelerated pick.
+  10. lbl.sprite_sheet + lbl.lens_flare — texture animation + lens FX.
+
+All 11 methods work in headless mode (return spec dicts) and
+in-browser mode (return live Three.js objects). Backward-compatible
+— the prior 62-method SECTION 22 surface is unchanged.
+
+If you remember these 10 rules + the 20 rules from v2.0.1 + the
+10 rules from v2.0.2, you'll generate v2.0.3-compatible Python
+factories covering modeling, animation, rigging, AND system VFX.
+
+Companion files (v2.0.3):
+  • public/modeling/lbl_py.py — 7,400+ lines (added SECTION 23)
+  • public/modeling/test_integration.py — 21 tests (was 17)
+  • public/modeling/build_inlined.py — regenerates the inlined helper
+  • public/modeling/patch_index.py — patches index.html with new src
+
+================================================================================
+END OF PART 420-450 (v2.0.3 patch documentation)
 ================================================================================
