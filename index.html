@@ -20949,6 +20949,15 @@ def _bind_section_23_facade(lbl_instance):
     for name, fn in methods.items():
         setattr(lbl_instance, name, fn)
     return lbl_instance
+
+
+# Singleton — the `lbl` module instance
+lbl = _LBLFacade()
+sys.modules['lbl'] = lbl
+
+# Bind SECTION 23 methods to the singleton now that it exists
+lbl = _bind_section_23_facade(lbl)
+sys.modules['lbl'] = lbl
 `;
 ;
 ;
