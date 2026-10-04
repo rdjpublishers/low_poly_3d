@@ -1,5 +1,5 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v1.36 / v8.27 — IMAGE-TO-PYTHON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.0 — IMAGE-TO-PYTHON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   https://rdjpublishers.com/low_poly_3d/
 ================================================================================
@@ -26,6 +26,28 @@ This file is the IMAGE-specific Python layer. The Python-specific
 non-image methodology (PART 200-219) lives canonically in
 Prompt_To_Py.txt — this file cross-references it rather than
 duplicating it.
+
+
+────────────────────────────────────────────────────────────────────────
+WHAT'S NEW IN v2.0.0 — DIAGNOSTIC FIX + TS PARITY (IMAGE-DRIVEN)
+────────────────────────────────────────────────────────────────────────
+The image-driven Python pipeline inherits every v2.0 fix and feature
+from the prompt-driven pipeline (see PART 360-385 of Prompt_To_Py.txt
+for the canonical v2.0 documentation). Key points for image-driven:
+
+  * Style B is the default. Sample image colors into the 10-slot palette.
+  * Translate image features to lbl.* primitives OR THREE.* primitives.
+  * For each sampled color, decide which palette slot it belongs to
+    (body / stripe / carbon / rim / tire / glass / headlight / taillight
+    / chrome / accent).
+  * Pass the palette name (or registered name) at load time:
+        create_model({"palette": "midnight-blue", "theme": "auto"})
+  * The renderer + lbl helper do the rest.
+
+The PART 360-385 v2.0 addendum is appended at the end of this file.
+It mirrors the documentation in Prompt_To_Py.txt -- refer to that file
+for the full v2.0 surface.
+
 
 Cross-references — image-to-Python factories should ALSO follow:
   PART 153-166 — Image-Driven Factory Defaults (PART 153-166 — this is
@@ -7052,6 +7074,1096 @@ PART 907 — IMAGE-DRIVEN PYTHON TESTING
 PART 908-1000 — RESERVED FOR FUTURE
 
 ================================================================================
-END OF Image_To_Py.txt
-END OF Image_To_Py.txt
-END OF Image_To_Py.txt
+END OF PART 385 (v2.0)
+END OF PART 385 (v2.0)
+END OF PART 385 (v2.0)
+
+================================================================================
+PART 360-385 — v2.0.0 PYTHON UPGRADE (DIAGNOSTIC FIX + TS PARITY)
+================================================================================
+
+This PART block is the v2.0 upgrade documentation, layered additively on
+top of every PART above. It addresses the diagnostic issues found in
+Deepseek diagnostic report (`deepseek_text_20261004_c51484.txt`) AND
+brings the Python implementation to full parity with the TypeScript
+implementation, per PART 200-302 of the original spec.
+
+Companion files:
+  • public/modeling/lbl_py.py — the upgraded Python helper (v2.0)
+  • public/models/Model_10.py — worked supercar example
+  • public/models/Model_11_Character.py — worked rigged character
+  • public/models/Model_12_House.py — worked architectural example
+  • CHANGES_v2_0.md — release notes
+  • public/modeling/test_integration.py — standalone test suite
+  • public/modeling/build_inlined.py — regenerates the inlined JS helper
+  • public/modeling/patch_index.py — patches index.html
+
+────────────────────────────────────────────────────────────────────────
+PART 360 — DIAGNOSTIC FIX SUMMARY (MUST READ)
+────────────────────────────────────────────────────────────────────────
+
+The Deepseek diagnostic identified two failure modes for the v1.36 Python
+factory path. Both are FIXED in v2.0. New code MUST follow them.
+
+PROBLEM 1 — WHITE MODELS (the lbl.paint_rectangle path)
+  Cause: Used document.createElement("canvas") + THREE.CanvasTexture.
+          Pyodide on mobile has getContext("2d") returning null.
+          CanvasTexture silently fails → THREE falls back to material.color.
+          Since materials had color=0xffffff placeholder, everything
+          rendered as solid white.
+  FIX:    Use lbl.make_texture(...) which builds THREE.DataTexture (no
+          canvas). All materials are solid PBR (no color placeholders).
+
+PROBLEM 2 — SCATTERED DOTS (the Style A lbl.attach_* path)
+  Cause: Used lbl.attach_box / lbl.attach_cylinder (Style A).
+          The lbl helper geometry attachment calls failed silently in this
+          Pyodide build, producing degenerate flat geometry.
+  FIX:    Use Style B (THREE.Group direct) — `from js import THREE`,
+          `THREE.Mesh.new(...)`, `g.add(...)`. This is the default.
+
+────────────────────────────────────────────────────────────────────────
+PART 361 — STYLE B IS THE DEFAULT (Critical rule)
+────────────────────────────────────────────────────────────────────────
+
+For all v2.0 Python factories, use Style B (THREE.Group return).
+
+  ✓ DO use Style B:  return THREE.Group() with full sculptRuntime
+  ✗ DO NOT use Style A: lbl.attach_box etc. (kept for backward compat)
+
+Why: Style A had silent failures in Pyodide. Style B uses raw THREE.*
+calls which always work. Style B also supports everything Style A does
+plus animations, materials, textures, rigging, and runtime contracts.
+
+The minimal Style B factory:
+
+    from js import THREE
+    def create_model():
+        g = lbl.Group("MyModel")
+        g.userData.meta = {"name": "My Model", "style": "smooth-low-poly",
+                            "category": "prop", "subject": "..."}
+        body = lbl.Mesh(lbl.Box(1, 1, 1), lbl.standard(color=0xff8000),
+                        name="body", cast_shadow=True, receive_shadow=True)
+        g.add(body)
+        lbl.install_runtime(g, {"detailInventory": [
+            {"id": "body", "region": "main", "kind": "feature",
+             "priority": "high", "reviewThreshold": 0.7}]})
+        return g
+
+────────────────────────────────────────────────────────────────────────
+PART 362 — THE 10-SLOT PALETTE CONTRACT (Critical rule)
+────────────────────────────────────────────────────────────────────────
+
+Every model uses a 10-slot palette. The slots are:
+  body       — main body paint
+  stripe     — racing stripe / livery accent
+  carbon     — aero parts (splitter, diffuser, wing)
+  rim        — wheel rim metal
+  tire       — tire rubber
+  glass      — windows (transparent)
+  headlight  — emissive headlight colour
+  taillight  — emissive taillight colour
+  chrome     — exhaust + trim
+  accent     — brake calipers, badges
+
+Each slot is a dict: {color, roughness, metalness, emissive, emissiveIntensity, opacity}
+
+8 BUILT-IN PRESETS (always available):
+  racing-red, midnight-blue, sunset-gold, neon-cyber,
+  british-green, stealth-black, pearl-white, desert-sand
+
+Usage:
+  mats = lbl.build_materials("racing-red")
+  body_mat = mats["body"]      # → MeshStandardMaterial with full PBR
+  stripe_mat = mats["stripe"]
+  # ... use these as the material for your body / stripe meshes
+
+REGISTER A CUSTOM PALETTE:
+  lbl.register_palette("candy-purple", {
+      "body":   {"color": "#b020c0", "roughness": 0.25, "metalness": 0.45},
+      "stripe": {"color": "#ff80f0"},
+      "accent": {"color": "#ffff80", "emissive": "#ffff80",
+                 "emissiveIntensity": 0.4},
+      "rim":    {"color": "#d0a0ff"},
+  })
+
+DERIVE FROM A BASE HEX:
+  lbl.derive_palette("my-blue", base="#1e3a8a")
+  # Auto-generates body, stripe, accent, rim, glass from base hex.
+  # headlight + taillight stay constant (white + red).
+
+HOT-SWAP AT RUNTIME:
+  car.userData.setPalette("neon-cyber")               # full swap
+  car.userData.setPalette({"body": {"color": "#00ff80"}})  # partial swap
+  car.userData.availablePalettes                       # list all 8+
+
+PER-LOAD OPTIONS:
+  def create_model(options=None):
+      palette = (options or {}).get("palette", "racing-red")
+      mats = lbl.build_materials(palette)
+
+────────────────────────────────────────────────────────────────────────
+PART 363 — MATERIALS ARE SOLID PBR (NO color=0xffffff PLACEHOLDERS)
+────────────────────────────────────────────────────────────────────────
+
+Always use solid PBR materials. NEVER use CanvasTexture or
+document.createElement. If you need a pattern, layer it as a separate Mesh.
+
+WRONG (legacy — DO NOT USE):
+  canvas = document.createElement("canvas")
+  ctx = canvas.getContext("2d")
+  # ... draw pattern
+  mat.map = THREE.CanvasTexture.new(canvas)
+
+RIGHT (v2.0):
+  stripe = lbl.Mesh(lbl.Box(2.0, 0.005, 0.10), stripe_mat, name="stripe_0")
+  stripe.position.set(0.50, 0.495, 0.16)
+  car.add(stripe)
+  # OR for actual texture needs:
+  tex = lbl.make_texture({"type": "noise", "seed": 1}, size=256)
+  mat.map = tex  # DataTexture — works in Pyodide everywhere
+
+PBR recipes:
+  lbl.material("metal",   color="#cfd2d6", roughness=0.2, metalness=1.0)
+  lbl.material("stone",   color="#888880", roughness=0.85)
+  lbl.material("wood",    color="#6a4020", roughness=0.7, clearcoat=0.3)
+  lbl.material("leather", color="#5a3010", roughness=0.6, clearcoat=0.4)
+  lbl.material("cloth",   color="#a02020", roughness=0.85, sheen=0.4)
+  lbl.material("skin_material", color="#e0ae87", clearcoat=0.1)
+  lbl.material("velvet",  color="#600030", sheen=1.0, sheen_color="#ff80c0")
+  lbl.material("chitin",  color="#3a5a40", iridescence=0.6, clearcoat=0.8)
+  lbl.material("elytra",  color="#1a2810", iridescence=0.4, clearcoat=1.0)
+  lbl.material("membrane", color="#f0d8d8", transmission=0.7, ior=1.4)
+  lbl.material("emissive", base="#ffffff", emissive="#fffaec", intensity=2.0)
+
+Raw factories:
+  lbl.standard(color=0xff8000, roughness=0.5, metalness=0.0)
+  lbl.physical(color=0xff8000, clearcoat=1.0, transmission=0.0)
+  lbl.basic(color=0xffffff)              # unlit
+
+CS2 PBR (PART 45 / 289):
+  lbl.cs2_finish("#a04030", finish="case-hardened", wear="FT")
+  # 8 finishes: anodized, anodized-multicolored, custom-paint, gunsmith,
+  #             hydrographic, patina, solid-color, sprayed, damascus-steel
+  # 5 wear tiers: FN / MW / FT / WW / BS
+
+────────────────────────────────────────────────────────────────────────
+PART 364 — GEOMETRY: USE THE CUSTOM SHAPE HELPERS
+────────────────────────────────────────────────────────────────────────
+
+Beyond the basic THREE primitives, v2.0 adds these custom shape helpers:
+
+  lbl.FilletedBox(w, h, d, radius, smoothness)
+      Rounded-box geometry (uses RoundedBoxGeometry from three/addons).
+      Use for body, fenders, doors, panels — anything box-shaped that
+      shouldn't have sharp edges.
+
+  lbl.TaperedTube(points, start_radius, end_radius, segments)
+      Tube with variable radius along its length.
+      Use for: rocket nozzles, antennae, exhaust transitions.
+
+  lbl.StarPattern(num_spokes, inner_radius, outer_radius, thickness)
+      5-spoke alloy rim star (BoxGeometry-based).
+      Use for: wheel rims, decorative star patterns.
+
+  lbl.BeveledWasher(inner_radius, outer_radius, thickness, bevel)
+      Chamfered washer (RingGeometry + ExtrudeGeometry).
+      Use for: bolts, gaskets, decorative washers.
+
+  lbl.LathedTire(outer_radius, inner_radius, width, shoulder_radius, segments)
+      PART 179 — lathed toroidal tire. Fixes audit E41 ("flat cylinder tire").
+      Use for: ALL tires (mandatory compliance).
+
+  lbl.SweptTube(points, radius, radial_segments, tubular_segments)
+      PART 179 — tube swept along a CatmullRomCurve3.
+      Use for: exhaust headers, pipes, flexible tubes.
+
+  lbl.ExhaustCanister(length, radius_top, radius_bottom, oval=True, ...)
+      PART 179 — oval exhaust canister (lathed + non-uniform X scale).
+      Use for: motorcycle/vehicle exhaust.
+
+  lbl.Loft(profile_points, path_points, segments, closed_path=False)
+      Cross-section lofted along a path (custom geometry).
+      Use for: limbs, organic tapered surfaces, character body parts.
+
+  lbl.Lathe(profile_points, segments)
+      LatheGeometry — rotational surface from [x, y] profile.
+      Use for: wheels, vases, table legs, anything rotationally symmetric.
+
+  lbl.Extrude(shape, depth, bevel_enabled, ...)
+      ExtrudeGeometry — 2D shape → 3D body.
+      Use for: fairings, panels, shields, custom 2D profiles.
+
+  lbl.CatmullRom(points, tension=0.5, closed=False)
+      CatmullRomCurve3 — smooth spline through points.
+
+  lbl.Bezier(p0, p1, p2, p3, segments=24)
+      CubicBezierCurve3.
+
+  lbl.Shape() / lbl.Path()
+      THREE.Shape / THREE.Path for custom 2D profiles.
+
+────────────────────────────────────────────────────────────────────────
+PART 365 — PROCEDURAL TEXTURES (DataTexture-only, no canvas)
+────────────────────────────────────────────────────────────────────────
+
+CRITICAL: Pyodide on mobile often has getContext("2d") returning null.
+CanvasTexture silently fails → 3D models render as solid color fallbacks.
+NEVER use document.createElement or THREE.CanvasTexture.
+
+ALWAYS use lbl.make_texture(...) which builds THREE.DataTexture:
+
+  tex = lbl.make_texture({"type": "noise", "seed": 1, "octaves": 4}, size=256)
+  mat.map = tex
+
+Available texture types:
+  • "noise"        — value noise grayscale RGBA
+  • "voronoi"      — Voronoi / Worley cells
+  • "brick"        — running-bond brick
+  • "splatter"     — random splat dots
+  • "stripe"       — vertical/horizontal stripes
+  • "truchet"      — Truchet curves
+  • "voxel"        — chunky pixel art
+  • "radial"       — radial gradient
+  • "linear"       — linear gradient
+  • "micro-rough"  — micro-roughness (for material.roughnessMap)
+
+Convenience façade:
+  lbl.make_noise_texture(size=256, seed=1)
+  lbl.make_brick_texture(size=256, ...)
+  lbl.make_splatter_texture(size=256, ...)
+  lbl.make_micro_roughness_texture(size=256, seed=1)
+  lbl.make_radial_gradient_texture(size=256, color1, color2)
+  lbl.make_linear_gradient_texture(size=256, color1, color2, angle)
+  lbl.make_voxel_texture(size=256, primary, secondary, accent, ...)
+  lbl.make_voronoi_texture(size=256, cells=8, ...)
+  lbl.make_truchet_texture(size=256, ...)
+  lbl.make_stripe_texture(size=256, color1, color2, stripe_width, vertical)
+
+For patterns that are too complex for textures (stripes, decals, badges),
+add them as separate Mesh layers:
+
+  stripe = lbl.Mesh(lbl.Box(0.70, 0.005, 0.10), stripe_mat, name="stripe_0")
+  stripe.position.set(0.50, 0.495, 0.16)
+  car.add(stripe)
+
+────────────────────────────────────────────────────────────────────────
+PART 366 — RIGGING (SKELETON, BONES, SKINNING)
+────────────────────────────────────────────────────────────────────────
+
+Build a skeleton + bind a mesh as a SkinnedMesh:
+
+  from js import THREE
+
+  def build_skeleton():
+      pelvis = THREE.Bone.new(); pelvis.name = "pelvis"; pelvis.position.set(0, 0, 0)
+      spine  = THREE.Bone.new(); spine.name  = "spine";  spine.position.set(0, 0.3, 0)
+      chest  = THREE.Bone.new(); chest.name  = "chest";  chest.position.set(0, 0.6, 0)
+      neck   = THREE.Bone.new(); neck.name   = "neck";   neck.position.set(0, 0.9, 0)
+      head   = THREE.Bone.new(); head.name   = "head";   head.position.set(0, 1.1, 0)
+      spine.add(chest)
+      chest.add(neck)
+      neck.add(head)
+      pelvis.add(spine)
+      skel = THREE.Skeleton.new([pelvis, spine, chest, neck, head])
+      return {"root": pelvis, "bones": {b.name: b for b in [pelvis, spine, chest, neck, head]}, "skeleton": skel}
+
+Or use the lbl helper:
+  skel = lbl.skeleton([
+      {"name": "pelvis", "restPosition": [0, 0, 0]},
+      {"name": "spine",  "restPosition": [0, 0.3, 0], "parent": "pelvis"},
+      {"name": "chest",  "restPosition": [0, 0.6, 0], "parent": "spine"},
+      {"name": "neck",   "restPosition": [0, 0.9, 0], "parent": "chest"},
+      {"name": "head",   "restPosition": [0, 1.1, 0], "parent": "neck"},
+  ])
+
+Bind a mesh as SkinnedMesh:
+  skinned_mesh = lbl.skinned_mesh(geometry, material, skel)
+  # Now you can rotate any bone to deform the mesh.
+
+For simpler hierarchical rigs (no skinning), use Object3D nesting:
+  head_pivot = lbl.Group("head_pivot")
+  head_pivot.position.set(0, 1.1, 0)
+  head_mesh = lbl.Mesh(lbl.FilletedBox(0.24, 0.26, 0.24, 0.05, 3),
+                       skin_mat, name="head")
+  head_pivot.add(head_mesh)
+  body.add(head_pivot)
+  # Animate: head_pivot.rotation.y = sin(elapsed) * 0.3
+
+────────────────────────────────────────────────────────────────────────
+PART 367 — ANIMATION (CLIPS, MIXER, KEYFRAMES, DAMPED SPRINGS)
+────────────────────────────────────────────────────────────────────────
+
+Build a procedural walk cycle:
+
+  mixer = lbl.make_mixer(group)
+  walk_clip = lbl.build_walk_clip(
+      joint_paths=[
+          ("arm_L_pivot", 0.0),        # phase offset 0
+          ("arm_R_pivot", math.pi),    # phase offset π (opposite)
+          ("leg_L_pivot", math.pi),
+          ("leg_R_pivot", 0.0),
+      ],
+      duration=1.0, frequency=2.0, amplitude=0.4,
+  )
+  lbl.play_animation(mixer, walk_clip, fade_in=0.3)
+
+For more control, build clips from keyframe tracks:
+
+  times = [0, 0.5, 1.0]                        # 3 keyframes
+  values = [0.0, 0.5, 0.0]                     # arm.rotation.x values
+  track = lbl.number_keyframe_track("arm_L_pivot.rotation[x]", times, values)
+  clip = lbl.make_clip("wave", 1.0, [track])
+  action = lbl.play_animation(mixer, clip)
+
+Damped spring for secondary motion (cape, tail, antenna):
+
+  spring = lbl.damp_spring(target=0, k=80, c=8, mass=1.0)
+  def tick(dt, elapsed):
+      target = math.sin(elapsed * 1.5) * 0.3
+      spring.target = target
+      spring.step(dt)
+      cape.rotation.x = spring.value
+
+Sine wave / bounce helpers:
+
+  val = lbl.sine_wave(t, amplitude=1.0, frequency=2.0, phase=0.0)
+  val = lbl.bounce(t, amplitude=1.0, frequency=2.0)  # damped
+  l, r = lbl.walk_phase(t, frequency=2.0, amplitude=0.4)  # L/R pair
+
+Loop frame equality check (use before shipping):
+  ok = lbl.loop_frame_equal([first_frame_values], [last_frame_values])
+
+────────────────────────────────────────────────────────────────────────
+PART 368 — SCULPT RUNTIME CONTRACT (mandatory for Style B)
+────────────────────────────────────────────────────────────────────────
+
+Every Style B Group MUST populate userData.sculptRuntime. The simplest
+way is:
+
+  lbl.install_runtime(group, {
+      "subject": "supercar",                # what the model IS
+      "style":   "stylized-lowpoly",        # which visual style
+      "category": "vehicle",                # canonical category
+      "detailInventory": [                  # named parts the inspector should highlight
+          {"id": "lower_body", "region": "chassis", "kind": "feature",
+           "priority": "high", "reviewThreshold": 0.7},
+          {"id": "headlight_0", "region": "lights", "kind": "feature",
+           "priority": "high", "reviewThreshold": 0.8},
+          # ... every named mesh should have a matching inventory entry
+      ],
+  })
+
+install_runtime auto-populates:
+  group.userData.sculptRuntime = {
+      "subject", "style", "category",
+      "nodes":   {name: Object3D, ...},
+      "meshes":  {name: Mesh, ...},
+      "materials": {name: Material, ...},
+      "sockets": {},
+      "colliders": {},
+      "destructionGroups": {},
+      "actions": {},
+      "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+      "vfx": {},
+      "passes": {},
+      "passesReviewed": {},
+      "passesComplete": False,
+      "fidelity": {"score": 0.0, "issues": []},
+      "landmarks": [],
+      "detailInventory": [...],
+  }
+  group.userData.tick           = placeholder tick (replace with yours)
+  group.userData.setPalette     = lbl.palette.set (runtime hot-swap)
+  group.userData.availablePalettes = list of registered palette names
+
+────────────────────────────────────────────────────────────────────────
+PART 369 — TICK CONTRACT (mandatory for animated models)
+────────────────────────────────────────────────────────────────────────
+
+Every Style B Group that animates MUST set:
+
+  def tick(dt, elapsed):
+      # dt = seconds since last frame
+      # elapsed = seconds since first frame
+      # ... animate here
+
+  group.userData.tick = tick
+
+The renderer calls tick(dt, elapsed) every render frame.
+
+Common patterns:
+  • Wheel spin:    part.rotation.x += dt * speed
+  • Walk cycle:    phase = elapsed * 2.0
+                   arm_L.rotation.x = sin(phase) * 0.4
+                   arm_R.rotation.x = sin(phase + math.pi) * 0.4
+  • Engine idle:   car.position.y = sin(elapsed * 35) * 0.003
+  • Steering:      steer_angle += (target - steer_angle) * dt * 4.0
+  • Lean-in-turn:  lean_angle += (-steer * abs(speed) * 0.15 - lean) * dt * 2.0
+                   car.rotation.z = lean_angle
+  • Damped spring: spring.target = target_value
+                   spring.step(dt)
+                   part.rotation.x = spring.value
+
+────────────────────────────────────────────────────────────────────────
+PART 370 — CROSS-PRIMITIVE VOCABULARY (PART 67)
+────────────────────────────────────────────────────────────────────────
+
+The cross-primitive helpers are patterns of how to ARRANGE primitives:
+
+  lbl.disc(radius, thickness, segments)        — thin cylinder treated as disc
+  lbl.arc(radius, tube, arc_angle, segments)   — partial torus
+  lbl.ribbon(points, width, thickness, segs)   — flat strip along curve
+  lbl.helix(turns, height, radius, tube, segs) — spiral tube
+  lbl.cross_planes(size, axis1, axis2, axis3)  — 3 intersecting planes
+  lbl.place_chain(base_geom, count, transforms) — placed instances
+  lbl.recolor_by_palette(group, name)          — hot-swap on existing group
+  lbl.apply_material_animation(mat, prop, keyframes, fps) — animated material
+  lbl.preflight_check(group, **opts)          — full audit before shipping
+
+────────────────────────────────────────────────────────────────────────
+PART 371 — STANDALONE PRIMITIVES (PART 68-71)
+────────────────────────────────────────────────────────────────────────
+
+  lbl.star(points, outer_radius, inner_radius, depth, bevel)     # PART 68
+  lbl.polygon(sides, radius, depth, bevel)                       # PART 68
+  lbl.annulus(inner_radius, outer_radius, depth, bevel)          # PART 68
+  lbl.heart(size, depth, bevel)                                  # PART 69
+  lbl.spade(size, depth, bevel)                                  # PART 69
+  lbl.burst(rays, inner_radius, outer_radius, depth, bevel)      # PART 70
+  lbl.arch(width, height, depth, segments, bevel)                # PART 70
+  lbl.edged_box(width, height, depth, edge_radius, edge_segments) # PART 70
+  lbl.molding(length, profile_points, depth, bevel)              # PART 70
+  lbl.pumpkin(size, segments, height)                            # PART 71
+  lbl.leaf(size, depth, bevel)                                   # PART 71
+  lbl.arched_slab(width, height, depth, segments, bevel)         # PART 71
+
+────────────────────────────────────────────────────────────────────────
+PART 372 — 44-TECHNIQUE MODELING BUNDLE BRIDGE
+────────────────────────────────────────────────────────────────────────
+
+The 44 helpers from MT_core / MT_mesh / MT_organic / MT_materials /
+MT_advanced are reachable from Python via:
+
+  lbl.mt.makePrimitive(kind, opts)         # 1: box / sphere / cylinder / ...
+  lbl.mt.bmeshFromGeometry(geom)            # 2: BMesh
+  lbl.mt.proceduralGenerate(axiom, rules, iters)  # 3: procedural
+  lbl.mt.makeParametric(uFn, vFn, opts)     # 4: parametric surface
+  lbl.mt.generativeGrow({...})              # 5: space colonization
+  lbl.mt.sdfSphere([x,y,z], r)              # 6: SDF
+  lbl.mt.sdfUnion(sdf_a, sdf_b)
+  lbl.mt.sdfMarch(sdf, {resolution: 32})    # marching cubes
+  lbl.mt.voxelCarve(geom)                   # 7: voxel
+  lbl.mt.marchingCubesFromVoxels(vg)
+  lbl.mt.csgUnion(mesh_a, mesh_b)           # 8: CSG (requires three-bvh-csg)
+  lbl.mt.csgSubtract(mesh_a, mesh_b)
+  lbl.mt.lSystem(axiom, rules, iters)       # 9: L-system
+  lbl.mt.fractalMandelbulb({power: 8, ...})  # 10: fractal
+  lbl.mt.fractalMenger(...)
+  lbl.mt.makeNurbsCurve(ctrl, degree)       # 11: NURBS
+  lbl.mt.makeCatmullRom(points, opts)
+  lbl.mt.detectNonManifold(geom)            # 12: non-manifold
+  lbl.mt.fixNonManifold(geom)
+  lbl.mt.subdivideCatmullClark(geom, levels) # 13: subdivision
+  lbl.mt.isotropicRemesh(geom, opts)        # 14: remeshing
+  lbl.mt.qemDecimate(geom, opts)            # 16: decimation
+  lbl.mt.laplacianSmooth(geom, opts)        # 19: smoothing
+  lbl.mt.sculptBrush(geom, opts)            # 20: sculpting
+  lbl.mt.displaceSurface(geom, opts)        # 21: displace + noise
+  lbl.mt.smplSkeleton(...)                  # 22: SMPL
+  lbl.mt.makeBlendshape(target, name, weight) # 23: blendshapes
+  lbl.mt.computeLBS(skeleton, geom)         # 26: LBS
+  lbl.mt.computeDQS(skeleton, geom)         # 27: DQS
+  lbl.mt.deltaMush(geom, opts)              # 29: delta mush
+  lbl.mt.autoRig(geom, opts)                # 34: auto-rigging
+  lbl.mt.uvUnwrap(geom, opts)               # 37: UV unwrapping
+  lbl.mt.bakeMap(geom, kind, opts)          # 38: baking
+  lbl.mt.packAtlases(rects, opts)           # 40: atlas packing
+  lbl.mt.generateLOD(geom, opts)            # 41: LOD chain
+  lbl.mt.makeInstanced(geom, count, opts)   # 42: instancing
+  lbl.mt.physicsStep(world, dt)             # 44: physics
+
+Engine dispatcher:
+  lbl.mt.run(technique, target, opts)
+  lbl.mt.runStack({target, steps})
+  lbl.mt.applyToScene(technique, scene, opts)
+  lbl.mt.selfTest()  # 16-bundle sanity check
+  lbl.mt.catalog    # list of all 44 techniques
+
+────────────────────────────────────────────────────────────────────────
+PART 373 — DEFORMERS (PART 244.8 / 67)
+────────────────────────────────────────────────────────────────────────
+
+All operate on THREE.BufferGeometry and return a new geometry:
+
+  lbl.bend(geometry, axis="x", angle=0.5)
+      Bend around an axis (in radians).
+  lbl.twist(geometry, axis="y", angle=1.0)
+      Twist around an axis (in radians).
+  lbl.taper(geometry, axis="y", ratio=0.5)
+      Taper along an axis (scales cross-section linearly).
+  lbl.spherize(geometry, amount=1.0)
+      Pull toward a sphere (useful for organic blob characters).
+  lbl.noise(geometry, amplitude=0.05, frequency=4.0, seed=1, octaves=4)
+      Displace vertices by value noise.
+  lbl.modifier_stack(geometry, modifiers)
+      Chain modifiers in order. modifiers is a list of dicts.
+  lbl.fill_vertex_channel(geometry, channel, value)
+      Set every vertex value of a given attribute.
+  lbl.converge_faces(geometry, target, radius=0.1, strength=1.0)
+      Pull vertices toward a target point.
+  lbl.project_uv(geometry, method="planar", axis="z")
+      Assign UVs by planar/spherical/cylindrical/box projection.
+
+────────────────────────────────────────────────────────────────────────
+PART 374 — LOOK-DEV LIGHTING
+────────────────────────────────────────────────────────────────────────
+
+  lbl.lookdev_lights(mode="reference")  # 4-mode studio rig
+      mode ∈ {"reference", "grazing", "neutral", "stage"}
+      Returns: {group, shadow_catcher, lights}
+
+  lbl.reference_lights()  # warm key + cool fill + rim (default)
+  lbl.grazing_lights()    # strong side lighting for surface detail
+  lbl.neutral_lights()    # soft even lighting (for QA photography)
+  lbl.stage_lights()      # 4-light stage rig
+
+  lbl.shadow_catcher()    # transparent ground plane (receives shadows)
+
+  lbl.architectural_lights(mode="day")  # 4-mode architectural rig
+      mode ∈ {"day", "night", "interior", "studio"}
+
+  lbl.build_arch_palette()  # 9-key architectural palette
+      # Returns: {stuccoWhite, woodTeak, woodOak, concrete, stonePavers,
+      #          brickRed, roofTile, glass, door} as MeshStandardMaterials
+
+────────────────────────────────────────────────────────────────────────
+PART 375 — VALIDATION (PART 174 / 248)
+────────────────────────────────────────────────────────────────────────
+
+Before returning your group, run:
+
+  warnings = lbl.preflight_check(group, triangle_budget=10000)
+  # Returns list of warnings (empty = all checks passed).
+  if warnings:
+      group.userData.preflightWarnings = warnings
+
+The combined audit checks:
+  - Triangle budget (default 8,500 for supercar, 5,000 for character)
+  - Bounding box (min_y, max_abs_coord)
+  - Shadow setup (every body mesh has cast + receive)
+  - sculptRuntime contract conformance
+  - userData.tick is set (warns if not)
+  - Material color is set (warns if 0xffffff placeholder)
+
+Individual checks:
+  lbl.validate_triangle_budget(group, budget)
+  lbl.validate_bbox(group, min_y=0.0, max_abs_coord=10.0)
+  lbl.validate_shadows(group, require_cast=True, require_receive=True)
+  lbl.validate_sculpt_runtime(group)  # PART 207 contract
+
+────────────────────────────────────────────────────────────────────────
+PART 376 — ARCHITECTURAL HELPERS (PART 270-274)
+────────────────────────────────────────────────────────────────────────
+
+  7 parametric constructors:
+    lbl.arch_parametric(width, height, depth, segments)
+    lbl.molding_parametric(length, profile, depth)
+    lbl.step_block(width, height, depth, bevel)
+    lbl.stair(width, height, depth, steps, step_depth)
+    lbl.column(radius, height, base_height, capital_height, flutes, material)
+    lbl.arched_window(width, height, depth, frame_thickness, material)
+    lbl.roof_tile(width, length, depth, bevel, material)
+
+  Anti-z-fighting (PART 272):
+    dx, dy, dz = lbl.stack_level(key, axis="y")
+    # Returns a tiny offset to prevent z-fighting when stacking layers.
+
+  Look-dev lighting (PART 273):
+    lbl.architectural_lights(mode="day"|"night"|"interior"|"studio")
+
+  9-key material palette (PART 274):
+    lbl.build_arch_palette()  # Returns materials dict
+
+────────────────────────────────────────────────────────────────────────
+PART 377 — VEHICLE / HARD-SURFACE HELPERS (PART 167-178 / 255-259)
+────────────────────────────────────────────────────────────────────────
+
+  Skeleton-first pipeline:
+    lbl.vehicle_skeleton_first(body_width, body_length, body_height,
+                                wheel_radius, wheelbase)
+
+  5 fairing techniques:
+    lbl.quadratic_fairing(width, height, depth, control_points)
+    lbl.bezier_extrude(pts, depth, bevel_enabled, ...)
+    lbl.lathe_fairing(profile_points, segments)
+    lbl.swept_extrusion(profile_shape, path_points, frames)
+    lbl.parametric_fairing(uFn, vFn, u_segments, v_segments)
+
+  Custom shape helpers (vehicle-specific):
+    lbl.FilletedBox(...)          # body
+    lbl.TaperedTube(...)          # frame spars
+    lbl.StarPattern(...)          # wheel rims
+    lbl.BeveledWasher(...)        # bolts, gaskets
+    lbl.LathedTire(...)           # tires (PART 179)
+    lbl.SweptTube(...)            # exhaust headers
+    lbl.ExhaustCanister(...)      # mufflers
+
+────────────────────────────────────────────────────────────────────────
+PART 378 — v2.0 UPGRADED COMMON MISTAKES (DO NOT)
+────────────────────────────────────────────────────────────────────────
+
+DO NOT use CanvasTexture or document.createElement — they fail in Pyodide
+on mobile. The renderer silently returns null textures → 3D models render
+as solid color fallbacks (white if no color set).
+
+DO NOT set color=0xffffff as a texture placeholder.
+
+DO NOT use Style A (lbl.attach_box, lbl.attach_cylinder, lbl.paint_rectangle)
+for new code — Style B is the default and supports everything Style A does
+plus more (animations, materials, textures, rigging, runtime contracts).
+
+DO NOT print() for debug output — the renderer captures stdout.
+
+DO NOT import external pip packages (numpy, PIL, etc.) — they don't ship
+with Pyodide by default.
+
+DO NOT create detached THREE objects and forget to add them to the Group.
+Always: g.add(mesh).
+
+DO NOT use lbl.cast_shadow=False on body meshes — shadows are required.
+
+DO NOT return None from create_model — return a Group or blueprint dict.
+
+DO NOT use Math.PI in Python — it's math.pi.
+
+DO NOT use new keyword with Three.js — it's THREE.Mesh.new() in Pyodide.
+
+DO NOT forget to call lbl.install_runtime() — without it the inspector
+won't be able to show the model tree.
+
+DO NOT forget to call lbl.preflight_check() before returning.
+
+DO NOT skip userData.setPalette + availablePalettes — users want to
+hot-swap palettes at runtime.
+
+DO NOT skip userData.tick if the model animates.
+
+────────────────────────────────────────────────────────────────────────
+PART 379 — v2.0 UPGRADED RUNTIME ERROR REFERENCE
+────────────────────────────────────────────────────────────────────────
+
+"ImportError: cannot import name 'X' from 'js'" — you're importing a class
+that wasn't mirrored to window. Common ones: RoundedBoxGeometry,
+TransformControls, GLTFExporter. The renderer auto-mirrors THREE.* and
+RoundedBoxGeometry/TransformControls/GLTFExporter, but custom addons
+need explicit `from js import window; window.MyClass = MyClass` first.
+
+"AttributeError: 'JsProxy' object has no attribute 'X'" — you used
+THREE.X.new() but X is a property, not a class. Check Three.js docs.
+
+"factory returned None and no builder-API objects were registered" —
+your create_model returned None without calling lbl.blueprint() first.
+Either return a Group, return lbl.blueprint(), or call lbl.attach_box()
++ similar.
+
+"sculptRuntime contract not satisfied" — you forgot lbl.install_runtime()
+or your detailInventory has items that don't match any mesh name.
+
+"Pyodide loader did not expose loadPyodide() — CDN URL may have changed."
+— the user's network is offline or the CDN is blocked. They need to
+transpile their .py to .json locally.
+
+"Model renders white" — you used CanvasTexture which failed silently.
+Switch to lbl.make_texture(...) (DataTexture) or layer the pattern as a
+separate Mesh.
+
+"Model renders as scattered flat dots" — you used Style A (lbl.attach_*)
+which has silent geometry failures. Switch to Style B (THREE.Group direct).
+
+────────────────────────────────────────────────────────────────────────
+PART 380 — v2.0 UPGRADED PRE-OUTPUT CHECKLIST
+────────────────────────────────────────────────────────────────────────
+
+Before you (the AI) output the .py file, verify:
+  [ ] create_model (or build / make / main) function is defined
+  [ ] Signature: def create_model(options=None):
+  [ ] Style B: returns a THREE.Group (not a dict)
+  [ ] All meshes have name= set
+  [ ] All meshes have castShadow=True + receiveShadow=True
+  [ ] body / stripe / carbon / rim / tire / glass / headlight / taillight
+      / chrome / accent palette slots are populated (if applicable)
+  [ ] Pattern meshes (stripes, decals) are separate Mesh layers
+  [ ] No CanvasTexture / document.createElement calls
+  [ ] userData.sculptRuntime set (use lbl.install_runtime)
+  [ ] userData.tick set if any animation
+  [ ] userData.setPalette + availablePalettes for hot-swap
+  [ ] userData.meta has name + style + category
+  [ ] Imports: `from js import THREE` (only if you need THREE.* directly)
+  [ ] lbl.preflight_check() called before returning
+  [ ] All lbl.* method names match PART 3 / 364-377 above
+  [ ] No 0xffffff color placeholders
+
+────────────────────────────────────────────────────────────────────────
+PART 381 — MINIMAL v2.0 WORKED EXAMPLE (Style B)
+────────────────────────────────────────────────────────────────────────
+
+  # hello_block.py -- minimal Style B Python factory.
+  #
+  # Renders a single red box with full PBR, palette hot-swap, and animation.
+
+  from js import THREE
+
+  def create_model():
+      g = lbl.Group("Hello Block")
+      g.userData.meta = {"name": "Hello Block", "style": "smooth-low-poly",
+                          "category": "prop", "subject": "box"}
+
+      # Build a mutable materials dict from the racing-red palette
+      mats = lbl.build_materials("racing-red")
+      body_mat = mats["body"]
+
+      # Solid red box (v2.0 PBR -- no canvas, no texture placeholders)
+      body = lbl.Mesh(lbl.FilletedBox(1.0, 1.0, 1.0, 0.08, 4),
+                      body_mat, name="body")
+      body.position.y = 0.5
+      g.add(body)
+
+      # Idle bob animation (Style B -- userData.tick)
+      def tick(dt, elapsed):
+          body.position.y = 0.5 + math.sin(elapsed * 1.5) * 0.05
+      g.userData.tick = tick
+
+      # SculptRuntime contract (auto-populates 9-key + setPalette)
+      lbl.install_runtime(g, {"subject": "box", "style": "smooth-low-poly",
+                                "category": "prop",
+                                "detailInventory": [
+                                    {"id": "body", "region": "main",
+                                     "kind": "feature", "priority": "high",
+                                     "reviewThreshold": 0.7}
+                                ]})
+
+      # Preflight audit
+      warnings = lbl.preflight_check(g, triangle_budget=2000)
+      if warnings:
+          g.userData.preflightWarnings = warnings
+
+      return g
+
+────────────────────────────────────────────────────────────────────────
+PART 382 — ADVANCED v2.0 WORKED EXAMPLE (supercar with palette hot-swap)
+────────────────────────────────────────────────────────────────────────
+
+  # supercar.py -- Apex Horizon GT Style B factory with full v2.0 surface.
+  #
+  # Try at runtime in browser console:
+  #   car.userData.setPalette("neon-cyber")
+  #   car.userData.setDriveSpeed(0.5)
+  #   car.userData.steer(0.3)
+  #   car.userData.revEngine(1.0)
+
+  from js import THREE
+
+  def create_model(options=None):
+      palette_name = (options or {}).get("palette", "racing-red")
+      mats = lbl.build_materials(palette_name)
+      body_mat    = mats["body"]
+      stripe_mat  = mats["stripe"]
+      carbon_mat  = mats["carbon"]
+      rim_mat     = mats["rim"]
+      tire_mat    = mats["tire"]
+      glass_mat   = mats["glass"]
+      headlight_mat = mats["headlight"]
+      taillight_mat = mats["taillight"]
+      chrome_mat  = mats["chrome"]
+      accent_mat  = mats["accent"]
+
+      car = lbl.Group("ApexHorizonGT")
+      car.userData.meta = {"name": "Apex Horizon GT", "category": "vehicle",
+                            "style": "stylized-lowpoly", "subject": "supercar"}
+
+      # Lower body
+      lower = lbl.Mesh(lbl.FilletedBox(2.4, 0.30, 1.70, 0.06, 4),
+                       body_mat, name="lower_body")
+      lower.position.set(0, 0.62, 0)
+      car.add(lower)
+
+      # Hood
+      hood = lbl.Mesh(lbl.FilletedBox(1.2, 0.10, 1.40, 0.04, 3),
+                      body_mat, name="hood")
+      hood.position.set(0.85, 0.99, 0)
+      car.add(hood)
+
+      # Racing stripes (FIX 4 -- separate Mesh layers, not textures)
+      for side in (-1, 1):
+          s = lbl.Mesh(lbl.Box(2.0, 0.005, 0.06), stripe_mat,
+                       name="stripe_{}".format(side))
+          s.position.set(0, 1.05, side * 0.18)
+          car.add(s)
+
+      # Front splitter (carbon)
+      splitter = lbl.Mesh(lbl.FilletedBox(2.1, 0.04, 1.75, 0.015, 2),
+                          carbon_mat, name="front_splitter")
+      splitter.position.set(1.20, 0.42, 0)
+      car.add(splitter)
+
+      # Rear wing (carbon)
+      wing = lbl.Mesh(lbl.FilletedBox(0.30, 0.04, 1.10, 0.015, 2),
+                      carbon_mat, name="rear_wing")
+      wing.position.set(-1.10, 1.18, 0)
+      car.add(wing)
+
+      # Canopy (glass)
+      canopy = lbl.Mesh(lbl.FilletedBox(1.10, 0.32, 1.20, 0.04, 3),
+                        glass_mat, name="canopy")
+      canopy.position.set(-0.05, 1.08, 0)
+      car.add(canopy)
+
+      # Headlights (emissive)
+      for side in (-1, 1):
+          hl = lbl.Mesh(lbl.Box(0.18, 0.10, 0.30), headlight_mat,
+                        name="headlight_{}".format(side))
+          hl.position.set(1.30, 0.85, side * 0.55)
+          car.add(hl)
+
+      # Wheels using LathedTire + StarPattern (custom shape helpers)
+      def build_wheel(x, side):
+          wg = lbl.Group("wheel_{}".format(side))
+          tire_geo = lbl.LathedTire(outer_radius=0.34, inner_radius=0.18,
+                                      width=0.22, shoulder_radius=0.04)
+          tire_geo.rotateY(math.pi/2)
+          tire = lbl.Mesh(tire_geo, tire_mat, name="tire")
+          wg.add(tire)
+          spokes = lbl.StarPattern(5, 0.07, 0.28, 0.05)
+          spokes.position.x = (0.11 / 2) * side
+          wg.add(spokes)
+          wg.position.set(x, 0.34, 0)
+          return wg
+      for x in (-1.25, 1.25):
+          car.add(build_wheel(x, -1))
+          car.add(build_wheel(x, 1))
+
+      # Exhaust (oval canister + swept header)
+      exhaust = lbl.Mesh(
+          lbl.ExhaustCanister(length=0.45, radius_top=0.085, radius_bottom=0.095,
+                              oval=True), chrome_mat, name="exhaust")
+      exhaust.rotation.z = math.pi / 2
+      exhaust.position.set(-1.20, 0.50, 0.85)
+      car.add(exhaust)
+      header = lbl.Mesh(
+          lbl.SweptTube([[-1.20, 0.50, 0.65], [-1.00, 0.40, 0.55],
+                          [-0.70, 0.35, 0.50], [-0.40, 0.40, 0.50]],
+                         radius=0.025, radial_segments=8), chrome_mat,
+          name="exhaust_header")
+      car.add(header)
+
+      # Tick (animation -- wheels spin, body leans, lights pulse)
+      state = {"drive": 0.0, "steer": 0.0, "lean": 0.0, "rev": 0.0}
+      target_steer = [0.0]
+
+      def tick(dt, elapsed):
+          state["steer"] += (target_steer[0] - state["steer"]) * min(1, dt * 4)
+          state["lean"] += (-state["steer"] * abs(state["drive"]) * 0.15 -
+                            state["lean"]) * min(1, dt * 2)
+          car.rotation.z = state["lean"]
+          for w in car.children:
+              if w.name.startswith("wheel_"):
+                  if w.name.endswith("-1") or w.name.endswith("1"):
+                      w.rotation.y = state["steer"]
+                  if w.children and w.children[0].name == "tire":
+                      w.children[0].rotation.x += dt * state["drive"] * 4
+          if headlight_mat:
+              headlight_mat.emissiveIntensity = 2.0 + math.sin(elapsed * 1.5) * 0.1
+
+      car.userData.tick = tick
+
+      # Public API (Actions)
+      def steer(a):
+          target_steer[0] = max(-0.6, min(0.6, a))
+      def set_drive(s):
+          state["drive"] = max(-2.0, min(2.0, s))
+      def rev_engine(power=1.0):
+          state["rev"] += 0.3 * power
+          state["rev"] = min(2.5, state["rev"])
+      car.userData.steer = steer
+      car.userData.setDriveSpeed = set_drive
+      car.userData.revEngine = rev_engine
+
+      # SculptRuntime contract (auto-populated)
+      lbl.install_runtime(car, {"subject": "supercar", "style": "stylized-lowpoly",
+                                 "category": "vehicle",
+                                 "detailInventory": [
+                                     {"id": "lower_body", "region": "chassis",
+                                      "kind": "feature", "priority": "high",
+                                      "reviewThreshold": 0.7},
+                                     {"id": "hood", "region": "chassis",
+                                      "kind": "feature", "priority": "high",
+                                      "reviewThreshold": 0.7},
+                                     {"id": "front_splitter", "region": "aero",
+                                      "kind": "feature", "priority": "medium",
+                                      "reviewThreshold": 0.5},
+                                     {"id": "rear_wing", "region": "aero",
+                                      "kind": "feature", "priority": "medium",
+                                      "reviewThreshold": 0.5},
+                                     {"id": "canopy", "region": "cockpit",
+                                      "kind": "feature", "priority": "high",
+                                      "reviewThreshold": 0.7},
+                                     {"id": "headlight_-1", "region": "lights",
+                                      "kind": "feature", "priority": "high",
+                                      "reviewThreshold": 0.8},
+                                     {"id": "headlight_1", "region": "lights",
+                                      "kind": "feature", "priority": "high",
+                                      "reviewThreshold": 0.8},
+                                     {"id": "exhaust", "region": "exhaust",
+                                      "kind": "feature", "priority": "medium",
+                                      "reviewThreshold": 0.5},
+                                 ]})
+
+      # Preflight
+      warnings = lbl.preflight_check(car, triangle_budget=10000)
+      if warnings:
+          car.userData.preflightWarnings = warnings
+
+      return car
+
+────────────────────────────────────────────────────────────────────────
+PART 383 — CHARACTER RIGGING v2.0 EXAMPLE
+────────────────────────────────────────────────────────────────────────
+
+  # character.py -- rigged humanoid with skeleton + walk cycle.
+  #
+  # Try at runtime:
+  #   char.userData.setSkinTheme("void-monarch")
+  #   char.userData.playAnimation("walk", fade=0.3)
+
+  from js import THREE
+
+  SKIN_THEMES = {
+      "cyber-paladin":    {"skin": "#e0ae87", "armor": "#1b202c", "accent": "#fbb034", "glow": "#00f5d4"},
+      "void-monarch":     {"skin": "#c9987a", "armor": "#0d0817", "accent": "#fb923c", "glow": "#e879f9"},
+      "celestial-knight": {"skin": "#e8be99", "armor": "#f8fafc", "accent": "#f59e0b", "glow": "#38bdf8"},
+  }
+
+  def create_model(options=None):
+      theme = (options or {}).get("theme", "cyber-paladin")
+      T = SKIN_THEMES[theme]
+      skin_mat = lbl.skin_material(base_color=T["skin"])
+      armor_mat = lbl.standard(color=T["armor"], roughness=0.30, metalness=0.70)
+      glow_mat = lbl.emissive(T["glow"], T["glow"], 1.5)
+
+      g = lbl.Group("rigged_character")
+      g.userData.meta = {"name": "Rigged Character", "category": "character",
+                          "style": "stylized-lowpoly", "subject": "humanoid"}
+
+      # 5-bone skeleton (rigging)
+      skel = lbl.skeleton([
+          {"name": "pelvis", "restPosition": [0, 0, 0]},
+          {"name": "spine",  "restPosition": [0, 0.3, 0], "parent": "pelvis"},
+          {"name": "chest",  "restPosition": [0, 0.6, 0], "parent": "spine"},
+          {"name": "neck",   "restPosition": [0, 0.9, 0], "parent": "chest"},
+          {"name": "head",   "restPosition": [0, 1.1, 0], "parent": "neck"},
+      ])
+      g.add(skel["root"])
+
+      # Body parts (hierarchical -- no skinning needed for chunky-mascot)
+      g.add(lbl.Mesh(lbl.Box(0.36, 0.20, 0.26), armor_mat, name="pelvis"))
+      g.add(lbl.Mesh(lbl.FilletedBox(0.40, 0.50, 0.30, 0.04, 3),
+                      armor_mat, name="torso"))
+      g.add(lbl.Mesh(lbl.FilletedBox(0.24, 0.26, 0.24, 0.05, 3),
+                      skin_mat, name="head"))
+      for side in (-1, 1):
+          g.add(lbl.Mesh(lbl.FilletedBox(0.14, 0.46, 0.14, 0.03, 2),
+                          armor_mat, name="arm_{}".format(side)))
+          g.add(lbl.Mesh(lbl.FilletedBox(0.16, 0.50, 0.16, 0.03, 2),
+                          armor_mat, name="leg_{}".format(side)))
+
+      # Walk cycle via AnimationMixer + procedural clip (animation)
+      mixer = lbl.make_mixer(g)
+      walk_clip = lbl.build_walk_clip(
+          joint_paths=[
+              ("arm_-1_pivot", 0.0), ("arm_1_pivot", math.pi),
+              ("leg_-1_pivot", math.pi), ("leg_1_pivot", 0.0),
+          ],
+          duration=1.0, frequency=2.0, amplitude=0.4,
+      )
+      lbl.play_animation(mixer, walk_clip, fade_in=0.3)
+
+      # Damped spring for cape (secondary motion)
+      cape_spring = lbl.damp_spring(target=0, k=80, c=8)
+      def tick(dt, elapsed):
+          cape_spring.target = math.sin(elapsed * 1.5) * 0.3
+          cape_spring.step(dt)
+
+      g.userData.tick = tick
+      g.userData.playAnimation = lambda n, f=0.3: lbl.play_animation(
+          mixer, walk_clip if n == "walk" else None, f)
+      g.userData.setSkinTheme = lambda t: None  # placeholder
+      g.userData.availableThemes = list(SKIN_THEMES.keys())
+
+      lbl.install_runtime(g, {"subject": "character", "style": "stylized-lowpoly",
+                                "category": "character",
+                                "detailInventory": [
+                                    {"id": "head", "region": "head",
+                                     "kind": "feature", "priority": "high",
+                                     "reviewThreshold": 0.9},
+                                    {"id": "torso", "region": "torso",
+                                     "kind": "panel", "priority": "high",
+                                     "reviewThreshold": 0.8},
+                                ]})
+      return g
+
+────────────────────────────────────────────────────────────────────────
+PART 384 — v2.0 UPGRADE: COMPANION FILES
+────────────────────────────────────────────────────────────────────────
+
+The full worked examples live in the repo:
+
+  • public/models/Model_10.py — Apex Horizon GT supercar (Style B, ~500 lines)
+  • public/models/Model_11_Character.py — rigged character (~320 lines)
+  • public/models/Model_12_House.py — procedural cottage (~250 lines)
+
+The upgraded lbl helper:
+
+  • public/modeling/lbl_py.py — 4,500+ lines of v2.0 surface
+    (Style A + Style B + 10-slot palette + 8 presets + MT bridge +
+     custom shapes + rigging + animation + look-dev lighting + validation)
+
+The build + patch tools (only when re-building the inlined source):
+
+  • public/modeling/build_inlined.py — regenerates the inlined JS helper
+  • public/modeling/patch_index.py — patches index.html with new source
+
+The standalone test suite:
+
+  • public/modeling/test_integration.py — 8 integration tests
+
+The release notes:
+
+  • CHANGES_v2_0.md — full changelog
+
+────────────────────────────────────────────────────────────────────────
+PART 385 — SUMMARY: WHAT CHANGED IN v2.0
+────────────────────────────────────────────────────────────────────────
+
+For the AI prompt author, here is the absolute minimum you need to know:
+
+1. Use Style B (THREE.Group return) -- NOT Style A.
+2. Use the 10-slot palette system (lbl.build_materials + setPalette).
+3. Use solid PBR materials -- NO CanvasTexture, NO document.createElement.
+4. Use separate Mesh layers for patterns (stripes, decals).
+5. Set userData.sculptRuntime via lbl.install_runtime.
+6. Set userData.tick for any animation.
+7. Set userData.setPalette + availablePalettes for hot-swap.
+8. Use the new custom shape helpers (FilletedBox, LathedTire, etc.)
+9. Use rigging helpers (skeleton, skinned_mesh) for characters.
+10. Use animation helpers (build_walk_clip, damp_spring, mixer).
+11. Run preflight_check before returning.
+12. NEVER use color=0xffffff as a texture placeholder.
+
+If you remember these 12 rules, you'll generate v2.0-compatible Python
+factories. If you also use the worked examples in Model_10.py /
+Model_11_Character.py / Model_12_House.py as patterns, you'll match the
+TypeScript output quality.
+
+================================================================================
+END OF PART 360-385 (v2.0 upgrade documentation)
+================================================================================
