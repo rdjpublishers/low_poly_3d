@@ -627,7 +627,8 @@ Every class, every constant, every helper is available.
   (Three.js Direct) authors find it more Pythonic to write
   `from js import RoundedBoxGeometry` than `THREE.RoundedBoxGeometry`.
 
-Idiom translation — JS to Python:
+Idiom translation — JS to Python (default — works for everything except
+animation classes, see 203.1):
   new THREE.Group()                  THREE.Group.new()
   new THREE.Mesh(g, m)               THREE.Mesh.new(g, m)
   new THREE.BoxGeometry(w, h, d)     THREE.BoxGeometry.new(w, h, d)
@@ -659,6 +660,93 @@ Gotchas (the only ones worth knowing):
      like `MeshStandardMaterial`.
   5. You CAN return a JS object to Python and pass it back to JS, but
      you should NOT destroy the proxy mid-use (PART 216.2 covers this).
+
+203.1 — `THREE.X.new(...)` IS UNSAFE FOR ANIMATION CLASSES (Pyodide 0.26+)
+  Default rule: `THREE.Group.new()`, `THREE.Mesh.new()`, `THREE.BoxGeometry
+  .new(...)`, etc. all work fine. The `.new()` Pyodide idiom returns a
+  borrowed PyProxy that is kept alive by your Python local / by the
+  JS-side references you set — for 99% of THREE classes this is
+  fine.
+
+  Exception — DO NOT use `.new()` for THREE.js animation classes:
+    THREE.AnimationMixer.new(root)
+    THREE.AnimationClip.new(name, duration, tracks)
+    THREE.NumberKeyframeTrack.new(name, times, values)
+    (and VectorKeyframeTrack / QuaternionKeyframeTrack / BooleanKeyframeTrack
+     / ColorKeyframeTrack / StringKeyframeTrack — same family.)
+
+  In Pyodide 0.26 / 0.26.1 / 0.26.2 (the version this renderer loads),
+  the borrowed PyProxy returned by `.new()` for these classes is
+  destroyed at the end of the very next JS function call after it's
+  created — even when a Python local still holds the variable. The
+  symptom is:
+
+      pyodide.ffi.JsException: Error: This borrowed proxy was
+      automatically destroyed at the end of a function call.
+      Try using create_proxy or create_once_callable.
+
+  on the FIRST call that touches the returned object. For animation
+  classes, the death-blow is `mixer.clipAction(clip)` — Three.js's
+  `clipAction` body reads `clip.uuid` immediately, and by then the
+  proxy has already been invalidated by Pyodide's auto-destroy.
+
+  The only working escape hatch I found in the v0.26.x line (verified
+  in a real Pyodide v0.26.2 + three@0.160.0 browser harness):
+
+      from js import window
+      clip  = window.eval("new THREE.AnimationClip(name, duration, tracks)")
+      track = window.eval("new THREE.NumberKeyframeTrack(name, times, values)")
+      mixer = window.eval("new THREE.AnimationMixer(root_proxy)")
+
+  Why this works: Pyodide's `.new()` machinery is bypassed entirely.
+  The `eval(...)` runs the constructor in pure JS, and the proxy
+  Pyodide hands back survives the lifetime of the JS-side object.
+  (Stored helper functions like `window.__mkClip = function(...)
+  { return new THREE.AnimationClip(...) }` and then calling
+  `window.__mkClip(...)` from Python do NOT work — Pyodide still
+  destroys the returned proxy on the call.)
+
+  For the `AnimationMixer` case you also need the `root` object to
+  be reachable from the eval string. Stash it on window first:
+
+      window.__lbl_root_proxy = root
+      mixer = window.eval("new THREE.AnimationMixer(window.__lbl_root_proxy)")
+
+  Or, if you want a more compact helper that survives both styles:
+
+      def _clip(name, dur, tracks):
+          import json as _json
+          tracks_spec = [
+              {"name": str(t.name),
+               "times":  [float(x) for x in t.times],
+               "values": [float(x) for x in t.values],
+               "type":   "number"}
+              for t in tracks
+          ]
+          spec = {"name": str(name), "duration": float(dur), "tracks": tracks_spec}
+          return window.eval(
+              "(function(){"
+            + "var c=THREE.AnimationClip.parse(JSON.parse(" + _json.dumps(_json.dumps(spec)) + "));"
+            + "return new THREE.AnimationClip(c.name, c.duration, c.tracks);"
+            + "})()"
+          )
+
+  The `_json.dumps(_json.dumps(spec))` double-encode is required
+  because the embed string itself is a JS source literal — the inner
+  spec must survive two round-trips of JSON quoting.
+
+  Note: this only affects animation classes. Other `.new()` calls in
+  the same factory are unaffected and should keep using the idiomatic
+  `THREE.X.new(...)` form.
+
+  Note 2: the renderer's own `lbl_py.py` helpers `_make_mixer` /
+  `_make_clip` / `_play_animation` (and the `_LBLFacade.make_mixer /
+  make_clip / play_animation` wrappers) currently use the broken
+  `.new()` path. ANY factory that exercises animations via the
+  `lbl.*` facade methods will hit this same error. The fix is in
+  the renderer, not in user factories — but until it's shipped, Style
+  B factories with AnimationMixer MUST use the window.eval workaround
+  above. See PART 213.14.
 
 Example — a complete Three.js Direct factory (PART 212 expanded):
   from js import THREE
@@ -1162,6 +1250,120 @@ PART 213 — COMMON MISTAKES
      any `THREE.X` (see PART 203.0). If you need a class that ISN'T in
      THREE, use the `from js import THREE; THREE.X` form instead.
 
+213.12 — `globals()["shoulder_L"]` to look up a local variable
+  ❌ for side in ("L", "R"):
+         _add(globals()["shoulder_" + side], geom, mat, "upperarm_" + side)
+  ✅ bones = {"pelvis": pelvis, "spine": spine, "chest": chest, ...}
+     for side in ("L", "R"):
+         _add(bones["shoulder_" + side], geom, mat, "upperarm_" + side)
+
+  Why: `globals()` only sees MODULE-level names, not function-local
+  ones. If you create your bones as locals inside `create_model` (the
+  normal pattern), `globals()["shoulder_L"]` raises `KeyError:
+  'shoulder_L'` on the first iteration of the loop. The fix is a
+  one-line dict that maps `name -> bone` after the bones are built;
+  Python locals are still very much alive inside the loop, but the
+  dict lookup is more robust against refactors than reaching into
+  `locals()` (which doesn't always reflect post-assignment bindings
+  in Pyodide 0.26+) and is dramatically more robust than `globals()`
+  for keys that never had module scope in the first place.
+
+  Symptom in the renderer validator:
+      Python factory "create_model" threw while building the model:
+        ... KeyError: 'shoulder_L'
+  (or any other bone name; the renderer will show whichever name the
+  loop hit first.)
+
+213.13 — `pyodide.ffi.to_js({"idle": idle_clip, ...})` to keep clips alive
+  ❌ from pyodide.ffi import to_js
+     _clips_keepalive = to_js({"idle": idle_clip, "walk": walk_clip, ...})
+     root.userData.lbl_clip_keepalive = _clips_keepalive
+  ✅ root.userData.lbl_clip_refs = {
+         "idle": idle_clip,
+         "walk": walk_clip,
+         "run":  run_clip,
+         "wave": wave_clip,
+     }
+
+  Why: `to_js(...)` is designed for converting Python return values
+  that JS will use. As part of unwrapping nested PyProxies it
+  DESTROYS the borrowed proxies it consumes — including the very
+  ones you just stashed in the dict. After `to_js` returns, your
+  Python locals for `idle_clip` etc. point at destroyed proxies,
+  and the very next time you reference them (e.g. in the
+  `for nm, clip in (...)` loop) you get the "borrowed proxy was
+  automatically destroyed" error.
+
+  The correct keepalive pattern is to assign the Python dict
+  DIRECTLY to a JS-side slot (e.g. `root.userData.foo = py_dict`).
+  Pyodide stores the dict as a PyProxy of a Python dict, which
+  keeps the inner PyProxies alive as long as the outer
+  userData property is reachable. This is exactly the pattern the
+  renderer's own `_install_runtime()` uses for
+  `group.userData.sculptRuntime = rt` (see PART 207) — it works.
+
+  But — and this is critical — for AnimationClip / AnimationMixer
+  / KeyframeTrack proxies this keepalive alone is NOT enough to
+  survive Pyodide's `.new()` proxy handling. See PART 203.1 and
+  213.14. The two fixes stack: build the JS objects via
+  `window.eval("new THREE.X(...)")`, AND stash them in
+  `root.userData.<slot>` as a plain Python dict.
+
+213.14 — `THREE.AnimationMixer.new(root)` / `AnimationClip.new(...)`
+  ❌ mixer = THREE.AnimationMixer.new(root)
+     idle_clip = THREE.AnimationClip.new("idle", 2.0, [track1, track2, ...])
+     for nm, clip in (("idle", idle_clip), ...):
+         mixer.clipAction(clip)        # ← crashes here on the first iteration
+  ✅ from js import window
+     window.__lbl_root_proxy = root
+     mixer = window.eval("new THREE.AnimationMixer(window.__lbl_root_proxy)")
+     idle_clip = window.eval("new THREE.AnimationClip('idle', 2.0, [...])")
+     for nm, clip in (("idle", idle_clip), ...):
+         mixer.clipAction(clip)
+
+  Why: Pyodide 0.26 / 0.26.1 / 0.26.2 destroys the borrowed proxy
+  returned by `.new()` for animation classes BEFORE the first
+  property access. `mixer.clipAction(clip)` reads `clip.uuid` (and
+  other fields) immediately, and the proxy is already dead. The
+  error message is:
+
+      pyodide.ffi.JsException: Error: This borrowed proxy was
+      automatically destroyed at the end of a function call.
+      Try using create_proxy or create_once_callable.
+
+  The `create_proxy` / `create_once_callable` hint in the message
+  is misleading — those are for Python functions passed to JS, not
+  for JS objects retrieved from JS.
+
+  Workaround: invoke the constructor through `window.eval(...)` so
+  Pyodide's `.new()` proxy handler is bypassed entirely. Only
+  `THREE.Animation*` / `THREE.*KeyframeTrack` (and related
+  timeline / mixer / action classes) need this — for everything
+  else, keep using `THREE.X.new(...)`.
+
+  For tracks specifically, the spec round-trip pattern works
+  cleanly because tracks are simple `{name, times, values}` dicts:
+
+      def _track(n, t, v):
+          import json as _json
+          return window.eval(
+              "new THREE.NumberKeyframeTrack("
+            + _json.dumps(str(n)) + ", "
+            + _json.dumps([float(x) for x in t]) + ", "
+            + _json.dumps([float(x) for x in v])
+            + ")"
+          )
+
+  For clips that wrap multiple tracks, use AnimationClip.parse +
+  `new` chained inside an IIFE (see PART 203.1 for the full helper).
+
+  History: this is a Pyodide 0.26.x regression (Pyodide 0.25 and
+  earlier worked). Pyodide 0.26.4 changes some related proxy
+  semantics but the `.new()` pattern for animation classes is
+  still unreliable in the 0.26.x line. Once the renderer is
+  pinned to Pyodide >= 0.27 (TBD; depends on release schedule), the
+  workaround can likely be removed.
+
 213.11 — Saturated small part without `emissive` (PART 50.3 warning)
   ❌ A tiny accent piece with `color: "#f5821b"` and no `emissive` set
      → validator warns:
@@ -1282,6 +1484,26 @@ PART 216 — DIFFERENCES FROM THE TS PATH (Pyodide constraints, perf)
   hold raw Python references to scene objects after the factory
   returns, because Python references don't keep the JS object alive
   in Pyodide's reference counting scheme.
+
+  PYODIDE 0.26.x CAVEAT (read this if you build Animation* objects):
+  Pyodide 0.26 / 0.26.1 / 0.26.2 changed how borrowed proxies are
+  cleaned up. For MOST THREE.js classes the rules above still hold
+  — a Python local keeps the JS object alive. But for THREE.js
+  animation classes (AnimationMixer, AnimationClip, *KeyframeTrack
+  and friends), the borrowed proxy returned by `THREE.X.new(...)`
+  is destroyed at the end of the very next JS function call after
+  it's created — even when a Python local still references it.
+
+  The death-blow is `mixer.clipAction(clip)` because Three.js's
+  `clipAction` reads `clip.uuid` immediately. By then the proxy is
+  already dead and you get:
+
+      pyodide.ffi.JsException: Error: This borrowed proxy was
+      automatically destroyed at the end of a function call.
+
+  See PART 203.1 for the full workaround (use
+  `window.eval("new THREE.X(...)")` instead of `THREE.X.new(...)`
+  for these classes). See PART 213.14 for the user-facing recipe.
 
 216.3 — STDOUT/STDERR CAPTURE
   Pyodide captures print() / sys.stdout output and the renderer
@@ -1484,6 +1706,40 @@ in the validator log. Match the error to the cause:
   "Failed to load the compiled module"
     TS path error, shouldn't appear for Python. If it does, the
     renderer has a bug — file an issue.
+
+  "pyodide.ffi.JsException: Error: This borrowed proxy was
+   automatically destroyed at the end of a function call.
+   Try using create_proxy or create_once_callable."
+    Pyodide 0.26 / 0.26.1 / 0.26.2 — almost always triggered by
+    `THREE.AnimationMixer.new(...)` / `THREE.AnimationClip.new(...)` /
+    `THREE.NumberKeyframeTrack.new(...)` (or the Vector / Quaternion
+    variants). The create_proxy / create_once_callable hint is for
+    Python functions, not JS objects — ignore it. The actual fix
+    is to invoke the constructor via `window.eval("new THREE.X(...)")`
+    instead of `THREE.X.new(...)`. See PART 203.1 + PART 213.14 for
+    the full helper / recipe. Other `.new()` calls in the same
+    factory are unaffected; only the animation-class family needs
+    the workaround.
+
+  "Python factory \"create_model\" threw while building the model:
+   Traceback (most recent call last):
+     File ..., line N, in create_model
+       x = globals()[\"shoulder_L\"]
+   KeyError: \'shoulder_L\'"
+    You tried to look up a local variable via `globals()`. Locals
+    inside `create_model` are NOT in module globals. Build a dict
+    like `bones = {b.name: b for b in all_bones}` and look up via
+    `bones["shoulder_" + side]`. See PART 213.12.
+
+  "NameError: name 'lbl' is not defined" (at File \"\", line 1)
+    `py.runPython(\'lbl.reset()\')` failed because the `lbl` symbol
+    was never bound in `py.globals`. Almost always caused by the
+    inlined `LBL_PY_HELPER_SRC` in `index.html` being truncated (the
+    file no longer ends with the `lbl = _LBLFacade()` + `sys.modules
+    ['lbl'] = lbl` registration block). The fix is to update the
+    renderer so the inlined copy of `public/modeling/lbl_py.py` is
+    byte-identical to the standalone file (i.e. ends with the same
+    singleton registration). Affects EVERY .py upload until fixed.
 
 ================================================================================
 PART 219 — FILE METADATA + COMPANION FILES

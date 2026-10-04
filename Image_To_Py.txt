@@ -3673,6 +3673,26 @@ PART 311-315 — IMAGE-DRIVEN MATERIAL/TEXTURE/ANIMATION/STAGE MISTAKES
   - The renderer's auto-frame uses the image's silhouette; off-
     frame parts get clipped.
 
+  ──────────────────────────────────────────────────────────────────
+  IMAGE-DRIVEN FACTORIES MUST ALSO READ THESE IN Prompt_To_Py.txt:
+    PART 213.12 — `globals()["shoulder_L"]` to look up a local
+      variable (KeyError). Same pitfall applies whenever you build
+      a name -> object dict inside `create_model` and try to reach
+      into `globals()` instead.
+    PART 213.13 — `pyodide.ffi.to_js({...})` to keep clips alive.
+      The `to_js` call DESTROYS the borrowed proxies it unwraps;
+      assigning the Python dict directly to `root.userData.foo`
+      is the correct keepalive.
+    PART 213.14 — `THREE.AnimationMixer.new(...)` /
+      `THREE.AnimationClip.new(...)` / `THREE.*KeyframeTrack.new(...)`.
+      Pyodide 0.26 / 0.26.1 / 0.26.2 destroys the borrowed proxy
+      for these classes before the first property access. Use
+      `window.eval("new THREE.X(...)")` instead. This is the same
+      fix that Prompt_To_Py.txt PART 203.1 documents, with full
+      helper code.
+  ──────────────────────────────────────────────────────────────────
+
+
 ────────────────────────────────────────────────────────────────────────
 PART 316-322 — IMAGE-DRIVEN WORKED EXAMPLES (5 NEW)
 ──────────────────────────────────────────────
