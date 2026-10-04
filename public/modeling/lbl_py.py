@@ -355,23 +355,71 @@ class _LBLBuilder:
         unchanged.
 
         Auto-injected meta defaults (silence common validator warnings):
-          • meta.style         — "low-poly" (overridable by the user)
-          • meta.category      — "general"  (overridable by the user)
-          • meta.proportions   — the PART 49.1 proportion declaration
-                                 with sensible placeholders
+
+          • meta.style       — "smooth-low-poly" (canonical PART 48.1;
+                               the project default; overridable)
+          • meta.category    — "prop" (canonical PART 49.1; safe
+                               catch-all for unclassified objects;
+                               overridable)
+          • meta.proportions — the PART 49.1 proportion declaration
+                               with sensible placeholders (W_over_H
+                               and fill — the two fields the fidelity
+                               gate grades even when nothing else is
+                               declared)
+
+        Why these specific defaults?
+
+          v1.36 / v8.27 introduced the canonical 13-style vocabulary
+          (Prompt_To_Ts.txt PART 48.1) and the canonical 11-category
+          vocabulary (PART 49.1). The previous auto-injected values
+          ("low-poly" and "general") were from an earlier draft and
+          are NOT in either canonical list, so the validator
+          immediately warned:
+
+            ⚠ meta.style:"low-poly" is not one of the PART 48.1
+              canonical styles …
+            ⚠ meta.category:"general" is not one of PART 49.1's
+              SUBJECT_CATEGORY values …
+
+          Replacing them with canonical values silences the warnings
+          while still letting the user override via lbl.name()'s meta
+          kwargs, by editing blueprint()["meta"] before returning, or
+          (for Style B THREE.Group returns) by setting
+          g.userData.meta = { ... } — see Prompt_To_Py.txt PART 203.1.
+
+        Style B note:
+
+          If you return a THREE.Group instead of calling
+          lbl.blueprint() (the Style B path — see PART 203), the same
+          defaults are mirrored onto the group's userData.meta by the
+          renderer, so the validator's PART 51.2 fidelity gate and
+          PART 49.1 declaration checks still see them.
         """
         meta = dict(self._ctx["meta"])
         # Only fill in fields the user didn't already set.
         if "style" not in meta:
-            meta["style"] = "low-poly"
+            # PART 48.1 canonical default — was "low-poly" pre-v1.36
+            meta["style"] = "smooth-low-poly"
         if "category" not in meta:
-            meta["category"] = "general"
+            # PART 49.1 canonical default — was "general" pre-v1.36
+            meta["category"] = "prop"
         if "proportions" not in meta:
             meta["proportions"] = {
                 "W_over_H": 1.0,
                 "fill":     0.85,
                 # Other fields are opt-in — see Prompt_To_Py.txt PART 225
             }
+        # The PART 49.1 / PART 51.2 fidelity gate requires both
+        # meta.style and meta.category to be SET (not just canonical)
+        # for grading to run. The two guards above already cover
+        # that, but if a caller removed them and left meta empty,
+        # we'd want the snapshot to fail loud rather than silently
+        # produce a no-grade result. Re-check here at the very end
+        # of the function as a belt-and-braces:
+        assert "style" in meta and meta["style"], \
+            "lbl.blueprint(): meta.style is empty after auto-injection — this is a bug"
+        assert "category" in meta and meta["category"], \
+            "lbl.blueprint(): meta.category is empty after auto-injection — this is a bug"
         return {
             "meta": meta,
             "palette": dict(self._ctx["palette"]),
@@ -389,6 +437,189 @@ class _LBLBuilder:
         self._ctx["palette"].clear()
         self._ctx["objects"].clear()
         self._ctx["group_stack"].clear()
+
+    # ─────────────────────────────────────────────────────────────────────
+    # PART 230-234 — Procedural Texture Extensions (Python side)
+    # ─────────────────────────────────────────────────────────────────────
+    # The JS side lives at public/modeling/mt-texture-extensions.js and
+    # is loaded via the import map (`mt-texture-extensions`). These
+    # Python methods are thin pass-throughs to the JS helpers — the
+    # mood table and the deterministic procedural kernels stay in JS
+    # so Style B (Three.js Direct) factories can also call them via
+    # `from js import MT_textures; MT_textures.makeStyleField(...)`.
+    #
+    # Why the dual-surface: the Style A (lbl.*) users want a clean
+    # Python API, but Style B users already use `from js import X` for
+    # everything else, so they expect MT_textures to be reachable the
+    # same way. We support both. The methods here just delegate.
+
+    def style_field(self, prompt, **opts):
+        """PART 230 — text prompt → palette + style hints.
+
+        Thin wrapper around MT_textures.makeStyleField. Returns the
+        same shape — `{ palette: [{name,color,roughness,metalness,...}],
+        style: {mtlMood, glossLevel, emissiveLevel, matchedKeywords} }`.
+
+        Example:
+            sf = lbl.style_field("rusty iron with brass fittings")
+            for entry in sf["palette"]:
+                print(entry["name"], entry["color"], entry["roughness"])
+            # → shell  #3a3d42 0.55
+            # → metal  #b5965a 0.4
+            # → accent #8b3a1a 0.85
+            ...
+        """
+        from js import MT_textures  # auto-mirrored addon import
+        return MT_textures.makeStyleField(prompt, opts)
+
+    def multi_scale_pattern(self, spec, **opts):
+        """PART 231 — multi-octave procedural texture.
+
+        Same shape as proceduralTextureCanvas (PART 74.2) but stacks
+        the same pattern at 1× / 4× / 16× / 64× scales with weighted
+        blending. Inspired by geometric-textures (Hertz et al.,
+        SIGGRAPH 2020).
+
+        Returns { canvas, texture }. Use texture as a material's map.
+        """
+        from js import MT_textures
+        return MT_textures.makeMultiScalePattern(spec, opts)
+
+    def cavity_aware_pattern(self, spec, geom, **opts):
+        """PART 232 — curvature-modulated procedural texture.
+
+        Wraps proceduralTextureCanvas with curvature-driven intensity
+        modulation. Cavities boost pattern contrast (dirt-in-crevices),
+        ridges pull toward base color (polished rim). Inspired by
+        mesh-texture-synthesis (Kovacs et al., CGF 2024).
+        """
+        from js import MT_textures
+        return MT_textures.makeCavityAwarePattern(spec, geom, opts)
+
+    def geodesic_field(self, geom, anchors, **opts):
+        """PART 233 — geodesic distance field on a mesh.
+
+        For each vertex, returns the approximate geodesic distance to
+        the nearest anchor. Inspired by UV3-TeD (Foti et al., 3DV 2023)
+        and Point-UV Diffusion (Yu et al., ICCV 2023).
+
+        Returns a Float32Array (length = vertex count).
+        """
+        from js import MT_textures
+        return MT_textures.makeGeodesicField(geom, anchors, opts)
+
+    def progressive_uv(self, geom, **opts):
+        """PART 234 — incremental UV unwrap by visibility.
+
+        Like uvUnwrap, but processes the mesh in a visibility-priority
+        order so the most-seen faces get assigned UV space first with
+        the highest texel density. Inspired by Text2Tex (Richardson
+        et al., ICCV 2023) which tracks each texel's generation status
+        incrementally.
+
+        Writes UVs into geom.attributes.uv in place. Returns
+        { uv, faceOrder, atlasSize, tilesPerRow }.
+        """
+        from js import MT_textures
+        return MT_textures.makeProgressiveUV(geom, opts)
+
+    # ─────────────────────────────────────────────────────────────────────
+    # PART 235-242 — High-poly / style-agnostic surface (Python side)
+    # ─────────────────────────────────────────────────────────────────────
+    # The JS side lives at public/modeling/mt-highpoly.js and is loaded
+    # via the import map (`mt-highpoly`). These are thin pass-throughs to
+    # the JS helpers — same pattern as PART 230-234. Together, the two
+    # bundles let the renderer genuinely support BOTH low-poly (PART 100-
+    # 143 / 145-152 / 167-189 / 230-234) AND high-poly (PART 235-242).
+    #
+    # Style-agnosticism: the renderer's auto-injected meta.style default
+    # is still "smooth-low-poly" (matches the project name), but Python
+    # factories that want high-poly override it on the returned blueprint
+    # dict (Style A) or on g.userData.meta (Style B):
+
+    def import_external_mesh(self, url, format=None, **opts):
+        """PART 235 — load an OBJ/GLTF/FBX/STL/DAE mesh from URL.
+
+        Returns a JS Promise; in Pyodide this can be awaited. Resolves
+        to a THREE.Group with vertex normals / default materials
+        applied if missing.
+
+        Example:
+            import asyncio
+            g = await asyncio.ensure_future(
+                lbl.import_external_mesh('https://example.com/model.glb')
+            )
+        """
+        from js import MT_highpoly
+        return MT_highpoly.importExternalMesh(url, format, opts)
+
+    def make_atlas_uv(self, geom, **opts):
+        """PART 236 — MaxRects BSSF atlas packing for high-poly meshes.
+
+        Writes UVs into geom.attributes.uv in place. For high-poly
+        meshes (1K+ faces), this is the right way to assign UVs —
+        makeProgressiveUV (PART 234) is the visibility-priority
+        shortcut for low-poly.
+        """
+        from js import MT_highpoly
+        return MT_highpoly.makeAtlasUV(geom, opts)
+
+    def fast_curvature(self, geom, **opts):
+        """PART 237 — BVH-accelerated curvature for high-poly meshes.
+
+        For meshes with 100K+ verts (photogrammetry scans), use this
+        instead of MT_textures' O(N×27) spatial-hash version. Falls
+        back to the spatial-hash version if MeshBVH isn't loaded.
+        """
+        from js import MT_highpoly
+        return MT_highpoly.makeFastCurvature(geom, opts)
+
+    def highpoly_pbr(self, **opts):
+        """PART 238 — pbr-realistic material recipe.
+
+        Convenience factory for MeshPhysicalMaterial with the
+        canonical "realistic surface" defaults (roughness 0.45,
+        metalness 0.05, clearcoat 0.3, envMapIntensity 1.0).
+        """
+        from js import MT_highpoly
+        return MT_highpoly.highPolyPBR(opts)
+
+    def photogrammetry_pbr(self, **opts):
+        """PART 239 — photogrammetry material recipe.
+
+        Matte (roughness 0.85) + strong normal-map response + low
+        envMapIntensity — tuned for scanned real-world meshes with
+        baked-in detail.
+        """
+        from js import MT_highpoly
+        return MT_highpoly.photogrammetryPBR(opts)
+
+    def subdivide_for_highpoly(self, geom, **opts):
+        """PART 240 — boost low-poly toward high-poly via subdivision.
+
+        Wraps Catmull-Clark. The result has ~4× verts per level.
+        """
+        from js import MT_highpoly
+        return MT_highpoly.subdivideForHighPoly(geom, opts)
+
+    def decimate_for_lowpoly(self, geom, **opts):
+        """PART 241 — reduce high-poly to low-poly via QEM decimation.
+
+        QEM preserves silhouette + topology better than uniform
+        random downsample, so the chunky 3D look survives.
+        """
+        from js import MT_highpoly
+        return MT_highpoly.decimateForLowPoly(geom, opts)
+
+    def make_image_texture(self, url, **opts):
+        """PART 242 — image URL → UV texture.
+
+        Returns a THREE.CanvasTexture (Promise resolves once the image
+        loads). For high-poly meshes with a real-world photograph
+        or hand-painted texture.
+        """
+        from js import MT_highpoly
+        return MT_highpoly.makeImageTexture(url, opts)
 
 
 # When this file is loaded standalone (e.g. from a Python REPL for
