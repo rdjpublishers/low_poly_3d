@@ -885,13 +885,46 @@ Both paths produce the same 9-key shape (Prompt_To_Ts.txt PART 6):
       "destructionGroups":  {},   # optional — for breakable models
       "materials":          {},   # optional — name → material reference
       "actions":            {},   # optional — named actions for inspector
-      "animation":          {},   # optional — AnimationClips + mixer
+      "animations":         {     # optional — AnimationClips + mixer
+                               # (PLURAL key — the renderer's
+                               # lblCollectAnimations() reads this
+                               # exact shape; the singular `animation`
+                               # field below is kept for diagnostic
+                               # backwards-compat ONLY and is NOT
+                               # read by the in-app player)
+          "clips":   [clip_idle, clip_walk, clip_run],
+          "mixer":   mixer,        # THREE.AnimationMixer
+          "actions": {             # optional: name → AnimationAction
+              "idle": action_idle,
+              "walk": action_walk,
+              "run":  action_run,
+          },
+      },
+      "animation":          {},   # legacy singular key — DIAGNOSTIC
+                                   # ONLY. The renderer reads the
+                                   # plural `animations` key above.
+                                   # Old factories writing on this
+                                   # field get a silent in-app
+                                   # player with no toggle button.
+                                   # See PART 213.15.
       "vfx":                {},   # optional — particle/light/effect handles
   }
 
 At minimum, populate `nodes` and `meshes` so the inspector can list the
 named parts. The other keys are optional but unlock more inspector
 features.
+
+The `animations` key is what makes the renderer's "Animation Controls"
+panel (play / pause / next-clip) appear at the bottom of the viewer.
+If `sculptRuntime.animations.clips` is non-empty AND
+`sculptRuntime.animations.mixer` is a real AnimationMixer, the toggle
+button is enabled and clicking play/next cycles through the clips.
+
+  ► Use `lbl.publish_animation(g, mixer=mixer, clips=[clip_a, clip_b])`
+    to write the modern shape in one call. The default tick installed
+    by `lbl.install_runtime(g)` then auto-drives the mixer, so the
+    factory does not need to write its own `userData.tick` just for
+    animation playback.
 
 Example — minimal sculptRuntime for a 2-part model:
   body = THREE.Mesh.new(...)
@@ -902,6 +935,25 @@ Example — minimal sculptRuntime for a 2-part model:
       "nodes":  {"root": g, "body": body, "wheel": wheel},
       "meshes": {"body": body, "wheel": wheel},
   }
+
+Example — sculptRuntime with skeletal animation (PLURAL `animations`):
+  mixer = THREE.AnimationMixer.new(g)
+  idle_clip = THREE.AnimationClip.new("idle", 1.0, [idle_track])
+  walk_clip = THREE.AnimationClip.new("walk", 1.0, [walk_track])
+  g.userData.sculptRuntime = {
+      "nodes":  ...,
+      "meshes": ...,
+      "animations": {
+          "clips": [idle_clip, walk_clip],
+          "mixer": mixer,
+          "actions": {
+              "idle": mixer.clipAction(idle_clip),
+              "walk": mixer.clipAction(walk_clip),
+          },
+      },
+  }
+  # …or just the helper:
+  lbl.publish_animation(g, mixer=mixer, clips=[idle_clip, walk_clip])
 
 The renderer's detail-inventory gate (Prompt_To_Ts.txt PART 20) checks
 that every high-priority entry in detailInventory has at least one
@@ -942,6 +994,18 @@ AnimationMixer pattern from Prompt_To_Ts.txt PART 5.6:
 The renderer doesn't auto-create the mixer — your factory is
 responsible for the rig, the clips, the mixer, and the tick. The
 renderer's contribution is to call tick every frame.
+
+To also surface the in-app Animation Controls panel (play/pause/
+next-clip button), publish the modern shape:
+
+  lbl.publish_animation(g, mixer=mixer, clips=[clip])
+
+This writes `g.userData.sculptRuntime.animations = { clips, mixer,
+actions }` so the renderer's `lblCollectAnimations()` picks the clips
+up and the toggle button is enabled. If you also called
+`lbl.install_runtime(g)` earlier, its default tick already drives the
+mixer, so you can skip writing your own `g.userData.tick`. See PART
+207 + PART 213.15 for the full contract.
 
 ================================================================================
 PART 209 — PROCEDURAL CANVAS TEXTURES (Python form)
@@ -1390,6 +1454,73 @@ PART 213 — COMMON MISTAKES
          or alternatively set `roughness` very high (≥ 0.95) and
          `metalness` 0 so the material reads as matte plastic, which
          the rule also exempts.
+
+213.12 — `globals()["shoulder_L"]` to look up a local (KeyError)
+  See PART 213.12 above — same pitfall applies whenever you build a
+  name → object dict inside `create_model` and try to reach into
+  `globals()` instead.
+
+213.13 — `pyodide.ffi.to_js({...})` to keep clips alive
+  See PART 213.13 above — `to_js` destroys the borrowed proxies it
+  unwraps; assigning the Python dict directly to `root.userData.foo`
+  is the correct keepalive.
+
+213.14 — `THREE.AnimationMixer.new(...)` / `THREE.AnimationClip.new(...)`
+  / `THREE.*KeyframeTrack.new(...)` Pyodide proxy-destroy pitfall
+  See PART 213.14 above — use `window.eval("new THREE.X(...)")` instead.
+
+213.15 — `sculptRuntime.animation` (SINGULAR) hides the toggle button.
+  The renderer reads `sculptRuntime.animations` (PLURAL — note the "s"),
+  with shape `{ clips: THREE.AnimationClip[], mixer: THREE.AnimationMixer,
+  actions: Record<string, THREE.AnimationAction> }`. If a Python factory
+  publishes clips on the SINGULAR `sculptRuntime.animation` key (which
+  is what pre-fix v2.0 lbl._install_runtime did), the renderer's
+  lblCollectAnimations() walks `userData.animations` / `userData.animations.clips`
+  / `userData.animations.mixer.getActions()`, finds NOTHING (because the
+  factory put it on the singular key), and the in-app Animation Controls
+  panel stays hidden — the model animates if the factory's own tick
+  drives the mixer, but the user can't pause, replay, or cycle clips.
+
+  ❌ Symptom: Python-built model animates fine, but the bottom-panel
+     play / pause / next-clip button is missing (the TS-built models in
+     /models/Model_*.ts show the button; the .py one doesn't).
+  ❌ Wrong (singular, what the original _install_runtime wrote):
+        g.userData.sculptRuntime = {
+            ...
+            "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+            # no clips, no mixer on the right key
+        }
+  ✅ Right (plural, mirror of TS PART 6.1B / Prompt_To_Ts.txt):
+        g.userData.sculptRuntime = {
+            ...
+            "animations": {
+                "clips":   [clip_idle, clip_walk, clip_run],
+                "mixer":   mixer,                  # THREE.AnimationMixer
+                "actions": {                       # optional, name → Action
+                    "idle": mixer.clipAction(clip_idle),
+                    "walk": mixer.clipAction(clip_walk),
+                },
+            },
+        }
+  ✅ Easier: use the helper so you can't get it wrong:
+        mixer = lbl.make_mixer(g)
+        idle  = lbl.make_clip("idle",  1.0, [idle_track])
+        walk  = lbl.make_clip("walk",  1.2, [walk_track])
+        lbl.publish_animation(g, mixer=mixer, clips=[idle, walk])
+        # lbl.publish_animation writes BOTH:
+        #   g.userData.sculptRuntime.animations  = { clips, mixer, actions }
+        #   g.userData.sculptRuntime.animation   = legacy mirror (diagnostic)
+        # AND lbl.install_runtime(g) installs a tick that calls
+        # mixer.update(dt) automatically — so the factory doesn't have
+        # to write its own userData.tick just for animation playback.
+
+  The `animation` (singular) key is kept populated for backwards-compat
+  (some pre-fix factories read it from `rt.animation.current` /
+  `rt.animation.mixer`), but the renderer never reads it. If you write
+  a new factory, always publish the PLURAL key.
+
+  See PART 207 (paragraph above) for the canonical contract and PART
+  6.1B in Prompt_To_Ts.txt for the TS-side shape this mirrors.
 
   The rule fires when baseColor.saturation > 0.7 AND
   `objectMaxScaleDim(o) < 0.3 * blueprintBBoxDiag` AND `emissive` is
@@ -5387,6 +5518,11 @@ PART 312 — ANIMATION & RIGGING MISTAKES (PYTHON FORM)
            action.play()
            g.userData.tick = lambda dt, elapsed: mixer.update(dt)
         # The renderer doesn't auto-create the mixer.
+        # Also publish the modern shape so the in-app play button works:
+        ✅✅ lbl.publish_animation(g, mixer=mixer, clips=[clip])
+            # (see PART 213.15 — singular `sculptRuntime.animation`
+            # is the diagnostic-only key; the renderer reads
+            # `sculptRuntime.animations` plural).
 
   312.4 — TICK WITH WRONG SIGNATURE
         ❌ def tick():  # no args
@@ -5900,8 +6036,18 @@ PART 318 — CHUNKY CHARACTER WITH RIG (WALK CYCLE)
       g.userData.sculptRuntime = {
           "nodes": {b.name or f"bone_{i}": b for i, b in enumerate(bones)},
           "meshes": {"body": body_mesh},
-          "animation": {"walk": action},
+          # PLURAL `animations` key — the shape the renderer's
+          # lblCollectAnimations() reads. Without this, the in-app
+          # play/next-clip button stays hidden. See PART 213.15.
+          "animations": {
+              "clips":   [clip],
+              "mixer":   mixer,
+              "actions": {"walk": action},
+          },
       }
+      # (Or equivalently: lbl.publish_animation(g, mixer=mixer, clips=[clip])
+      #  — that helper writes the same shape and keeps a legacy mirror
+      #  on the singular `animation` key for backwards compat.)
       g.userData.meta = {
           "style": "chunky-mascot",
           "category": "character",
@@ -7799,7 +7945,17 @@ install_runtime auto-populates:
       "colliders": {},
       "destructionGroups": {},
       "actions": {},
-      "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+      "animations": {                              # PLURAL key —
+                                                    # the renderer's
+                                                    # lblCollectAnimations()
+                                                    # reads this shape.
+          "clips":   [],                           # populate via
+          "mixer":   None,                         # lbl.publish_animation()
+          "actions": {},
+      },
+      "animation": {},                             # singular, legacy
+                                                    # diagnostic mirror
+                                                    # — see PART 213.15
       "vfx": {},
       "passes": {},
       "passesReviewed": {},
@@ -7808,7 +7964,10 @@ install_runtime auto-populates:
       "landmarks": [],
       "detailInventory": [...],
   }
-  group.userData.tick           = placeholder tick (replace with yours)
+  group.userData.tick           = placeholder tick (drives a published
+                                                 mixer if one exists —
+                                                 see PART 208 + PART
+                                                 213.15)
   group.userData.setPalette     = lbl.palette.set (runtime hot-swap)
   group.userData.availablePalettes = list of registered palette names
 
@@ -8889,7 +9048,17 @@ install_runtime auto-populates:
       "colliders": {},
       "destructionGroups": {},
       "actions": {},
-      "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+      "animations": {                              # PLURAL key —
+                                                    # the renderer's
+                                                    # lblCollectAnimations()
+                                                    # reads this shape.
+          "clips":   [],                           # populate via
+          "mixer":   None,                         # lbl.publish_animation()
+          "actions": {},
+      },
+      "animation": {},                             # singular, legacy
+                                                    # diagnostic mirror
+                                                    # — see PART 213.15
       "vfx": {},
       "passes": {},
       "passesReviewed": {},
@@ -8898,7 +9067,10 @@ install_runtime auto-populates:
       "landmarks": [],
       "detailInventory": [...],
   }
-  group.userData.tick           = placeholder tick (replace with yours)
+  group.userData.tick           = placeholder tick (drives a published
+                                                 mixer if one exists —
+                                                 see PART 208 + PART
+                                                 213.15)
   group.userData.setPalette     = lbl.palette.set (runtime hot-swap)
   group.userData.availablePalettes = list of registered palette names
 

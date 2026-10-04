@@ -3690,6 +3690,12 @@ PART 311-315 — IMAGE-DRIVEN MATERIAL/TEXTURE/ANIMATION/STAGE MISTAKES
       `window.eval("new THREE.X(...)")` instead. This is the same
       fix that Prompt_To_Py.txt PART 203.1 documents, with full
       helper code.
+    PART 213.15 — `sculptRuntime.animation` (SINGULAR) hides the
+      animation toggle button. The renderer reads the PLURAL key
+      `sculptRuntime.animations = { clips, mixer, actions }`. The
+      helper `lbl.publish_animation(g, mixer=m, clips=[...])` writes
+      the modern shape in one call. See PART 207 + PART 213.15 in
+      Prompt_To_Py.txt for the full contract.
   ──────────────────────────────────────────────────────────────────
 
 
@@ -7506,7 +7512,18 @@ install_runtime auto-populates:
       "colliders": {},
       "destructionGroups": {},
       "actions": {},
-      "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+      "animations": {                              # PLURAL key —
+                                                    # the renderer's
+                                                    # lblCollectAnimations()
+                                                    # reads this shape.
+          "clips":   [],                           # populate via
+          "mixer":   None,                         # lbl.publish_animation()
+          "actions": {},
+      },
+      "animation": {},                             # singular, legacy
+                                                    # diagnostic mirror
+                                                    # — see PART 213.15
+                                                    # in Prompt_To_Py.txt
       "vfx": {},
       "passes": {},
       "passesReviewed": {},
@@ -7515,7 +7532,10 @@ install_runtime auto-populates:
       "landmarks": [],
       "detailInventory": [...],
   }
-  group.userData.tick           = placeholder tick (replace with yours)
+  group.userData.tick           = placeholder tick (drives a published
+                                                 mixer if one exists —
+                                                 see PART 208 + PART
+                                                 213.15)
   group.userData.setPalette     = lbl.palette.set (runtime hot-swap)
   group.userData.availablePalettes = list of registered palette names
 
@@ -8596,7 +8616,18 @@ install_runtime auto-populates:
       "colliders": {},
       "destructionGroups": {},
       "actions": {},
-      "animation": {"current": "idle", "elapsed": 0.0, "paused": False},
+      "animations": {                              # PLURAL key —
+                                                    # the renderer's
+                                                    # lblCollectAnimations()
+                                                    # reads this shape.
+          "clips":   [],                           # populate via
+          "mixer":   None,                         # lbl.publish_animation()
+          "actions": {},
+      },
+      "animation": {},                             # singular, legacy
+                                                    # diagnostic mirror
+                                                    # — see PART 213.15
+                                                    # in Prompt_To_Py.txt
       "vfx": {},
       "passes": {},
       "passesReviewed": {},
@@ -8605,7 +8636,10 @@ install_runtime auto-populates:
       "landmarks": [],
       "detailInventory": [...],
   }
-  group.userData.tick           = placeholder tick (replace with yours)
+  group.userData.tick           = placeholder tick (drives a published
+                                                 mixer if one exists —
+                                                 see PART 208 + PART
+                                                 213.15)
   group.userData.setPalette     = lbl.palette.set (runtime hot-swap)
   group.userData.availablePalettes = list of registered palette names
 
