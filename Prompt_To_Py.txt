@@ -20,12 +20,26 @@ pipeline — drop a .py file onto the page and it Just Works.
   PART 205 — PBR materials vocabulary (mirror of TS PART 7)
   PART 206 — Palette discipline (mirror of TS PART 10)
   PART 207 — sculptRuntime contract (mirror of TS PART 6, Python form)
+              — 207.1 required 9-key shape + full optional shape
+              — 207.2 sockets (mirror of TS PART 6.3)
+              — 207.3 destructionGroups + colliders (TS 6.4-6.5)
+              — 207.4 per-mesh metadata (TS PART 6.7)
+              — NOTE: double-drive bug (TS 6.1B NOTE)
   PART 208 — tick(dt, elapsed) for per-frame animation (mirror of TS PART 5)
+              — 208.1 signature (TS PART 5.1)
+              — 208.2 state machines (TS PART 5.2)
+              — 208.3 discrete / spawned actors / pool pattern (TS PART 5.3)
+              — 208.4 easing helpers (TS PART 5.4)
+              — 208.5 glTF channel-name translation table (TS PART 5.6a)
+              — 208.6 headless playback verification (TS PART 5.6b)
+              — 208.7 custom-runtime update(elapsed) (TS PART 5.7)
   PART 209 — Procedural canvas textures (mirror of TS PART 8)
   PART 210 — Validation checklist (mirror of TS PART 12)
   PART 211 — Minimal worked example (Blueprint-Return style)
   PART 212 — Advanced worked example (Three.js Direct style)
   PART 213 — Common mistakes (mirror of TS PART 15, Python-specific)
+              — 213.0-213.15 (213.15 documents the singular-vs-plural
+                animation trap — see PART 207 too)
   PART 214 — Pre-output checklist for AI authors
   PART 215 — Cross-references to the 6 existing spec files
   PART 216 — Differences from the TS path (Pyodide constraints, perf)
@@ -960,6 +974,125 @@ that every high-priority entry in detailInventory has at least one
 matching Mesh in the userData tree. For Python, set detailInventory on
 sculptRuntime (or via meta.detailInventory in Style A).
 
+NOTE — DOUBLE-DRIVE BUG (mirror of TS PART 6.1B NOTE). If you
+publish a mixer under `sculptRuntime.animations.mixer` AND also call
+`mixer.update(dt)` from `userData.tick`, the clip plays at 2× speed
+(two update paths touching one mixer — different symptom from
+PART 213.15, same root cause). The factory's tick should own the
+`mixer.update()` call; `sculptRuntime.animations.mixer` is for the
+renderer's UI/inspector to read from, NOT a second place to drive it
+from. `lbl.install_runtime(g)` installs a default tick that already
+calls `mixer.update(dt)` when a mixer is published, so if you used
+`lbl.publish_animation()` after `lbl.install_runtime()`, do NOT also
+write `g.userData.tick = lambda dt, elapsed: mixer.update(dt)` — pick
+ONE (either the install_runtime default tick, OR your own that owns
+mixer.update, OR omit tick entirely and let the renderer auto-tick).
+
+--------------------------------------------------------------------------
+207.2 — SOCKETS (empty Object3Ds the host can reparent things to)
+       (mirror of TS PART 6.3)
+--------------------------------------------------------------------------
+Sockets are placeholders — empty THREE.Object3D nodes with `.name` set,
+a position to mark the attach point, and no children. The host (and
+downstream code) re-parents other meshes into them. Add them to the
+`sculptRuntime.sockets` map so the Inspector's "Parts" panel can list
+them alongside meshes and nodes:
+
+  g.userData.sculptRuntime = {
+      ...,
+      "sockets": {
+          "muzzle": muzzle_socket,
+          "top_rotor": top_rotor_socket,
+          "under_thruster": under_thruster_socket,
+      },
+  }
+
+A `THREE.Group` also works as a socket, but a bare `THREE.Object3D.new()`
+is the lightweight choice when the socket is a single empty placeholder
+(no children of its own, no transform children).
+
+--------------------------------------------------------------------------
+207.3 — DESTRUCTION GROUPS + COLLIDERS (mirror of TS PART 6.4-6.5)
+--------------------------------------------------------------------------
+For breakable models (a building that shatters, a vehicle that breaks
+apart on impact), group breakable pieces by subassembly:
+
+  g.userData.sculptRuntime = {
+      ...,
+      "destructionGroups": {
+          "claws": [forearm_shield_L, forearm_shield_R, claw_tip_L, claw_tip_R],
+          "rotors": [top_rotor_hub, bottom_rotor_hub],
+          "panels": [panel_1, panel_2, panel_3],
+      },
+      "colliders": {
+          "body":    THREE.Box3.new().setFromObject(body_orb),
+          "head":    THREE.Box3.new().setFromObject(head),
+          "left_arm": THREE.Box3.new().setFromObject(left_arm),
+      },
+  }
+
+`colliders` may be any shape the host recognises — `Box3`, `Sphere`,
+`Mesh.raycast`-compatible, etc. The shape's job is to give the host a
+cheap AABB / sphere / mesh proxy for hit-testing and physics; populate
+the field at factory body the moment meshes are positioned, NOT on demand.
+
+--------------------------------------------------------------------------
+207.4 — PER-MESH METADATA (component role + action profile)
+       (mirror of TS PART 6.7)
+--------------------------------------------------------------------------
+For complex models with many named parts, the renderer reads four
+OPTIONAL per-mesh metadata fields. None are required, but populating
+them turns the Inspector from a passive tree into a live gizmo that
+knows what each part IS and what you can do to it. Set them AFTER
+positioning the node in the scene so the parent id is the one actually
+being used.
+
+  # 207.4.1 — sculptComponent: identity + role + parent + dependent sockets
+  body.userData.sculptComponent = {
+      "id":       "body",
+      "parentId": "root",
+      "role":     "shell",     # one of: 'cabin', 'shell', 'garment',
+                               # 'head', 'limb', 'wheel', 'barrel',
+      # 'receiver', 'trigger', 'magazine', 'scope', 'stock',
+      # 'joint', 'bone', 'ik-target', 'socket', 'mount', 'handle',
+      # 'crown-emblem', 'character-root', 'skeleton-root', 'rig-root',
+      # or any string the host recognises
+      "sockets":  [],          # socket ids this part depends on
+  }
+
+  # 207.4.2 — actionProfile: which 1-click actions are valid for this part
+  wheel.userData.actionProfile = {
+      "canSpin":    True,      # drives sculptRuntime.actions.spin
+      "canGlow":    True,      # drives sculptRuntime.actions.glow
+      "canFire":    False,
+      "canRecoil":  False,
+      "canEject":   False,
+      "canOpen":    False,
+      "canElectrify": False,
+      "canJump":    False,
+      "canWiggle":  False,
+      "canSway":    False,
+      "canRecenter": True,     # drives sculptRuntime.actions.reset
+  }
+  # The Inspector reads this and shows only the relevant buttons. A
+  # barrel node with canFire + canRecoil + canEject gets three buttons;
+  # a foot node with canSway gets one.
+
+  # 207.4.3 — animationRole: classify nodes for skeletal animation
+  shoulder_L.userData.animationRole = "bone"
+  ik_target_hand.userData.animationRole = "ik-target"
+
+  # 207.4.4 — socketFor: trace parent ↔ child between a part and its socket
+  muzzle_socket.userData.socketFor = "barrel"   # matches a sculptRuntime.nodes key
+
+These fields are read by the renderer's Inspector, the gizmo, and the
+action-hooks panel. They do NOT change the rendered scene. A factory
+that omits them is still valid; the Inspector simply has less to show.
+
+Names must match the same casing convention as sculptRuntime (PART
+6.2 in TS / "camelCase descriptive consistent" — `'frontTire'` in the
+runtime MUST be `'frontTire'` here).
+
 ================================================================================
 PART 208 — tick(dt, elapsed) FOR PER-FRAME ANIMATION
 ================================================================================
@@ -1006,6 +1139,223 @@ up and the toggle button is enabled. If you also called
 `lbl.install_runtime(g)` earlier, its default tick already drives the
 mixer, so you can skip writing your own `g.userData.tick`. See PART
 207 + PART 213.15 for the full contract.
+
+--------------------------------------------------------------------------
+208.1 — SIGNATURE (mirror of TS PART 5.1)
+--------------------------------------------------------------------------
+  def tick(dt, elapsed):
+      # dt = seconds since the previous frame (use this for ALL time math)
+      # elapsed = seconds since the renderer started (use for periodic effects)
+      pass
+  g.userData.tick = tick
+
+Do NOT use `performance.now()` or `time.time()` for time math — the
+renderer is in control of time, your factory is a passive consumer.
+Use `dt` for decay, easing, and integration; use `elapsed` for sin/cos
+periodic motion where the phase needs to be stable across pauses.
+
+--------------------------------------------------------------------------
+208.2 — STATE MACHINES (the recommended pattern — mirror of TS PART 5.2)
+--------------------------------------------------------------------------
+Keep ALL the per-frame work inside one function, every piece of
+mutable state in a single `state` dict, every constant as a named
+local. Diffable, debuggable, easy to extend:
+
+  state = {
+      "recoil": 0.0,             # 0..1 current kick
+      "flash":  0.0,             # seconds of flash remaining
+      "since_fire": 0.0,         # seconds since the last shot
+  }
+  FIRE_INTERVAL   = 2.4        # seconds between shots
+  FLASH_DURATION  = 0.07       # flash envelope
+  RECOIL_DECAY    = 3.2        # recoil spring stiffness
+
+  def fire():
+      state["recoil"]     = 1.0
+      state["flash"]      = FLASH_DURATION
+      state["since_fire"] = 0.0
+
+  def tick(dt, elapsed):
+      state["since_fire"] += dt
+      if state["since_fire"] >= FIRE_INTERVAL:
+          fire()
+      state["recoil"] = max(0.0, state["recoil"] - dt * RECOIL_DECAY)
+      # apply state["recoil"] to whichever nodes are affected
+      r = state["recoil"] * state["recoil"]
+      gun.position.z = -r * 0.1
+  g.userData.tick = tick
+
+--------------------------------------------------------------------------
+208.3 — DISCRETE / SPAWNED ACTORS (shells, particles, decals)
+       (mirror of TS PART 5.3 — pre-allocate the pool, never `new` in tick)
+--------------------------------------------------------------------------
+For per-frame spawned actors (a shell ejecting, a muzzle puff, a
+particle effect), pre-allocate the maximum number you'll ever need, park
+them in a pool, and recycle slots. NEVER call `THREE.Obj.new(...)` inside
+the tick — at 60 fps you'll allocate 1800 objects in 30 seconds and
+the browser GC-stutters:
+
+  shells = []
+  for _ in range(5):
+      s = build_shell()    # factory-time allocation, not per-frame
+      s.visible = False
+      g.add(s)
+      shells.append({"group": s, "active": False, "vy": 0.0, "life": 0.0})
+
+  def spawn_shell():
+      slot = next((s for s in shells if not s["active"]), shells[0])
+      slot["active"] = True
+      slot["group"].visible = True
+      slot["group"].position.set(0, 0, 0)
+      slot["vy"] = 2.0
+      slot["life"] = 1.5
+
+  def tick(dt, elapsed):
+      for slot in shells:
+          if not slot["active"]:
+              continue
+          slot["life"] -= dt
+          if slot["life"] <= 0:
+              slot["active"] = False
+              slot["group"].visible = False
+              continue
+          slot["vy"] -= 9.8 * dt        # gravity
+          slot["group"].position.y += slot["vy"] * dt
+  g.userData.tick = tick
+
+GC-friendly, diffable, and you can tune parameters without allocating.
+
+--------------------------------------------------------------------------
+208.4 — EASING (mirror of TS PART 5.4)
+--------------------------------------------------------------------------
+Cheap, good-looking easings in 2 lines each:
+  - Linear:               t = max(0.0, min(1.0, elapsed / dur))
+  - Ease-out (cubic):    t = 1.0 - (1.0 - clamp01(t)) ** 3
+  - Ease-in-out (sine):  t = -(math.cos(math.pi * clamp01(t)) - 1.0) / 2.0
+  - Pop:                 t = clamp01(t); r = t * (2.0 - t)
+
+The `lbl` module ships convenience wrappers for the most common ones
+(also used internally by walk_phase / damp_spring / bounce):
+  - lbl.damp_spring(target=..., k=80, c=8).step(dt)  — spring with ease
+  - lbl.bounce(elapsed, dur)                         — bounce envelope
+  - lbl.sine_wave(elapsed, amp, freq, phase, base)  — pure sinusoid
+
+For idle motion (sway, breathing, blink, head-bob), use `elapsed`
+directly with a slow sin/cos so the phase survives any pause:
+
+  g.rotation.y   = math.sin(elapsed * 0.3) * 0.28           # ±0.28 rad sway
+  g.position.y   = 0.55 + math.sin(elapsed * 0.9) * 0.01    # tiny vertical breath
+
+--------------------------------------------------------------------------
+208.5 — BAKING FROM A .glb/.gltf REFERENCE: PROPERTY-NAME TRANSLATION
+       (CRITICAL — mirror of TS PART 5.6a)
+--------------------------------------------------------------------------
+When clips are built from keyframe data extracted out of a reference
+.glb/.gltf file (not hand-authored), the raw glTF JSON uses glTF's own
+channel target names:
+
+    translation | rotation | scale
+
+These are NOT the three.js Object3D property names. THREE.PropertyBinding
+resolves KeyframeTrack names against the actual object properties, and
+Object3D has no `.translation` property at all, and `.rotation` is an
+Euler — a different value type/size than the Quaternion a glTF 'rotation'
+channel is baked as. Using the glTF path name verbatim as the track name
+does NOT throw, does NOT log a warning, and the AnimationClip / mixer /
+action all construct and play "successfully" — the track simply never
+finds anything to write to, so the model sits frozen while every symptom
+you'd check (clips present, actions playing, mixer.update() being called
+every frame) looks correct. This is the single most common way a baked
+clip silently fails to play in a Python factory.
+
+The required translation table when building track names from glTF data:
+
+    glTF channel target      three.js KeyframeTrack target      Track type
+    --------------------      -----------------------------      ----------
+    translation           →   <node>.position                    VectorKeyframeTrack
+    rotation               →   <node>.quaternion                  QuaternionKeyframeTrack
+    scale                   →   <node>.scale                       VectorKeyframeTrack
+
+  # NEVER build a track name as f"{node}.{gltf_path}" directly.
+  # ALWAYS pass gltf_path through an explicit lookup table first:
+  GLTF_PATH_TO_THREE_PROPERTY = {
+      "translation": "position",
+      "rotation":    "quaternion",
+      "scale":       "scale",
+  }
+  track_name = f"{node_name}.{GLTF_PATH_TO_THREE_PROPERTY[gltf_path]}"
+
+A `rotation` channel MUST be constructed with `QuaternionKeyframeTrack`
+(4 floats/key, XYZW) targeting `.quaternion` — never `NumberKeyframeTrack`
+per-Euler-component targeting `.rotation[x/y/z]` when the source data is
+already baked as quaternions. lbl.detect_animation_track_type() (PART
+389.1) classifies correctly when the track name ends in `.quaternion`,
+so name the track correctly and the helper picks the right class.
+
+In Pyodide 0.26+ the borrowed proxy returned by `.new()` for
+QuaternionKeyframeTrack / VectorKeyframeTrack / AnimationClip /
+AnimationMixer is destroyed at the end of the next JS function call —
+use `window.eval("new THREE.QuaternionKeyframeTrack(name, times, values)")`
+instead (PART 213.14). lbl.quaternion_keyframe_track() / lbl.vector_keyframe_track()
+/ lbl.make_clip() / lbl.make_mixer() already wrap the window.eval path,
+so prefer the helpers over raw `THREE.X.new(...)`.
+
+--------------------------------------------------------------------------
+208.6 — HEADLESS PLAYBACK VERIFICATION BEFORE DELIVERY
+       (mirror of TS PART 5.6b — "constructs without compile error ≠ plays")
+--------------------------------------------------------------------------
+"The clip constructs without a NameError" is NOT evidence the animation
+plays. Python cannot catch a track name that resolves to a nonexistent
+runtime property — this is a runtime binding failure, not a type error.
+
+Before treating any baked-animation .py file as done, run an actual
+headless playback check — not just a Python `py_compile`:
+
+  1. Stub `document.createElement` and `from js import THREE` (the
+     lbl_py.py test harness does this — see public/modeling/
+     test_integration.py). The 4 lbl.make_mixer() / lbl.make_clip()
+     helpers all early-return out of their canvas-texture helpers
+     when `getContext()` returns null, so this is usually enough to
+     construct the model headless.
+  2. Call create_model(), grab a node that a track targets via
+     `g.getObjectByName('<NodeName>')`.
+  3. Record that node's `.position` / `.quaternion` BEFORE ticking.
+  4. Call `g.userData.tick(dt, elapsed)` (or drive the mixer directly
+     via mixer.update(dt)) for ~30-90 simulated frames.
+  5. Record the same node's `.position` / `.quaternion` AFTER, and
+     assert it actually changed.
+
+If the AFTER values equal the BEFORE values, the clip is NOT playing —
+even though the clip, action, and mixer all "exist" — and the file is
+not done. Do this check for at least one rotation-path node and one
+translation-path node per clip family before delivery.
+
+--------------------------------------------------------------------------
+208.7 — Custom-runtime `update(elapsed)` (no tick, no mixer)
+       (mirror of TS PART 5.7)
+--------------------------------------------------------------------------
+Some models keep their animation driver on a custom runtime namespace
+object (think: `g.userData.<myNamespace>`) and expose a `.update(elapsed)`
+method on it — but DO NOT set `userData.tick` (because the entire
+animation logic lives inside the namespace, including a private elapsed
+clock). The renderer's auto-discovery path:
+
+  # The renderer walks root.userData after mount, finds the first
+  # object with both an `update(elapsed)` method AND a `_root`
+  # back-reference to the model, and calls it every frame with the
+  # renderer's elapsed time. No `root.userData.tick` needed.
+
+If you go this route, set `_root` on the runtime so the DFS finds it:
+
+  runtime = {
+      "_root": g,
+      "update": lambda elapsed: None,    # your animation logic here
+  }
+  g.userData.my_namespace = runtime
+
+Pick ONE driver — the renderer skips the custom-runtime `update()`
+when `userData.tick` exists. PART 5.7's `_root` back-reference is only
+consulted when there's no tick (see tickAllTsModels() in index.html).
 
 ================================================================================
 PART 209 — PROCEDURAL CANVAS TEXTURES (Python form)
@@ -1589,6 +1939,14 @@ The image-driven layer is image-specific regardless of the output
 format, so for the image-to-Python path see Image_To_Py.txt — it
 duplicates the image-specific layer (PART 153-166) but cross-references
 the Python-specific PARTs (PART 200-219) from this file.
+
+For the AnimationMixer contract specifically, PART 207 (sculptRuntime
+shape — mirror of TS PART 6.1B) + PART 208.1-208.7 (tick signature,
+state machines, actor pools, easing, glTF track-name translation,
+headless verification, custom-runtime update(elapsed) — mirrors of
+TS PART 5.1-5.7) + PART 213.15 (singular-vs-plural trap) collectively
+form the canonical Python animation contract. Read all of these before
+writing any non-trivial AnimationMixer.
 
 ================================================================================
 PART 216 — DIFFERENCES FROM THE TS PATH (Pyodide constraints, perf)
