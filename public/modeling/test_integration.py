@@ -256,9 +256,8 @@ def test_lbl_facade(mod):
                    "darken", "lighten", "saturate", "ACES",
                    "Group", "Mesh", "set_position", "set_rotation",
                    "set_scale", "attach", "attach_at", "walk",
-                   "collect_meshes", "collect_by_name",
-                   "sphere2", "sphere2"]:
-        pass  # methods exist (verified via _MT_BRIDGE analysis)
+                   "collect_meshes", "collect_by_name"]:
+        assert hasattr(lbl, method), "missing lbl." + method
     # mt bridge
     assert hasattr(lbl, "mt")
     assert hasattr(lbl.mt, "makePrimitive")
@@ -266,6 +265,375 @@ def test_lbl_facade(mod):
     assert hasattr(lbl.mt, "autoRig")
     assert hasattr(lbl.mt, "generateLOD")
     assert hasattr(lbl.mt, "run")
+    # SECTION 22 additions (PART 386-410 v2.0.2)
+    for method in [
+        # PART 387 skeleton
+        "load_skeleton_template", "list_skeleton_classes",
+        # PART 386 ACES
+        "aces_run", "aces_runstack", "aces_self_test",
+        "aces_export_bone_names", "aces_asset_extras",
+        "aces_oklab_to_linear", "aces_linear_to_oklab",
+        # PART 390 / 391 / 393 schema
+        "schema_linter", "hard_surface_factory_shell",
+        "validate_socket_attachments",
+        # PART 187 / 199.3 lights
+        "sport_motorcycle_lights",
+        # PART 192 architectural
+        "create_wall_with_apertures",
+        # PART 174 validation
+        "validate_draw_call_count", "validate_bounding_box",
+        "validate_ground_clearance",
+        # PART 389 animation
+        "detect_animation_track_type", "build_animation_track",
+        "collect_animation_clips",
+        # PART 388 MT fallbacks
+        "bmesh_to_geometry", "sdf_box", "sdf_torus", "sdf_plane",
+        "sdf_intersect", "sdf_subtract", "lsystem_interpret",
+        "smpl_apply_shape", "lbs_skin", "dqs_skin",
+        "auto_retopologize", "subdivide_loop", "isotropic_remesh",
+        "triangulate", "quadify", "taubin_smooth", "sculpt_brush",
+        "displace_surface",
+        # PART 395 bezier
+        "bezier_fairing",
+        # PART 403 default export
+        "add_default_export",
+        # PART 411-450 v2.0.2 additions
+        "make_sculpt_runtime", "validate_sculpt_runtime_dict",
+        "extract_animation_clips", "collect_meshes_by_name",
+        "compute_silhouette_iou", "make_style_field_palette",
+        "install_set_palette", "list_palettes", "get_palette_names",
+        "make_pbr_recipe", "apply_pbr_recipe", "attach_label",
+        "setup_environment", "export_glb", "serialize_blueprint",
+        "material_from_palette_slot", "install_tick_default",
+        "is_in_pyodide", "system_capabilities", "pbr_recipe_names",
+        "finish_names", "wear_tier_names",
+    ]:
+        assert hasattr(lbl, method), "missing lbl." + method
+    print("  PASS")
+
+
+def test_skeleton_templates(mod):
+    print("test_skeleton_templates")
+    # PART 387
+    classes = mod.lbl.list_skeleton_classes()
+    assert "humanoid" in classes
+    assert "quadruped" in classes
+    assert "bird" in classes
+    assert "fish" in classes
+    assert "insect" in classes
+    assert "object" in classes
+    # Load each
+    for c in classes:
+        tmpl = mod.lbl.load_skeleton_template(c)
+        assert "joints" in tmpl, c + " missing joints"
+        assert len(tmpl["joints"]) > 0, c + " has 0 joints"
+        # object MUST be single-rooted (ANALYSIS_REPORT [B] #1 fix)
+        if c == "object":
+            roots = [j for j in tmpl["joints"] if "parent" not in j]
+            assert len(roots) == 1, "object must have 1 root, got %d" % len(roots)
+        # quadruped height MUST be 1.115 (ANALYSIS_REPORT [B] #2 fix)
+        if c == "quadruped":
+            assert abs(tmpl["height"] - 1.115) < 1e-6, "quadruped height = " + str(tmpl["height"])
+    # Loading a bad class raises
+    try:
+        mod.lbl.load_skeleton_template("nope")
+        assert False, "should have raised"
+    except KeyError:
+        pass
+    print("  PASS")
+
+
+def test_aces_bridge(mod):
+    print("test_aces_bridge")
+    # PART 386
+    # oklab color helpers (pure-Python)
+    rgb = mod.lbl.aces_oklab_to_linear((0.5, 0.5, 0.5))
+    assert len(rgb) == 3, "aces_oklab_to_linear wrong shape"
+    rgb2 = mod.lbl.aces_linear_to_oklab(rgb)
+    assert len(rgb2) == 3
+    # Self test returns a dict
+    st = mod.lbl.aces_self_test()
+    assert "ok" in st
+    assert "modules" in st
+    assert "errors" in st
+    # aces_run returns a dict (placeholder in headless)
+    rep = mod.lbl.aces_run(None, {})
+    assert "ok" in rep
+    # aces_runstack
+    rep2 = mod.lbl.aces_runstack([None, None], {})
+    assert "reports" in rep2
+    # export_bone_names
+    names = mod.lbl.aces_export_bone_names({"joints": [{"name": "Root"}, {"name": "Spine"}]})
+    assert "Root" in names and "Spine" in names
+    # asset_extras
+    extras = mod.lbl.aces_asset_extras({})
+    assert "harness" in extras
+    print("  PASS")
+
+
+def test_mt_fallbacks(mod):
+    print("test_mt_fallbacks")
+    # PART 388 — all should return non-None (placeholder or real)
+    assert mod.lbl.bmesh_to_geometry({"vertices": [], "faces": []}) is not None
+    box = mod.lbl.sdf_box((0, 0.5, 0), (1, 0.5, 0.5))
+    # inside (centre of box) should be negative
+    assert box((0, 0.5, 0)) < 0
+    # outside should be positive
+    assert box((5, 5, 5)) > 0
+    torus = mod.lbl.sdf_torus((0, 0, 0), 1.0, 0.2)
+    plane = mod.lbl.sdf_plane((0, 1, 0), 0.0)
+    # With normal (0,1,0), points with y<0 are "below" (negative SDF) and
+    # points with y>0 are "above" (positive SDF).
+    assert plane((0, -1, 0)) < 0  # below plane
+    assert plane((0, 1, 0)) > 0   # above plane
+    # intersection / subtraction are functions of two SDFs
+    inter = mod.lbl.sdf_intersect(box, plane)
+    assert callable(inter)
+    sub = mod.lbl.sdf_subtract(box, plane)
+    assert callable(sub)
+    # lsystem
+    s = mod.lbl.lsystem_interpret({"F": "F+F", "+": "+", "-": "-"}, "F", 2)
+    assert "F" in s and "+" in s
+    # lbs / dqs
+    assert mod.lbl.lbs_skin(None, None, None, None) is not None
+    assert mod.lbl.dqs_skin(None, None, None, None) is not None
+    # mesh ops
+    assert mod.lbl.auto_retopologize(None, 1000) is not None
+    assert mod.lbl.subdivide_loop(None, 1) is not None
+    assert mod.lbl.isotropic_remesh(None, 0.05, 2) is not None
+    assert mod.lbl.quadify(None, 30) is not None
+    assert mod.lbl.triangulate(None) is not None
+    assert mod.lbl.taubin_smooth(None, 5, 0.5) is not None
+    assert mod.lbl.sculpt_brush(None, [0, 0, 0], [0, 1, 0]) is not None
+    assert mod.lbl.displace_surface(None, None) is not None
+    # smpl_apply_shape
+    assert mod.lbl.smpl_apply_shape(None, None) is not None
+    print("  PASS")
+
+
+def test_animation_track_detection(mod):
+    print("test_animation_track_detection")
+    # PART 389 / ANALYSIS_REPORT #18
+    # Quaternion
+    assert mod.lbl.detect_animation_track_type("head.quaternion", [0, 0, 0, 1, 0, 0, 0.707, 0.707]) == "quaternion"
+    assert mod.lbl.detect_animation_track_type("head.rotation", [0, 0, 0, 1]) == "quaternion"
+    # Vector
+    assert mod.lbl.detect_animation_track_type("head.position", [0, 0, 0, 1, 2, 3]) == "vector"
+    # Number
+    assert mod.lbl.detect_animation_track_type("headlight.emissiveIntensity", [0, 1, 0.5, 0.7]) == "number"
+    # build_animation_track returns the right spec
+    t = mod.lbl.build_animation_track("head.quaternion", [0, 1], [0, 0, 0, 1, 0, 0, 0.707, 0.707])
+    assert t["type"] == "quaternion"
+    t2 = mod.lbl.build_animation_track("head.position", [0, 1], [0, 0, 0, 1, 2, 3])
+    assert t2["type"] == "vector"
+    t3 = mod.lbl.build_animation_track("headlight.emissiveIntensity", [0, 1], [0, 1])
+    assert t3["type"] == "number"
+    # collect_animation_clips — short-circuits on real clips
+    rt = {"animations": {"clips": ["c1", "c2"]}}
+    assert mod.lbl.collect_animation_clips(rt) == ["c1", "c2"]
+    rt_empty = {"animations": {"clips": []}}
+    assert mod.lbl.collect_animation_clips(rt_empty) == []
+    print("  PASS")
+
+
+def test_schema_linter_and_shells(mod):
+    print("test_schema_linter_and_shells")
+    # PART 390
+    rep = mod.lbl.schema_linter(None, {"gridKeyMm": 5.0})
+    assert "ok" in rep
+    assert "blocks" in rep
+    assert "warns" in rep
+    # PART 391
+    shell = mod.lbl.hard_surface_factory_shell({
+        "name": "Apex GT",
+        "bounding_box": [4.2, 1.5, 1.8],
+    })
+    assert shell["name"] == "Apex GT"
+    assert "audits" in shell
+    assert shell["audits"]["validate_triangle_budget"] == 8500
+    # PART 393
+    val = mod.lbl.validate_socket_attachments(None, {"sockets": {}})
+    assert "ok" in val
+    # PART 392
+    wall = mod.lbl.create_wall_with_apertures(
+        width=4.0, height=3.0, thickness=0.2,
+        apertures=[{"x": 1, "y": 0, "w": 0.9, "h": 2.1, "kind": "door"}],
+    )
+    assert wall["type"] == "wall_with_apertures"
+    assert len(wall["apertures"]) == 1
+    print("  PASS")
+
+
+def test_validation_helpers(mod):
+    print("test_validation_helpers")
+    # PART 174.2-4
+    # In headless, validate_bounding_box returns min=[+inf, +inf, +inf]
+    bb = mod.lbl.validate_bounding_box(None, min_y=0.0, max_abs_coord=10.0)
+    assert "ok" in bb and "min" in bb and "max" in bb
+    dc = mod.lbl.validate_draw_call_count(None, budget=30)
+    assert "ok" in dc and "count" in dc
+    gc = mod.lbl.validate_ground_clearance(None, clearance=0.0)
+    assert "ok" in gc
+    print("  PASS")
+
+
+def test_lookdev_and_bezier(mod):
+    print("test_lookdev_and_bezier")
+    # PART 187 sport motorcycle lights
+    rig = mod.lbl.sport_motorcycle_lights("reference")
+    assert rig["mode"] == "reference"
+    assert len(rig["lights"]) > 0
+    rig_g = mod.lbl.sport_motorcycle_lights("grazing")
+    assert rig_g["mode"] == "grazing"
+    rig_n = mod.lbl.sport_motorcycle_lights("neutral")
+    assert rig_n["mode"] == "neutral"
+    # PART 395 bezier fairing
+    spec = mod.lbl.bezier_fairing([(0, 0), (0.3, 0.4), (0.7, 0.4), (1, 0)], depth=0.04, bevel=0.005)
+    assert spec["type"] == "bezier_fairing"
+    assert spec["options"]["depth"] == 0.04
+    assert spec["options"]["bevelEnabled"] is True
+    # No duplicate keys (TS1117 fix)
+    assert len(spec["options"]) == len(set(spec["options"].keys()))
+    print("  PASS")
+
+
+def test_default_export_helper(mod):
+    print("test_default_export_helper")
+    # PART 403 — fix Models 7, 8, 9 missing default export
+    import types
+    m = types.ModuleType("test_mod")
+    def myfunc():
+        return "hello"
+    mod.lbl.add_default_export(myfunc, m)
+    assert m.myfunc is myfunc
+    assert m.default is myfunc
+    print("  PASS")
+
+
+def test_sculpt_runtime_and_pbr(mod):
+    print("test_sculpt_runtime_and_pbr")
+    # PART 411
+    sr = mod.lbl.make_sculpt_runtime({"nodes": {"a": 1}, "meshes": {"b": 2}})
+    assert sr["nodes"] == {"a": 1}
+    assert sr["meshes"] == {"b": 2}
+    assert "detailInventory" in sr
+    assert "fidelity" in sr
+    # validate
+    val = mod.lbl.validate_sculpt_runtime_dict(sr)
+    assert val["ok"] is True, "sculptRuntime missing: " + str(val["missing"])
+    # PART 412
+    recipes = mod.lbl.pbr_recipe_names()
+    assert "chitin" in recipes
+    assert "metal" in recipes
+    spec = mod.lbl.make_pbr_recipe("chitin")
+    assert "sheen" in spec
+    # palette introspection
+    pals = mod.lbl.list_palettes()
+    assert "racing-red" in pals
+    # style field palette
+    pal = mod.lbl.make_style_field_palette("fire dragon on a neon highway")
+    assert "colors" in pal
+    assert len(pal["colors"]) == 5
+    # system capabilities
+    caps = mod.lbl.system_capabilities()
+    assert "pyodide" in caps
+    assert "skeleton_classes" in caps
+    assert "aces_modules" in caps
+    print("  PASS")
+
+
+def test_vfx_post_fx_chain(mod):
+    print("test_vfx_post_fx_chain")
+    # PART 421 — post_fx chain
+    pf = mod.lbl.post_fx(None, chain=["bloom", "ssao", "outline", "fxaa",
+                                        "halftone", "chromatic", "vignette",
+                                        "filmgrain"])
+    assert pf["type"] == "post_fx"
+    assert len(pf["passes"]) == 8
+    names = [p["name"] for p in pf["passes"]]
+    assert "bloom" in names
+    assert "ssao" in names
+    assert "outline" in names
+    assert "fxaa" in names
+    # unknown pass is appended with error note
+    pf2 = mod.lbl.post_fx(None, chain=["bogus"])
+    assert len(pf2["passes"]) == 1
+    assert "error" in pf2["passes"][0]
+    print("  PASS")
+
+
+def test_vfx_outline_shader(mod):
+    print("test_vfx_outline_shader")
+    # PART 420 — outline (headless: returns spec dict)
+    ol = mod.lbl.outline_pass(None, mode="backface", thickness=0.02, color="#000000")
+    # In headless it's a dict; in browser it'd be a Group
+    assert ol is not None
+    assert (isinstance(ol, dict) and ol.get("type") == "outline_pass") or hasattr(ol, "name")
+    # PART 424 — shader_material (returns dict)
+    sm = mod.lbl.shader_material(
+        "void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+        "void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }",
+        uniforms={"t": {"value": 0.5}},
+    )
+    assert sm["type"] == "shader_material"
+    assert "t" in sm["uniforms"]
+    print("  PASS")
+
+
+def test_vfx_particle_trail(mod):
+    print("test_vfx_particle_trail")
+    # PART 425 — particle_system (headless)
+    ps = mod.lbl.particle_system({
+        "count": 50,
+        "color": "#ff8800",
+        "emitter": "sphere",
+        "additive": True,
+        "lifetime": 2.0,
+        "size": 0.1,
+    })
+    assert ps["type"] == "particle_system"
+    assert ps["count"] == 50
+    assert ps["color"] == "#ff8800"
+    # PART 426 — trail (headless)
+    tr = mod.lbl.trail(None, None, color="#88aaff", width=0.05, length=10)
+    assert tr["type"] == "trail"
+    assert tr["length"] == 10
+    assert callable(tr.get("tick"))
+    # PART 429 — sprite_sheet (returns a tick function)
+    ss = mod.lbl.sprite_sheet(None, frame_width=64, frame_height=64,
+                              frame_count=8, fps=12)
+    assert ss["type"] == "sprite_sheet"
+    assert callable(ss["tick"])
+    # ss["tick"](0.0, 0.5) should run without throwing
+    ss["tick"](0.016, 0.5)
+    print("  PASS")
+
+
+def test_vfx_grass_bvh_decal(mod):
+    print("test_vfx_grass_bvh_decal")
+    # PART 427 — instanced_grass (headless)
+    ig = mod.lbl.instanced_grass(None, blade_count=200, height=0.5, width=0.04,
+                                  color="#3a7d2c", ground_size=10.0)
+    assert ig["type"] == "instanced_grass"
+    assert ig["blade_count"] == 200
+    # PART 428 — bvh_raycast (headless)
+    bc = mod.lbl.bvh_raycast([], None)
+    assert bc["type"] == "bvh_raycast"
+    assert bc["mesh_count"] == 0
+    # PART 423 — decal (headless)
+    d = mod.lbl.decal(None, None, position=(0, 1, 0), normal=(0, 1, 0),
+                       size=(0.5, 0.5, 0.5))
+    assert d["type"] == "decal"
+    assert d["size"] == [0.5, 0.5, 0.5]
+    # PART 422 — IBL helmet (headless)
+    ibl = mod.lbl.ibl_helmet(None, mode="room", intensity=1.0)
+    assert ibl["type"] == "ibl_helmet"
+    assert ibl["mode"] == "room"
+    # PART 430 — lens flare
+    lf = mod.lbl.lens_flare(None, light_position=(0, 5, 0),
+                              color="#ffeecc", size=1.0, count=4)
+    assert lf["type"] == "lens_flare"
+    assert lf["count"] == 4
     print("  PASS")
 
 
@@ -286,6 +654,19 @@ def main():
         test_animation_helpers(mod)
         test_style_a_backward_compat(mod)
         test_lbl_facade(mod)
+        test_skeleton_templates(mod)
+        test_aces_bridge(mod)
+        test_mt_fallbacks(mod)
+        test_animation_track_detection(mod)
+        test_schema_linter_and_shells(mod)
+        test_validation_helpers(mod)
+        test_lookdev_and_bezier(mod)
+        test_default_export_helper(mod)
+        test_sculpt_runtime_and_pbr(mod)
+        test_vfx_post_fx_chain(mod)
+        test_vfx_outline_shader(mod)
+        test_vfx_particle_trail(mod)
+        test_vfx_grass_bvh_decal(mod)
     except AssertionError as e:
         print(f"FAILED: {e}")
         import traceback

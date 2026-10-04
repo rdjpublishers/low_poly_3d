@@ -3,12 +3,12 @@ lbl_py.py — LBL Python builder helper (mirrors the JS blueprint API).
 
 This module is the Python counterpart to the builder API exposed to
 JavaScript blueprint scripts in index.html. It is auto-injected by the
-renderer when a .py file is loaded — every .py file can call `lbl.attach_box(...)`
-etc. without an explicit import (the renderer adds `lbl` to builtins on
+renderer when a .py file is loaded — every .py file can call \`lbl.attach_box(...)\`
+etc. without an explicit import (the renderer adds \`lbl\` to builtins on
 the Python side before running the user code).
 
 The renderer ships the source of this file inlined into index.html
-(see `LBL_PY_HELPER_SRC` in the Python section) so the first .py load
+(see \`LBL_PY_HELPER_SRC\` in the Python section) so the first .py load
 needs no extra network round-trip. The version in this file is the
 canonical readable source; the inlined copy is byte-identical and is
 the one that actually runs. If you change one, change the other.
@@ -31,8 +31,8 @@ FIX 3   — All materials default to solid MeshStandardMaterial /
            when textures fail.
 FIX 4   — Patterns are added as separate Mesh layers (BoxGeometry
            stripes, decals, badges) — no texture baking.
-FIX 7   — Materials live in a mutable dict (`mats`) so a single
-           `setPalette()` call can hot-swap every colour slot at once.
+FIX 7   — Materials live in a mutable dict (\`mats\`) so a single
+           \`setPalette()\` call can hot-swap every colour slot at once.
 
 Plus the full TS-equivalent feature surface (PART 200-302):
 
@@ -43,8 +43,8 @@ Plus the full TS-equivalent feature surface (PART 200-302):
   • 8 shape-creation techniques (loft, lathe, extrude, CSG, SDF,
     subdivision, NURBS, procedural deformers).
   • 44-Technique Modeling Bundle bridge (MT.* helpers via
-    `from js import MT_core` / `MT_mesh` / `MT_materials` /
-    `MT_organic` / `MT_advanced` / `MT`).
+    \`from js import MT_core\` / \`MT_mesh\` / \`MT_materials\` /
+    \`MT_organic\` / \`MT_advanced\` / \`MT\`).
   • Custom shape helpers (FilletedBox, TaperedTube, RimStarPattern,
     BeveledWasher, LathedTire, SweptTube, ExhaustCanister,
     HardSurfaceFactoryShell).
@@ -215,16 +215,16 @@ Public surface (lbl.*)
 
   lbl.ACES(...)
 
-The renderer auto-registers every public method on the `lbl` module
+The renderer auto-registers every public method on the \`lbl\` module
 instance, so user scripts can call any of them with the bare
-`lbl.foo(...)` form (no import needed).
+\`lbl.foo(...)\` form (no import needed).
 
 ────────────────────────────────────────────────────────────────────────
 """
 
 # This file is HUGE. We split it across multiple string sections and
 # exec them in order. Each section defines a fragment that goes into
-# the final `lbl` namespace.
+# the final \`lbl\` namespace.
 
 import sys
 import math
@@ -324,8 +324,8 @@ def _hex_to_rgb(h):
     if h.startswith("#"):
         h = h[1:]
     if h.startswith("0x") or h.startswith("0X"):
-        return ((int(h, 16) >> 16) & 0xFF) / 255.0, \
-               ((int(h, 16) >>  8) & 0xFF) / 255.0, \
+        return ((int(h, 16) >> 16) & 0xFF) / 255.0, \\
+               ((int(h, 16) >>  8) & 0xFF) / 255.0, \\
                (int(h, 16)        & 0xFF) / 255.0
     if len(h) == 3:
         h = h[0] * 2 + h[1] * 2 + h[2] * 2
@@ -393,21 +393,21 @@ def _hsl_to_rgb(h, s, l):
 
 
 def _darken(rgb, amount):
-    """Darken an RGB 0..1 tuple by `amount` (0..1)."""
+    """Darken an RGB 0..1 tuple by \`amount\` (0..1)."""
     h, s, l = _rgb_to_hsl(*rgb)
     l = max(0, l - amount)
     return _hsl_to_rgb(h, s, l)
 
 
 def _lighten(rgb, amount):
-    """Lighten an RGB 0..1 tuple by `amount` (0..1)."""
+    """Lighten an RGB 0..1 tuple by \`amount\` (0..1)."""
     h, s, l = _rgb_to_hsl(*rgb)
     l = min(1, l + amount)
     return _hsl_to_rgb(h, s, l)
 
 
 def _saturate(rgb, amount):
-    """Saturate an RGB 0..1 tuple by `amount` (-1..1)."""
+    """Saturate an RGB 0..1 tuple by \`amount\` (-1..1)."""
     h, s, l = _rgb_to_hsl(*rgb)
     s = max(0, min(1, s + amount))
     return _hsl_to_rgb(h, s, l)
@@ -608,7 +608,7 @@ class _PaletteRegistry:
     def register(self, name, defs):
         """Register a custom palette (PART 4.3).
 
-        `defs` is a dict where each key is a slot name from the 10-slot
+        \`defs\` is a dict where each key is a slot name from the 10-slot
         contract (body/stripe/carbon/rim/tire/glass/headlight/taillight/
         chrome/accent). Each slot value can be:
             - a hex string ("#c42020")
@@ -770,7 +770,7 @@ class _PaletteRegistry:
         """
         from js import THREE
         rt = group.userData.sculptRuntime if hasattr(group.userData, "sculptRuntime") else None
-        mats = (rt.materials if rt and hasattr(rt, "materials") else None) \
+        mats = (rt.materials if rt and hasattr(rt, "materials") else None) \\
                or getattr(group.userData, "materials", None)
         if mats is None:
             # No materials registered — try to walk the group + collect
@@ -1218,8 +1218,8 @@ def _texture_truchet(width, height, seed=1, cells=8,
     return _make_data_texture(width, height, bytes(out))
 
 
-# Convenience façade: a single `make_texture(spec, opts)` that dispatches
-# on `spec.type`. Use this in user code:
+# Convenience façade: a single \`make_texture(spec, opts)\` that dispatches
+# on \`spec.type\`. Use this in user code:
 #
 #     tex = lbl.make_texture({"type": "noise", "seed": 1}, size=256)
 #     mat.map = tex
@@ -1405,7 +1405,7 @@ def _circle(radius=1, segments=32, theta_start=0.0, theta_length=2 * math.pi):
 
 
 def _tube_curve(points, tubular_segments=64, radius=0.2, radial_segments=8, closed=False):
-    """Build a TubeGeometry along a Catmull-Rom curve through `points`."""
+    """Build a TubeGeometry along a Catmull-Rom curve through \`points\`."""
     from js import THREE
     pts = [THREE.Vector3.new(float(p[0]), float(p[1]), float(p[2])) for p in points]
     curve = THREE.CatmullRomCurve3.new(pts, bool(closed), "catmullrom", 0.5)
@@ -2823,7 +2823,7 @@ def _compute_lbs_weights(geometry, skeleton, influences=4):
 def _compute_dqs_weights(geometry, skeleton, influences=4):
     """PART 283 #27 — Dual Quaternion Skinning weights (same as LBS but
     in dual-quat form). For Python we just return LBS weights with a
-    `method` marker — the renderer converts at upload time.
+    \`method\` marker — the renderer converts at upload time.
     """
     g = _compute_lbs_weights(geometry, skeleton, influences=influences)
     g.userData.skinningMethod = "DQS"
@@ -2878,7 +2878,7 @@ def _walk_phase(t, frequency=2.0, amplitude=0.4, phase_offset=math.pi):
     """PART 247.2 — walk-cycle phase helper.
 
     Returns (left, right) angle pair. Left/right are phase-offset by
-    `phase_offset` (default Pi = opposite directions).
+    \`phase_offset\` (default Pi = opposite directions).
     """
     return (amplitude * math.sin(2.0 * math.pi * frequency * t),
             amplitude * math.sin(2.0 * math.pi * frequency * t + phase_offset))
@@ -3373,14 +3373,14 @@ def _install_tick(group, fn):
 # ════════════════════════════════════════════════════════════════════════
 # SECTION 17 — MT module bridge (PART 281-285)
 # ════════════════════════════════════════════════════════════════════════
-# Mirror every MT.* helper on `lbl.mt`. Each delegates to the JS bridge
-# `from js import MT_*`. The bridge is dynamic — if the addon isn't
+# Mirror every MT.* helper on \`lbl.mt\`. Each delegates to the JS bridge
+# \`from js import MT_*\`. The bridge is dynamic — if the addon isn't
 # loaded, calling a helper returns None (no crash).
 
 def _mt_call(ns, fn, *args, **kwargs):
     """Generic MT module bridge call.
 
-    Looks up `window[ns][fn]` and calls it. Returns None if the addon
+    Looks up \`window[ns][fn]\` and calls it. Returns None if the addon
     isn't loaded.
     """
     try:
@@ -3896,7 +3896,7 @@ class _LBLBuilder:
 
     Backward-compat from lbl.py v1.x. The new Style B (THREE.Group
     return) and palette system are exposed as top-level functions on
-    the `lbl` module instance.
+    the \`lbl\` module instance.
     """
 
     def __init__(self):
@@ -4079,9 +4079,9 @@ class _LBLBuilder:
             meta["category"] = "prop"
         if "proportions" not in meta:
             meta["proportions"] = {"W_over_H": 1.0, "fill": 0.85}
-        assert "style" in meta and meta["style"], \
+        assert "style" in meta and meta["style"], \\
             "lbl.blueprint(): meta.style is empty after auto-injection — this is a bug"
-        assert "category" in meta and meta["category"], \
+        assert "category" in meta and meta["category"], \\
             "lbl.blueprint(): meta.category is empty after auto-injection — this is a bug"
         return {
             "meta": meta,
@@ -4142,7 +4142,7 @@ class _LBLBuilder:
 
 
 # ════════════════════════════════════════════════════════════════════════
-# SECTION 21 — The `lbl` module top-level facade
+# SECTION 21 — The \`lbl\` module top-level facade
 # ════════════════════════════════════════════════════════════════════════
 # This is what user scripts interact with. It merges:
 #   1. Style A backward-compat (the lbl.attach_box etc. from v1.x)
@@ -4159,7 +4159,7 @@ class _LBLBuilder:
 #  12. sculptRuntime + tick + setPalette hot-swap
 
 class _LBLFacade:
-    """The `lbl` module — single object user scripts interact with.
+    """The \`lbl\` module — single object user scripts interact with.
 
     Combines Style A (lbl.attach_box etc.) backward-compat with the
     full Style B (THREE.Group return) building blocks + every helper
@@ -4531,7 +4531,7 @@ class _LBLFacade:
     # ── SECTION 22 additions (PART 386-410 v2.0.2) — bound as methods ────
     # The methods are defined as module-level functions in SECTION 22
     # below; we just bind them here. This keeps the methods callable as
-    # both `lbl.foo(...)` and `lbl_module.foo(...)` for testing.
+    # both \`lbl.foo(...)\` and \`lbl_module.foo(...)\` for testing.
 
     # Skeleton (PART 387)
     def load_skeleton_template(self, class_name):
@@ -4734,7 +4734,7 @@ class _LBLFacade:
 # ════════════════════════════════════════════════════════════════════════
 # SECTION 22 — v2.0.2 SURFACE (PART 386-410)
 # ════════════════════════════════════════════════════════════════════════
-# This section implements every method the spec claims to exist on `lbl`
+# This section implements every method the spec claims to exist on \`lbl\`
 # but that the v2.0 file was missing. All methods follow the same
 # contract: try the JS bridge first (so they participate in the actual
 # ACES / MT / three-rig-helpers bundles when running in Pyodide), then
@@ -4895,7 +4895,7 @@ def _list_skeleton_classes():
 
 
 def _load_skeleton_template(class_name):
-    """Return the skeleton template dict for `class_name`.
+    """Return the skeleton template dict for \`class_name\`.
 
     Returns a deep copy so callers can mutate it without affecting the
     registry. Raises KeyError if the class is unknown.
@@ -4912,7 +4912,7 @@ def _load_skeleton_template(class_name):
 # ─────────────────────────────────────────────────────────────────────
 # PART 386 — ACES (anyCreature Engine Surface) FULL SURFACE
 # ─────────────────────────────────────────────────────────────────────
-# The ACES bridge. In Pyodide, this delegates to `window.ACES_*` modules.
+# The ACES bridge. In Pyodide, this delegates to \`window.ACES_*\` modules.
 # In headless test environments, it returns a placeholder report so the
 # lbl surface stays callable.
 
@@ -5093,14 +5093,14 @@ def _aces_asset_extras(spec, opts=None):
 # ─────────────────────────────────────────────────────────────────────
 
 def _mt_call_with_fallback(ns, fn, fallback, *args, **kwargs):
-    """Call MT_<ns>.<fn> if loaded; otherwise run `fallback(*args, **kwargs)`."""
+    """Call MT_<ns>.<fn> if loaded; otherwise run \`fallback(*args, **kwargs)\`."""
     try:
         from js import window
         mod = getattr(window, ns, None)
         if mod is not None:
             method = mod[fn] if hasattr(mod, "__getitem__") else getattr(mod, fn, None)
-            # Guard against test-stub `getattr` always returning a stub
-            # (which makes `hasattr` always True). Only proceed if the
+            # Guard against test-stub \`getattr\` always returning a stub
+            # (which makes \`hasattr\` always True). Only proceed if the
             # method is actually a callable, not a stub.
             if callable(method) and not _is_stub(method):
                 return method(*args, **kwargs)
@@ -5194,7 +5194,7 @@ def _lsystem_interpret(rules, axiom, iterations=3):
 def _smpl_apply_shape(geometry, blend_shape, weight=1.0):
     """Apply a blend-shape to a geometry (PART 388.8).
 
-    In Pyodide, this calls `MT_organic.smplApplyShape`. In headless
+    In Pyodide, this calls \`MT_organic.smplApplyShape\`. In headless
     tests, returns a placeholder dict.
     """
     return _mt_call_with_fallback(
@@ -5620,7 +5620,7 @@ def _validate_bounding_box(group, min_y=0.0, max_abs_coord=10.0):
 
 
 def _validate_ground_clearance(group, clearance=0.0):
-    """Check that no part of the model is below `clearance` in world-Y."""
+    """Check that no part of the model is below \`clearance\` in world-Y."""
     bb = _validate_bounding_box(group, min_y=-1e6, max_abs_coord=1e6)
     min_y = bb["min"][1]
     return {
@@ -5664,7 +5664,7 @@ def _bezier_fairing(control_points, depth=0.04, bevel=0.005, twist=0.0):
 # ─────────────────────────────────────────────────────────────────────
 
 def _add_default_export(model_func, module=None):
-    """Bind `model_func` as BOTH a named attribute and `default`.
+    """Bind \`model_func\` as BOTH a named attribute and \`default\`.
 
     Fixes Models 7, 8, 9 spec deviation (ANALYSIS_REPORT #5).
     Returns the module (so calls can be chained).
@@ -5814,7 +5814,7 @@ def _install_set_palette(group, available_palettes):
 
 
 def _palette_apply(group, name_or_dict):
-    """Apply a palette to every Mesh under `group`."""
+    """Apply a palette to every Mesh under \`group\`."""
     try:
         from js import THREE
         mats = None
@@ -6066,7 +6066,7 @@ def _wear_tier_names():
 # ─────────────────────────────────────────────────────────────────────
 
 def _outline_pass(group, mode="backface", thickness=0.02, color="#000000"):
-    """Apply an outline to every Mesh under `group`.
+    """Apply an outline to every Mesh under \`group\`.
 
     Two modes:
       - 'backface' (default): clone each mesh, flip culling, push along
@@ -6756,10 +6756,3 @@ def _bind_section_23_facade(lbl_instance):
     return lbl_instance
 
 
-# Singleton — the `lbl` module instance
-lbl = _LBLFacade()
-sys.modules['lbl'] = lbl
-
-# Bind SECTION 23 methods to the singleton now that it exists
-lbl = _bind_section_23_facade(lbl)
-sys.modules['lbl'] = lbl
