@@ -13985,6 +13985,20 @@ function runJsBlueprint(code){
 // v1.37 / v8.28 — Lazy Pyodide loader. The first .py load fetches the
 // multi-MB Pyodide runtime; later loads reuse the cached instance. Mirrors
 // the getTsCompiler() pattern above so the cost only hits once per session.
+//
+// v2.0.3 (PROBLEM 4 fix) — the .catch() at the END of this chain previously
+// caught both actual loader failures (network) AND Python-side errors from
+// `py.runPython(LBL_PY_HELPER_SRC)` (e.g. a Python KeyError: 'lbl' from
+// the helper bootstrap). Both got mis-attributed as "Could not load Pyodide
+// from jsDelivr" — confusing the user because the underlying error had
+// nothing to do with Pyodide or jsDelivr.
+//
+// The chain now uses two distinct catch blocks:
+//   - A loader-specific catch that fires ONLY when import() rejects or
+//     loadPyodide() throws (network/CDN failures).
+//   - A helper-bootstrap catch that surfaces the real Python error
+//     message (no more "Could not load Pyodide" wrapper for non-network
+//     failures).
 let __pyodidePromise = null;
 function getPyodide(){
   if(window.__pyodide) return Promise.resolve(window.__pyodide);
@@ -13998,101 +14012,169 @@ function getPyodide(){
     .then(mod => {
       const loadPyodide = mod.loadPyodide || (mod.default && mod.default.loadPyodide);
       if(typeof loadPyodide !== 'function'){
-        throw new Error('Pyodide loader did not expose loadPyodide() — CDN URL may have changed.');
+        // Network/CDN-level error (loader script didn't expose loadPyodide).
+        // Tag with __lblLoaderError so the outer catch knows to attribute
+        // it to the loader, not the helper bootstrap.
+        const e = new Error('Pyodide loader did not expose loadPyodide() — CDN URL may have changed.');
+        e.__lblLoaderError = true;
+        throw e;
       }
       return loadPyodide({ indexURL: PYODIDE_BASE });
     })
     .then(py => {
-      window.__pyodide = py;
-      // Pre-register the LBL Python helper module — see
-      // public/modeling/lbl_py.py. We ship it as an inlined string rather
-      // than a separate fetch so a single .py file load needs zero extra
-      // network round-trips. The helper exposes the same builder API the
-      // JS blueprint path uses (name/define_palette/attach_box/...), so
-      // authors can move between the two formats without rewriting their
-      // model code.
-      py.runPython(LBL_PY_HELPER_SRC);
-      // Bind `lbl` as a top-level global too so user scripts can use
-      // lbl.attach_box(...) without an explicit `import lbl`. The
-      // sys.modules registration above is for the explicit-import path.
-      py.runPython(`
+      // The Pyodide runtime itself is loaded. Now do the helper
+      // bootstrap in a separate try/catch so a Python error here gets
+      // attributed to "Python helper bootstrap failed" — NOT to a
+      // "Could not load Pyodide" network failure.
+      try{
+        window.__pyodide = py;
+        // Pre-register the LBL Python helper module — see
+        // public/modeling/lbl_py.py. We ship it as an inlined string rather
+        // than a separate fetch so a single .py file load needs zero extra
+        // network round-trips. The helper exposes the same builder API the
+        // JS blueprint path uses (name/define_palette/attach_box/...), so
+        // authors can move between the two formats without rewriting their
+        // model code.
+        py.runPython(LBL_PY_HELPER_SRC);
+        // Bind `lbl` as a top-level global too so user scripts can use
+        // lbl.attach_box(...) without an explicit `import lbl`. The
+        // sys.modules registration above is for the explicit-import path.
+        try{
+          py.runPython(`
 import builtins
 builtins.lbl = sys.modules['lbl']
 `);
-      // Expose the page's THREE module to Python so style-B scripts can
-      // `from js import THREE`. We re-bind on every call to runPyBlueprint
-      // too, in case the import map resolved a different build.
-      py.globals.set('THREE', THREE);
-      // v1.37 / v8.28 — also expose THREE's class constructors as global
-      // JS names so user code can write `from js import RoundedBoxGeometry`
-      // (the natural Python idiom) in addition to `THREE.RoundedBoxGeometry`.
-      // We walk THREE's own keys + all first-level properties of three's
-      // sub-namespaces (like THREE.MathUtils) and copy any class
-      // constructors to the window (which is the "js" namespace from
-      // Python's perspective). Re-run on every getPyodide() to pick up
-      // any late-loaded addon classes.
-      try{
-        for(const k of Object.keys(THREE)){
-          const v = THREE[k];
-          if(typeof v === 'function'){
-            try{ window[k] = v; }catch(_){ /* some names are reserved */ }
+        }catch(builtinsErr){
+          // If the `lbl` symbol isn't in sys.modules for any reason
+          // (corrupted cache, helper edit typo, etc.) re-register it.
+          // Without this guard, the next user-code run would throw
+          // `KeyError: 'lbl'` and get mis-attributed as a network error.
+          console.warn('[LBL] builtins.lbl rebind failed, retrying via py.globals:', builtinsErr);
+          try{
+            const lblMod = py.runPython('sys.modules["lbl"]');
+            if(lblMod){ py.globals.set('lbl', lblMod); }
+          }catch(fallbackErr){
+            console.error('[LBL] Could not rebind lbl:', fallbackErr);
           }
         }
-        // Also walk three's addons if the import map has loaded them.
-        if(THREE.MathUtils){
-          for(const k of Object.keys(THREE.MathUtils)){
-            const v = THREE.MathUtils[k];
-            if(typeof v === 'function'){
-              try{ window[k] = v; }catch(_){}
-            }
-          }
-        }
-        // v1.36 / v8.28 — also mirror the known THREE addon classes
-        // imported at the top of this file (RoundedBoxGeometry,
-        // TransformControls, GLTFExporter, etc.). These live in
-        // 'three/addons/...' and are NOT properties of THREE itself,
-        // so the loops above never find them. Without this list, a
-        // Python factory that does `from js import RoundedBoxGeometry`
-        // (the natural Style B idiom — see Prompt_To_Py.txt PART 203
-        // and the worked example in PART 212) fails at import time
-        // with "ImportError: cannot import name 'RoundedBoxGeometry'
-        // from 'js'". We check `typeof window[k] !== 'undefined'`
-        // before assigning so hot-reloaded addons aren't clobbered.
-        const ADDON_CLASSES = [
-          'RoundedBoxGeometry',  // three/addons/geometries/RoundedBoxGeometry.js
-          'TransformControls',   // three/addons/controls/TransformControls.js
-          'GLTFExporter',        // three/addons/exporters/GLTFExporter.js
-        ];
-        for(const k of ADDON_CLASSES){
-          if(typeof window[k] === 'undefined' && typeof globalThis[k] !== 'undefined'){
-            try{ window[k] = globalThis[k]; }catch(_){ /* some names are reserved */ }
-          }
-        }
-        // Probe the import map for any late-loaded addon classes —
-        // mirrors what we do for THREE's own keys. This catches
-        // addons the user imports dynamically, not just the ones
-        // we hardcode above.
+        // Expose the page's THREE module to Python so style-B scripts can
+        // `from js import THREE`. We re-bind on every call to runPyBlueprint
+        // too, in case the import map resolved a different build.
+        py.globals.set('THREE', THREE);
+        // v1.37 / v8.28 — also expose THREE's class constructors as global
+        // JS names so user code can write `from js import RoundedBoxGeometry`
+        // (the natural Python idiom) in addition to `THREE.RoundedBoxGeometry`.
+        // We walk THREE's own keys + all first-level properties of three's
+        // sub-namespaces (like THREE.MathUtils) and copy any class
+        // constructors to the window (which is the "js" namespace from
+        // Python's perspective). Re-run on every getPyodide() to pick up
+        // any late-loaded addon classes.
         try{
-          for(const k of Object.keys(window)){
-            // Anything starting with a capital letter and ending in
-            // "Geometry"/"Controls"/"Exporter"/"Helper"/"Loader"/
-            // "Pass"/"Effect"/"Material" and not already on window
-            // from the loops above is a candidate addon class.
-            if(/^[A-Z].*(Geometry|Controls|Exporter|Helper|Loader|Pass|Effect|Material)$/.test(k)
-               && typeof window[k] === 'function'
-               && typeof THREE[k] === 'undefined'){
-              // Already on window (from the import statement) — leave it.
+          for(const k of Object.keys(THREE)){
+            const v = THREE[k];
+            if(typeof v === 'function'){
+              try{ window[k] = v; }catch(_){ /* some names are reserved */ }
             }
+          }
+          // Also walk three's addons if the import map has loaded them.
+          if(THREE.MathUtils){
+            for(const k of Object.keys(THREE.MathUtils)){
+              const v = THREE.MathUtils[k];
+              if(typeof v === 'function'){
+                try{ window[k] = v; }catch(_){}
+              }
+            }
+          }
+          // v1.36 / v8.28 — also mirror the known THREE addon classes
+          // imported at the top of this file (RoundedBoxGeometry,
+          // TransformControls, GLTFExporter, etc.). These live in
+          // 'three/addons/...' and are NOT properties of THREE itself,
+          // so the loops above never find them. Without this list, a
+          // Python factory that does `from js import RoundedBoxGeometry`
+          // (the natural Style B idiom — see Prompt_To_Py.txt PART 203
+          // and the worked example in PART 212) fails at import time
+          // with "ImportError: cannot import name 'RoundedBoxGeometry'
+          // from 'js'". We check `typeof window[k] !== 'undefined'`
+          // before assigning so hot-reloaded addons aren't clobbered.
+          const ADDON_CLASSES = [
+            'RoundedBoxGeometry',  // three/addons/geometries/RoundedBoxGeometry.js
+            'TransformControls',   // three/addons/controls/TransformControls.js
+            'GLTFExporter',        // three/addons/exporters/GLTFExporter.js
+          ];
+          for(const k of ADDON_CLASSES){
+            if(typeof window[k] === 'undefined' && typeof globalThis[k] !== 'undefined'){
+              try{ window[k] = globalThis[k]; }catch(_){ /* some names are reserved */ }
+            }
+          }
+          // Probe the import map for any late-loaded addon classes —
+          // mirrors what we do for THREE's own keys. This catches
+          // addons the user imports dynamically, not just the ones
+          // we hardcode above.
+          try{
+            for(const k of Object.keys(window)){
+              // Anything starting with a capital letter and ending in
+              // "Geometry"/"Controls"/"Exporter"/"Helper"/"Loader"/
+              // "Pass"/"Effect"/"Material" and not already on window
+              // from the loops above is a candidate addon class.
+              if(/^[A-Z].*(Geometry|Controls|Exporter|Helper|Loader|Pass|Effect|Material)$/.test(k)
+                 && typeof window[k] === 'function'
+                 && typeof THREE[k] === 'undefined'){
+                // Already on window (from the import statement) — leave it.
+              }
+            }
+          }catch(_){}
+        }catch(e){
+          console.warn('[LBL] Failed to mirror THREE.* to window:', e);
+        }
+        // v2.0.3 (PROBLEM 1 fix) — ensure `lbl` is bound in py.globals
+        // even if the helper source has any quirky path that didn't
+        // register it on the implicit globals dict. This is a belt-
+        // and-braces guard that costs <1 ms and is run once.
+        try{
+          const lblMod = py.runPython('sys.modules["lbl"]');
+          if(lblMod){
+            py.globals.set('lbl', lblMod);
           }
         }catch(_){}
-      }catch(e){
-        console.warn('[LBL] Failed to mirror THREE.* to window:', e);
+        return py;
+      }catch(bootstrapErr){
+        // The Pyodide runtime is loaded but the helper bootstrap failed.
+        // Tag with __lblBootstrapError so the outer catch attributes
+        // this correctly (not a network error).
+        const wrapped = new Error(
+          'Python helper bootstrap failed (Pyodide loaded successfully). '
+          + 'This is usually a Python syntax / NameError in the helper source, NOT a network problem. '
+          + 'Underlying: ' + (bootstrapErr && bootstrapErr.message || bootstrapErr)
+        );
+        wrapped.__lblBootstrapError = true;
+        wrapped.cause = bootstrapErr;
+        throw wrapped;
       }
-      return py;
     })
     .catch(err => {
       __pyodidePromise = null; // let the next attempt retry
-      throw new Error('Could not load Pyodide from jsDelivr. Either come back online, or transpile your .py to .json locally and load the JSON file instead. (' + (err && err.message || err) + ')');
+      // v2.0.3 — distinguish three failure modes so the user gets an
+      // accurate error message instead of a misleading
+      // "Could not load Pyodide from jsDelivr" wrapper.
+      if(err && err.__lblLoaderError){
+        // Real network / CDN failure.
+        throw new Error('Could not load Pyodide from jsDelivr. Either come back online, or transpile your .py to .json locally and load the JSON file instead. (' + (err && err.message || err) + ')');
+      }
+      if(err && err.__lblBootstrapError){
+        // Pyodide loaded but the helper bootstrap raised — surface
+        // the original Python error verbatim.
+        throw err;
+      }
+      // Unknown error path. Try to classify it: if the message
+      // looks like a Python exception (Traceback ... SyntaxError /
+      // NameError), surface it as a helper bootstrap issue rather
+      // than a network issue.
+      const msg = String(err && err.message || err || '');
+      if(/Traceback|SyntaxError|NameError|KeyError|ImportError|AttributeError|TypeError/i.test(msg)){
+        throw new Error('Python helper bootstrap failed (Pyodide loaded successfully). Underlying: ' + msg);
+      }
+      // Otherwise, treat as a network failure (default fallback).
+      throw new Error('Could not load Pyodide from jsDelivr. Either come back online, or transpile your .py to .json locally and load the JSON file instead. (' + msg + ')');
     });
   return __pyodidePromise;
 }
@@ -20868,6 +20950,7 @@ def _bind_section_23_facade(lbl_instance):
         setattr(lbl_instance, name, fn)
     return lbl_instance
 `;
+;
 ;
 ;
 ;
