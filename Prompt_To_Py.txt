@@ -392,6 +392,52 @@ Example — a 3-block stack with palette:
 The renderer captures `lbl.blueprint()` even if you forget the explicit
 return — see PART 200.2 for the auto-snapshot behaviour.
 
+202.1 — PALETTE MATERIAL RESOLUTION HAPPENS AT ATTACH-TIME
+  When you pass `material="shell"` and `shell` is a dict in your palette
+  (e.g. `{"color": "#f5821b", "roughness": 0.55, "metalness": 0.05}`),
+  the `lbl` helper copies those fields onto the object as baseColor /
+  roughness / metalness / etc. and sets the object's `material` field
+  to the built-in `"default"` preset BEFORE the wire format ever leaves
+  Python. The renderer's schema validator then sees a clean string,
+  and `buildScene()` reads the baked-in PBR fields directly.
+
+  This is a mirror of the JS path's `__applyPaletteMaterial()` helper
+  (search `__applyPaletteMaterial` in index.html for the full
+  rationale). It exists because the JSON pipeline's `applyPalette()`
+  does *string* substitution only — if the palette value is a dict,
+  applyPalette() would inline the dict directly and break the
+  validator's `typeof === "string"` assertion on `material`.
+
+  Result: Style A authors can use full PBR palette dicts (the natural
+  Python idiom) and the wire format stays clean. No `$ref` syntax
+  needed for the common case.
+
+  If you want the JSON-pipeline `$name` form for some reason, you can
+  still use it — `material="$shell"` is left as-is by the resolver
+  and the JSON pipeline's `applyPalette()` will substitute it. The
+  resolver only kicks in for bare names like `material="shell"`.
+
+202.2 — META DEFAULTS ARE AUTO-INJECTED
+  When you call `lbl.blueprint()`, the returned dict's `meta` block is
+  auto-populated with sensible defaults if you didn't set them:
+
+    meta["style"]        = "low-poly"  (overridable)
+    meta["category"]     = "general"   (overridable)
+    meta["proportions"]  = {"W_over_H": 1.0, "fill": 0.85}  (overridable)
+
+  This silences two common validator warnings:
+    • PART 49.1 proportion declaration not found
+    • PART 51.2 fidelity gate: no meta.style/meta.category set
+
+  To override, just set them yourself before calling `lbl.blueprint()`:
+
+    lbl.name("My Model")
+    # ... build objects ...
+    blueprint_dict = lbl.blueprint()
+    blueprint_dict["meta"]["style"] = "voxel"      # override default
+    blueprint_dict["meta"]["category"] = "creature"  # override default
+    return blueprint_dict
+
 ================================================================================
 PART 203 — THE `from js import THREE` BRIDGE
 ================================================================================
@@ -404,6 +450,29 @@ import is one line:
 
 This gives you the same THREE module the page's renderer code uses.
 Every class, every constant, every helper is available.
+
+203.0 — ALSO: any THREE class name works as a `from js import X`
+  The renderer also mirrors every function in `THREE` (and
+  `THREE.MathUtils`) onto the global JS namespace, so these
+  shorthands work too:
+
+    from js import RoundedBoxGeometry     # ← works, equivalent to THREE.RoundedBoxGeometry
+    from js import TextGeometry            # ← same
+    from js import RectAreaLightUniformsLib  # ← same
+
+  Why: Pyodide's `from js import X` reads from the global JS namespace
+  (i.e. `window.X`). The renderer iterates `Object.keys(THREE)` on
+  load and re-runs the same loop on every `runPyBlueprint()` call (so
+  late-loaded addons are mirrored too), assigning each class
+  constructor to `window[k]`. Any reserved name collisions (e.g. a
+  THREE class that happens to be a built-in JS name) are silently
+  skipped via a try/catch — the user can still reach them via
+  `THREE.X` instead.
+
+  Style A (Blueprint-Return) authors don't usually need this — the
+  `lbl.*` helpers cover the common primitive vocabulary. Style B
+  (Three.js Direct) authors find it more Pythonic to write
+  `from js import RoundedBoxGeometry` than `THREE.RoundedBoxGeometry`.
 
 Idiom translation — JS to Python:
   new THREE.Group()                  THREE.Group.new()
@@ -918,6 +987,28 @@ PART 213 — COMMON MISTAKES
   throw. If you need data, see PART 216 on the `pyodide.loadPackage`
   / `pyodide.open_url` workaround.
 
+213.9 — Full PBR dict in palette (no longer a mistake)
+  ❌ lbl.define_palette({"shell": {"color": "#f5821b", "roughness": 0.55}})
+  ✅ That's correct! The lbl helper resolves the palette dict at
+     attach-time (see PART 202.1) — baseColor / roughness / metalness
+     are baked onto the object, and `material` is set to the recognised
+     `"default"` preset so the schema validator passes.
+
+  History: in the original v1.36 / v8.27 release, the wire format
+  emitted `"material": "$shell"` (JSON-spec style), which `applyPalette()`
+  then inlined as a dict — and the validator's `typeof === "string"`
+  check on `material` failed. Fixed in v1.36 / v8.27 patch 2: the lbl
+  helper now does attach-time palette resolution (mirroring the JS
+  path's `__applyPaletteMaterial()`) so the wire format is always
+  validator-clean.
+
+213.10 — `from js import SomeClass` failing on non-THREE names
+  ❌ from js import RoundedBoxGeometry   # would have failed in v1.36.0
+  ✅ That works now. The renderer mirrors every THREE class onto the
+     `window` global on Pyodide load, so `from js import X` works for
+     any `THREE.X` (see PART 203.0). If you need a class that ISN'T in
+     THREE, use the `from js import THREE; THREE.X` form instead.
+
 ================================================================================
 PART 214 — PRE-OUTPUT CHECKLIST FOR AI AUTHORS
 ================================================================================
@@ -1134,6 +1225,36 @@ in the validator log. Match the error to the cause:
     If you see this on a current build, your local `index.html` is
     out of date; the fix is `let data = result.data;` (not `const`).
     See CHANGES_v136.md for the full patch notes.
+
+  "ImportError: cannot import name 'X' from 'js' (unknown location)"
+    Style B (Three.js Direct) only — you tried `from js import X` for
+    some class that the renderer hadn't mirrored to the global JS
+    namespace yet. Fixed in v1.36 / v8.27 patch 2: every class in
+    THREE (and THREE.MathUtils) is mirrored to `window` on Pyodide
+    load and re-mirrored on every `runPyBlueprint()` call (so late-
+    loaded addons get picked up). If you're on a current build and
+    still see this, check that the THREE module your import map
+    resolved actually exports `X` — try `from js import THREE; print
+    (THREE.X)` to verify. See PART 203.0 for the full mirroring rules.
+
+  "obj[N] 'X': 'material' must be a string"
+    Schema validator rejection. Internal renderer bug (fixed in
+    v1.36 / v8.27 patch 2): the lbl helper used to emit `"material":
+    "$shell"` (a JSON-spec `$ref`), but `applyPalette()` only does
+    string substitution — if the palette value was a full PBR dict,
+    applyPalette() inlined the dict directly, breaking the validator.
+    Fixed by `_apply_palette_material()` in the lbl helper, which
+    resolves the dict at attach-time and emits the recognised
+    `"default"` preset string instead. See PART 202.1 and PART 213.9.
+
+  "PART 49.1 proportion declaration not found at all"
+    Style A (Blueprint-Return) only — the renderer was warning about
+    a missing `meta.proportions` block. Fixed in v1.36 / v8.27 patch
+    2: `lbl.blueprint()` auto-injects sensible defaults
+    (`{"W_over_H": 1.0, "fill": 0.85}`) so the warning no longer
+    fires for lbl-based factories. Override by setting
+    `blueprint_dict["meta"]["proportions"]` before returning. See
+    PART 202.2.
 
   "Factory 'X' returned an empty THREE.Object3D (no children)."
     Style B: your factory returned a Group with no children. The

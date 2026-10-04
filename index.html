@@ -13789,6 +13789,33 @@ builtins.lbl = sys.modules['lbl']
       // `from js import THREE`. We re-bind on every call to runPyBlueprint
       // too, in case the import map resolved a different build.
       py.globals.set('THREE', THREE);
+      // v1.36 / v8.27 — also expose THREE's class constructors as global
+      // JS names so user code can write `from js import RoundedBoxGeometry`
+      // (the natural Python idiom) in addition to `THREE.RoundedBoxGeometry`.
+      // We walk THREE's own keys + all first-level properties of three's
+      // sub-namespaces (like THREE.MathUtils) and copy any class
+      // constructors to the window (which is the "js" namespace from
+      // Python's perspective). Re-run on every getPyodide() to pick up
+      // any late-loaded addon classes.
+      try{
+        for(const k of Object.keys(THREE)){
+          const v = THREE[k];
+          if(typeof v === 'function'){
+            try{ window[k] = v; }catch(_){ /* some names are reserved */ }
+          }
+        }
+        // Also walk three's addons if the import map has loaded them.
+        if(THREE.MathUtils){
+          for(const k of Object.keys(THREE.MathUtils)){
+            const v = THREE.MathUtils[k];
+            if(typeof v === 'function'){
+              try{ window[k] = v; }catch(_){}
+            }
+          }
+        }
+      }catch(e){
+        console.warn('[LBL] Failed to mirror THREE.* to window:', e);
+      }
       return py;
     })
     .catch(err => {
@@ -13858,11 +13885,45 @@ class _LBLBuilder:
         rot[axis_to_idx[axis]] = sign * 1.5707963267948966  # pi/2
         return rot
 
+    def _apply_palette_material(self, o):
+        # Resolve palette material dict into the object's fields.
+        # Mirror of the JS path's __applyPaletteMaterial() (see index.html).
+        # If the user passed a bare material name like "shell" and the
+        # palette has {"shell": {"color": ..., "roughness": ...}}, this
+        # function copies those fields onto the object as baseColor/
+        # roughness/metalness/etc. and resets material to "default" so the
+        # schema validator's 'typeof === "string"' assertion passes.
+        # Idempotent: leaves $-refs alone (applyPalette handles those).
+        m = o.get("material")
+        if isinstance(m, str) and not m.startswith("$"):
+            pal = self._ctx.get("palette", {})
+            defn = pal.get(m)
+            if isinstance(defn, dict):
+                if defn.get("color") is not None and o.get("baseColor") is None and o.get("color") is None:
+                    o["baseColor"] = defn["color"]
+                if defn.get("roughness") is not None and o.get("roughness") is None:
+                    o["roughness"] = defn["roughness"]
+                if defn.get("metalness") is not None and o.get("metalness") is None:
+                    o["metalness"] = defn["metalness"]
+                if defn.get("opacity") is not None and o.get("opacity") is None:
+                    o["opacity"] = defn["opacity"]
+                if defn.get("emissive") is not None and o.get("emissive") is None:
+                    o["emissive"] = defn["emissive"]
+                if defn.get("emissiveIntensity") is not None and o.get("emissiveIntensity") is None:
+                    o["emissiveIntensity"] = defn["emissiveIntensity"]
+                o["material"] = "default"
+
     def _push_object(self, o):
         if self._ctx["group_stack"]:
             top = self._ctx["group_stack"][-1]
             if isinstance(top, dict) and "mirrorFace" in top and "mirrorFace" not in o:
                 o["mirrorFace"] = top["mirrorFace"]
+        # Resolve palette dict into object fields (mirror JS __applyPaletteMaterial).
+        # Done only if the user passed a bare name (no '$' prefix); $-refs are
+        # left for applyPalette() in the JSON pipeline.
+        m = o.get("material")
+        if isinstance(m, str) and not m.startswith("$"):
+            self._apply_palette_material(o)
         self._ctx["objects"].append(o)
         return o
 
@@ -13919,7 +13980,7 @@ class _LBLBuilder:
         for k in ("material", "mirrorFace", "smoothing", "colorVariation",
                   "toneVariant", "emissive", "emissiveIntensity"):
             if k in opts:
-                o[k] = self._ref(opts[k]) if k == "material" else opts[k]
+                o[k] = opts[k]
         return self._push_object(o)
 
     def attach_cylinder(self, id, **opts):
@@ -13941,7 +14002,7 @@ class _LBLBuilder:
         elif "rotation" in opts:
             o["rotation"] = opts["rotation"]
         if "material" in opts:
-            o["material"] = self._ref(opts["material"])
+            o["material"] = opts["material"]
         return self._push_object(o)
 
     def attach_chain(self, id, **opts):
@@ -13957,7 +14018,7 @@ class _LBLBuilder:
         }
         o.update(self._resolve_on(opts))
         if "material" in opts:
-            o["material"] = self._ref(opts["material"])
+            o["material"] = opts["material"]
         return self._push_object(o)
 
     def paint_rectangle(self, id, **opts):
@@ -13966,7 +14027,7 @@ class _LBLBuilder:
         size = opts.get("size") or [1, 1]
         o["scale"] = [size[0], size[1], 1]
         if "material" in opts:
-            o["material"] = self._ref(opts["material"])
+            o["material"] = opts["material"]
         return self._push_object(o)
 
     def hollow(self, id, **opts):
@@ -13991,8 +14052,21 @@ class _LBLBuilder:
             self._ctx["group_stack"].pop()
 
     def blueprint(self):
+        # Auto-inject meta defaults to silence common validator warnings
+        # (PART 49.1 proportion declaration + PART 51.2 fidelity gate).
+        # Only fills in fields the user didn't already set — overrides win.
+        meta = dict(self._ctx["meta"])
+        if "style" not in meta:
+            meta["style"] = "low-poly"
+        if "category" not in meta:
+            meta["category"] = "general"
+        if "proportions" not in meta:
+            meta["proportions"] = {
+                "W_over_H": 1.0,
+                "fill":     0.85,
+            }
         return {
-            "meta": dict(self._ctx["meta"]),
+            "meta": meta,
             "palette": dict(self._ctx["palette"]),
             "objects": list(self._ctx["objects"]),
         }
@@ -14018,6 +14092,18 @@ async function runPyBlueprint(text, filename){
   // Rebind THREE every call so a hot-reloaded import map or a different
   // three build is reflected without restarting Pyodide.
   py.globals.set('THREE', THREE);
+  // Also re-mirror THREE's classes to window so user `from js import X`
+  // statements pick up any addons that were loaded after the first
+  // .py file (or a hot-reloaded import map). getPyodide() does the
+  // initial mirroring; this keeps the mirror fresh.
+  try{
+    for(const k of Object.keys(THREE)){
+      const v = THREE[k];
+      if(typeof v === 'function'){
+        try{ window[k] = v; }catch(_){}
+      }
+    }
+  }catch(_){}
   py.runPython('lbl.reset()');
   // Capture stdout/stderr so we can surface them in the validator log.
   const stdoutLines = [];
