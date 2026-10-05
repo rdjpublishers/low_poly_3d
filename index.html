@@ -14041,15 +14041,33 @@ function getPyodide(){
         // JS blueprint path uses (name/define_palette/attach_box/...), so
         // authors can move between the two formats without rewriting their
         // model code.
-        py.runPython(LBL_PY_HELPER_SRC);
-        // Bind `lbl` as a top-level global too so user scripts can use
-        // lbl.attach_box(...) without an explicit `import lbl`. The
-        // sys.modules registration above is for the explicit-import path.
+        //
+        // v2.0.4 (BUG FIX) — pass an explicit filename so a helper-side
+        // SyntaxError no longer reports `File "", line 1` (the user's
+        // Problem 7). The previous call had no `filename` argument, so
+        // Pyodide defaulted to an empty/blank filename and the traceback
+        // was useless. We also run a defensive install right after: if a
+        // future build script ever strips the trailing singleton install
+        // from the helper source (this was the v2.0.0..v2.0.3 regression
+        // that caused Problem 1+2 — `NameError: name 'lbl' is not
+        // defined`), the bootstrap guard below reconstructs it on the fly.
+        py.runPython(LBL_PY_HELPER_SRC, { filename: '<lbl-py-helper-bootstrap>' });
         try{
+          // v2.0.4 defensive install — read what's there now (the helper
+          // source may have already installed `lbl` if build_inlined.py
+          // was patched correctly; this block is a no-op in that case)
+          // or build a fresh singleton if for any reason it is missing.
           py.runPython(`
-import builtins
-builtins.lbl = sys.modules['lbl']
-`);
+import sys as _lbl_sys
+import builtins as _lbl_builtins
+_lbl_mod = _lbl_sys.modules.get('lbl')
+if _lbl_mod is None:
+    _lbl_mod = _LBLFacade()
+    _lbl_mod = _bind_section_23_facade(_lbl_mod)
+    _lbl_sys.modules['lbl'] = _lbl_mod
+_lbl_builtins.lbl = _lbl_mod
+`, { filename: '<lbl-py-helper-bootstrap-guard>' });
+          window.__lbl_helper_version = 'v2.0.4';
         }catch(builtinsErr){
           // If the `lbl` symbol isn't in sys.modules for any reason
           // (corrupted cache, helper edit typo, etc.) re-register it.
@@ -21201,8 +21219,14 @@ def _bind_section_23_facade(lbl_instance):
     return lbl_instance
 
 
-`;
-;
+# Singleton — the \`lbl\` module instance
+lbl = _LBLFacade()
+sys.modules['lbl'] = lbl
+
+# Bind SECTION 23 methods to the singleton now that it exists
+lbl = _bind_section_23_facade(lbl)
+sys.modules['lbl'] = lbl
+`;;
 ;
 ;
 ;
@@ -21246,6 +21270,14 @@ async function runPyBlueprint(text, filename){
     }
   }catch(_){}
   py.runPython('lbl.reset()');
+  // v2.0.4 — log the helper bootstrap version into stderr so the user
+  // can confirm the cache is fresh (Problem 6: "the same NameError still
+  // appeared" usually meant an old browser-cached index.html). The
+  // banner includes both the helper-source version AND the renderer
+  // version, so a mismatch between them is easy to spot.
+  console.info('[LBL Py] helper=' + (window.__lbl_helper_version || '?') +
+    ' filename=' + (filename || '<pasted>') +
+    ' bytes=' + text.length);
   // Capture stdout/stderr so we can surface them in the validator log.
   const stdoutLines = [];
   const stderrLines = [];

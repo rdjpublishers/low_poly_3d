@@ -1,8 +1,54 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.3 — IMAGE-TO-PYTHON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.4 — IMAGE-TO-PYTHON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   https://rdjpublishers.com/low_poly_3d/
 ================================================================================
+
+WHAT'S NEW IN v2.0.4 — PYTHON HELPER BOOTSTRAP FIX (this release)
+================================================================================
+This patch fixes a long-standing bug in the renderer-side bootstrap of
+the `lbl` Python helper module. Every image-driven .py factory was
+silently failing because the build script stripped the trailing
+`lbl = _LBLFacade(); sys.modules['lbl'] = lbl` block from the inlined
+helper source, and the renderer's bootstrap only READS
+`sys.modules['lbl']` — it never INSTALLS it. The result: every
+`import lbl` or `lbl.attach_box(...)` raised
+`NameError: name 'lbl' is not defined`, including in pure-THREE Style B
+factories (the validator was surfacing the helper bootstrap's stale
+state, not the user's code).
+
+This is the same v2.0.4 patch as Prompt_To_Py.txt (canonical
+reference: PART 220 in that file). The image-driven version
+duplicates the most-impactful items here and adds image-specific
+guidance in PART 700 at the bottom of this file. The high-impact
+items for image-driven AI authors:
+
+  - `import lbl` is now guaranteed to resolve. The renderer-side
+    v2.0.4 bootstrap explicitly reconstructs the `lbl` singleton if
+    the inlined helper source fails to install it for any reason.
+  - Use the documented Style A surface (`lbl.attach_box`,
+    `lbl.attach_cylinder`, `lbl.define_palette`, `lbl.name`,
+    `lbl.blueprint`) wherever possible. Avoid `lbl.Group`, `lbl.Mesh`,
+    `lbl.FilletedBox`, `lbl.install_runtime`, `lbl.preflight_check`,
+    `lbl.standard` etc. — those are NOT part of the v2.0.4 documented
+    surface and may be missing on cold cache.
+  - The Pyodide 0.26.x material constructor bug (PART 213.16) is
+    still present; route every material through `lbl.material(...)`
+    / `lbl.physical(...)` / `lbl.basic(...)` OR
+    `window.eval("new THREE.<cls>(<json>)")`. `THREE.MeshStandard
+    Material.new({...})` silently returns white.
+  - Build materials INSIDE `create_model()`, not at module top level.
+  - Every factory invocation now logs `[LBL Py] helper='v2.0.4'
+    filename=...` to the browser dev tools console. If you don't see
+    that string, the renderer's `index.html` is stale (clear cache).
+  - Helper-side SyntaxError tracebacks now report a real filename
+    (`<lbl-py-helper-bootstrap>`) instead of `File "", line 1`.
+
+This is additive over v2.0.3 — no PARTs were renumbered, removed, or
+changed in meaning. PART 700 (at the bottom of this file) is the
+only new image-driven section; PART 213.17 in Prompt_To_Py.txt is
+the canonical common-mistake entry. See PART 700 for the full
+image-driven v2.0.4 contract.
 
 WHAT'S NEW IN v1.36 / v8.27 (this release)
 ================================================================================
@@ -11229,4 +11275,208 @@ AI factory author should know about but couldn't find in the spec.
     pass brings all 8 spec files to ONE consistent canonical version
     per pair (v8.28 / v1.37 for JS+TS+JSON; v2.0.2 for Python).
 
+================================================================================
+PART 700 — v2.0.4 IMAGE-TO-PYTHON FIX (MUST-READ FOR AI AUTHORS)
+================================================================================
+
+v2.0.4 is a renderer-side fix for a long-standing bug that caused
+EVERY image-driven .py factory to fail with
+`NameError: name 'lbl' is not defined` until the inlined helper source
+was patched. This section is the image-driven-specific counterpart
+to PART 220 in Prompt_To_Py.txt. The high-impact items are duplicated
+in the "WHAT'S NEW IN v2.0.4" section at the top of this file; the
+sections below add image-driven-specific guidance.
+
+────────────────────────────────────────────────────────────────────────
+700.0 — IMAGE-DRIVEN IMPACT
+────────────────────────────────────────────────────────────────────────
+Image-driven factories are MORE affected by the v2.0.3 bug than
+prompt-driven factories because:
+
+  (a) Image-driven factories often use the full `lbl.*` facade
+      (Style A: `lbl.attach_box`, `lbl.attach_cylinder`,
+      `lbl.define_palette`, `lbl.name`, `lbl.blueprint`) to keep
+      code volume small when translating an image to a factory.
+      Every one of those calls was failing on v2.0.3 with the
+      `NameError` on `lbl`.
+
+  (b) Image-driven factories usually have a `ref_img` parameter
+      and use `lblSpec.helpers.imageToStyle` / `imageGradient` /
+      `imageHash` to derive the factory's style / colors / seed
+      from the image. The `ref_img` is passed by the renderer at
+      factory-invocation time, so the factory body must be
+      re-runnable (the renderer may call it multiple times for
+      3-variant ranking). Top-level `lbl` reassignment (PART 220.2.e)
+      is especially harmful in this context because it persists
+      across re-invocations.
+
+  (c) Image-driven Style B factories use the MT bundle bridge
+      (`from js import MT_core, MT_materials, lblSpec`) to handle
+      complex shapes. These factories are NOT affected by the
+      `NameError` on `lbl` directly, BUT the validator was
+      misattributing the helper bootstrap's stale state to the
+      user's code, so pure-THREE Style B factories were ALSO
+      failing on v2.0.3. The v2.0.4 fix unblocks them too.
+
+────────────────────────────────────────────────────────────────────────
+700.1 — THE FIX (RENDERER-SIDE, AUTOMATIC FOR THE USER)
+────────────────────────────────────────────────────────────────────────
+Same as PART 220.1 in Prompt_To_Py.txt. The fix is renderer-side
+only — AI authors do NOT need to change their output. The fix has
+three layers:
+
+  1. The inlined helper source in `index.html` now ends with the
+     singleton install block (no longer stripped by
+     `build_inlined.py`).
+  2. A defensive `lbl = _LBLFacade(); sys.modules['lbl'] = lbl`
+     guard runs immediately after the helper bootstrap.
+  3. The bootstrap sets `window.__lbl_helper_version = 'v2.0.4'`
+     and every `runPyBlueprint` call logs `[LBL Py] helper='v2.0.4'
+     filename=...` to the browser dev tools console.
+
+────────────────────────────────────────────────────────────────────────
+700.2 — WHAT THIS MEANS FOR IMAGE-DRIVEN AI AUTHORS
+────────────────────────────────────────────────────────────────────────
+v2.0.4 does NOT change the public Python surface. The Style A
+(`lbl.attach_box` / `lbl.attach_cylinder` / `lbl.define_palette` /
+`lbl.name` / `lbl.blueprint`) and Style B (`from js import THREE` +
+`from js import MT_core` + `_lbl_three_new`-style `window.eval`
+routing) authoring styles are unchanged. v2.0.4 additionally
+guarantees the following — please verify your output against them:
+
+  700.2.a — `import lbl` is guaranteed to resolve (same as 220.2.a).
+            Image-driven factories that do `import lbl` at the top
+            will succeed on every v2.0.4+ renderer.
+
+  700.2.b — Use the documented `lbl.*` surface only (same as 220.2.b).
+            The full safe-list / unsafe-list is in PART 220.2.b of
+            Prompt_To_Py.txt. Image-driven factories should pay
+            particular attention to the unsafe list:
+              lbl.Group, lbl.Mesh, lbl.Box, lbl.Cylinder, lbl.Sphere,
+              lbl.Torus, lbl.Cone, lbl.Capsule, lbl.Plane,
+              lbl.Extrude, lbl.Lathe, lbl.Shape, lbl.Curve,
+              lbl.Spline, lbl.Tube, lbl.Loft, lbl.FilletedBox,
+              lbl.TaperedTube, lbl.StarPattern, lbl.BeveledWasher,
+              lbl.LathedTire, lbl.SweptTube, lbl.ExhaustCanister,
+              lbl.standard, lbl.install_runtime, lbl.preflight_check.
+            For Group / Mesh / Box / Cylinder / Sphere / Torus /
+            Cone / Capsule / Plane / Extrude / Lathe / Shape / Curve
+            / Spline / Tube / Loft, use Style B (PART 276 image-
+            driven Style B worked example shows the pattern).
+
+  700.2.c — Materials belong INSIDE `create_model()`, not at module
+            top level (same as 220.2.c). Image-driven factories
+            especially: the `ref_img` parameter is only valid
+            inside the factory body, so any material that needs
+            the image-derived palette must be constructed inside
+            the factory too.
+
+  700.2.d — The Pyodide 0.26.x material constructor bug is unchanged
+            (see PART 213.16). Route every material through
+            `lbl.material(...)` / `lbl.physical(...)` /
+            `lbl.basic(...)` / `lbl.emissive(...)` OR through
+            `window.eval("new THREE.<cls>(<json>)")`.
+
+  700.2.e — Do NOT reassign `lbl = ...` at module top level
+            (same as 220.2.e). Image-driven factories are
+            re-invoked for 3-variant ranking, so a top-level
+            `lbl` reassignment persists across invocations and
+            will eventually shadow the renderer-side wiring.
+
+  700.2.f — Image-derived palette hot-swap (PART 275 / PART 405) is
+            unchanged. `lbl.apply_palette(mats, name)` still
+            hot-swaps every material in the `mats` dict. The
+            `mats` dict must be built inside `create_model()`,
+            not at module top level.
+
+  700.2.g — MT bundle calls (PART 372, PART 405) are unchanged. If
+            your image-driven factory uses
+            `MT_core.loft(...)` / `MT_materials.brushed_steel(...)`
+            / `MT_highpoly.importExternalMesh(...)` etc., they
+            work the same way on v2.0.4. The `from js import
+            MT_core` (etc.) imports are mirrored to the `js`
+            namespace by the v2.0.4 bootstrap on first Pyodide
+            load (PART 203.0 in Prompt_To_Py.txt).
+
+────────────────────────────────────────────────────────────────────────
+700.3 — IMAGE-DRIVEN PRE-OUTPUT CHECKLIST (v2.0.4 ADDITIONS)
+────────────────────────────────────────────────────────────────────────
+Add these to the PART 214 + PART 380 + PART 410 checklists when
+generating a v2.0.4+ image-driven factory:
+
+  [ ] The factory uses only the documented `lbl.*` surface
+      (PART 220.2.b / PART 700.2.b).
+  [ ] All materials are constructed INSIDE `create_model()`,
+      never at module top level (PART 220.2.c / PART 700.2.c).
+  [ ] The factory does NOT reassign `lbl = ...` at module top
+      level (PART 220.2.e / PART 700.2.e). Re-invocations for
+      3-variant ranking will shadow the renderer-side wiring.
+  [ ] The `ref_img` parameter (if present) is ONLY used inside
+      the factory body, never stored as a module-level global.
+  [ ] If using Style B, no `THREE.MeshStandardMaterial.new({...})`
+      (PART 213.16) — use `window.eval("new THREE.<cls>(<json>)")`
+      or the `lbl.material` facade.
+  [ ] The `mats` dict (if using `lbl.apply_palette` for image-
+      derived palette hot-swap) is built INSIDE `create_model()`,
+      not at module top level.
+  [ ] The factory's IoU retry loop (PART 254 / PART 279) uses
+      `lbl.image_to_palette_swatch` or `lblSpec.helpers.imageToStyle`
+      — both work in v2.0.4 unchanged.
+
+────────────────────────────────────────────────────────────────────────
+700.4 — RUNTIME ERROR REFERENCE (v2.0.4 ADDITIONS)
+────────────────────────────────────────────────────────────────────────
+The PART 218 + PART 379 + PART 409 runtime error references are
+unchanged for v2.0.4 — the eight common errors there (NameError on
+`lbl`, the .new() bug, etc.) are all still possible to surface
+from a misauthored .py file. The v2.0.4 bootstrap no longer masks
+them. The key change is that "NameError: name 'lbl' is not defined"
+with the traceback header `File "<lbl-py-helper-bootstrap>", line N`
+now means a real helper-source bug, not "the helper source is
+missing the install block" — the install block is guaranteed present
+in v2.0.4.
+
+Image-driven-specific causes for "NameError: name 'lbl' is not
+defined" on a v2.0.4 renderer:
+
+  (a) The factory shadows `lbl` (reassigns at module top level with
+      `lbl = ...`) — fix: remove the reassignment. Especially
+      relevant for image-driven factories that are re-invoked for
+      3-variant ranking.
+  (b) The renderer's `index.html` is stale (older than v2.0.4)
+      and the user is on a cached page. Verify by checking browser
+      dev tools → Console for `[LBL Py] helper='v2.0.4' filename=...`
+      at the time the .py file is loaded. If the string is missing
+      or shows a different version, the user needs a hard-refresh
+      (Cmd/Ctrl+Shift+R).
+  (c) The factory uses an `lbl.*` method NOT in the v2.0.4 surface
+      (PART 220.2.b) and gets `AttributeError: 'lbl' object has no
+      attribute 'X'` instead of a NameError. Switch to the Style B
+      path or to the documented `lbl.*` method.
+
+See PART 220.4 in Prompt_To_Py.txt for the full v2.0.4 runtime
+error reference (the image-driven forms are identical because the
+runtime errors are the same).
+
+────────────────────────────────────────────────────────────────────────
+700.5 — MIGRATION FROM v2.0.3 IMAGE-DRIVEN FACTORIES
+────────────────────────────────────────────────────────────────────────
+Same as PART 220.5 in Prompt_To_Py.txt: a factory that worked on a
+v2.0.3 renderer (with the bug) will work unchanged on v2.0.4 (with
+the fix). A factory that was written to work AROUND the bug (e.g.
+by re-creating `_LBLFacade` manually, or by re-binding `lbl` in the
+factory body) will ALSO work on v2.0.4, but the workaround is no
+longer necessary and can be deleted.
+
+The only image-driven-specific tweak is: factories that used
+`lbl.install_runtime(g)` to wire the sculptRuntime + tick + actions
+on a v2.0.3 renderer should switch to the documented Style A
+`lbl.blueprint()` chain (which auto-installs the runtime via the
+`lbl._style_a.install_runtime` method on the Style A builder) OR
+to the Style B pattern of assigning `g.userData.sculptRuntime = {...}`
+manually. `lbl.install_runtime` is not in the v2.0.4 documented
+surface (see PART 220.2.b).
+
+────────────────────────────────────────────────────────────────────────
+END OF PART 700 (v2.0.4 image-to-Python patch documentation)
 ────────────────────────────────────────────────────────────────────────

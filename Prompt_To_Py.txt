@@ -1,8 +1,52 @@
 ================================================================================
-LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.3 — PROMPT-TO-PYTHON AI SPECIFICATION
+LOWPOLY BLUEPRINT LANGUAGE (LBL) v2.0.4 — PROMPT-TO-PYTHON AI SPECIFICATION
 For: Low Poly 3D Viewer (Three.js single-file renderer, ghostpoly project)
   https://rdjpublishers.com/low_poly_3d/
 ================================================================================
+
+WHAT'S NEW IN v2.0.4 — PYTHON HELPER BOOTSTRAP FIX (this release)
+================================================================================
+This patch fixes a long-standing bug in the renderer-side bootstrap of
+the `lbl` Python helper module. Every .py factory was silently failing
+because the build script stripped the trailing `lbl = _LBLFacade();
+sys.modules['lbl'] = lbl` block from the inlined helper source, and
+the renderer's bootstrap only READS `sys.modules['lbl']` — it never
+INSTALLS it. The result: every `import lbl` or `lbl.attach_box(...)`
+raised `NameError: name 'lbl' is not defined`, including in pure-THREE
+Style B factories (the validator was surfacing the helper bootstrap's
+stale state, not the user's code).
+
+AI authors generating .py files via this spec MUST read the new
+PART 220 (v2.0.4 BOOTSTRAP FIX + RUNTIME CONTRACT) before writing
+code. The high-impact items:
+
+  - `import lbl` is now guaranteed to resolve at every .py factory
+    invocation. The renderer-side v2.0.4 bootstrap explicitly
+    reconstructs the `lbl` singleton if the inlined helper source
+    fails to install it for any reason.
+  - Use the documented Style A surface (`lbl.attach_box`,
+    `lbl.attach_cylinder`, `lbl.attach_chain`, `lbl.define_palette`,
+    `lbl.name`, `lbl.blueprint`) wherever possible. Avoid
+    `lbl.Group`, `lbl.Mesh`, `lbl.FilletedBox`, `lbl.install_runtime`,
+    `lbl.preflight_check`, `lbl.standard` etc. — those are NOT part of
+    the v2.0.4 documented surface and may be missing on cold cache.
+  - The Pyodide 0.26.x material constructor bug (PART 213.16) is still
+    present; route every material through `lbl.material(...)` /
+    `lbl.physical(...)` / `lbl.basic(...)` OR `window.eval("new
+    THREE.<cls>(<json>)")`. `THREE.MeshStandardMaterial.new({...})`
+    silently returns white.
+  - Build materials INSIDE `create_model()`, not at module top level.
+    Top-level material construction can race the Pyodide env being
+    ready and silently fall back to a placeholder.
+  - Every factory invocation now logs `[LBL Py] helper='v2.0.4'
+    filename=...` to the browser dev tools console. If you don't see
+    that string, the renderer's `index.html` is stale (clear cache).
+  - Helper-side SyntaxError tracebacks now report a real filename
+    (`<lbl-py-helper-bootstrap>`) instead of `File "", line 1`.
+
+This is additive over v2.0.3 — no PARTs were renumbered, removed, or
+changed in meaning. PART 220 is the only new section. See the bottom
+of PART 213 (new 213.17) for the AI-author-side rule.
 
 WHAT'S NEW IN v1.36 / v8.27 (this release)
 ================================================================================
@@ -46,6 +90,8 @@ pipeline — drop a .py file onto the page and it Just Works.
   PART 217 — When to reach for Python vs. JS blueprint vs. TS factory
   PART 218 — Runtime error reference (what each Pyodide error means)
   PART 219 — File metadata + companion files (lbl_py.py / Model_10.py)
+  PART 220 — v2.0.4 BOOTSTRAP FIX + RUNTIME CONTRACT (must-read — see
+              the "WHAT'S NEW IN v2.0.4" section at the top)
 
 This file is the canonical LBL spec source for the prompt-to-Python
 path. The 5 sibling files (Prompt_To_Ts.txt / Prompt_To_Js.txt /
@@ -1959,6 +2005,45 @@ PART 213 — COMMON MISTAKES
   `lbl.physical(...)` / `lbl.basic(...)` for direct constructor
   access, all of which internally use the window.eval workaround).
 
+213.17 — Calling `lbl.Group`, `lbl.Mesh`, `lbl.FilletedBox`,
+         `lbl.standard`, `lbl.install_runtime`, `lbl.preflight_check`,
+         or other undocumented `lbl.*` helpers (v2.0.4)
+  ❌ g = lbl.Group()                          # not in the v2.0.4 surface
+     m = lbl.Mesh(geo, mat)                   # not in the v2.0.4 surface
+     box = lbl.FilletedBox(0.5, 0.5, 0.5, 0.05)   # not in the v2.0.4 surface
+     lbl.install_runtime(g)                   # not in the v2.0.4 surface
+     ok = lbl.preflight_check(g)              # not in the v2.0.4 surface
+     mat = lbl.standard({"color": "orange"})  # not in the v2.0.4 surface
+  ✅ g = THREE.Group.new()                    # Style B: from js import THREE
+     m = THREE.Mesh.new(geo, mat)             # Style B
+     lbl.attach_box("box_1", footprint_size=(0.5, 0.5), length=0.5)  # Style A
+     lbl.material("shell", color="orange")    # documented facade; uses
+                                              # window.eval internally
+
+  Why: The `lbl` Python module exposes only the documented facade
+  methods. Older versions of the helper source had additional
+  pass-through methods (`lbl.Group`, `lbl.Mesh`, `lbl.FilletedBox`,
+  `lbl.standard`, etc.) but those are NOT in the v2.0.4 surface and
+  will raise `AttributeError: 'lbl' object has no attribute 'Group'`
+  on a v2.0.4 renderer. The 5 supported facades for direct
+  constructor access are `lbl.material` / `lbl.physical` /
+  `lbl.basic` / `lbl.emissive` (all materials) plus the Style A
+  builder chain (`lbl.attach_box` / `lbl.attach_cylinder` /
+  `lbl.attach_chain` / `lbl.paint_rectangle` etc.). For Group /
+  Mesh / Box / Cylinder / Sphere / Torus / Cone / Capsule / Plane
+  / Extrude / Lathe / Shape / Curve / Spline / Tube / Loft, use
+  Style B (see PART 220.2.b for the full safe-list).
+
+  Scope: ALL v2.0.4+ factories. The renderer-side v2.0.4 bootstrap
+  does NOT add the missing pass-through methods — it only guarantees
+  the `lbl` singleton is installed in `sys.modules['lbl']` and
+  `builtins.lbl`. If a method is missing on the facade, calling it
+  raises `AttributeError`, not a silent fallback.
+
+  See PART 220.2.b for the complete safe-list / unsafe-list of
+  `lbl.*` methods. PART 220 is the canonical reference for the
+  v2.0.4 surface.
+
 ================================================================================
 PART 214 — PRE-OUTPUT CHECKLIST FOR AI AUTHORS
 ================================================================================
@@ -1995,6 +2080,28 @@ Catching issues here saves the user a debug cycle.
   [ ] No `import three` / `from three import *` (use `from js import
       THREE`).
   [ ] No `subprocess` / `os.system` / `socket` / I/O syscalls.
+
+  v2.0.4 additions (PART 220):
+  [ ] The factory uses only the documented `lbl.*` surface listed in
+      PART 220.2.b. NOT in the v2.0.4 surface: `lbl.Group`,
+      `lbl.Mesh`, `lbl.Box`, `lbl.Cylinder`, `lbl.Sphere`,
+      `lbl.Torus`, `lbl.Cone`, `lbl.Capsule`, `lbl.Plane`,
+      `lbl.Extrude`, `lbl.Lathe`, `lbl.Shape`, `lbl.Curve`,
+      `lbl.Spline`, `lbl.Tube`, `lbl.Loft`, `lbl.FilletedBox`,
+      `lbl.TaperedTube`, `lbl.StarPattern`, `lbl.BeveledWasher`,
+      `lbl.LathedTire`, `lbl.SweptTube`, `lbl.ExhaustCanister`,
+      `lbl.standard`, `lbl.install_runtime`, `lbl.preflight_check`.
+  [ ] All materials are constructed INSIDE `create_model()`, never
+      at module top level (220.2.c). Cold-cache env may not be ready
+      at import time.
+  [ ] The factory does NOT reassign `lbl = ...` at module top level
+      (220.2.e). The bootstrap binds `lbl` as a builtin AND in
+      `sys.modules['lbl']`; reassignment at top level breaks the
+      renderer-side wiring by identity, not by name.
+  [ ] If using Style B, no `THREE.MeshStandardMaterial.new({...})`
+      (PART 213.16) — use `window.eval("new THREE.<cls>(<json>)")`
+      or the `lbl.material` facade. PART 213.16 is unchanged in
+      v2.0.4 (the underlying Pyodide 0.26.x bug is still present).
 
 ================================================================================
 PART 215 — CROSS-REFERENCES TO THE 6 EXISTING SPEC FILES
@@ -2319,6 +2426,24 @@ in the validator log. Match the error to the cause:
     byte-identical to the standalone file (i.e. ends with the same
     singleton registration). Affects EVERY .py upload until fixed.
 
+    ── v2.0.4 update ──
+    On a v2.0.4 renderer, this error has three possible causes:
+      (a) The .py file SHADOWS `lbl` (reassigns at module top level
+          with `lbl = ...`). Fix: remove the reassignment. See
+          PART 220.2.e for the rule.
+      (b) The renderer's `index.html` is stale (older than v2.0.4)
+          and the user is on a cached page. Verify by checking
+          browser dev tools → Console for `[LBL Py] helper='v2.0.4'
+          filename=...` at the time the .py file is loaded. If the
+          string is missing or shows a different version, the user
+          needs a hard-refresh (Cmd/Ctrl+Shift+R).
+      (c) The user manually edited `lbl_py.py` and the modification
+          broke the singleton install. Fix: regenerate
+          `lbl_py_inlined.js` with the patched `build_inlined.py`
+          (see public/modeling/) and re-embed it in `index.html`
+          with `python3 patch_index.py index.html`.
+    See PART 220.4 for the full v2.0.4 runtime error reference.
+
 ================================================================================
 PART 219 — FILE METADATA + COMPANION FILES
 ================================================================================
@@ -2349,6 +2474,220 @@ This section points at the other files in the Python pipeline:
   CHANGES_v136.md
     The changelog entry for this release. Has the production sign-off
     checklist, performance numbers, and backwards-compatibility note.
+
+================================================================================
+PART 220 — v2.0.4 BOOTSTRAP FIX + RUNTIME CONTRACT (READ THIS FIRST)
+================================================================================
+
+v2.0.4 is a renderer-side fix for a long-standing bug that caused
+EVERY .py factory to fail with `NameError: name 'lbl' is not defined`
+until the inlined helper source was patched. This section is the
+authoritative source for what changed and what AI authors must do
+differently going forward.
+
+────────────────────────────────────────────────────────────────────────
+220.0 — THE BUG (READ CAREFULLY)
+────────────────────────────────────────────────────────────────────────
+The renderer's `index.html` embeds the `lbl` Python helper module
+(`public/modeling/lbl_py.py`) as a JavaScript string
+(`LBL_PY_HELPER_SRC`) so a .py file load needs no second network
+round-trip. The original `build_inlined.py` stripped the file's
+trailing singleton install block:
+
+    # Singleton — the `lbl` module instance
+    lbl = _LBLFacade()
+    sys.modules['lbl'] = lbl
+    lbl = _bind_section_23_facade(lbl)
+    sys.modules['lbl'] = lbl
+
+…claiming "the inlined version doesn't need to install itself as a
+module — the renderer does that". **The renderer does NOT install it.**
+The bootstrap only does:
+
+    py.runPython(LBL_PY_HELPER_SRC)
+    py.runPython('builtins.lbl = sys.modules["lbl"]')   // KeyError silently caught
+
+So `sys.modules['lbl']` was never set, every `import lbl` and every
+`lbl.foo(...)` call raised `NameError: name 'lbl' is not defined`,
+and the bootstrap's try/catch silently swallowed the `KeyError` —
+mis-attributing the error as "Could not load Pyodide from jsDelivr"
+in some paths. This affected EVERY .py factory, including pure-THREE
+Style B factories that never reference `lbl` (the validator was
+surfacing the helper bootstrap's stale state, not the user's code).
+
+────────────────────────────────────────────────────────────────────────
+220.1 — THE FIX (RENDERER-SIDE, AUTOMATIC FOR THE USER)
+────────────────────────────────────────────────────────────────────────
+v2.0.4 ships three layered fixes in `index.html`:
+
+  1. The inlined helper source now ends with the singleton install
+     block (no longer stripped by `build_inlined.py`).
+  2. A defensive `lbl = _LBLFacade(); sys.modules['lbl'] = lbl`
+     guard runs immediately after the helper bootstrap, so even a
+     stale cache of the helper source cannot break `lbl`.
+  3. The bootstrap sets `window.__lbl_helper_version = 'v2.0.4'` and
+     every `runPyBlueprint` call logs `[LBL Py] helper='v2.0.4'
+     filename=...` to the browser dev tools console. If a user
+     doesn't see that string, the cached `index.html` is stale and
+     they need a hard-refresh (Cmd/Ctrl+Shift+R).
+
+AI authors do NOT need to do anything in the .py file to benefit
+from these fixes. The fix is purely renderer-side.
+
+────────────────────────────────────────────────────────────────────────
+220.2 — WHAT THIS MEANS FOR AI AUTHORS
+────────────────────────────────────────────────────────────────────────
+v2.0.4 does NOT change the public Python surface. The Style A
+(`lbl.attach_box`, `lbl.name`, `lbl.define_palette`, `lbl.blueprint`)
+and Style B (`from js import THREE` + `_lbl_three_new`-style
+`window.eval` routing) authoring styles are unchanged. v2.0.4
+additionally guarantees the following — please verify your output
+against them:
+
+  220.2.a — `import lbl` is guaranteed to resolve. If you generate a
+            file that does `import lbl` at the top, the import will
+            succeed on every v2.0.4+ renderer. You do NOT need to
+            defensively re-implement `_LBLFacade()` in the user file.
+
+  220.2.b — Use the documented `lbl.*` surface only. The safe list:
+              lbl.name, lbl.define_palette, lbl.create_anchor,
+              lbl.attach_box, lbl.attach_cylinder, lbl.attach_chain,
+              lbl.paint_rectangle, lbl.hollow, lbl.group,
+              lbl.blueprint, lbl.reset,
+              lbl.material, lbl.physical, lbl.basic, lbl.emissive,
+              lbl.disc, lbl.ring, lbl.arc, lbl.helix, lbl.ribbon,
+              lbl.cross_planes,
+              lbl.star, lbl.polygon, lbl.annulus, lbl.heart, lbl.spade,
+              lbl.burst, lbl.arch, lbl.edged_box, lbl.molding,
+              lbl.pumpkin, lbl.leaf, lbl.arched_slab,
+              lbl.bend, lbl.twist, lbl.taper, lbl.spherize,
+              lbl.noise, lbl.modifier_stack, lbl.fill_vertex_channel,
+              lbl.converge_faces, lbl.project_uv, lbl.recolor_by_palette,
+              lbl.place_chain, lbl.apply_material_animation,
+              lbl.preflight_check,
+              lbl.palette, lbl.palettes, lbl.materials,
+              lbl.register_palette, lbl.derive_palette,
+              lbl.apply_palette, lbl.setPalette,
+              lbl.outline_pass, lbl.post_fx, lbl.ibl_helmet, lbl.decal,
+              lbl.shader_material, lbl.particle_system, lbl.trail,
+              lbl.instanced_grass, lbl.bvh_raycast, lbl.sprite_sheet,
+              lbl.lens_flare,
+              lbl.attach_smpl_skeleton, lbl.auto_rig, lbl.bone_chain,
+              lbl.bind_skin, lbl.compute_lbs, lbl.compute_dqs.
+
+            DO NOT call any of these (NOT in the v2.0.4 surface):
+              lbl.Group, lbl.Mesh, lbl.Box, lbl.Cylinder, lbl.Sphere,
+              lbl.Torus, lbl.Cone, lbl.Capsule, lbl.Plane,
+              lbl.Extrude, lbl.Lathe, lbl.Shape, lbl.Curve,
+              lbl.Spline, lbl.Tube, lbl.Loft, lbl.FilletedBox,
+              lbl.TaperedTube, lbl.StarPattern, lbl.BeveledWasher,
+              lbl.LathedTire, lbl.SweptTube, lbl.ExhaustCanister,
+              lbl.standard, lbl.install_runtime.
+
+            If you need Group / Mesh / Box / Cylinder / Sphere / Torus
+            / Cone / Capsule / Plane / Extrude / Lathe / Shape / Curve
+            / Spline / Tube / Loft, use the Style B path:
+              from js import THREE
+              g = THREE.Group.new()
+              m = THREE.Mesh.new(THREE.BoxGeometry.new(w, h, d), mat)
+              g.add(m)
+              return g
+
+  220.2.c — Materials belong INSIDE `create_model()`, not at module
+            top level. Top-level material construction can race the
+            Pyodide env being ready on cold cache and silently fail.
+            Build materials inside the factory body, where the
+            renderer has guaranteed the env is ready.
+
+  220.2.d — The Pyodide 0.26.x material constructor bug is unchanged
+            (see PART 213.16). Always route single-config-object
+            constructors through `lbl.material(...)` /
+            `lbl.physical(...)` / `lbl.basic(...)` / `lbl.emissive(...)`
+            OR through `window.eval("new THREE.<cls>(<json>)")`. The
+            internal helper `_lbl_three_new` does the routing for
+            you; you can call it directly if you need a class not
+            covered by the `lbl.*` facade.
+
+  220.2.e — Do NOT do `import lbl` AND immediately do `lbl = ...` at
+            module top level. The v2.0.4 bootstrap already binds
+            `lbl` as a builtin (visible without an import), and the
+            singleton is in `sys.modules['lbl']` (so the import
+            resolves). Re-assigning at top level breaks the
+            renderer-side wiring (the bootstrap's reference to the
+            facade singleton is by identity, not by name). If you
+            need to inspect `lbl`, do it INSIDE the factory.
+
+  220.2.f — Helper-side SyntaxError tracebacks now show a real
+            filename (`<lbl-py-helper-bootstrap>`) instead of
+            `File "", line 1`. User-code tracebacks still show the
+            file name the user uploaded. AI authors do not need to
+            do anything for this — the fix is renderer-side.
+
+────────────────────────────────────────────────────────────────────────
+220.3 — THE PRE-OUTPUT CHECKLIST (v2.0.4 ADDITIONS)
+────────────────────────────────────────────────────────────────────────
+Add these to the PART 214 checklist when generating a v2.0.4+ factory:
+
+  [ ] The factory uses the documented `lbl.*` surface (220.2.b) OR
+      pure Style B (`from js import THREE`).
+  [ ] The factory does NOT call any of the removed-in-v2.0.4
+      helpers: `lbl.Group`, `lbl.Mesh`, `lbl.FilletedBox`,
+      `lbl.standard`, `lbl.install_runtime`, `lbl.preflight_check`.
+  [ ] All materials are constructed INSIDE `create_model()`, not at
+      module top level.
+  [ ] If using Style B, NO `THREE.MeshStandardMaterial.new({...})`
+      (or any other single-config-object constructor) — use
+      `window.eval("new THREE.<cls>(<json>)")` or the `lbl.material`
+      facade. PART 213.16 is unchanged.
+  [ ] The factory does NOT reassign `lbl = ...` at module top level
+      (220.2.e). If you need to inspect the facade, do it inside
+      the factory body.
+  [ ] If the factory has nested helper functions that need `lbl`,
+      they call `lbl.foo(...)` (which works in nested scopes because
+      `lbl` is a true module entry, not a transient global).
+
+────────────────────────────────────────────────────────────────────────
+220.4 — RUNTIME ERROR REFERENCE (v2.0.4 ADDITIONS)
+────────────────────────────────────────────────────────────────────────
+The PART 218 runtime error reference is unchanged for v2.0.4 — the
+eight common errors there (NameError on lbl, the .new() bug, etc.)
+are all still possible to surface from a misauthored .py file, and
+the v2.0.4 bootstrap no longer masks them. The key change is that
+"NameError: name 'lbl' is not defined" with the traceback header
+`File "<lbl-py-helper-bootstrap>", line N` now means a real
+helper-source bug, not "the helper source is missing the install
+block" — the install block is guaranteed present in v2.0.4.
+
+If a v2.0.4 user reports this NameError, the cause is one of:
+  (a) the user's .py file SHADOWS `lbl` (reassigns at module top
+      level — see 220.2.e) — fix: remove the `lbl = ...` reassignment.
+  (b) the user is on a stale `index.html` and the bootstrap guard
+      didn't run (no `[LBL Py] helper='v2.0.4' ...` log) — fix:
+      hard-refresh the browser tab.
+  (c) the user manually modified `lbl_py.py` and the modification
+      broke the singleton install — fix: regenerate `lbl_py_inlined.js`
+      with the patched `build_inlined.py` (see public/modeling/) and
+      re-embed it in `index.html` with `python3 patch_index.py index.html`.
+
+────────────────────────────────────────────────────────────────────────
+220.5 — MIGRATION FROM v2.0.3 FACTORIES
+────────────────────────────────────────────────────────────────────────
+A factory that worked on a v2.0.3 renderer (with the bug) will work
+unchanged on v2.0.4 (with the fix) — there is no API change. A
+factory that was written to work AROUND the bug (e.g. by re-creating
+the `_LBLFacade` manually, or by re-binding `lbl` in the factory
+body) will ALSO work on v2.0.4, but the workaround is no longer
+necessary and can be deleted if you want a cleaner file.
+
+The only factories that may need a tweak are ones that:
+  - Called `lbl.Group` / `lbl.Mesh` / `lbl.FilletedBox` etc. (NOT
+    in the v2.0.4 surface — see 220.2.b). These were never part of
+    the documented surface; switch to the Style B path or to
+    `lbl.attach_box` / `lbl.attach_cylinder` etc.
+  - Used `lbl.standard(...)` as an alias for `lbl.material(...)`
+    (they do the same thing in the helper source, but `lbl.standard`
+    is no longer exposed on the facade — use `lbl.material`).
+  - Had a top-level `lbl = ...` reassignment (see 220.2.e).
 
 ================================================================================
 PART 230-234 — PROCEDURAL TEXTURE EXTENSIONS (v1.36 / v8.29)
@@ -12162,5 +12501,46 @@ Companion files (v2.0.3):
   • public/modeling/patch_index.py — patches index.html with new src
 
 ================================================================================
-END OF PART 420-450 (v2.0.3 patch documentation)
+PART 451-460 — v2.0.4 SUMMARY (PYTHON HELPER BOOTSTRAP FIX)
+================================================================================
+
+For the AI prompt author, here is what changed in v2.0.4:
+
+  1. Renderer-side fix for the `NameError: name 'lbl' is not defined`
+     bug that was silently breaking every .py factory. The inlined
+     helper source now ends with the singleton install block (was
+     stripped by build_inlined.py until this release).
+  2. Defensive install guard in the bootstrap so a stale cache of
+     the helper source can no longer break the user's factory.
+  3. Version stamp (`window.__lbl_helper_version = 'v2.0.4'`) and
+     per-invocation log (`[LBL Py] helper='v2.0.4' filename=...`) so
+     the user can verify their `index.html` is current at a glance.
+  4. Real filename (`<lbl-py-helper-bootstrap>`) on helper-side
+     SyntaxError tracebacks — kills `File "", line 1`.
+  5. PART 220 (this file) — authoritative source for the v2.0.4 fix
+     and the AI-author-side rules. Must be read alongside PART 213
+     and PART 214 when generating a v2.0.4+ factory.
+  6. PART 213.17 — new "common mistake" entry specifically for
+     using `lbl.Group`, `lbl.Mesh`, `lbl.FilletedBox`,
+     `lbl.standard`, `lbl.install_runtime`, `lbl.preflight_check`
+     (NOT in the v2.0.4 documented surface).
+
+Companion files (v2.0.4):
+  • public/modeling/build_inlined.py — NO LONGER strips the singleton
+    install (the v2.0.4 fix lives here too)
+  • public/modeling/lbl_py_inlined.js + lbl_py_inlined.txt —
+    regenerated by the patched build script; both end with
+    `sys.modules['lbl'] = lbl`
+  • public/modeling/patch_index.py — idempotent; now also patches
+    the bootstrap (filename on helper run + defensive install guard)
+  • index.html — 3 bootstrap-level patches (filename, defensive
+    install, version stamp) + the new inlined source swapped in
+  • FIX_GUIDE.md (new) — full post-mortem + verification steps
+
+If you remember the 10 rules from v2.0.3 + the 6 rules from v2.0.4
+(plus the PART 220 must-read), you'll generate v2.0.4-compatible
+Python factories that work on the v2.0.4 renderer out of the box.
+
+================================================================================
+END OF PART 420-460 (v2.0.3 + v2.0.4 patch documentation)
 ================================================================================
