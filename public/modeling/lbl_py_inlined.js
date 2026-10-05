@@ -234,7 +234,69 @@ instance, so user scripts can call any of them with the bare
 import sys
 import math
 import struct
+import json
 import random as _stdlib_random
+
+
+# ════════════════════════════════════════════════════════════════════════
+# SECTION 0 — Pyodide 0.26.x .new() proxy workaround (FIX 8)
+# ════════════════════════════════════════════════════════════════════════
+# Pyodide 0.26 / 0.26.1 / 0.26.2's \`THREE.X.new({...})\` proxy silently
+# drops the parameter dict when X is a class that takes a single config
+# object — MeshStandardMaterial, MeshPhysicalMaterial, MeshBasicMaterial,
+# MeshLambertMaterial, ShadowMaterial, ShaderMaterial, PointsMaterial,
+# LineBasicMaterial, Color, etc. The constructor returns a valid object,
+# but with all properties left at their defaults (typically white / black
+# / opaque).
+#
+# The bug is invisible: no exception is raised, no warning is printed. The
+# material just renders the wrong colour.
+#
+# Geometries with positional args (BoxGeometry, CylinderGeometry,
+# SphereGeometry, IcosahedronGeometry, Group(), Mesh()) are unaffected
+# because their \`.new()\` proxies forward the args correctly.
+#
+# FIX 8 — route every single-config-object constructor through
+# \`window.eval("new THREE.X(<json>)")\` so the Pyodide \`.new()\` proxy is
+# bypassed entirely. JSON-serialise the dict (Pyodide translates THREE.*
+# enum constants like THREE.DoubleSide to their numeric value when
+# json.dumps reads them, so this works for material dicts that mix hex
+# ints, hex strings, floats, and THREE.* constants).
+#
+# Authoritative repro + write-up: see \`CHANGES_v136.md\`.
+
+def _lbl_three_new(cls_name, *args):
+    """Construct a \`new THREE.<cls_name>(args...)\` object via window.eval.
+
+    Bypasses the Pyodide 0.26.x \`.new()\` proxy bug that silently drops
+    the parameter dict for single-config-object constructors (Material,
+    Color, ShaderMaterial, ...). JSON-serialisable args (hex ints, hex
+    strings, floats, booleans, lists, dicts, and THREE.* enum constants
+    like THREE.DoubleSide → 2) are inlined as JS literals. JS objects
+    that can't be JSON-serialised (THREE.Shape, THREE.Vector3, etc.)
+    are stashed on \`window.__lbl_arg_<i>\` and referenced by name in the
+    eval string — Pyodide handles the round-trip correctly.
+
+    Args:
+        cls_name: bare THREE class name, e.g. "MeshStandardMaterial".
+        *args:    any number of positional args to the JS constructor.
+
+    Returns:
+        The freshly-constructed JS object (a THREE.X instance).
+    """
+    from js import window
+    parts = []
+    for i, a in enumerate(args):
+        try:
+            parts.append(json.dumps(a))
+        except (TypeError, ValueError):
+            slot = "__lbl_arg_" + str(i)
+            setattr(window, slot, a)
+            parts.append("window." + slot)
+    return window.eval(
+        "new THREE." + cls_name + "(" + ", ".join(parts) + ")"
+    )
+
 
 # ════════════════════════════════════════════════════════════════════════
 # SECTION 1 — Mulberry32 PRNG + deterministic helpers
@@ -716,13 +778,13 @@ class _PaletteRegistry:
             color = _to_int(slot_def["color"])
             roughness = float(slot_def.get("roughness", 0.5))
             metalness = float(slot_def.get("metalness", 0.0))
-            mat = THREE.MeshStandardMaterial.new({
+            mat = _lbl_three_new("MeshStandardMaterial", {
                 "color": color,
                 "roughness": roughness,
                 "metalness": metalness,
             })
             if slot_def.get("emissive") is not None and slot_def.get("emissiveIntensity", 0.0) > 0:
-                mat.emissive = THREE.Color.new(_to_int(slot_def["emissive"]))
+                mat.emissive = _lbl_three_new("Color", _to_int(slot_def["emissive"]))
                 mat.emissiveIntensity = float(slot_def["emissiveIntensity"])
             if slot_def.get("opacity", 1.0) < 1.0:
                 mat.transparent = True
@@ -1430,7 +1492,7 @@ def _extrude_shape(shape, depth=1, bevel_enabled=True, bevel_thickness=0.04,
                    bevel_size=0.04, bevel_segments=4, curve_segments=12):
     """ExtrudeGeometry — turn a THREE.Shape (with optional holes) into a 3D body."""
     from js import THREE
-    return THREE.ExtrudeGeometry.new(shape, {
+    return _lbl_three_new("ExtrudeGeometry", shape, {
         "depth": float(depth),
         "bevelEnabled": bool(bevel_enabled),
         "bevelThickness": float(bevel_thickness),
@@ -1489,7 +1551,7 @@ def _beveled_washer(inner_radius=0.3, outer_radius=0.5, thickness=0.05, bevel=0.
     hole = THREE.Path.new()
     hole.absarc(0, 0, float(inner_radius), 0, 2 * math.pi, True)
     shape.holes.push(hole)
-    return THREE.ExtrudeGeometry.new(shape, {
+    return _lbl_three_new("ExtrudeGeometry", shape, {
         "depth": float(thickness),
         "bevelEnabled": True,
         "bevelThickness": float(bevel),
@@ -2333,7 +2395,7 @@ def _chitin_material(base_color="#3a5a40", iridescence=0.6, clearcoat=0.8,
     High clearcoat + iridescence gives the wet-shiny rainbow beetle look.
     """
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2357,7 +2419,7 @@ def _elytra_material(base_color="#1a2810", iridescence=0.4, clearcoat=1.0,
     More metallic than chitin, with a subtle iridescent shift.
     """
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2371,7 +2433,7 @@ def _elytra_material(base_color="#1a2810", iridescence=0.4, clearcoat=1.0,
     except Exception:
         pass
     if emissive is not None:
-        mat.emissive = THREE.Color.new(_to_int(emissive))
+        mat.emissive = _lbl_three_new("Color", _to_int(emissive))
         mat.emissiveIntensity = float(emissive_intensity)
     return mat
 
@@ -2383,7 +2445,7 @@ def _membrane_material(base_color="#f0d8d8", transmission=0.7, ior=1.4,
     Semi-transparent with subsurface scattering simulated via transmission.
     """
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": 0.0,
@@ -2403,14 +2465,14 @@ def _velvet_material(base_color="#600030", sheen=1.0, sheen_color="#ff80c0",
     Sheen scattering creates the soft fuzz at glancing angles.
     """
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
         "sheen": float(sheen),
     })
     try:
-        mat.sheenColor = THREE.Color.new(_to_int(sheen_color))
+        mat.sheenColor = _lbl_three_new("Color", _to_int(sheen_color))
         mat.sheenRoughness = float(sheen_roughness)
     except Exception:
         pass
@@ -2422,7 +2484,7 @@ def _skin_material(base_color="#e0ae87", roughness=0.55, metalness=0.0,
                     ior=1.4, thickness=0.5):
     """Human-skin PBR recipe (PART 31.3 / 286)."""
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2439,7 +2501,7 @@ def _cloth_material(base_color="#a02020", roughness=0.85, metalness=0.0,
                     sheen=0.4, sheen_roughness=0.7, micro_roughness=None):
     """Cloth/fabric PBR recipe (PART 31.3)."""
     from js import THREE
-    mat = THREE.MeshStandardMaterial.new({
+    mat = _lbl_three_new("MeshStandardMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2459,7 +2521,7 @@ def _leather_material(base_color="#5a3010", roughness=0.6, metalness=0.0,
                       clearcoat=0.4, clearcoat_roughness=0.2):
     """Leather PBR recipe (PART 31.3)."""
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2473,7 +2535,7 @@ def _stone_material(base_color="#888880", roughness=0.85, metalness=0.0,
                     clearcoat=0.1):
     """Stone/rock PBR recipe (PART 31.3)."""
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2486,7 +2548,7 @@ def _wood_material(base_color="#6a4020", roughness=0.7, metalness=0.0,
                    clearcoat=0.3, clearcoat_roughness=0.5):
     """Wood PBR recipe (PART 31.3)."""
     from js import THREE
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2500,7 +2562,7 @@ def _metal_material(base_color="#cfd2d6", roughness=0.2, metalness=1.0,
                     clearcoat=0.0):
     """Generic metal PBR recipe (PART 286)."""
     from js import THREE
-    mat = THREE.MeshStandardMaterial.new({
+    mat = _lbl_three_new("MeshStandardMaterial", {
         "color": _to_int(base_color),
         "roughness": float(roughness),
         "metalness": float(metalness),
@@ -2512,10 +2574,10 @@ def _emissive_material(base_color="#ffffff", emissive="#fffaec",
                         emissive_intensity=2.0):
     """Emissive light PBR recipe (PART 286)."""
     from js import THREE
-    mat = THREE.MeshStandardMaterial.new({
+    mat = _lbl_three_new("MeshStandardMaterial", {
         "color": _to_int(base_color),
     })
-    mat.emissive = THREE.Color.new(_to_int(emissive))
+    mat.emissive = _lbl_three_new("Color", _to_int(emissive))
     mat.emissiveIntensity = float(emissive_intensity)
     return mat
 
@@ -2608,7 +2670,7 @@ def _cs2_finish(base_color, finish="anodized", wear="FT",
     t = (w["float"] - 0.0) / 0.45
     t = max(0.0, min(1.0, t))
     t = wear_remap_min + (wear_remap_max - wear_remap_min) * t
-    mat = THREE.MeshPhysicalMaterial.new({
+    mat = _lbl_three_new("MeshPhysicalMaterial", {
         "color": _to_int(base_color),
         "roughness": float(f["roughness"]) * t,
         "metalness": float(f["metalness"]) * (2.0 - t),
@@ -3057,7 +3119,7 @@ def _lookdev_lights(mode="reference", shadow_map_size=2048):
         g.add(back)
     # Shadow catcher (transparent ground)
     ground_geo = THREE.PlaneGeometry.new(20, 20)
-    ground_mat = THREE.ShadowMaterial.new({"opacity": 0.30})
+    ground_mat = _lbl_three_new("ShadowMaterial", {"opacity": 0.30})
     ground = THREE.Mesh.new(ground_geo, ground_mat)
     ground.rotation.x = -math.pi / 2
     ground.position.y = -0.001
@@ -3842,7 +3904,7 @@ def _build_arch_palette():
     from js import THREE
     out = {}
     for k, v in ARCH_PALETTE.items():
-        mat = THREE.MeshStandardMaterial.new({
+        mat = _lbl_three_new("MeshStandardMaterial", {
             "color": _to_int(v["color"]),
             "roughness": v.get("roughness", 0.5),
             "metalness": v.get("metalness", 0.0),
@@ -4515,13 +4577,13 @@ class _LBLFacade:
         return _make_material(recipe, **opts)
     def physical(self, **opts):
         from js import THREE
-        return THREE.MeshPhysicalMaterial.new(opts)
+        return _lbl_three_new("MeshPhysicalMaterial", opts)
     def standard(self, **opts):
         from js import THREE
-        return THREE.MeshStandardMaterial.new(opts)
+        return _lbl_three_new("MeshStandardMaterial", opts)
     def basic(self, **opts):
         from js import THREE
-        return THREE.MeshBasicMaterial.new(opts)
+        return _lbl_three_new("MeshBasicMaterial", opts)
     def emissive(self, base="#ffffff", emissive="#fffaec", intensity=2.0):
         return _emissive_material(base, emissive, intensity)
     def chitin(self, **opts): return _chitin_material(**opts)
@@ -4585,7 +4647,7 @@ class _LBLFacade:
     def shadow_catcher(self):
         from js import THREE
         ground_geo = THREE.PlaneGeometry.new(20, 20)
-        ground_mat = THREE.ShadowMaterial.new({"opacity": 0.30})
+        ground_mat = _lbl_three_new("ShadowMaterial", {"opacity": 0.30})
         ground = THREE.Mesh.new(ground_geo, ground_mat)
         ground.rotation.x = -math.pi / 2
         ground.receiveShadow = True
@@ -6073,7 +6135,7 @@ def _attach_label(group, text, position=(0, 0, 0), color="#ffffff", size=0.1):
         from js import THREE
         geo = THREE.PlaneGeometry.new(1, 1)
         # Texture is not available in headless; just return a marker mesh
-        mat = THREE.MeshBasicMaterial.new({"color": color, "side": THREE.DoubleSide})
+        mat = _lbl_three_new("MeshBasicMaterial", {"color": color, "side": THREE.DoubleSide})
         m = THREE.Mesh.new(geo, mat)
         m.position.set(position[0], position[1], position[2])
         m.scale.set(float(size) * max(1, len(text)), float(size), 1)
@@ -6292,8 +6354,8 @@ def _outline_pass(group, mode="backface", thickness=0.02, color="#000000"):
             if "Mesh" in tn and hasattr(o, "geometry") and o.geometry is not None:
                 try:
                     mat = o.material
-                    color_obj = THREE.Color.new(str(color))
-                    outline_mat = THREE.MeshBasicMaterial.new({
+                    color_obj = _lbl_three_new("Color", str(color))
+                    outline_mat = _lbl_three_new("MeshBasicMaterial", {
                         "color": color_obj,
                         "side": THREE.BackSide,
                     })
@@ -6481,7 +6543,7 @@ def _decal(group, texture, position=(0, 0, 0), normal=(0, 0, 1), size=(1, 1, 1),
         mat4.setPosition(pos)
         size_v = THREE.Vector3.new(float(size[0]), float(size[1]), float(size[2]))
         decal_geo = DecalGeometry.new(target.geometry, pos, nrm, size_v)
-        decal_mat = THREE.MeshStandardMaterial.new({
+        decal_mat = _lbl_three_new("MeshStandardMaterial", {
             "map": texture if texture is not None else None,
             "transparent": True,
             "polygonOffset": True,
@@ -6527,7 +6589,7 @@ def _shader_material(vertex_shader, fragment_shader, uniforms=None):
                 norm[k] = v
             else:
                 norm[k] = {"value": v}
-        mat = THREE.ShaderMaterial.new({
+        mat = _lbl_three_new("ShaderMaterial", {
             "vertexShader": str(vertex_shader),
             "fragmentShader": str(fragment_shader),
             "uniforms": norm,
@@ -6610,8 +6672,8 @@ def _particle_system(spec):
             positions[i+1] += jitter_y * scale
             positions[i+2] += jitter_z * scale
         geo.setAttribute("position", THREE.Float32BufferAttribute.new(positions, 3))
-        mat = THREE.PointsMaterial.new({
-            "color": THREE.Color.new(spec["color"]),
+        mat = _lbl_three_new("PointsMaterial", {
+            "color": _lbl_three_new("Color", spec["color"]),
             "size": float(spec["size"]),
             "transparent": True,
             "opacity": 0.9,
@@ -6685,8 +6747,8 @@ def _trail(emitter, target, color="#ffffff", width=0.05, length=20, fade=0.92):
         for p in pts:
             flat.extend([p.x, p.y, p.z])
         geo.setAttribute("position", THREE.Float32BufferAttribute.new(flat, 3))
-        mat = THREE.LineBasicMaterial.new({
-            "color": THREE.Color.new(str(color)),
+        mat = _lbl_three_new("LineBasicMaterial", {
+            "color": _lbl_three_new("Color", str(color)),
             "transparent": True,
             "opacity": float(fade),
         })
@@ -6761,8 +6823,8 @@ def _instanced_grass(field, blade_count=1000, blade_geo=None, height=0.4, width=
             blade_geo = THREE.PlaneGeometry.new(float(width), float(height), 1, 3)
             # Translate so base is at y=0
             blade_geo.translate(0, float(height) * 0.5, 0)
-        mat = THREE.MeshLambertMaterial.new({
-            "color": THREE.Color.new(str(color)),
+        mat = _lbl_three_new("MeshLambertMaterial", {
+            "color": _lbl_three_new("Color", str(color)),
             "side": THREE.DoubleSide,
             "transparent": True,
             "alphaTest": 0.5,
@@ -6900,8 +6962,8 @@ def _lens_flare(emitter, light_position, color="#ffeecc", size=1.0, count=6):
         for i in range(int(count)):
             sz = float(size) * (0.5 + 0.5 * (i / max(1, int(count) - 1)))
             geo = THREE.PlaneGeometry.new(sz, sz)
-            mat = THREE.MeshBasicMaterial.new({
-                "color": THREE.Color.new(str(color)),
+            mat = _lbl_three_new("MeshBasicMaterial", {
+                "color": _lbl_three_new("Color", str(color)),
                 "transparent": True,
                 "opacity": 0.5 / (i + 1),
                 "blending": THREE.AdditiveBlending,
