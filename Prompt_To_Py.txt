@@ -406,7 +406,7 @@ full runtime-hooks / tick / inspector / GLB export pipeline kicks in.
       g.name = "My Model"
       box = THREE.Mesh.new(
           THREE.BoxGeometry.new(1, 1, 1),
-          THREE.MeshStandardMaterial.new({"color": "orange"}),
+          _lbl_three_new("MeshStandardMaterial", {"color": "orange"}),
       )
       g.add(box)
       g.userData.sculptRuntime = {
@@ -773,7 +773,7 @@ Example — a complete Three.js Direct factory (PART 212 expanded):
       from js import RoundedBoxGeometry
       body = THREE.Mesh.new(
           RoundedBoxGeometry.new(1.0, 0.5, 0.4, 4, 0.1),
-          THREE.MeshStandardMaterial.new({
+          _lbl_three_new("MeshStandardMaterial", {
               "color": 0xf5821b,
               "roughness": 0.45,
               "metalness": 0.05,
@@ -789,7 +789,7 @@ Example — a complete Three.js Direct factory (PART 212 expanded):
       for i, x in enumerate((-0.45, 0.45)):
           wheel = THREE.Mesh.new(
               THREE.CylinderGeometry.new(0.25, 0.25, 0.2, 16),
-              THREE.MeshStandardMaterial.new({"color": 0x222831}),
+              _lbl_three_new("MeshStandardMaterial", {"color": 0x222831}),
           )
           wheel.position.set(x, 0.25, 0)
           wheel.rotation.x = 1.5707963267948966  # 90deg → axis along Z
@@ -856,7 +856,7 @@ Style A (Blueprint-Return) — pass materials via `lbl.define_palette()`:
                  material="shell")  # references the "shell" palette entry
 
 Style B (Three.js Direct) — pass materials via Three.js constructors:
-  shell_mat = THREE.MeshStandardMaterial.new({
+  shell_mat = _lbl_three_new("MeshStandardMaterial", {
       "color": 0xf5821b,    # can be hex int, hex string, or named CSS color
       "roughness": 0.55,
       "metalness": 0.05,
@@ -1485,7 +1485,7 @@ Save as `tiny_motorcycle.py`:
       from js import RoundedBoxGeometry
       body = THREE.Mesh.new(
           RoundedBoxGeometry.new(1.2, 0.5, 0.4, 4, 0.08),
-          THREE.MeshStandardMaterial.new({
+          _lbl_three_new("MeshStandardMaterial", {
               "color": 0xf5821b,
               "roughness": 0.45,
               "metalness": 0.05,
@@ -1500,7 +1500,7 @@ Save as `tiny_motorcycle.py`:
       # Tank — half-sphere on top of the body
       tank = THREE.Mesh.new(
           THREE.SphereGeometry.new(0.28, 16, 12, 0, 6.283185307, 0, 1.570796327),
-          THREE.MeshStandardMaterial.new({
+          _lbl_three_new("MeshStandardMaterial", {
               "color": 0xdc6b0a, "roughness": 0.4,
           }),
       )
@@ -1514,7 +1514,7 @@ Save as `tiny_motorcycle.py`:
       for i, x in enumerate((-0.45, 0.45)):
           wheel = THREE.Mesh.new(
               THREE.CylinderGeometry.new(0.25, 0.25, 0.18, 16),
-              THREE.MeshStandardMaterial.new({"color": 0x222831}),
+              _lbl_three_new("MeshStandardMaterial", {"color": 0x222831}),
           )
           wheel.position.set(x, 0.25, 0)
           wheel.rotation.x = 1.5707963267948966
@@ -1878,6 +1878,87 @@ PART 213 — COMMON MISTAKES
   (lamp/screen/lava/magic/eyes) — if your part matches any of those,
   option (a) is the right fix; otherwise option (b).
 
+213.16 — `THREE.MeshStandardMaterial.new({color: ...})` silently returns WHITE
+  ❌ mat = THREE.MeshStandardMaterial.new({"color": "#3f7d3a"})
+         THREE.MeshBasicMaterial.new({"color": "#ff0000"})
+         THREE.Color.new("#ff0000")
+         THREE.ShaderMaterial.new({...})
+         THREE.PointsMaterial.new({...})
+         THREE.LineBasicMaterial.new({...})
+         # ANY single-config-object constructor invoked through `.new()`
+     → mat.color.getHexString() == "#ffffff" (default white)
+     → mesh renders white even though the call returned successfully
+     → NO error, NO warning — the bug is invisible
+  ✅ from js import window
+     import json as _json
+     mat = window.eval("new THREE.MeshStandardMaterial("
+                       + _json.dumps({"color": "#3f7d3a"}) + ")")
+     # or, with the v1.36 / v8.27 helper that lbl provides:
+     mat = lbl.material("shell", color="#3f7d3a")
+
+  Why: Pyodide 0.26 / 0.26.1 / 0.26.2's `THREE.X.new()` proxy silently
+  drops the parameter dict for any class that takes a single config
+  object — MeshStandardMaterial, MeshPhysicalMaterial, MeshBasicMaterial,
+  MeshLambertMaterial, ShadowMaterial, ShaderMaterial, PointsMaterial,
+  LineBasicMaterial, Color, ExtrudeGeometry(shape, options), etc.
+  The constructor returns a valid JS object, but with all properties
+  left at their defaults (typically white / black / opaque).
+
+  This is RELATED to but DIFFERENT from PART 213.14's animation-class
+  bug. PART 213.14's `.new()` proxy destroy crashes the script with a
+  loud error message; this one SILENTLY produces a wrong-coloured model.
+  Both bugs share the same fix (route through `window.eval("new
+  THREE.X(...)")`), but you may never notice this one unless you
+  sample the rendered colours.
+
+  Workaround (the only known fix in Pyodide 0.26.x):
+
+    from js import window
+    import json
+    def _new(cls, opts):
+        return window.eval("new THREE." + cls + "("
+                          + json.dumps(opts) + ")")
+    mat = _new("MeshStandardMaterial", {"color": "#3f7d3a",
+                                         "roughness": 0.85})
+
+  `json.dumps` produces valid JS object literals (true / false /
+  null / strings / numbers / arrays), so primitives and dicts pass
+  through cleanly. THREE.* enum constants (THREE.DoubleSide = 2,
+  THREE.FrontSide = 0, THREE.AdditiveBlending = 2, etc.) work too
+  because Pyodide exposes the underlying numeric value when
+  json.dumps reads the proxy. JS objects that can't be JSON-
+  serialised (THREE.Shape, THREE.Vector3, etc.) need to be stashed
+  on window and referenced by name — `lbl._lbl_three_new()` in the
+  v1.36 / v8.27 build handles this automatically.
+
+  Scope of the bug:
+    • AFFECTED:  MeshStandardMaterial, MeshPhysicalMaterial,
+                 MeshBasicMaterial, MeshLambertMaterial,
+                 ShadowMaterial, ShaderMaterial, PointsMaterial,
+                 LineBasicMaterial, Color, ExtrudeGeometry
+                 (single-config-object constructors)
+    • UNAFFECTED: BoxGeometry, CylinderGeometry, SphereGeometry,
+                  IcosahedronGeometry, ConeGeometry, TorusGeometry,
+                  CapsuleGeometry, PlaneGeometry, RingGeometry,
+                  CircleGeometry, LatheGeometry, TubeGeometry,
+                  CatmullRomCurve3, Vector2, Vector3, Vector4, Euler,
+                  Quaternion, Matrix4, Group(), Mesh(), etc.
+                  (positional-args constructors work fine through
+                  `.new()`)
+
+  History: Pyodide 0.25 and earlier worked correctly for both
+  animation and material constructors. The bug was introduced in
+  Pyodide 0.26. Pyodide 0.26.4 fixes some related proxy semantics
+  but the `.new()` parameter-drop on single-config-object
+  constructors is still present in the 0.26.x line. Once the
+  renderer is pinned to Pyodide >= 0.27 (TBD), this workaround can
+  likely be removed. Until then, ALL `.new()` calls in Style B
+  factories should follow the `window.eval` pattern, OR use the
+  helper shipped in the v1.36 / v8.27 `lbl` Python module
+  (`lbl.material(...)` for materials, `lbl.standard(...)` /
+  `lbl.physical(...)` / `lbl.basic(...)` for direct constructor
+  access, all of which internally use the window.eval workaround).
+
 ================================================================================
 PART 214 — PRE-OUTPUT CHECKLIST FOR AI AUTHORS
 ================================================================================
@@ -1895,6 +1976,14 @@ Catching issues here saves the user a debug cycle.
       `lbl.define_palette()` entry. No typos.
   [ ] For Style B, every `THREE.Xxx.new()` call uses the `.new()`
       idiom, not the parens-only form.
+  [ ] For Style B, NO single-config-object constructor is called via
+      `THREE.X.new({...})` (PART 213.16 — Pyodide 0.26.x silently drops
+      the parameter dict, leaving the material white). Either use
+      `window.eval("new THREE.<data>(<json>)")`, OR the `lbl.material(...)`
+      / `lbl.standard(...)` / `lbl.physical(...)` / `lbl.basic(...)`
+      facade in the v1.36 / v8.27 build, OR the internal
+      `_lbl_three_new(...)` helper. Geometries with positional args are
+      unaffected — keep using `THREE.BoxGeometry.new(w, h, d)`, etc.
   [ ] If using RoundedBoxGeometry, RectAreaLightUniformsLib, or
       TextGeometry, the `from js import Xxx` import is present.
   [ ] sculptRuntime is populated (PART 207) — at minimum nodes +
@@ -2442,7 +2531,7 @@ TS factories, but the helper names differ — they're mounted on
                                 (wheels, vases, table legs). `points`
                                 is a list of [x, y] control points.
 
-  3. EXTRUDE                 — THREE.ExtrudeGeometry.new(shape, opts)
+  3. EXTRUDE                 — _lbl_three_new("ExtrudeGeometry", shape, opts)
                                 For 2D shape → 3D (fairings, panels,
                                 shields). Define a THREE.Shape with
                                 optional holes via `.holes`.
@@ -2539,7 +2628,7 @@ Python factories have the same 5 material techniques as TS:
               geom, size=256,
               curvatureMode="ridge", curvatureStrength=0.6,
           )
-          mat = THREE.MeshStandardMaterial.new({
+          mat = _lbl_three_new("MeshStandardMaterial", {
               "color": base_color,
               "roughness": 0.45,
               "metalness": 0.85,
@@ -2880,7 +2969,7 @@ PART 252 — PYTHON FORM: STRICT STYLE LOCK ENFORCEMENT
   from js import THREE
 
   def make_chunky_material(color_hex, roughness=0.7, metalness=0.1):
-      return THREE.MeshStandardMaterial.new({
+      return _lbl_three_new("MeshStandardMaterial", {
           "color": color_hex,
           "roughness": roughness,
           "metalness": metalness,
@@ -3156,7 +3245,7 @@ The 5 fairing techniques from PART 170, with Python forms:
                             shape.lineTo(1.0, 0.3)
                             shape.lineTo(0, 0.3)
                             shape.closePath()
-                            geo = THREE.ExtrudeGeometry.new(shape, {"depth": 0.1})
+                            geo = _lbl_three_new("ExtrudeGeometry", shape, {"depth": 0.1})
 
   2. BEZIER             Cubic Bezier in 2D. The shape.holes
                         property takes THREE.Path objects.
@@ -3166,7 +3255,7 @@ The 5 fairing techniques from PART 170, with Python forms:
                             path.moveTo(0.1, 0.1)
                             path.bezierCurveTo(0.3, 0.5, 0.7, 0.5, 0.9, 0.1)
                             shape.holes.push(path)
-                            geo = THREE.ExtrudeGeometry.new(shape, opts)
+                            geo = _lbl_three_new("ExtrudeGeometry", shape, opts)
 
   3. LATHE              For rotationally symmetric parts (wheel
                         hubs, headlight bezels, exhaust tips):
@@ -3232,7 +3321,7 @@ detail. The Python helper:
           return tex
 
   Apply to a material:
-      mat = THREE.MeshStandardMaterial.new({
+      mat = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xf5821b,
           "roughness": 0.55,
           "roughnessMap": make_micro_roughness_texture(seed=42),
@@ -4267,7 +4356,7 @@ PART 284 — MT.materials (6 MATERIAL/UV HELPERS, PYTHON FORM)
             tex = MT_materials.proceduralTextureCanvas({
                 "type": "noise", "seed": 7, "scale": 8,
             }, {"size": 256})
-            return THREE.MeshStandardMaterial.new({
+            return _lbl_three_new("MeshStandardMaterial", {
                 "color": 0x8a6a4a,
                 "roughness": 0.5,
                 "metalness": 0.85,
@@ -4372,7 +4461,7 @@ PART 286 — PART 74 PBR CREATURE RECIPES (PYTHON FORM)
             tex = MT_materials.proceduralTextureCanvas({
                 "type": "voronoi", "scale": 16, "seed": 1,
             }, {"size": 512})
-            return THREE.MeshPhysicalMaterial.new({
+            return _lbl_three_new("MeshPhysicalMaterial", {
                 "color": base_color,
                 "roughness": 0.35,
                 "metalness": 0.2,
@@ -4389,7 +4478,7 @@ PART 286 — PART 74 PBR CREATURE RECIPES (PYTHON FORM)
             tex = MT_materials.proceduralTextureCanvas({
                 "type": "voronoi", "scale": 32, "seed": 7,
             }, {"size": 1024})
-            return THREE.MeshPhysicalMaterial.new({
+            return _lbl_three_new("MeshPhysicalMaterial", {
                 "color": base_color,
                 "roughness": 0.2,
                 "metalness": 0.3,
@@ -4417,7 +4506,7 @@ PART 286 — PART 74 PBR CREATURE RECIPES (PYTHON FORM)
                            128 + math.sin(i * math.pi / 4) * 100)
                 ctx.stroke()
             tex = THREE.CanvasTexture.new(tex_canvas)
-            return THREE.MeshPhysicalMaterial.new({
+            return _lbl_three_new("MeshPhysicalMaterial", {
                 "color": base_color,
                 "roughness": 0.7,
                 "metalness": 0.0,
@@ -4433,7 +4522,7 @@ PART 286 — PART 74 PBR CREATURE RECIPES (PYTHON FORM)
   4. VELVET (sheen surface)
         from js import THREE
         def make_velvet(base_color=[0.4, 0.05, 0.15]):
-            return THREE.MeshPhysicalMaterial.new({
+            return _lbl_three_new("MeshPhysicalMaterial", {
                 "color": base_color,
                 "roughness": 0.95,
                 "metalness": 0.0,
@@ -4666,7 +4755,7 @@ PART 290 — PART 28 ADVANCED SHADER & VFX TECHNIQUES (PYTHON FORM)
 
   1. CUSTOM SHADER MATERIAL
         from js import THREE
-        mat = THREE.ShaderMaterial.new({
+        mat = _lbl_three_new("ShaderMaterial", {
             "vertexShader": """
                 varying vec3 vPos;
                 void main() {
@@ -4864,7 +4953,7 @@ PART 293 — PART 31 CHARACTER / MASCOT SCULPT ENRICHMENT (PYTHON FORM)
       from js import MT_materials
       normal_map = MT_materials.bakeMap(base_geom, "normal", {"size": 1024})
       ao_map = MT_materials.bakeMap(base_geom, "ao", {"size": 1024})
-      mat = THREE.MeshStandardMaterial.new({
+      mat = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xf5821b,
           "roughness": 0.55,
           "metalness": 0.1,
@@ -5251,7 +5340,7 @@ PART 300 — 4 PBR CREATURE RECIPES (PYTHON FORM)
            tex = MT_materials.proceduralTextureCanvas({
                "type": "voronoi", "scale": 16, "seed": 1,
            }, {"size": 512})
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(base_color),
                "roughness": 0.35,
                "metalness": 0.2,
@@ -5269,7 +5358,7 @@ PART 300 — 4 PBR CREATURE RECIPES (PYTHON FORM)
            tex = MT_materials.proceduralTextureCanvas({
                "type": "voronoi", "scale": 32, "seed": 7,
            }, {"size": 1024})
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(base_color),
                "roughness": 0.2,
                "metalness": 0.3,
@@ -5311,7 +5400,7 @@ PART 300 — 4 PBR CREATURE RECIPES (PYTHON FORM)
                    ctx.stroke()
            tex = THREE.CanvasTexture.new(tex_canvas)
            tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(base_color),
                "roughness": 0.7,
                "metalness": 0.0,
@@ -5326,7 +5415,7 @@ PART 300 — 4 PBR CREATURE RECIPES (PYTHON FORM)
 
   4. VELVET (sheen surface)
        def make_velvet(base_color=(0.4, 0.05, 0.15)):
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(base_color),
                "roughness": 0.95,
                "metalness": 0.0,
@@ -5424,7 +5513,7 @@ PART 303 — 5 BASELINE PBR PRESETS (PYTHON FORM)
   1. MATTE PLASTIC
        from js import THREE
        def make_matte_plastic(color=(0.5, 0.5, 0.5)):
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": list(color),
                "roughness": 0.7,
                "metalness": 0.05,
@@ -5433,7 +5522,7 @@ PART 303 — 5 BASELINE PBR PRESETS (PYTHON FORM)
 
   2. GLOSSY PLASTIC
        def make_glossy_plastic(color=(0.2, 0.2, 0.2)):
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": list(color),
                "roughness": 0.3,
                "metalness": 0.0,
@@ -5447,7 +5536,7 @@ PART 303 — 5 BASELINE PBR PRESETS (PYTHON FORM)
            tex = MT_materials.proceduralTextureCanvas({
                "type": "stripe", "scale": 64, "angle": 0.1,
            }, {"size": 512})
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": list(color),
                "roughness": 0.4,
                "metalness": 0.9,
@@ -5457,7 +5546,7 @@ PART 303 — 5 BASELINE PBR PRESETS (PYTHON FORM)
 
   4. CHROME
        def make_chrome():
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": 0xeeeeee,
                "roughness": 0.05,
                "metalness": 1.0,
@@ -5467,7 +5556,7 @@ PART 303 — 5 BASELINE PBR PRESETS (PYTHON FORM)
 
   5. ANODIZED METAL
        def make_anodized_metal(color=(0.6, 0.2, 0.1)):
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(color),
                "roughness": 0.4,
                "metalness": 0.95,
@@ -5486,13 +5575,13 @@ PART 304 — 3 CHARACTER PBR PRESETS (PYTHON FORM)
        def make_eye_materials(pupil_color=(0, 0, 0),
                               sclera_color=(1, 1, 1),
                               glow_color=(0.4, 0.8, 1.0)):
-           sclera = THREE.MeshStandardMaterial.new({
+           sclera = _lbl_three_new("MeshStandardMaterial", {
                "color": list(sclera_color), "roughness": 0.2,
            })
-           pupil = THREE.MeshStandardMaterial.new({
+           pupil = _lbl_three_new("MeshStandardMaterial", {
                "color": list(pupil_color), "roughness": 0.1,
            })
-           glow = THREE.MeshStandardMaterial.new({
+           glow = _lbl_three_new("MeshStandardMaterial", {
                "color": list(glow_color),
                "emissive": list(glow_color),
                "emissiveIntensity": 2.0,
@@ -5505,7 +5594,7 @@ PART 304 — 3 CHARACTER PBR PRESETS (PYTHON FORM)
            hair_strands = MT_organic.hairStrands(skull_mesh, {
                "count": 2000, "segments": 8, "length": 0.05,
            })
-           mat = THREE.MeshPhysicalMaterial.new({
+           mat = _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(base_color),
                "roughness": 0.7,
                "metalness": 0.0,
@@ -5517,7 +5606,7 @@ PART 304 — 3 CHARACTER PBR PRESETS (PYTHON FORM)
 
   8. SKIN (subsurface scattering)
        def make_skin(base_color=(0.95, 0.78, 0.66)):
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(base_color),
                "roughness": 0.5,
                "metalness": 0.0,
@@ -5537,7 +5626,7 @@ PART 305 — 2 SPECIALTY PBR PRESETS (PYTHON FORM)
 
   9. GLASS (transmission + clearcoat)
        def make_glass(color=(0.9, 0.95, 1.0), tint=(0.85, 0.95, 1.0)):
-           return THREE.MeshPhysicalMaterial.new({
+           return _lbl_three_new("MeshPhysicalMaterial", {
                "color": list(color),
                "roughness": 0.05,
                "metalness": 0.0,
@@ -5555,7 +5644,7 @@ PART 305 — 2 SPECIALTY PBR PRESETS (PYTHON FORM)
 
   10. EMISSIVE GLOW (lamp / screen / lava)
        def make_glow(color=(1.0, 0.7, 0.3), intensity=2.0):
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": list(color),
                "emissive": list(color),
                "emissiveIntensity": intensity,
@@ -5592,7 +5681,7 @@ PART 307 — 2 ENVIRONMENT PBR PRESETS (PYTHON FORM)
                "type": "noise", "octaves": 5, "seed": 1,
            }, {"size": 512})
            ao = MT_materials.bakeMap(geom, "ao", {"size": 512})
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": list(base_color),
                "roughness": 0.95,
                "metalness": 0.0,
@@ -5607,7 +5696,7 @@ PART 307 — 2 ENVIRONMENT PBR PRESETS (PYTHON FORM)
            tex = MT_materials.proceduralTextureCanvas({
                "type": "wood", "seed": 1, "scale": 8,
            }, {"size": 512})
-           return THREE.MeshStandardMaterial.new({
+           return _lbl_three_new("MeshStandardMaterial", {
                "color": list(base_color),
                "roughness": 0.8,
                "metalness": 0.0,
@@ -5795,18 +5884,18 @@ PART 311 — MATERIAL & TEXTURE MISTAKES (PYTHON FORM)
         # Or use a less-saturated color.
 
   311.2 — TRANSPARENT MATERIAL WITHOUT `transparent: True`
-        ❌ mat = THREE.MeshStandardMaterial.new({
+        ❌ mat = _lbl_three_new("MeshStandardMaterial", {
                "color": 0xffffff,
                "opacity": 0.5,  # ignored without transparent!
            })
-        ✅ mat = THREE.MeshStandardMaterial.new({
+        ✅ mat = _lbl_three_new("MeshStandardMaterial", {
                "color": 0xffffff,
                "transparent": True,
                "opacity": 0.5,
            })
 
   311.3 — METALLIC MATERIAL WITHOUT PMREM/HDRI
-        ❌ mat = THREE.MeshStandardMaterial.new({
+        ❌ mat = _lbl_three_new("MeshStandardMaterial", {
                "color": 0xcccccc,
                "metalness": 0.9,  # looks like flat plastic!
            })
@@ -6070,15 +6159,15 @@ PART 316 — CHUNKY ROBOT (CHUNKY-MASCOT)
       g.name = "Chunky Robot"
 
       # Palette
-      shell_mat = THREE.MeshStandardMaterial.new({
+      shell_mat = _lbl_three_new("MeshStandardMaterial", {
           "color": 0x5a7fb8, "roughness": 0.7, "metalness": 0.1,
           "flatShading": True,  # PART 252
       })
-      accent_mat = THREE.MeshStandardMaterial.new({
+      accent_mat = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xf5821b, "roughness": 0.5, "metalness": 0.1,
           "flatShading": True,
       })
-      eye_mat = THREE.MeshStandardMaterial.new({
+      eye_mat = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xffffff, "roughness": 0.2,
           "emissive": 0xaef5ff, "emissiveIntensity": 1.5,
           "flatShading": True,
@@ -6203,13 +6292,13 @@ PART 317 — ORGANIC CREATURE (CHITIN)
       g.name = "Iridescent Beetle"
 
       # Materials — chitin recipe from PART 286
-      chitin = THREE.MeshPhysicalMaterial.new({
+      chitin = _lbl_three_new("MeshPhysicalMaterial", {
           "color": 0x261a0f, "roughness": 0.35, "metalness": 0.2,
           "iridescence": 1.0, "iridescenceIOR": 1.3,
           "iridescenceThicknessRange": [200, 800],
           "clearcoat": 0.6, "clearcoatRoughness": 0.1,
       })
-      wing = THREE.MeshPhysicalMaterial.new({
+      wing = _lbl_three_new("MeshPhysicalMaterial", {
           "color": 0x0a2540, "roughness": 0.2, "metalness": 0.3,
           "iridescence": 1.0, "iridescenceIOR": 1.5,
           "iridescenceThicknessRange": [300, 1000],
@@ -6318,10 +6407,10 @@ PART 318 — CHUNKY CHARACTER WITH RIG (WALK CYCLE)
       g.name = "Walking Character"
 
       # Materials
-      skin = THREE.MeshStandardMaterial.new({
+      skin = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xf2a07b, "roughness": 0.6, "metalness": 0.0,
       })
-      cloth = THREE.MeshStandardMaterial.new({
+      cloth = _lbl_three_new("MeshStandardMaterial", {
           "color": 0x4a6fa5, "roughness": 0.7, "metalness": 0.0,
       })
 
@@ -6431,14 +6520,14 @@ PART 319 — CHUNKY VEHICLE (FORM-PRESERVED)
       g.name = "Chunky Sedan"
 
       # Palette
-      paint = THREE.MeshStandardMaterial.new({
+      paint = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xcc4444, "roughness": 0.4, "metalness": 0.3,
           "clearcoat": 0.7, "clearcoatRoughness": 0.1,
       })
-      tire = THREE.MeshStandardMaterial.new({
+      tire = _lbl_three_new("MeshStandardMaterial", {
           "color": 0x1a1a1e, "roughness": 0.95, "metalness": 0.0,
       })
-      glass = THREE.MeshPhysicalMaterial.new({
+      glass = _lbl_three_new("MeshPhysicalMaterial", {
           "color": 0x90c0e0, "transmission": 0.85, "thickness": 0.05,
           "roughness": 0.05, "transparent": True, "opacity": 0.5,
       })
@@ -6451,7 +6540,7 @@ PART 319 — CHUNKY VEHICLE (FORM-PRESERVED)
       body_shape.lineTo(-0.7, 0.5)
       body_shape.bezierCurveTo(-1.0, 0.5, -1.05, 0.2, -1.0, 0)
       body_shape.closePath()
-      body_geo = THREE.ExtrudeGeometry.new(body_shape, {
+      body_geo = _lbl_three_new("ExtrudeGeometry", body_shape, {
           "depth": 0.8, "bevelEnabled": True,
           "bevelSize": 0.04, "bevelThickness": 0.04, "bevelSegments": 4,
       })
@@ -6470,7 +6559,7 @@ PART 319 — CHUNKY VEHICLE (FORM-PRESERVED)
       cabin_shape.lineTo(-0.5, 0.3)
       cabin_shape.bezierCurveTo(-0.65, 0.25, -0.65, 0.1, -0.55, 0)
       cabin_shape.closePath()
-      cabin_geo = THREE.ExtrudeGeometry.new(cabin_shape, {
+      cabin_geo = _lbl_three_new("ExtrudeGeometry", cabin_shape, {
           "depth": 0.7, "bevelEnabled": True,
           "bevelSize": 0.03, "bevelThickness": 0.03, "bevelSegments": 3,
       })
@@ -6496,7 +6585,7 @@ PART 319 — CHUNKY VEHICLE (FORM-PRESERVED)
       hole.lineTo(-0.42, 0.22)
       hole.bezierCurveTo(-0.48, 0.18, -0.48, 0.06, -0.45, 0.02)
       window_shape.holes.push(hole)
-      window_geo = THREE.ExtrudeGeometry.new(window_shape, {
+      window_geo = _lbl_three_new("ExtrudeGeometry", window_shape, {
           "depth": 0.72, "bevelEnabled": False,
       })
       windows = THREE.Mesh.new(window_geo, glass)
@@ -6521,7 +6610,7 @@ PART 319 — CHUNKY VEHICLE (FORM-PRESERVED)
       for i, x in enumerate((-0.9, 0.9)):
           headlight = THREE.Mesh.new(
               THREE.SphereGeometry.new(0.08, 12, 8),
-              THREE.MeshStandardMaterial.new({
+              _lbl_three_new("MeshStandardMaterial", {
                   "color": 0xffeecc,
                   "emissive": 0xffd66b, "emissiveIntensity": 2.0,
               }),
@@ -6577,10 +6666,10 @@ PART 320 — BUILDING (4-WALL HOUSE)
 
       # Materials from the architectural palette
       palette = MT_architectural.materialPalette()
-      wall_face = THREE.MeshStandardMaterial.new(palette["wall_face"])
-      roof_tile = THREE.MeshStandardMaterial.new(palette["roof_tile"])
-      door = THREE.MeshStandardMaterial.new(palette["door"])
-      window_glass = THREE.MeshPhysicalMaterial.new(palette["window_glass"])
+      wall_face = _lbl_three_new("MeshStandardMaterial", palette["wall_face"])
+      roof_tile = _lbl_three_new("MeshStandardMaterial", palette["roof_tile"])
+      door = _lbl_three_new("MeshStandardMaterial", palette["door"])
+      window_glass = _lbl_three_new("MeshPhysicalMaterial", palette["window_glass"])
 
       # 4 walls
       for i, side in enumerate(("N", "E", "S", "W")):
@@ -6682,10 +6771,10 @@ PART 321 — ENVIRONMENT (TREE + GROUND)
       g.name = "Chunky Tree"
 
       # Materials
-      bark = THREE.MeshStandardMaterial.new({
+      bark = _lbl_three_new("MeshStandardMaterial", {
           "color": 0x5a3a1a, "roughness": 0.95, "metalness": 0.0,
       })
-      leaf = THREE.MeshStandardMaterial.new({
+      leaf = _lbl_three_new("MeshStandardMaterial", {
           "color": 0x3a8a3a, "roughness": 0.7, "metalness": 0.0,
       })
 
@@ -6750,10 +6839,10 @@ PART 322 — DENSE CITYSCAPE (INSTANCED BUILDINGS)
       city.name = "Chunky City"
 
       # Materials
-      concrete = THREE.MeshStandardMaterial.new({
+      concrete = _lbl_three_new("MeshStandardMaterial", {
           "color": 0xa0a0a0, "roughness": 0.95, "metalness": 0.0,
       })
-      glass = THREE.MeshStandardMaterial.new({
+      glass = _lbl_three_new("MeshStandardMaterial", {
           "color": 0x6090b0, "roughness": 0.1, "metalness": 0.6,
           "transparent": True, "opacity": 0.6,
       })
@@ -7031,7 +7120,7 @@ PART 327 — 7 PRODUCTION TECHNIQUES (PYTHON FORM)
        canvas = document.createElement("canvas")
        # ... draw decal ...
        decal_tex = THREE.CanvasTexture.new(canvas)
-       mat = THREE.MeshStandardMaterial.new({
+       mat = _lbl_three_new("MeshStandardMaterial", {
            "color": 0xffffff, "map": decal_tex, "transparent": True,
        })
 
