@@ -1,6 +1,10 @@
 /* eslint-disable */
 // Auto-generated from public/modeling/lbl_py.py — DO NOT EDIT
 // Build with: python3 build_inlined.py
+//
+// v2.0.4 — trailing singleton install is now KEPT (was stripped in
+// v2.0.0..v2.0.3, which broke `import lbl` and direct `lbl.foo`
+// calls). See build_inlined.py header for the full post-mortem.
 
 const LBL_PY_HELPER_SRC = `
 """
@@ -7005,5 +7009,12 @@ def _bind_section_23_facade(lbl_instance):
     return lbl_instance
 
 
+# Singleton — the \`lbl\` module instance
+lbl = _LBLFacade()
+sys.modules['lbl'] = lbl
+
+# Bind SECTION 23 methods to the singleton now that it exists
+lbl = _bind_section_23_facade(lbl)
+sys.modules['lbl'] = lbl
 
 `;
